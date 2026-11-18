@@ -50,22 +50,29 @@ PYTHONPATH=integrations/cayleypy_native python -m unittest discover \
 
 ## Experimental packet scoring
 
-After rebuilding the bridge, Python callers may explicitly select
+When the matching `_beam_runtime` extension is installed, public `TQPScorer`
+uses its Rust-owned scorer library and context. The Rust loop calls the existing
+scalar scorer ABI in chunks of exactly `min(inference_batch, max_packet_rows)`,
+in the same order as the former Python loop. Coverage and finite-score checks
+remain the same. The Python implementation remains available as a compatibility
+fallback when the matching extension is absent.
+
+After rebuilding the bridge, callers may still explicitly select
 `TQPScorer(..., experimental_native_batch=True)`. This sends one complete packet
 through the optional `mgbs_tqp_score_many` C ABI; the existing scorer still
 evaluates it in sub-packets no larger than `inference_batch`. Without that
-symbol, explicit selection fails before the checkpoint is opened. The ordinary
-per-sub-packet ABI remains the default. Coverage and finite-score checks are
-unchanged. Set `MGBS_TQP_BATCH_TEST=1` to run the optional comparison tests.
+symbol, explicit selection fails before the checkpoint is opened. This option
+remains off by default. Set `MGBS_TQP_BATCH_TEST=1` to run the optional
+comparison tests.
 
-The input, scores and coverage buffers are borrowed, contiguous, disjoint
-CUDA allocations in the scorer's process and device. The caller must keep them
-alive until submitted work finishes and must pass their actual available byte
-lengths. The ABI checks declared lengths and offset arithmetic before scoring;
-it does not prove allocation bounds, device identity, or non-overlap. The Python
-adapter owns separate output and coverage tensors and checks its input tensor;
-its existing `rows.contiguous()` can copy a non-contiguous input. The new ABI
-does not add a packet copy or change the model's numerical policy.
+The input, scores and coverage buffers are borrowed, contiguous, disjoint CUDA
+allocations in the scorer's process and device. The Rust/PyO3 adapter keeps the
+PyTorch objects alive across the call and validates dtype, shape, device,
+contiguity, disjoint ranges and byte extents before entering native-sys. The
+native ABI also checks declared lengths and pointer-offset arithmetic; it cannot
+discover allocation bounds or device identity on its own. `rows.contiguous()`
+retains its existing behavior and may copy a non-contiguous input. Moving the
+chunk loop does not add a packet copy or change model numerics.
 
 On a small GL(4,2) checkpoint fixture the paired complete-search timings did
 not meet the promotion threshold; this is not a saturated inference benchmark.

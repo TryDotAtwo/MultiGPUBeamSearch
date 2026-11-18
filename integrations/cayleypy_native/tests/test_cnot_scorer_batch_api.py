@@ -19,6 +19,6 @@ def test_experimental_native_batch_rejects_an_old_scorer_before_open(monkeypatch
     manifest.write_text("{}", encoding="utf-8")
 
     with pytest.raises(RuntimeError, match="batch scorer ABI"):
-        cnot_scorer.TQPScorer("old-library", manifest, n=4, device="cuda:0",
-                              experimental_native_batch=True)
+        cnot_scorer._PythonTQPScorer("old-library", manifest, n=4, device="cuda:0",
+                                     experimental_native_batch=True)
     assert not opened

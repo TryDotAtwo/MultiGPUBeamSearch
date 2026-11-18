@@ -1,6 +1,7 @@
 """CUDA scorer backed by the restored 102-input TheQuantumProject field."""
 
 import ctypes as C
+import importlib
 import json
 from pathlib import Path
 import threading
@@ -34,6 +35,13 @@ def _load_api(path):
 
 class TQPScorer:
     """One restored field on one rank. Inputs are valid packed GL(n,2) states."""
+
+    def __new__(cls, *args, **kwargs):
+        if cls is TQPScorer:
+            native = _rust_tqp_scorer()
+            if native is not None:
+                return native(*args, **kwargs)
+        return super().__new__(cls)
 
     def __init__(self, library, manifest, *, n, device, inference_batch=4,
                  experimental_native_batch=False):
@@ -148,3 +156,18 @@ class TQPScorer:
                     raise RuntimeError(f"CNOT row {row}: feature {feature} rejected (status {value})")
                 raise RuntimeError(f"CNOT row {row}: nonfinite model score")
             return output
+
+
+class _PythonTQPScorer(TQPScorer):
+    """Reference compatibility adapter for older Rust extensions and tests."""
+
+
+def _rust_tqp_scorer():
+    module_name = f"{__package__}._beam_runtime"
+    try:
+        module = importlib.import_module(module_name)
+    except ModuleNotFoundError as error:
+        if error.name == module_name:
+            return None
+        raise
+    return getattr(module, "TQPScorer", None)

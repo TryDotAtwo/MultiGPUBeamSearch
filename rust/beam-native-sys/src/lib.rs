@@ -3,6 +3,7 @@ use libloading::Library;
 #[cfg(feature = "python")]
 pub mod cnot_device_bridge;
 pub mod cnot_domain;
+pub mod cnot_tqp_scorer;
 pub mod cnot_stream5;
 pub mod history;
 use std::{

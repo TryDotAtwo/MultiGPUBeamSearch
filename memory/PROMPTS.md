@@ -59,3 +59,5 @@ Keep an active goal until the migration and required verification are complete.
 
 
 2026-11-17 follow-up: Windows may contain repository source and small source-controlled instructions only. Run builds and checks remotely through GitHub Actions and the already-owned Vast instance. Do not create local datasets, weights, checkpoints, logs, result archives, dependencies, binaries or build outputs; preserve full logs/results remotely in test_results/ and Actions artifacts, leaving only small verification notes in the checkout. Check instance status before access; do not start, stop or rent compute without a user-set budget. Keep Python compatibility and the multi-GPU architecture; continue Rust + CUDA/C++ migration without optimization.
+
+2026-11-18 follow-up: Ivan confirmed use of the existing `VAST_API_KEY` as the GitHub Actions repository secret. A working status workflow already verifies that the secret is available; do not print or copy its value into source or logs.

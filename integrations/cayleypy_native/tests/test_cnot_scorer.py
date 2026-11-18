@@ -5,7 +5,7 @@ import os
 from pathlib import Path
 import unittest
 
-from multigpubeamsearch.cnot_scorer import TQPScorer
+from multigpubeamsearch.cnot_scorer import TQPScorer, _PythonTQPScorer
 
 
 LIBRARY = os.environ.get("MGBS_TQP_LIBRARY")
@@ -63,7 +63,7 @@ class CheckpointScorerTest(unittest.TestCase):
     def test_native_batch_matches_existing_chunked_checkpoint_scorer(self):
         t = self.torch
         kwargs = dict(n=4, device=self.device, inference_batch=2)
-        with TQPScorer(LIBRARY, MANIFEST, **kwargs) as reference, TQPScorer(
+        with _PythonTQPScorer(LIBRARY, MANIFEST, **kwargs) as reference, TQPScorer(
                 LIBRARY, MANIFEST, experimental_native_batch=True, **kwargs) as actual:
             base = self.packed([[1, 2, 7, 8], [1, 2, 7, 8],
                                 [1, 2, 4, 14], [1, 2, 7, 8]] * 5)
@@ -90,20 +90,20 @@ class CheckpointScorerTest(unittest.TestCase):
             for position, name in enumerate(("rows", "output", "votes")):
                 available = sizes.copy()
                 available[position] -= 1
-                code = actual._api.mgbs_tqp_score_many(
-                    actual._handle, 2, 2, 2, pointers[0], available[0],
+                code = reference._api.mgbs_tqp_score_many(
+                    reference._handle, 2, 2, 2, pointers[0], available[0],
                     pointers[1], available[1], pointers[2], available[2])
                 self.assertNotEqual(code, 0)
-                message = str(actual._native_error())
+                message = str(reference._native_error())
                 self.assertIn(name, message)
                 self.assertIn(f"required={sizes[position]}", message)
                 self.assertIn(f"available={available[position]}", message)
-            code = actual._api.mgbs_tqp_score_many(actual._handle, 2, 0, 2, None, 0, None, 0, None, 0)
+            code = reference._api.mgbs_tqp_score_many(reference._handle, 2, 0, 2, None, 0, None, 0, None, 0)
             self.assertEqual(code, 0)
             for head, batch, limit in ((3, 2, 2), (2, -1, 2), (2, 2, 0),
                                        (2, 2**63 - 1, 2)):
-                code = actual._api.mgbs_tqp_score_many(
-                    actual._handle, head, batch, limit, pointers[0], sizes[0],
+                code = reference._api.mgbs_tqp_score_many(
+                    reference._handle, head, batch, limit, pointers[0], sizes[0],
                     pointers[1], sizes[1], pointers[2], sizes[2])
                 self.assertNotEqual(code, 0)
 

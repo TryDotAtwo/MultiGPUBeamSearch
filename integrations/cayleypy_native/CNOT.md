@@ -92,11 +92,19 @@ failure-only `all_gather_object` diagnostic remain on the caller's default
 process group. This transfers collective dispatch, not the full CNOT search or
 checkpoint scorer.
 
-Python callers can separately construct `TQPScorer` with
-`experimental_native_batch=True` to submit one borrowed score packet per call
-to a newly built scorer library. Its internal inference sub-packets and checks
-are unchanged. This option remains off by default; it does not migrate the
-search loop to Rust. Its buffer contract and validation limits are described in
+With the matching PyO3 extension, public `TQPScorer` uses a Rust-owned
+scorer-library/context handle. Rust performs the existing `inference_batch`
+scalar-ABI calls in the same order and validates the same coverage and finite
+scores. The Python scorer remains the fallback for older or absent extensions.
+PyTorch still owns the row, score and status tensors; native-sys checks their
+dtype, device, shape, contiguity and disjoint ranges before borrowing addresses.
+This transfers scorer control and lifetime ownership without changing model
+kernels, output order, precision or search decisions.
+
+`experimental_native_batch=True` remains opt-in. It submits one borrowed packet
+through `mgbs_tqp_score_many`, which retains the same inference sub-packet size.
+Without that symbol, explicit selection fails before the checkpoint is opened.
+The buffer contract and validation limits are described in
 `integrations/cnot_scorer/README.md`.
 
 ## Data movement and limits

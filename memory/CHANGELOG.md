@@ -1789,3 +1789,19 @@ Preserved 26 checkouts and their source/index overlays; verified restoration of 
   it skipped the CUDA build and two-rank NCCL test without changing instance
   state. Physical multi-GPU acceptance remains pending. See
   `test_results/refactor_20261118/cnot-control-collectives/GITHUB_STATUS.md`.
+
+## 2026-11-18 - Rust-owned CNOT scorer control
+
+- Added a thread-bound scorer owner in `beam-native-sys` and a PyO3
+  `TQPScorer` adapter. The Rust path owns the dynamic library/context lifetime
+  and the existing scalar-ABI chunk loop. It keeps the same
+  `min(inference_batch, max_packet_rows)` subpacket partition and call order;
+  the experimental `mgbs_tqp_score_many` path remains opt-in.
+- PyTorch remains the owner of CUDA buffers. The native boundary checks tensor
+  type, dtype, device, shape, contiguity, byte extents, and buffer overlap
+  before borrowing device addresses. Python API and a reference fallback are
+  retained for older or absent extensions.
+- Hosted red/green CPU validation is pending. CUDA checkpoint scoring and
+  physical multi-GPU acceptance remain unverified while the existing Vast
+  instance is stopped. This change does not alter search decisions or model
+  numerics.

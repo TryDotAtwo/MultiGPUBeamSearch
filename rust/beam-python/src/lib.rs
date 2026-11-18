@@ -8,6 +8,7 @@ mod cnot_native_exchange;
 mod cnot_native_goal;
 mod cnot_native_selection;
 mod cnot_native_stages;
+mod cnot_tqp_scorer;
 mod cnot_stream5;
 mod configuration;
 mod inference;
@@ -133,6 +134,7 @@ fn _beam_runtime(module: &Bound<'_, PyModule>) -> PyResult<()> {
     cnot_native_goal::register(module)?;
     cnot_native_selection::register(module)?;
     cnot_native_stages::register(module)?;
+    cnot_tqp_scorer::register(module)?;
     cnot_stream5::register(module)?;
     cluster::register(module)?;
     probes::register(module)?;
