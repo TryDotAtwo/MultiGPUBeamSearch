@@ -130,11 +130,13 @@ For matching PyO3 extensions, CNOT input admission now runs through the Rust
 controls, asks PyTorch for an independent contiguous snapshot, derives the
 little-endian bytes from that snapshot, and constructs the owned
 `beam_core::cnot::CnotMatrix` before returning. PyTorch continues to own the
-tensor allocation; beam-core owns the validated matrix words. The Python API
-uses the existing path with older extensions, and explicit Python validation
-still selects the reference checks. This moves validation and snapshot
-coordination only; it does not change search steps, matrix semantics, scorer
-callbacks, or multi-rank collectives.
+tensor allocation; beam-core owns the validated matrix words. The extension
+returns an immutable typed `CnotSearchInput` holding that matrix and references
+to the snapshot and byte object. The Python API passes it through without
+rebuilding a Python `_InputMatrix`. Older extensions that return the original
+four-item tuple still use the compatibility wrapper, and explicit Python
+validation retains the reference representation. Search steps, matrix
+semantics, scorer callbacks, and multi-rank collectives are unchanged.
 
 When the compatibility stage adapter is needed, its CNOT goal stage now calls
 the Rust `run_cnot_native_goal` helper when the installed extension provides

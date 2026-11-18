@@ -13,6 +13,14 @@ struct PyCnotMatrix {
     inner: beam_core::cnot::CnotMatrix,
 }
 
+#[pyclass(name = "CnotSearchInput", frozen)]
+struct PyCnotSearchInput {
+    wires: u32,
+    raw: Py<PyBytes>,
+    root: Py<PyAny>,
+    matrix: beam_core::cnot::CnotMatrix,
+}
+
 #[pyfunction]
 fn validate_cnot_search_controls(
     wires: u32,
@@ -35,7 +43,7 @@ fn prepare_cnot_input<'py>(
     shortlist: &Bound<'py, PyAny>,
     depth: &Bound<'py, PyAny>,
     mode: &Bound<'py, PyAny>,
-) -> PyResult<(u32, Py<PyBytes>, Py<PyAny>, PyCnotMatrix)> {
+) -> PyResult<PyCnotSearchInput> {
     let invalid_shape =
         || PyValueError::new_err("expected one packed int64 matrix [1,n,ceil(n/64)]");
     let torch = py.import("torch")?;
@@ -95,12 +103,12 @@ fn prepare_cnot_input<'py>(
     let raw = raw_object.downcast::<PyBytes>()?.as_bytes();
     let inner = beam_core::cnot::CnotMatrix::from_le_bytes(wires as u32, raw)
         .map_err(|error| PyValueError::new_err(error.to_string()))?;
-    Ok((
-        wires as u32,
-        PyBytes::new(py, raw).unbind(),
-        snapshot.unbind(),
-        PyCnotMatrix { inner },
-    ))
+    Ok(PyCnotSearchInput {
+        wires: wires as u32,
+        raw: PyBytes::new(py, raw).unbind(),
+        root: snapshot.unbind(),
+        matrix: inner,
+    })
 }
 
 #[pyfunction]
@@ -220,6 +228,29 @@ impl PyCnotMatrix {
 
     fn verifies_construction(&self, py: Python<'_>, moves: Vec<u32>) -> PyResult<bool> {
         py.allow_threads(|| self.inner.verifies_construction(&moves))
+            .map_err(|error| PyValueError::new_err(error.to_string()))
+    }
+}
+
+#[pymethods]
+impl PyCnotSearchInput {
+    #[getter]
+    fn n(&self) -> u32 {
+        self.wires
+    }
+
+    #[getter]
+    fn raw(&self, py: Python<'_>) -> Py<PyBytes> {
+        self.raw.clone_ref(py)
+    }
+
+    #[getter]
+    fn root(&self, py: Python<'_>) -> Py<PyAny> {
+        self.root.clone_ref(py)
+    }
+
+    fn verifies_construction(&self, py: Python<'_>, moves: Vec<u32>) -> PyResult<bool> {
+        py.allow_threads(|| self.matrix.verifies_construction(&moves))
             .map_err(|error| PyValueError::new_err(error.to_string()))
     }
 }
@@ -570,6 +601,7 @@ pub(crate) fn outcome_to_python(
 
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<PyCnotMatrix>()?;
+    module.add_class::<PyCnotSearchInput>()?;
     module.add_function(wrap_pyfunction!(prepare_cnot_input, module)?)?;
     module.add_function(wrap_pyfunction!(validate_cnot_search_controls, module)?)?;
     module.add_function(wrap_pyfunction!(run_cnot_native_require_consensus, module)?)?;

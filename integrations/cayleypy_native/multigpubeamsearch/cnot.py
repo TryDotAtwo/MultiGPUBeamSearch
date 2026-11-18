@@ -74,9 +74,13 @@ def _input(root, width, shortlist, depth, mode, validation="auto"):
         prepare = None if native_module is None else getattr(
             native_module, "prepare_cnot_input", None)
         if callable(prepare) and type(mode) is str:
-            n, raw, snapshot, rust_matrix = prepare(
-                root, width, shortlist, depth, mode)
-            return _InputMatrix(n, raw, snapshot, rust_matrix=rust_matrix)
+            prepared = prepare(root, width, shortlist, depth, mode)
+            if isinstance(prepared, tuple):
+                if len(prepared) != 4:
+                    raise RuntimeError("Rust CNOT input preparer returned an invalid adapter result")
+                n, raw, snapshot, rust_matrix = prepared
+                return _InputMatrix(n, raw, snapshot, rust_matrix=rust_matrix)
+            return prepared
 
     if root.dtype != torch.int64 or root.ndim != 3 or root.shape[0] != 1:
         raise ValueError("expected one packed int64 matrix [1,n,ceil(n/64)]")
