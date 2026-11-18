@@ -8,6 +8,25 @@ from multigpubeamsearch.contracts import GraphContract
 from multigpubeamsearch.backend import parse_terminal
 
 
+def test_normalized_search_controls_are_delegated_to_rust(monkeypatch):
+    from multigpubeamsearch import rust_control
+
+    seen = []
+    monkeypatch.setattr(
+        rust_control,
+        "validate_search_controls",
+        lambda params: seen.append(dict(params)) or True,
+        raising=False,
+    )
+
+    params = dispatch._parameters({"beam_width": 16, "max_steps": 4})
+
+    assert params["beam_width"] == 16
+    assert len(seen) == 1
+    assert seen[0]["beam_width"] == 16
+    assert seen[0]["max_steps"] == 4
+
+
 def test_controls_reach_native_options(tmp_path, monkeypatch):
     graph=CayleyGraph(PermutationGroups.lrx(5),device='cpu')
     monkeypatch.setattr(dispatch,'runtime_devices',lambda *a:(0,1))
@@ -71,3 +90,4 @@ def test_invalid_reflection_source_fails_before_search():
     with pytest.raises(ValueError,match='does not solve'):
         reflected_search(lambda _:pytest.fail('must not search'),graph,
             dict(start_state=[1,0,2,3,4],return_path=True,reflect_mode='only',reflection_source=[0]),'native')
+
