@@ -99,6 +99,25 @@
   Это hosted CPU evidence: feature selection замокан; аппаратный worker,
   CUDA/NCCL и реальная multi-GPU работа этим прогоном не проверялись.
 
+## 2026-11-19 - Смена identity через существующий Rust session owner
+
+- `NativeSession` оставляет существующий PyO3 `SearchSession` при смене модели,
+  геометрии, опций или runtime-профиля и передаёт новые identity/launch в Rust.
+  Rust сравнивает identity и сам закрывает несовместимую rank-группу перед
+  запуском нового задания. Если подготовленный вызов завершается до launch,
+  Python освобождает старую сессию, чтобы не удерживать устаревшие workers.
+- Identity включает Python-only поля геометрии, размеров model artifact,
+  binding scope и `repr(options)`. Проверка request count принимает сброс к 1
+  только вместе с `persistent_session.reused=false`. Python fallback, формат
+  результата, C++/CUDA stages и multi-GPU topology не менялись; оптимизации
+  поиска не добавлялись.
+- RED run 44414135860: ожидаемо упали две параметризации теста повторного
+  создания owner (76 passed, 2 failed). GREEN run 44415524622: 78 passed за
+  5.48 секунды. Артефакты и SHA-256 записаны в
+  `test_results/refactor_20261119/rust-session-reuse/GITHUB_STATUS.md`.
+  Это hosted CPU проверка Python owner; реальный PyO3 runtime, CUDA/NCCL и
+  физическая multi-GPU работа этим запуском не проверялись.
+
 ## 2026-11-18 - CNOT identity-root control in Rust
 
 - Перенесено решение для уже целевого начального CNOT-состояния из общего
