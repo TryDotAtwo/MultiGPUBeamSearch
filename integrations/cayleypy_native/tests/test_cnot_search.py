@@ -113,6 +113,38 @@ def test_explicit_rust_validation_owns_input_and_checks_returned_path(monkeypatc
                     validation="rust")
 
 
+@pytest.mark.parametrize(
+    ("validation", "expected_controls"),
+    [("auto", [(2, 3, 2, "proposal")]), ("python", [])],
+)
+def test_search_control_validation_uses_the_selected_owner(monkeypatch, validation, expected_controls):
+    from types import SimpleNamespace
+    from multigpubeamsearch import rust_control
+
+    calls = []
+
+    class Matrix:
+        def __init__(self, n, raw):
+            self.n = n
+            self.raw = raw
+
+        def verifies_construction(self, gates):
+            return True
+
+    def validate_controls(wires, width, shortlist, mode):
+        calls.append((wires, width, shortlist, mode))
+
+    module = SimpleNamespace(CnotMatrix=Matrix, validate_cnot_search_controls=validate_controls)
+    monkeypatch.setattr(rust_control, "extension", lambda: module)
+    result = search_cnot(
+        pack_rows((1, 2)), object(), width=3, shortlist=99, max_depth=1,
+        mode="proposal", validation=validation, engine="python",
+    )
+
+    assert result.status == "solved"
+    assert calls == expected_controls
+
+
 def test_explicit_rust_validation_fails_closed_for_old_extension(monkeypatch):
     from types import SimpleNamespace
     from multigpubeamsearch import rust_control
