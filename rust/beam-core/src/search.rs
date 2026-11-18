@@ -18,6 +18,32 @@ pub fn native_depth_budget(max_steps: u64, touch_bfs_radius: u32) -> (u64, u32) 
     (max_steps - u64::from(effective_radius), effective_radius)
 }
 
+/// Return the duplicate-free geometric touch-BFS bound when it fits the cap.
+///
+/// Checked multiplication and addition match the shared search-budget contract.
+pub fn touch_bfs_worst_case_entries(
+    move_count: u32,
+    radius: u32,
+    max_entries: u64,
+) -> Result<u64> {
+    if move_count == 0 || move_count > 255 || radius > 12 || max_entries == 0 {
+        return Err(ContractError::Invalid("touch BFS configuration"));
+    }
+    let moves = u64::from(move_count);
+    let mut total = 1_u64;
+    let mut frontier = 1_u64;
+    for _ in 0..radius {
+        frontier = frontier
+            .checked_mul(moves)
+            .ok_or(ContractError::Overflow("touch BFS frontier"))?;
+        total = total
+            .checked_add(frontier)
+            .ok_or(ContractError::Overflow("touch BFS entries"))?;
+        crate::require_capacity("touch BFS entries", total, max_entries)?;
+    }
+    Ok(total)
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct TerminalResult {
     pub path: Option<Vec<u32>>,

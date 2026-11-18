@@ -124,6 +124,25 @@ def touch_bfs_worst_case_entries(move_count: int, radius: int, max_entries: int)
         raise ValueError("effective touch_bfs_radius must be a nonnegative integer")
     if type(max_entries) is not int or max_entries <= 0:
         raise ValueError("touch_bfs_max_entries must be a positive integer")
+    try:
+        from .rust_control import extension
+
+        native = getattr(extension(), "touch_bfs_worst_case_entries", None)
+    except NativeUnavailable:
+        native = None
+    if (
+        native is not None
+        and move_count <= 255
+        and radius <= 12
+        and max_entries <= (1 << 64) - 1
+    ):
+        try:
+            return native(move_count, radius, max_entries)
+        except ValueError as error:
+            raise NativeUnavailable(
+                f"native touch-BFS worst-case host allocation exceeds the {max_entries:,}-entry budget; "
+                "reduce touch_bfs_radius or increase touch_bfs_max_entries"
+            ) from error
     total = 1
     frontier = 1
     for _ in range(radius):

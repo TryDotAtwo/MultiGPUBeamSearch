@@ -85,17 +85,8 @@ pub fn search_budget(
     if effective_radius > 0 && moves > 32 {
         return Err(ContractError::Invalid("touch BFS suffix move packing"));
     }
-    let mut total = 1u64;
-    let mut frontier = 1u64;
-    for _ in 0..effective_radius {
-        frontier = frontier
-            .checked_mul(moves as u64)
-            .ok_or(ContractError::Overflow("touch BFS frontier"))?;
-        total = total
-            .checked_add(frontier)
-            .ok_or(ContractError::Overflow("touch BFS entries"))?;
-        crate::require_capacity("touch BFS entries", total, max_entries)?;
-    }
+    let total =
+        crate::search::touch_bfs_worst_case_entries(moves, effective_radius, max_entries)?;
     Ok(SearchBudget {
         requested_max_steps: max_steps,
         native_forward_depth_limit: max_steps - effective_radius,

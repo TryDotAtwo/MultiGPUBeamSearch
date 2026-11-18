@@ -13,6 +13,16 @@ fn native_depth_budget(max_steps: u64, touch_bfs_radius: u32) -> (u64, u32) {
 }
 
 #[pyfunction]
+fn touch_bfs_worst_case_entries(
+    move_count: u32,
+    radius: u32,
+    max_entries: u64,
+) -> PyResult<u64> {
+    beam_core::search::touch_bfs_worst_case_entries(move_count, radius, max_entries)
+        .map_err(|error| PyValueError::new_err(error.to_string()))
+}
+
+#[pyfunction]
 fn validate_options(options: &str) -> PyResult<String> {
     let options: beam_core::config::NativeOptions =
         serde_json::from_str(options).map_err(|e| PyValueError::new_err(e.to_string()))?;
@@ -125,6 +135,7 @@ impl InferenceCalibration {
 }
 pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(native_depth_budget, module)?)?;
+    module.add_function(wrap_pyfunction!(touch_bfs_worst_case_entries, module)?)?;
     module.add_function(wrap_pyfunction!(validate_options, module)?)?;
     module.add_class::<InferenceCalibration>()?;
     module.add_class::<DownstreamCalibration>()?;

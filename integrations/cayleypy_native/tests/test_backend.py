@@ -256,12 +256,44 @@ def test_touch_bfs_entry_budget_keeps_python_fallback_without_rust_method(monkey
     assert backend.touch_bfs_worst_case_entries(3, 2, 13) == 13
 
 
+@pytest.mark.parametrize(
+    "move_count,radius,max_entries,expected",
+    [
+        (2**32, 0, 2, 1),
+        (1, 13, 14, 14),
+        (1, 1, 2**64, 2),
+    ],
+)
+def test_touch_bfs_entry_budget_falls_back_outside_rust_ranges(
+    monkeypatch, move_count, radius, max_entries, expected
+):
+    import cayleypy_native.backend as backend
+    from multigpubeamsearch import rust_control
+
+    calls = []
+
+    def native_budget(*args):
+        calls.append(args)
+        return 77
+
+    monkeypatch.setattr(
+        rust_control,
+        "extension",
+        lambda: SimpleNamespace(touch_bfs_worst_case_entries=native_budget),
+    )
+
+    assert backend.touch_bfs_worst_case_entries(move_count, radius, max_entries) == expected
+    assert calls == []
+
+
 def test_rust_extension_exposes_touch_bfs_entry_budget():
     from multigpubeamsearch.rust_control import extension
 
     native = extension()
     assert native.touch_bfs_worst_case_entries(3, 2, 13) == 13
-    assert native.touch_bfs_worst_case_entries(3, 2, 12) is None
+    assert native.touch_bfs_worst_case_entries(33, 1, 34) == 34
+    with pytest.raises(ValueError, match="touch BFS entries capacity exceeded"):
+        native.touch_bfs_worst_case_entries(3, 2, 12)
 
 
 @pytest.mark.parametrize("value", [0, -1, True, 1.5, 2**64])

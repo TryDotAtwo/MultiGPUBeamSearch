@@ -1,4 +1,7 @@
-use beam_core::search::{native_depth_budget, search_budget, PermutationGraph, TerminalParser};
+use beam_core::search::{
+    native_depth_budget, search_budget, touch_bfs_worst_case_entries, PermutationGraph,
+    TerminalParser,
+};
 
 #[test]
 fn native_depth_budget_reserves_the_touch_bfs_suffix() {
@@ -7,6 +10,17 @@ fn native_depth_budget_reserves_the_touch_bfs_suffix() {
     assert_eq!(native_depth_budget(4, 12), (1, 3));
     assert_eq!(native_depth_budget(4, 2), (2, 2));
 }
+
+#[test]
+fn touch_bfs_entry_budget_matches_the_capped_geometric_bound() {
+    assert_eq!(touch_bfs_worst_case_entries(3, 2, 13).unwrap(), 13);
+    assert!(touch_bfs_worst_case_entries(3, 2, 12).is_err());
+    assert_eq!(touch_bfs_worst_case_entries(1, 12, 13).unwrap(), 13);
+    assert_eq!(touch_bfs_worst_case_entries(33, 1, 34).unwrap(), 34);
+    assert!(touch_bfs_worst_case_entries(255, 12, u64::MAX).is_err());
+    assert!(search_budget(2, 1, 33, 1000).is_err());
+}
+
 fn graph() -> PermutationGraph {
     PermutationGraph {
         center: vec![0, 1],
