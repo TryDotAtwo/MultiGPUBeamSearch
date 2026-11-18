@@ -2145,3 +2145,4 @@ Preserved 26 checkouts and their source/index overlays; verified restoration of 
 
 - For `validation="auto"` and `validation="rust"`, the Rust CNOT controller now constructs the typed `CnotSearchInput` directly inside the existing rank-wide admission error boundary. Explicit Python validation and old-extension paths still use the Python input-builder callback. Snapshot semantics, search, scorer, collective order and multi-GPU layout are unchanged.
 - Test-first Actions run 44420817709 failed only on the new ownership assertion (163 passed, 2 skipped); artifact 14482655492 retains the remote test log. Green verification is pending. CPU checks do not establish physical CUDA/NCCL or multi-GPU execution.
+- Follow-up run 44421729086 stopped at the Rust formatting gate before compilation; the reported line-wrap was corrected. No test result was produced by that run.

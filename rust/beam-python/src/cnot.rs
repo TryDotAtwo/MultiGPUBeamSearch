@@ -413,14 +413,7 @@ fn run_cnot_native_search<'py>(
     let admission = (|| -> PyResult<Bound<'py, PyAny>> {
         let validation_mode = validation.extract::<String>().ok();
         let input_matrix = if matches!(validation_mode.as_deref(), Some("auto") | Some("rust")) {
-            let prepared = prepare_cnot_input(
-                py,
-                &root,
-                &width,
-                &shortlist,
-                &max_depth,
-                &mode,
-            )?;
+            let prepared = prepare_cnot_input(py, &root, &width, &shortlist, &max_depth, &mode)?;
             Py::new(py, prepared)?.into_bound(py).into_any()
         } else {
             input_builder.call1((
