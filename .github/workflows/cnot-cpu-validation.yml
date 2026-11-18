@@ -86,25 +86,15 @@ jobs:
         run: |
           set -o pipefail
           python -m pytest -q \
-            integrations/cayleypy_native/tests/test_backend.py::test_native_options_delegate_to_rust_validator_when_available \
-            integrations/cayleypy_native/tests/test_backend.py::test_native_options_keep_python_validation_for_old_extensions \
-            integrations/cayleypy_native/tests/test_backend.py::test_native_options_keep_python_fallback_outside_rust_integer_ranges \
-            integrations/cayleypy_native/tests/test_backend.py::test_native_options_propagate_rust_validation_errors \
-            integrations/cayleypy_native/tests/test_backend.py::test_rust_extension_exposes_native_options_validator \
+            integrations/cayleypy_native/tests/test_backend.py \
+            integrations/cayleypy_native/tests/test_search_controls.py \
+            integrations/cayleypy_native/tests/test_rust_control.py \
             integrations/cayleypy_native/tests/test_cnot_search.py \
             integrations/cayleypy_native/tests/test_cnot_control_collectives.py \
             integrations/cayleypy_native/tests/test_cnot_scorer_runtime_dispatch.py \
             integrations/cayleypy_native/tests/test_cnot_scorer_batch_api.py \
             integrations/cayleypy_native/tests/test_cnot_rust_controller.py::test_rust_search_owns_stages_without_python_stage_object \
             integrations/cayleypy_native/tests/test_cnot_rust_controller.py::test_rust_search_owns_batch_stages_without_python_helpers \
-            integrations/cayleypy_native/tests/test_backend.py::test_native_depth_budget_uses_rust_extension_when_available \
-            integrations/cayleypy_native/tests/test_backend.py::test_native_depth_budget_keeps_python_fallback_without_rust_method \
-            integrations/cayleypy_native/tests/test_backend.py::test_rust_extension_exposes_native_depth_budget \
-            integrations/cayleypy_native/tests/test_backend.py::test_native_depth_budget_falls_back_outside_rust_integer_ranges \
-            integrations/cayleypy_native/tests/test_backend.py::test_touch_bfs_entry_budget_uses_rust_extension_when_available \
-            integrations/cayleypy_native/tests/test_backend.py::test_touch_bfs_entry_budget_keeps_python_fallback_without_rust_method \
-            integrations/cayleypy_native/tests/test_backend.py::test_touch_bfs_entry_budget_falls_back_outside_rust_ranges \
-            integrations/cayleypy_native/tests/test_backend.py::test_rust_extension_exposes_touch_bfs_entry_budget \
             2>&1 | tee test_results/refactor_20261118/cnot-tqp-scorer/cnot-search-cpu.log
       - name: Check the two-rank NCCL probe syntax
         run: |
