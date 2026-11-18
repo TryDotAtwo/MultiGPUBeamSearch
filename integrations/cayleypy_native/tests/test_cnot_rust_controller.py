@@ -158,6 +158,22 @@ def test_rust_controller_prepares_typed_input_without_python_builder(monkeypatch
     assert result == cnot.CnotResult("solved", (), [], [])
 
 
+def test_rust_native_root_goal_uses_typed_matrix_without_torch_equal(monkeypatch):
+    require_controller()
+    root = cnot.cnot_identity(3)
+    scorer = SimpleNamespace(metadata={})
+
+    def forbidden(*_args, **_kwargs):
+        pytest.fail("Rust CNOT root admission must use the owned packed matrix")
+
+    monkeypatch.setattr(torch, "equal", forbidden)
+    result = cnot.search_cnot(root, scorer, width=4, shortlist=6, max_depth=3,
+                              validation="auto", engine="rust")
+
+    assert result.status == "solved"
+    assert result.gates == ()
+
+
 def test_rust_top_level_controller_preserves_compatibility_stage_fallback():
     require_controller()
     controller = getattr(rust_control.extension(), "run_cnot_native_search", None)
