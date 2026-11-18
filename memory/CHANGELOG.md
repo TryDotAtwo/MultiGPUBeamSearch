@@ -1801,13 +1801,15 @@ Preserved 26 checkouts and their source/index overlays; verified restoration of 
   type, dtype, device, shape, contiguity, byte extents, and buffer overlap
   before borrowing device addresses. Python API and a reference fallback are
   retained for older or absent extensions.
-- GitHub CPU run 44208783672 passed Rust formatting, 3 `beam-core` CNOT tests,
-  4 `beam-runtime` CNOT tests, 4 native-sys scorer tests, the `beam-python`
-  compile check, 27 Python CNOT compatibility tests, and NCCL probe syntax
-  compilation. Full output is in artifact 14384877235 (SHA-256
-  `83510320d4f985701d3ab2bb43243dce2aa1d119574eb6bc292d5b17253cb5e7`); see
+- GitHub CPU run 44210146770 passed Rust formatting, 3 `beam-core` CNOT tests,
+  4 `beam-runtime` CNOT tests, 4 native-sys scorer tests, `cargo check` and
+  `cargo build` for `beam-python`, 28 Python CNOT compatibility tests, and
+  NCCL probe syntax compilation. The Python suite built/imported the actual
+  PyO3 extension and checked public dispatch and bool argument behavior. Full
+  output is in artifact 14385263763 (SHA-256
+  `ebd343ddcdf9f7ca0a62ecd14b994293b3b720d2fb7c41f47565a57a3258b212`); see
   `test_results/refactor_20261118/cnot-tqp-scorer/GITHUB_STATUS.md`.
-- This is CPU and compile evidence only. The Python dispatch test uses a mock;
-  the checkpoint library was not loaded, and CUDA scoring, NCCL execution, and
-  physical multi-GPU acceptance remain unverified. This change does not alter
-  search decisions or model numerics.
+- This is CPU and compile evidence only. The checkpoint scorer library was not
+  loaded; CUDA scoring, NCCL execution, and physical multi-GPU acceptance
+  remain unverified. This change does not alter search decisions or model
+  numerics.

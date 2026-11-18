@@ -1,9 +1,9 @@
 # Rust-owned CNOT scorer — GitHub CPU validation
 
-Source commit: `c062df51d6c35df0248018efae83ead0b5a12c86`
+Source commit: `f762ab013d9120879b40f4b6992bf89eca6f5b48`
 
-- CPU workflow [44208783672](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44208783672): passed Rust formatting, 3 `beam-core` CNOT tests, 4 `beam-runtime` CNOT tests, 4 native-sys scorer tests, `cargo check -p beam-python`, 27 Python CNOT compatibility tests, and NCCL probe syntax compilation.
-- Full log artifact [14384877235](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44208783672/artifacts/14384877235), SHA-256 `83510320d4f985701d3ab2bb43243dce2aa1d119574eb6bc292d5b17253cb5e7`.
-- The Python dispatch test selects a mocked Rust constructor. The scorer shared library was not loaded, and no CUDA kernel, NCCL collective, or multi-GPU search ran.
+- CPU workflow [44210146770](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44210146770): passed Rust formatting, 3 `beam-core` CNOT tests, 4 `beam-runtime` CNOT tests, 4 native-sys scorer tests, `cargo check` and `cargo build -p beam-python`, 28 Python CNOT compatibility tests, and NCCL probe syntax compilation.
+- Full log artifact [14385263763](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44210146770/artifacts/14385263763), SHA-256 `ebd343ddcdf9f7ca0a62ecd14b994293b3b720d2fb7c41f47565a57a3258b212`.
+- The suite built/imported the real PyO3 extension and checked public scorer dispatch, default arguments, and rejection of an integer in the bool option. It did not load the scorer shared library or run a CUDA kernel, NCCL collective, or multi-GPU search.
 
 These results verify CPU contracts and Rust/PyO3 buildability only. Physical CNOT scoring and multi-GPU acceptance remain unverified.
