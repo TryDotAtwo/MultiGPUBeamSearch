@@ -227,6 +227,43 @@ def test_native_depth_budget_falls_back_outside_rust_integer_ranges(
     assert calls == []
 
 
+def test_touch_bfs_entry_budget_uses_rust_extension_when_available(monkeypatch):
+    import cayleypy_native.backend as backend
+    from multigpubeamsearch import rust_control
+
+    calls = []
+
+    def native_budget(move_count, radius, max_entries):
+        calls.append((move_count, radius, max_entries))
+        return 77
+
+    monkeypatch.setattr(
+        rust_control,
+        "extension",
+        lambda: SimpleNamespace(touch_bfs_worst_case_entries=native_budget),
+    )
+
+    assert backend.touch_bfs_worst_case_entries(3, 2, 100) == 77
+    assert calls == [(3, 2, 100)]
+
+
+def test_touch_bfs_entry_budget_keeps_python_fallback_without_rust_method(monkeypatch):
+    import cayleypy_native.backend as backend
+    from multigpubeamsearch import rust_control
+
+    monkeypatch.setattr(rust_control, "extension", lambda: SimpleNamespace())
+
+    assert backend.touch_bfs_worst_case_entries(3, 2, 13) == 13
+
+
+def test_rust_extension_exposes_touch_bfs_entry_budget():
+    from multigpubeamsearch.rust_control import extension
+
+    native = extension()
+    assert native.touch_bfs_worst_case_entries(3, 2, 13) == 13
+    assert native.touch_bfs_worst_case_entries(3, 2, 12) is None
+
+
 @pytest.mark.parametrize("value", [0, -1, True, 1.5, 2**64])
 def test_touch_bfs_entry_budget_must_be_a_positive_integer(value):
     with pytest.raises(ValueError, match="touch_bfs_max_entries"):
