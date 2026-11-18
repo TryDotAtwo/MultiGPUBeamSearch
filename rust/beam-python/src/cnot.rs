@@ -20,9 +20,7 @@ fn validate_cnot_search_controls(
     mode: &str,
 ) -> PyResult<()> {
     let invalid = || PyValueError::new_err("invalid global width, shortlist, or depth");
-    let width = width
-        .extract::<u64>()
-        .map_err(|_| invalid())?;
+    let width = width.extract::<u64>().map_err(|_| invalid())?;
     let shortlist = shortlist.extract::<u64>().map_err(|_| invalid())?;
     beam_core::cnot::validate_search_controls(wires, width, shortlist, mode)
         .map_err(|error| PyValueError::new_err(error.to_string()))

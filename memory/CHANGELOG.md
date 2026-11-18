@@ -8,8 +8,11 @@
   same `world.sum` then failure-only `all_gather_object` sequence.
 - Older extensions retain the Python fallback, and one-rank execution is
   unchanged. Added tests for Rust delegation and the old-extension fallback.
-  GitHub Actions verification is pending; no local tests or builds were run.
-  This does not verify CUDA/NCCL runtime behavior or complete the CNOT migration.
+  Hosted run 44350398748 stopped at rustfmt in the earlier CNOT validator
+  before compilation or tests; artifact 14447143946 retains that log. Its
+  formatting correction is in progress for a rerun. No local tests or builds
+  were run. This does not verify CUDA/NCCL runtime behavior or complete the
+  CNOT migration.
 
 ## 2026-11-18 - CNOT search control validation in beam-core
 
