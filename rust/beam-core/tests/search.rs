@@ -1,4 +1,12 @@
-use beam_core::search::{search_budget, PermutationGraph, TerminalParser};
+use beam_core::search::{native_depth_budget, search_budget, PermutationGraph, TerminalParser};
+
+#[test]
+fn native_depth_budget_reserves_the_touch_bfs_suffix() {
+    assert_eq!(native_depth_budget(0, 12), (0, 0));
+    assert_eq!(native_depth_budget(1, 12), (1, 0));
+    assert_eq!(native_depth_budget(4, 12), (1, 3));
+    assert_eq!(native_depth_budget(4, 2), (2, 2));
+}
 fn graph() -> PermutationGraph {
     PermutationGraph {
         center: vec![0, 1],

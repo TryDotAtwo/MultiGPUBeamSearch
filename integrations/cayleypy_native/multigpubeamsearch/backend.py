@@ -480,6 +480,14 @@ def native_depth_budget(max_steps: int, touch_bfs_radius: int) -> tuple[int, int
         raise ValueError("max_steps must be a nonnegative integer")
     if type(touch_bfs_radius) is not int or touch_bfs_radius < 0:
         raise ValueError("touch_bfs_radius must be a nonnegative integer")
+    try:
+        from .rust_control import extension
+
+        native = getattr(extension(), "native_depth_budget", None)
+    except NativeUnavailable:
+        native = None
+    if native is not None:
+        return native(max_steps, touch_bfs_radius)
     if max_steps == 0:
         return 0, 0
     effective_radius = min(touch_bfs_radius, max_steps - 1)

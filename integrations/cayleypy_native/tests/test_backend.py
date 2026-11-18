@@ -198,6 +198,35 @@ def test_rust_extension_exposes_native_depth_budget():
     assert native.native_depth_budget(0, 12) == (0, 0)
 
 
+@pytest.mark.parametrize(
+    "max_steps,radius,expected",
+    [
+        (2**64, 3, (2**64 - 3, 3)),
+        (10, 2**32, (1, 9)),
+    ],
+)
+def test_native_depth_budget_falls_back_outside_rust_integer_ranges(
+    monkeypatch, max_steps, radius, expected
+):
+    import cayleypy_native.backend as backend
+    from multigpubeamsearch import rust_control
+
+    calls = []
+
+    def native_budget(max_steps, radius):
+        calls.append((max_steps, radius))
+        return 77, 2
+
+    monkeypatch.setattr(
+        rust_control,
+        "extension",
+        lambda: SimpleNamespace(native_depth_budget=native_budget),
+    )
+
+    assert backend.native_depth_budget(max_steps, radius) == expected
+    assert calls == []
+
+
 @pytest.mark.parametrize("value", [0, -1, True, 1.5, 2**64])
 def test_touch_bfs_entry_budget_must_be_a_positive_integer(value):
     with pytest.raises(ValueError, match="touch_bfs_max_entries"):

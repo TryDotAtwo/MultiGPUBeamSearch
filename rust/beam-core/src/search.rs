@@ -5,6 +5,19 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::{BTreeMap, BTreeSet};
 type Result<T> = std::result::Result<T, ContractError>;
+
+/// Reserve a suffix of the requested step budget for touch-BFS completion.
+///
+/// The solved start is handled before launch, so any nontrivial run keeps at
+/// least one native forward depth when `max_steps` is nonzero.
+pub fn native_depth_budget(max_steps: u64, touch_bfs_radius: u32) -> (u64, u32) {
+    if max_steps == 0 {
+        return (0, 0);
+    }
+    let effective_radius = u64::from(touch_bfs_radius).min(max_steps - 1) as u32;
+    (max_steps - u64::from(effective_radius), effective_radius)
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct TerminalResult {
     pub path: Option<Vec<u32>>,

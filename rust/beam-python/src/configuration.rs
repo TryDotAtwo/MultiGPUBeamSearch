@@ -6,6 +6,12 @@ use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc, Mutex,
 };
+
+#[pyfunction]
+fn native_depth_budget(max_steps: u64, touch_bfs_radius: u32) -> (u64, u32) {
+    beam_core::search::native_depth_budget(max_steps, touch_bfs_radius)
+}
+
 #[pyfunction]
 fn validate_options(options: &str) -> PyResult<String> {
     let options: beam_core::config::NativeOptions =
@@ -118,6 +124,7 @@ impl InferenceCalibration {
     }
 }
 pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
+    module.add_function(wrap_pyfunction!(native_depth_budget, module)?)?;
     module.add_function(wrap_pyfunction!(validate_options, module)?)?;
     module.add_class::<InferenceCalibration>()?;
     module.add_class::<DownstreamCalibration>()?;

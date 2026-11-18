@@ -57,6 +57,8 @@ jobs:
           {
             rustfmt --check --edition 2021 \
               rust/beam-runtime/src/cnot_search.rs \
+              rust/beam-core/src/search.rs \
+              rust/beam-python/src/configuration.rs \
               rust/beam-python/src/cnot.rs \
               rust/beam-python/src/cnot_tqp_scorer.rs \
               rust/beam-python/src/cnot_native_batch.rs \
@@ -66,6 +68,7 @@ jobs:
               rust/beam-native-sys/src/cnot_tqp_scorer.rs \
               rust/beam-python/src/cnot_stream5.rs
             cargo test --locked -p beam-core --test cnot
+            cargo test --locked -p beam-core --test search
             cargo test --locked -p beam-runtime cnot_search
             cargo test --locked -p beam-native-sys cnot_tqp_scorer
             cargo check --locked -p beam-python
@@ -90,6 +93,7 @@ jobs:
             integrations/cayleypy_native/tests/test_backend.py::test_native_depth_budget_uses_rust_extension_when_available \
             integrations/cayleypy_native/tests/test_backend.py::test_native_depth_budget_keeps_python_fallback_without_rust_method \
             integrations/cayleypy_native/tests/test_backend.py::test_rust_extension_exposes_native_depth_budget \
+            integrations/cayleypy_native/tests/test_backend.py::test_native_depth_budget_falls_back_outside_rust_integer_ranges \
             2>&1 | tee test_results/refactor_20261118/cnot-tqp-scorer/cnot-search-cpu.log
       - name: Check the two-rank NCCL probe syntax
         run: |
