@@ -159,6 +159,27 @@ def validate_search_controls(params):
     raise NativeBackendError("Rust search-control validator returned an unknown status")
 
 
+def build_graph_contract(center, start, generators, generator_names):
+    """Build a validated permutation contract when the extension supports it."""
+    try:
+        native = extension()
+    except (NativeUnavailable, ImportError):
+        return None
+    builder = getattr(native, "build_graph_contract", None)
+    if builder is None:
+        return None
+    request = {
+        "center": [str(value) for value in center],
+        "start": [str(value) for value in start],
+        "generators": [[str(value) for value in row] for row in generators],
+        "generator_name_count": len(generator_names),
+    }
+    try:
+        return json.loads(builder(json.dumps(request, allow_nan=False)))
+    except (TypeError, ValueError, OverflowError) as error:
+        raise NativeUnavailable(str(error)) from error
+
+
 
 def _inference_request(contract, model, runtime, options, devices, beam_width,
                        run_dir, environment, *, capacity_bootstrap=False):

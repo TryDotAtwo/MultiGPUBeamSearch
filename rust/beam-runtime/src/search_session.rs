@@ -1,9 +1,8 @@
 //! Compatible resource lifetime and independently validated search outcomes.
 use crate::{calibration::Environment, probes::ProbeSession, Error, ResidentWorkers, Result};
-use beam_core::search::{PermutationGraph, TerminalParser, TerminalResult};
+use beam_core::search::{permutation_graph_hash, PermutationGraph, TerminalParser, TerminalResult};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use sha2::{Digest, Sha256};
 use std::{
     fs::File,
     io::{BufRead, BufReader, Read},
@@ -14,45 +13,6 @@ use std::{
     },
     time::{Duration, Instant},
 };
-
-// CayleyPy checkpoints use Python's json.dumps(sort_keys=True) default
-// separators. Hash the canonical representation directly, without making a
-// second graph-sized JSON buffer or allocating one string per graph element.
-fn hash_decimal_array(hash: &mut Sha256, values: impl IntoIterator<Item = u32>) {
-    hash.update(b"[");
-    for (index, mut value) in values.into_iter().enumerate() {
-        if index != 0 {
-            hash.update(b", ");
-        }
-        let mut digits = [0u8; 10];
-        let mut start = digits.len();
-        loop {
-            start -= 1;
-            digits[start] = b'0' + (value % 10) as u8;
-            value /= 10;
-            if value == 0 {
-                break;
-            }
-        }
-        hash.update(&digits[start..]);
-    }
-    hash.update(b"]");
-}
-
-fn permutation_graph_hash(graph: &PermutationGraph) -> String {
-    let mut hash = Sha256::new();
-    hash.update(b"{\"central_state\": ");
-    hash_decimal_array(&mut hash, graph.center.iter().map(|&n| u32::from(n)));
-    hash.update(b", \"generators\": [");
-    for (index, generator) in graph.generators.iter().enumerate() {
-        if index != 0 {
-            hash.update(b", ");
-        }
-        hash_decimal_array(&mut hash, generator.iter().copied());
-    }
-    hash.update(b"], \"generators_type\": \"PERMUTATION\"}");
-    format!("{:x}", hash.finalize())
-}
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]

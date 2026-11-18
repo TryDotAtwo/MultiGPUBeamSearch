@@ -36,6 +36,24 @@ def test_graph_contract_preserves_math_and_synthetic_native_order():
         c.state_len = 5
 
 
+def test_graph_contract_uses_rust_builder_and_matches_cayleypy_hash():
+    from multigpubeamsearch import rust_control
+
+    assert callable(getattr(rust_control.extension(), "build_graph_contract", None))
+    g = graph()
+    c = GraphContract.from_graph(g, torch.tensor([[1, 2, 3, 0]]))
+    assert c.graph_hash == graph_hash(g.definition)
+
+
+def test_graph_contract_retains_python_fallback_for_older_extensions(monkeypatch):
+    from multigpubeamsearch import rust_control
+
+    monkeypatch.setattr(rust_control, "build_graph_contract", lambda *args: None)
+    g = graph()
+    c = GraphContract.from_graph(g, [1, 2, 3, 0])
+    assert c.graph_hash == graph_hash(g.definition)
+
+
 def test_colored_state_is_supported_without_renumbering():
     c = GraphContract.from_graph(graph([0, 0, 1, 1]), np.array([1, 1, 0, 0], dtype=np.uint8))
     assert c.num_classes == 2

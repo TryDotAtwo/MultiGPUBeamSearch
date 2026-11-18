@@ -1,5 +1,18 @@
 # Changelog
 
+## 2026-11-18 - GraphContract construction in beam-core
+
+- The CayleyPy adapter continues to extract list/tuple, NumPy and Torch values
+  and reject type coercion. A compatible PyO3 extension now sends normalized
+  graph values to `beam-core`, which validates state labels, the start-state
+  multiset, generator permutations and ordered generator count, then returns
+  the contract and the same canonical graph SHA-256 used by CayleyPy. The
+  persistent Rust session now calls this shared hash implementation.
+- Python-only and older-extension fallback remains. Search stages, model
+  preparation, CNOT execution, CUDA/NCCL, candidate order and multi-GPU
+  topology are unchanged. Hosted CPU validation is pending; this entry does
+  not claim runtime or multi-GPU acceptance.
+
 ## 2026-11-18 - Rust validation for normalized public search controls
 
 - After Python binds arguments against the installed CayleyPy signature, it now passes normalized search controls to `beam-core`: beam width (including `"max"`), maximum depth, beam mode, taboo history, destination/BFS compatibility, and boolean flags.

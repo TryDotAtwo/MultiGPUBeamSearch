@@ -1,6 +1,7 @@
 use beam_core::search::{
-    native_depth_budget, search_budget, touch_bfs_worst_case_entries,
-    validate_public_search_controls, PermutationGraph, PublicSearchControls,
+    build_public_graph_contract, native_depth_budget, search_budget,
+    touch_bfs_worst_case_entries, validate_public_search_controls, PermutationGraph,
+    PublicGraphContractRequest, PublicSearchControls,
     SearchControlError, TerminalParser,
 };
 
@@ -104,6 +105,62 @@ fn public_search_controls_preserve_invalid_and_unsupported_contracts() {
 
 fn json_tag(kind: &str, value: &str) -> serde_json::Value {
     serde_json::json!({"kind": kind, "value": value})
+}
+
+fn graph_contract_request() -> PublicGraphContractRequest {
+    serde_json::from_value(serde_json::json!({
+        "center": ["0", "1", "2", "3"],
+        "start": ["1", "2", "3", "0"],
+        "generators": [["1", "2", "3", "0"], ["3", "0", "1", "2"]],
+        "generator_name_count": 2
+    }))
+    .unwrap()
+}
+
+#[test]
+fn public_graph_contract_validates_and_hashes_ordered_permutations() {
+    let request = graph_contract_request();
+    let contract = build_public_graph_contract(request.clone()).unwrap();
+    assert_eq!(contract.state_len, 4);
+    assert_eq!(contract.num_classes, 4);
+    assert_eq!(contract.center, vec![0, 1, 2, 3]);
+    assert_eq!(contract.start, vec![1, 2, 3, 0]);
+    assert_eq!(contract.generators, vec![vec![1, 2, 3, 0], vec![3, 0, 1, 2]]);
+
+    let same_graph = build_public_graph_contract(request.clone()).unwrap();
+    assert_eq!(contract.graph_hash, same_graph.graph_hash);
+    let mut changed_order = request;
+    changed_order.generators.reverse();
+    assert_ne!(
+        contract.graph_hash,
+        build_public_graph_contract(changed_order)
+            .unwrap()
+            .graph_hash
+    );
+}
+
+#[test]
+fn public_graph_contract_rejects_invalid_states_and_generators() {
+    let mut bad_start = graph_contract_request();
+    bad_start.start = vec!["0".into(), "0".into(), "2".into(), "3".into()];
+    assert_eq!(
+        build_public_graph_contract(bad_start).unwrap_err(),
+        "start_state multiset must exactly match central_state"
+    );
+
+    let mut bad_generator = graph_contract_request();
+    bad_generator.generators[0][0] = "0".into();
+    assert_eq!(
+        build_public_graph_contract(bad_generator).unwrap_err(),
+        "every native generator must be a complete gather permutation"
+    );
+
+    let mut bad_name_count = graph_contract_request();
+    bad_name_count.generator_name_count = 1;
+    assert_eq!(
+        build_public_graph_contract(bad_name_count).unwrap_err(),
+        "generator_names must contain one string per ordered generator"
+    );
 }
 
 #[test]

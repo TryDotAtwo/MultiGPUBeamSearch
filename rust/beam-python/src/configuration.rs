@@ -42,6 +42,15 @@ fn validate_search_controls(request: &str) -> PyResult<(String, String)> {
         }
     }
 }
+
+#[pyfunction]
+fn build_graph_contract(request: &str) -> PyResult<String> {
+    let request: beam_core::search::PublicGraphContractRequest =
+        serde_json::from_str(request).map_err(|error| PyValueError::new_err(error.to_string()))?;
+    let contract = beam_core::search::build_public_graph_contract(request)
+        .map_err(|message| PyValueError::new_err(message))?;
+    serde_json::to_string(&contract).map_err(|error| PyValueError::new_err(error.to_string()))
+}
 #[pyclass]
 struct InferenceCalibration {
     request: beam_runtime::inference_job::Request,
@@ -149,6 +158,7 @@ pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(touch_bfs_worst_case_entries, module)?)?;
     module.add_function(wrap_pyfunction!(validate_options, module)?)?;
     module.add_function(wrap_pyfunction!(validate_search_controls, module)?)?;
+    module.add_function(wrap_pyfunction!(build_graph_contract, module)?)?;
     module.add_class::<InferenceCalibration>()?;
     module.add_class::<DownstreamCalibration>()?;
     module.add_class::<FrontierCalibration>()?;

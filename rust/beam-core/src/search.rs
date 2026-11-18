@@ -3,6 +3,7 @@ pub use crate::permutation::{search_budget, PermutationGraph, SearchBudget};
 use crate::ContractError;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
+use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 type Result<T> = std::result::Result<T, ContractError>;
 
@@ -24,6 +25,150 @@ pub struct PublicSearchControls {
     pub bfs_result_for_mitm_present: bool,
     pub return_path: TaggedSearchValue,
     pub use_child_scores: TaggedSearchValue,
+}
+
+/// CayleyPy values after the Python adapter has checked their original types.
+/// Decimal strings keep oversized Python integers lossless at the FFI edge.
+#[derive(Clone, Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PublicGraphContractRequest {
+    pub center: Vec<String>,
+    pub start: Vec<String>,
+    pub generators: Vec<Vec<String>>,
+    pub generator_name_count: usize,
+}
+
+/// Validated graph data used by the public adapter and native search session.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct PublicGraphContract {
+    pub state_len: usize,
+    pub num_classes: u16,
+    pub generators: Vec<Vec<u32>>,
+    pub center: Vec<u8>,
+    pub start: Vec<u8>,
+    pub graph_hash: String,
+}
+
+fn hash_decimal_array(hash: &mut Sha256, values: impl IntoIterator<Item = u32>) {
+    hash.update(b"[");
+    for (index, mut value) in values.into_iter().enumerate() {
+        if index != 0 {
+            hash.update(b", ");
+        }
+        let mut digits = [0u8; 10];
+        let mut start = digits.len();
+        loop {
+            start -= 1;
+            digits[start] = b'0' + (value % 10) as u8;
+            value /= 10;
+            if value == 0 {
+                break;
+            }
+        }
+        hash.update(&digits[start..]);
+    }
+    hash.update(b"]");
+}
+
+/// Match `cayleypy.models.checkpoint.graph_hash`'s sorted-key JSON encoding.
+pub fn permutation_graph_hash(graph: &PermutationGraph) -> String {
+    let mut hash = Sha256::new();
+    hash.update(b"{\"central_state\": ");
+    hash_decimal_array(&mut hash, graph.center.iter().copied().map(u32::from));
+    hash.update(b", \"generators\": [");
+    for (index, generator) in graph.generators.iter().enumerate() {
+        if index != 0 {
+            hash.update(b", ");
+        }
+        hash_decimal_array(&mut hash, generator.iter().copied());
+    }
+    hash.update(b"], \"generators_type\": \"PERMUTATION\"}");
+    format!("{:x}", hash.finalize())
+}
+
+/// Validate the normalized public graph and compute its stable CayleyPy identity.
+pub fn build_public_graph_contract(
+    request: PublicGraphContractRequest,
+) -> std::result::Result<PublicGraphContract, String> {
+    let size = request.center.len();
+    if !(1..=150).contains(&size) {
+        return Err("native logical state length must be in [1, 150]".into());
+    }
+    if request.start.len() != size {
+        return Err(format!(
+            "start_state must have exactly one state of length {size}"
+        ));
+    }
+    if request.generators.is_empty() || request.generators.len() > 255 {
+        return Err("native move count must be in [1, 255]".into());
+    }
+    if request.generator_name_count != request.generators.len() {
+        return Err("generator_names must contain one string per ordered generator".into());
+    }
+
+    let value_max = if size > 128 { 255 } else { 127 };
+    let parse_state = |values: &[String]| -> std::result::Result<Vec<u8>, String> {
+        values
+            .iter()
+            .map(|value| {
+                value
+                    .parse::<u16>()
+                    .ok()
+                    .filter(|value| *value <= value_max)
+                    .map(|value| value as u8)
+                    .ok_or_else(|| {
+                        format!("native state values must be integers in [0, {value_max}]")
+                    })
+            })
+            .collect()
+    };
+    let center = parse_state(&request.center)?;
+    let start = parse_state(&request.start)?;
+    let mut expected = center.clone();
+    let mut actual = start.clone();
+    expected.sort_unstable();
+    actual.sort_unstable();
+    if actual != expected {
+        return Err("start_state multiset must exactly match central_state".into());
+    }
+
+    let mut generators = Vec::with_capacity(request.generators.len());
+    for row in request.generators {
+        if row.len() != size {
+            return Err("every native generator must be a complete gather permutation".into());
+        }
+        let mut seen = vec![false; size];
+        let mut generator = Vec::with_capacity(size);
+        for value in row {
+            let source = value
+                .parse::<u32>()
+                .ok()
+                .filter(|source| (*source as usize) < size)
+                .ok_or_else(|| {
+                    "every native generator must be a complete gather permutation".to_string()
+                })?;
+            let slot = &mut seen[source as usize];
+            if *slot {
+                return Err("every native generator must be a complete gather permutation".into());
+            }
+            *slot = true;
+            generator.push(source);
+        }
+        generators.push(generator);
+    }
+
+    let graph = PermutationGraph {
+        center: center.clone(),
+        generators: generators.clone(),
+    };
+    Ok(PublicGraphContract {
+        state_len: size,
+        num_classes: u16::from(*center.iter().max().expect("non-empty center")) + 1,
+        generators,
+        center,
+        start,
+        graph_hash: permutation_graph_hash(&graph),
+    })
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

@@ -63,18 +63,35 @@ class GraphContract:
             raise NativeUnavailable("native logical state length must be in [1, 150]")
         center = _integers(definition.central_state, "central_state", size)
         start = _integers(start_state, "start_state", size, single_row=True)
+        generators = tuple(_integers(g, "generator", size) for g in definition.generators_permutations)
+        names = tuple(definition.generator_names)
+        native = None
+        if len(names) == len(generators) and all(isinstance(name, str) for name in names):
+            from .rust_control import build_graph_contract
+
+            native = build_graph_contract(center, start, generators, names)
+        if native is not None:
+            return cls(
+                native["state_len"],
+                native["num_classes"],
+                tuple(tuple(row) for row in native["generators"]),
+                names,
+                tuple(native["center"]),
+                tuple(native["start"]),
+                native["graph_hash"],
+            )
+
+        # Compatibility path for Python-only and older Rust extensions.
         value_max = 255 if size > 128 else 127
         if any(not 0 <= x <= value_max for x in center + start):
             raise NativeUnavailable(f"native state values must be integers in [0, {value_max}]")
         if Counter(center) != Counter(start):
             raise NativeUnavailable("start_state multiset must exactly match central_state")
-        generators = tuple(_integers(g, "generator", size) for g in definition.generators_permutations)
         if not generators or len(generators) > 255:
             raise NativeUnavailable("native move count must be in [1, 255]")
         expected = tuple(range(size))
         if any(tuple(sorted(g)) != expected for g in generators):
             raise NativeUnavailable("every native generator must be a complete gather permutation")
-        names = tuple(definition.generator_names)
         if len(names) != len(generators) or any(not isinstance(name, str) for name in names):
             raise NativeUnavailable("generator_names must contain one string per ordered generator")
         # Same schema and JSON encoding as cayleypy.models.checkpoint.graph_hash.
