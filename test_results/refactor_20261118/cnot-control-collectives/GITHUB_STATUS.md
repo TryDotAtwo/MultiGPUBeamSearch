@@ -30,3 +30,14 @@ Source commit: `6d410739ab5c8ce8deb0f09d1f42cb8e1020cee7`
 - Vast status workflow [44360849887](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44360849887): instance `61080396` was exited; transfer/build/NCCL were skipped without starting, stopping, or renting compute.
 
 The Rust layer now owns this exchange dispatch but still calls the existing PyTorch transport or CUDA operator. Physical CUDA/NCCL and multi-GPU CNOT runtime remain unverified.
+
+## Rust transport selection — 2026-11-18
+
+Source commit: `ee162cc9b8c5c612d62ba8ac432a647d175cfc91`
+
+- Test-first CPU workflow [44362409466](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44362409466): expected failures in the new Rust ABI and selection assertions (3 failed, 146 passed, 2 skipped).
+- Green CPU workflow [44363394178](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44363394178): Rust formatting/checks, PyO3 check/build, 149 Python tests passed, 2 skipped, and NCCL probe syntax passed.
+- Full hosted test log artifact [14455567451](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44363394178/artifacts/14455567451), SHA-256 `0f42f0b4e21e7e292538f4681f56b6d3e0bcbb1e8a5728fcd3f9108c56c88724`.
+- Vast status workflow [44363394309](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44363394309): instance `61080396` was exited; transfer/build/NCCL were skipped without changing instance state.
+
+The Rust layer now owns the transport choice and rank-consensus control flow. Existing Rust and Python transport implementations remain in use. This is CPU/control-flow evidence only; physical CUDA/NCCL and multi-GPU CNOT runtime remain unverified.

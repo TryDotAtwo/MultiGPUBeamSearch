@@ -1976,3 +1976,21 @@ Preserved 26 checkouts and their source/index overlays; verified restoration of 
   skipped the CUDA/NCCL run without changing instance state. No physical
   multi-GPU runtime was verified. Details:
   `test_results/refactor_20261118/cnot-control-collectives/GITHUB_STATUS.md`.
+
+## 2026-11-18 - Rust selection of CNOT transport
+
+- `World.start_transport` now delegates transport selection to a PyO3 Rust
+  function when available. Rust preserves the all-rank support vote for
+  `prefer_rust=True`, chooses Rust only when every rank supports it, keeps the
+  Python `Stream5` fallback, and skips the vote when Rust is not preferred.
+  Older extensions retain the previous Python implementation. No search,
+  collective-order, communicator, or wire-protocol behavior was changed.
+- Test-first run 44362409466 failed on the new ABI/selection assertions as
+  expected (3 failed, 146 passed, 2 skipped). Run 44363394178 passed Rust
+  formatting/checks, PyO3 build, 149 Python tests (2 skipped), and NCCL probe
+  syntax. Artifact 14455567451 SHA-256:
+  `0f42f0b4e21e7e292538f4681f56b6d3e0bcbb1e8a5728fcd3f9108c56c88724`.
+- Vast status run 44363394309 confirmed the existing instance was stopped and
+  skipped transfer/build/NCCL without changing its state. Physical CUDA/NCCL
+  and multi-GPU CNOT runtime remain unverified. Details:
+  `test_results/refactor_20261118/cnot-control-collectives/GITHUB_STATUS.md`.
