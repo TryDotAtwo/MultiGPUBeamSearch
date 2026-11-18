@@ -214,19 +214,29 @@ continue through the Python compatibility owner; `engine="rust"` fails closed.
 
 The optional ABI-1 depth-control table is installed with
 `beam_context_set_depth_control` before `prepare`; the blocking CLI counterpart is
-`beam_native_main_with_history_and_depth_control`. Rust owns a boxed callback
-bridge until native destruction joins the engine thread (or the blocking call
-returns). The table is copied by C++, while `user_data` stays borrowed for that
-interval. Callbacks run only at two existing boundaries per completed depth and
-receive scalar flags; they receive no CUDA pointer or tensor. Old libraries
-without these optional symbols retain the existing C++ continuation checks.
+`beam_native_main_with_history_and_depth_control`. It keeps its original
+24-byte input and 12-byte output layouts and supports the two existing depth
+checkpoints. Rust owns a boxed callback bridge until native destruction joins
+the engine thread (or the blocking call returns). The table is copied by C++,
+while `user_data` stays borrowed for that interval. Callbacks receive scalar
+state and no CUDA pointer or tensor. Old libraries without these optional
+symbols retain the existing C++ continuation checks.
 
 The first migrated decision covers calibration saturation before the existing
 frontier-live NCCL collective. The second covers the already-computed global
-frontier-live result and debug-path stop flags after that collective. CUDA stage
-dispatch, solve handling, history reconstruction and finalization remain in C++.
-The API preserves the previous collective order and does not introduce a
-candidate- or kernel-level Rust/C++ call.
+frontier-live result and debug-path stop flags after that collective. ABI-1
+continues to use the original C++ solve-bucket policy.
+
+An optional ABI-2 table, installed with `beam_context_set_depth_control_v2` or
+`beam_native_main_with_history_and_depth_control_v2`, adds the solve-bucket
+checkpoint while preserving the same callback ownership. Its input is 64 bytes
+aligned to 8; its output is 16 bytes aligned to 4 on the supported 64-bit ABI.
+`stop_reason` is `0` to continue, `1` for a depth-window stop, and `2` for a
+solution-capacity stop. New Rust code prefers ABI-2 and falls back to ABI-1
+when only its symbols exist. CUDA stage dispatch, bucket scanning, solution
+reconstruction, history and finalization remain in C++. Both interfaces
+preserve the previous collective order and avoid candidate- or kernel-level
+Rust/C++ calls. CPU ABI tests check both versions and their layouts.
 
 The current native engine still uses process environment, cwd and stdout. Run it
 in the dedicated worker, not in a notebook/Python process that owns CUDA tensors.

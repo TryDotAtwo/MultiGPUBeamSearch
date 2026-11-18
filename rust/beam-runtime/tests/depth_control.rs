@@ -1,6 +1,7 @@
+use beam_native_sys::depth_control::{DepthControlSink, STOP_REASON_CAPACITY};
 use beam_runtime::depth_control::{
-    continue_after, solve_bucket_stop_reason, DepthCheckpoint, SolveBucketStatus,
-    SolveBucketStopReason, TrackedPathStop,
+    continue_after, solve_bucket_stop_reason, DepthCheckpoint, DepthCheckpointV2,
+    NativeDepthController, SolveBucketStatus, SolveBucketStopReason, TrackedPathStop,
 };
 
 #[test]
@@ -108,4 +109,22 @@ fn solve_bucket_legacy_window_waits_for_a_solution_and_keeps_u32_wraparound() {
         solve_bucket_stop_reason(status),
         SolveBucketStopReason::DepthReached
     );
+}
+
+#[test]
+fn native_controller_exports_the_same_solve_bucket_reason_through_abi2() {
+    let decision = NativeDepthController
+        .decide_v2(DepthCheckpointV2::SolveBucketStop {
+            max_solutions: 3,
+            accepted_solutions: 3,
+            completed_depths: 1,
+            current_depth_index: 0,
+            stop_depth: 0,
+            first_found_depth_index: 0,
+            extra_depths: 0,
+            found_any: true,
+        })
+        .expect("valid solve-bucket state");
+    assert!(!decision.continue_search);
+    assert_eq!(decision.stop_reason, STOP_REASON_CAPACITY);
 }

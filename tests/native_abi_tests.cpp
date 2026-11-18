@@ -34,6 +34,38 @@ extern "C" int32_t depth_decide(
     return BEAM_OK;
 }
 
+extern "C" int32_t depth_decide_v2(
+    void* user,
+    const beam_depth_control_input_v2* input,
+    beam_depth_control_output_v2* output) {
+    if (!user || !input || !output || input->abi_version != 2 ||
+        input->struct_size != sizeof(*input) || output->abi_version != 2 ||
+        output->struct_size != sizeof(*output)) {
+        return BEAM_INVALID;
+    }
+    ++static_cast<DepthProbe*>(user)->calls;
+    if (input->checkpoint == BEAM_DEPTH_V2_BEFORE_FRONTIER_COLLECTIVE) {
+        output->continue_search = input->calibration_limit_reached == 0;
+    } else if (input->checkpoint == BEAM_DEPTH_V2_AFTER_FRONTIER_COLLECTIVE) {
+        output->continue_search = input->frontier_live != 0 && input->tracked_path_stop == 0;
+    } else if (input->checkpoint == BEAM_DEPTH_V2_SOLVE_BUCKET_STOP) {
+        if (input->max_solutions != 0 && input->accepted_solutions >= input->max_solutions) {
+            output->stop_reason = static_cast<std::uint32_t>(BEAM_DEPTH_STOP_REASON_CAPACITY);
+        } else if (input->stop_depth != 0 && input->completed_depths >= input->stop_depth) {
+            output->stop_reason = static_cast<std::uint32_t>(BEAM_DEPTH_STOP_REASON_DEPTH);
+        } else if (input->stop_depth == 0 && input->solve_bucket_found_any != 0 &&
+                   input->current_depth_index >=
+                       input->first_found_depth_index + input->extra_depths) {
+            output->stop_reason = static_cast<std::uint32_t>(BEAM_DEPTH_STOP_REASON_DEPTH);
+        }
+        output->continue_search = output->stop_reason ==
+            static_cast<std::uint32_t>(BEAM_DEPTH_STOP_REASON_NONE);
+    } else {
+        return BEAM_INVALID;
+    }
+    return BEAM_OK;
+}
+
 extern "C" int32_t depth_error(void*, char* out, uint64_t capacity, uint64_t* required) {
     if (!required) return BEAM_INVALID;
     *required = 1;
@@ -52,7 +84,8 @@ int run_production_runner(int argc, char** argv) {
     if(argc == 2 && std::string(argv[1]) == "fail-prepare")
         throw std::runtime_error("prepare failure preserved");
     auto* control = beam::native::current_control();
-    if (argc == 2 && std::string(argv[1]) == "depth-control") {
+    if (argc == 2 && (std::string(argv[1]) == "depth-control-v1" ||
+                      std::string(argv[1]) == "depth-control-v2")) {
         beam::native::DepthControlBridge depth_control;
         assert(depth_control);
         assert(!depth_control.continue_after(
@@ -65,6 +98,17 @@ int run_production_runner(int argc, char** argv) {
             BEAM_DEPTH_AFTER_FRONTIER_COLLECTIVE, true, true, 1));
         assert(depth_control.continue_after(
             BEAM_DEPTH_AFTER_FRONTIER_COLLECTIVE, true, true, 0));
+        if (std::string(argv[1]) == "depth-control-v2") {
+            assert(depth_control.supports_solve_bucket());
+            assert(depth_control.solve_bucket_stop_reason(0, 0, 1, 0, 0, 0, 0, false) ==
+                   static_cast<std::uint32_t>(BEAM_DEPTH_STOP_REASON_NONE));
+            assert(depth_control.solve_bucket_stop_reason(2, 2, 1, 0, 0, 0, 0, false) ==
+                   static_cast<std::uint32_t>(BEAM_DEPTH_STOP_REASON_CAPACITY));
+            assert(depth_control.solve_bucket_stop_reason(0, 0, 5, 4, 5, 4, 0, true) ==
+                   static_cast<std::uint32_t>(BEAM_DEPTH_STOP_REASON_DEPTH));
+        } else {
+            assert(!depth_control.supports_solve_bucket());
+        }
         return 0;
     }
     beam::native::HistoryBridge history;
@@ -132,8 +176,9 @@ int main() {
     invalid_depth_api.abi_version = 2;
     assert(beam_context_set_depth_control(ctx, &invalid_depth_api) == BEAM_INVALID);
     assert(beam_context_set_depth_control(ctx, &depth_api) == BEAM_OK);
-    const char* depth_args[] = {"test", "depth-control"};
-    assert(beam_context_prepare(ctx, 2, depth_args) == BEAM_OK);
+    const char* depth_args_v1[] = {"test", "depth-control-v1"};
+    const char* depth_args_v2[] = {"test", "depth-control-v2"};
+    assert(beam_context_prepare(ctx, 2, depth_args_v1) == BEAM_OK);
     assert(beam_context_set_depth_control(ctx, &depth_api) == BEAM_BUSY);
     assert(beam_context_wait(ctx, 1000) == BEAM_OK);
     assert(depth_probe.calls == 5);
@@ -143,8 +188,32 @@ int main() {
     beam_depth_control_api_v1 coarse_depth_api{
         1, sizeof(beam_depth_control_api_v1), &coarse_depth_probe, depth_decide, depth_error};
     assert(beam_native_main_with_history_and_depth_control(
-               2, depth_args, nullptr, &coarse_depth_api) == 0);
+               2, depth_args_v1, nullptr, &coarse_depth_api) == 0);
     assert(coarse_depth_probe.calls == 5);
+
+    ctx = nullptr;
+    assert(beam_context_create(1, &ctx) == BEAM_OK);
+    DepthProbe depth_probe_v2;
+    beam_depth_control_api_v2 depth_api_v2{
+        2, sizeof(beam_depth_control_api_v2), &depth_probe_v2, depth_decide_v2, depth_error};
+    assert(beam_context_set_depth_control_v2(nullptr, &depth_api_v2) == BEAM_INVALID);
+    beam_depth_control_api_v2 invalid_depth_api_v2 = depth_api_v2;
+    invalid_depth_api_v2.abi_version = 1;
+    assert(beam_context_set_depth_control_v2(ctx, &invalid_depth_api_v2) == BEAM_INVALID);
+    assert(beam_context_set_depth_control_v2(ctx, &depth_api_v2) == BEAM_OK);
+    assert(beam_context_prepare(ctx, 2, depth_args_v2) == BEAM_OK);
+    assert(beam_context_set_depth_control_v2(ctx, &depth_api_v2) == BEAM_BUSY);
+    assert(beam_context_wait(ctx, 1000) == BEAM_OK);
+    assert(depth_probe_v2.calls == 8);
+    assert(beam_context_destroy(ctx) == BEAM_OK);
+
+    DepthProbe coarse_depth_probe_v2;
+    beam_depth_control_api_v2 coarse_depth_api_v2{
+        2, sizeof(beam_depth_control_api_v2), &coarse_depth_probe_v2,
+        depth_decide_v2, depth_error};
+    assert(beam_native_main_with_history_and_depth_control_v2(
+               2, depth_args_v2, nullptr, &coarse_depth_api_v2) == 0);
+    assert(coarse_depth_probe_v2.calls == 8);
 
     ctx = nullptr;
     assert(beam_context_create(1, &ctx) == BEAM_OK);

@@ -13,8 +13,10 @@ namespace {
 std::atomic<bool> occupied{false};
 thread_local beam::native::Control* active_control = nullptr;
 thread_local const beam_history_api_v1* coarse_history = nullptr;
-thread_local const beam_depth_control_api_v1* active_depth_control = nullptr;
-thread_local const beam_depth_control_api_v1* coarse_depth_control = nullptr;
+thread_local const beam_depth_control_api_v1* active_depth_control_v1 = nullptr;
+thread_local const beam_depth_control_api_v1* coarse_depth_control_v1 = nullptr;
+thread_local const beam_depth_control_api_v2* active_depth_control_v2 = nullptr;
+thread_local const beam_depth_control_api_v2* coarse_depth_control_v2 = nullptr;
 bool valid_history(const beam_history_api_v1* api) {
     return api && api->abi_version == BEAM_NATIVE_ABI_VERSION &&
         api->struct_size >= sizeof(*api) && api->user_data && api->initialize &&
@@ -23,6 +25,10 @@ bool valid_history(const beam_history_api_v1* api) {
 bool valid_depth_control(const beam_depth_control_api_v1* api) {
     return api && api->abi_version == BEAM_NATIVE_ABI_VERSION &&
         api->struct_size >= sizeof(*api) && api->user_data && api->decide && api->error;
+}
+bool valid_depth_control_v2(const beam_depth_control_api_v2* api) {
+    return api && api->abi_version == 2U && api->struct_size >= sizeof(*api) &&
+        api->user_data && api->decide && api->error;
 }
 std::vector<std::string> copy_arguments(int argc, const char* const* argv) {
     if(argc < 1 || argc > 4096 || !argv) throw std::invalid_argument("invalid native argv");
@@ -50,12 +56,19 @@ beam::native::Control* beam::native::current_control() noexcept { return active_
 const beam_history_api_v1* beam::native::current_history() noexcept {
     return active_control ? &active_control->history : coarse_history;
 }
-const beam_depth_control_api_v1* beam::native::current_depth_control() noexcept {
-    if (active_depth_control) return active_depth_control;
-    if (active_control && active_control->depth_control.user_data) {
-        return &active_control->depth_control;
+const beam_depth_control_api_v1* beam::native::current_depth_control_v1() noexcept {
+    if (active_depth_control_v1) return active_depth_control_v1;
+    if (active_control && active_control->depth_control_v1.user_data) {
+        return &active_control->depth_control_v1;
     }
-    return coarse_depth_control;
+    return coarse_depth_control_v1;
+}
+const beam_depth_control_api_v2* beam::native::current_depth_control_v2() noexcept {
+    if (active_depth_control_v2) return active_depth_control_v2;
+    if (active_control && active_control->depth_control_v2.user_data) {
+        return &active_control->depth_control_v2;
+    }
+    return coarse_depth_control_v2;
 }
 
 extern "C" {
@@ -96,8 +109,11 @@ beam_result beam_context_prepare(beam_context* ctx, int argc, const char* const*
         ctx->control.phase = BEAM_PREPARING;
         ctx->worker = std::thread([ctx] {
             active_control = &ctx->control;
-            active_depth_control = ctx->control.depth_control.user_data
-                ? &ctx->control.depth_control
+            active_depth_control_v1 = ctx->control.depth_control_v1.user_data
+                ? &ctx->control.depth_control_v1
+                : nullptr;
+            active_depth_control_v2 = ctx->control.depth_control_v2.user_data
+                ? &ctx->control.depth_control_v2
                 : nullptr;
             try {
                 auto argv = argument_views(ctx->args);
@@ -109,7 +125,8 @@ beam_result beam_context_prepare(beam_context* ctx, int argc, const char* const*
             } catch(const std::exception& error) {
                 ctx->control.finish(BEAM_FAILED, error.what());
             } catch(...) { ctx->control.finish(BEAM_FAILED, "unknown native exception"); }
-            active_depth_control = nullptr;
+            active_depth_control_v1 = nullptr;
+            active_depth_control_v2 = nullptr;
             active_control = nullptr;
         });
         return BEAM_OK;
@@ -132,7 +149,18 @@ beam_result beam_context_set_depth_control(
     try {
         std::lock_guard lock(ctx->control.mutex);
         if(ctx->control.phase != BEAM_CREATED) return BEAM_BUSY;
-        ctx->control.depth_control = *api;
+        ctx->control.depth_control_v1 = *api;
+        return BEAM_OK;
+    } catch(...) { return BEAM_FAILED; }
+}
+beam_result beam_context_set_depth_control_v2(
+    beam_context* ctx,
+    const beam_depth_control_api_v2* api) {
+    if(!ctx || !valid_depth_control_v2(api)) return BEAM_INVALID;
+    try {
+        std::lock_guard lock(ctx->control.mutex);
+        if(ctx->control.phase != BEAM_CREATED) return BEAM_BUSY;
+        ctx->control.depth_control_v2 = *api;
         return BEAM_OK;
     } catch(...) { return BEAM_FAILED; }
 }
@@ -223,7 +251,8 @@ int beam_native_main_with_history_and_depth_control(
     if(depth_control && !valid_depth_control(depth_control)) return 1;
     if(occupied.exchange(true)) return 1;
     coarse_history=history;
-    coarse_depth_control=depth_control;
+    coarse_depth_control_v1=depth_control;
+    coarse_depth_control_v2=nullptr;
     int result = 1;
     try {
         auto args = copy_arguments(argc, argv);
@@ -233,7 +262,33 @@ int beam_native_main_with_history_and_depth_control(
         std::cerr << "production_runner_error=" << error.what() << '\n';
     } catch(...) { std::cerr << "production_runner_error=unknown exception\n"; }
     coarse_history=nullptr;
-    coarse_depth_control=nullptr;
+    coarse_depth_control_v1=nullptr;
+    coarse_depth_control_v2=nullptr;
+    occupied = false;
+    return result;
+}
+int beam_native_main_with_history_and_depth_control_v2(
+    int argc,
+    const char* const* argv,
+    const beam_history_api_v1* history,
+    const beam_depth_control_api_v2* depth_control) {
+    if(history && !valid_history(history)) return 1;
+    if(depth_control && !valid_depth_control_v2(depth_control)) return 1;
+    if(occupied.exchange(true)) return 1;
+    coarse_history=history;
+    coarse_depth_control_v1=nullptr;
+    coarse_depth_control_v2=depth_control;
+    int result = 1;
+    try {
+        auto args = copy_arguments(argc, argv);
+        auto views = argument_views(args);
+        result = run_production_runner(argc, views.data());
+    } catch(const std::exception& error) {
+        std::cerr << "production_runner_error=" << error.what() << '\n';
+    } catch(...) { std::cerr << "production_runner_error=unknown exception\n"; }
+    coarse_history=nullptr;
+    coarse_depth_control_v1=nullptr;
+    coarse_depth_control_v2=nullptr;
     occupied = false;
     return result;
 }

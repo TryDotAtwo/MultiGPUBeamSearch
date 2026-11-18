@@ -76,8 +76,15 @@ type RunWithHistoryAndDepthControl = unsafe extern "C" fn(
     *const history::Api,
     *const depth_control::Api,
 ) -> i32;
+type RunWithHistoryAndDepthControlV2 = unsafe extern "C" fn(
+    i32,
+    *const *const c_char,
+    *const history::Api,
+    *const depth_control::ApiV2,
+) -> i32;
 type SetHistory = unsafe extern "C" fn(*mut c_void, *const history::Api) -> i32;
 type SetDepthControl = unsafe extern "C" fn(*mut c_void, *const depth_control::Api) -> i32;
+type SetDepthControlV2 = unsafe extern "C" fn(*mut c_void, *const depth_control::ApiV2) -> i32;
 type SetGraphHash = unsafe extern "C" fn(*mut c_void, *const c_char, u64) -> i32;
 
 struct Bindings {
@@ -94,9 +101,11 @@ struct Bindings {
     layout: GetLayout,
     set_history: Option<SetHistory>,
     set_depth_control: Option<SetDepthControl>,
+    set_depth_control_v2: Option<SetDepthControlV2>,
     set_graph_hash: Option<SetGraphHash>,
     run_with_history: Option<RunWithHistory>,
     run_with_history_and_depth_control: Option<RunWithHistoryAndDepthControl>,
+    run_with_history_and_depth_control_v2: Option<RunWithHistoryAndDepthControlV2>,
 }
 #[derive(Clone)]
 pub struct NativeLibrary(Arc<Bindings>);
@@ -143,6 +152,10 @@ impl NativeLibrary {
                     .get::<SetDepthControl>(b"beam_context_set_depth_control\0")
                     .ok()
                     .map(|s| *s),
+                set_depth_control_v2: library
+                    .get::<SetDepthControlV2>(b"beam_context_set_depth_control_v2\0")
+                    .ok()
+                    .map(|s| *s),
                 set_graph_hash: library
                     .get::<SetGraphHash>(b"beam_context_set_graph_hash\0")
                     .ok()
@@ -154,6 +167,12 @@ impl NativeLibrary {
                 run_with_history_and_depth_control: library
                     .get::<RunWithHistoryAndDepthControl>(
                         b"beam_native_main_with_history_and_depth_control\0",
+                    )
+                    .ok()
+                    .map(|s| *s),
+                run_with_history_and_depth_control_v2: library
+                    .get::<RunWithHistoryAndDepthControlV2>(
+                        b"beam_native_main_with_history_and_depth_control_v2\0",
                     )
                     .ok()
                     .map(|s| *s),
@@ -219,24 +238,40 @@ impl NativeLibrary {
         history_sink: Box<dyn history::HistorySink>,
         depth_control_sink: Box<dyn depth_control::DepthControlSink>,
     ) -> Result<i32> {
-        let Some(run) = self.0.run_with_history_and_depth_control else {
+        if self.0.run_with_history_and_depth_control_v2.is_none()
+            && self.0.run_with_history_and_depth_control.is_none()
+        {
             return self.run_with_history(args, history_sink);
-        };
+        }
         let storage = arguments(args)?;
         let views = argument_views(&storage);
         let mut history_bridge = Box::new(history::Bridge::new(history_sink));
         let history_table = history_bridge.table();
         let mut depth_control_bridge = Box::new(depth_control::Bridge::new(depth_control_sink));
-        let depth_control_table = depth_control_bridge.table();
         // Native joins its engine before returning, so both boxed owners, the
         // callback tables, argv storage and dynamic library outlive all calls.
-        let code = unsafe {
-            run(
-                storage.len() as i32,
-                views.as_ptr(),
-                &history_table,
-                &depth_control_table,
-            )
+        let code = if let Some(run_v2) = self.0.run_with_history_and_depth_control_v2 {
+            let depth_control_table = depth_control_bridge.table_v2();
+            unsafe {
+                run_v2(
+                    storage.len() as i32,
+                    views.as_ptr(),
+                    &history_table,
+                    &depth_control_table,
+                )
+            }
+        } else if let Some(run_v1) = self.0.run_with_history_and_depth_control {
+            let depth_control_table = depth_control_bridge.table();
+            unsafe {
+                run_v1(
+                    storage.len() as i32,
+                    views.as_ptr(),
+                    &history_table,
+                    &depth_control_table,
+                )
+            }
+        } else {
+            unreachable!("availability checked above")
         };
         drop(depth_control_bridge);
         drop(history_bridge);
@@ -301,14 +336,18 @@ impl Context {
         &mut self,
         sink: Box<dyn depth_control::DepthControlSink>,
     ) -> Result<bool> {
-        let Some(install) = self.api.set_depth_control else {
-            return Ok(false);
-        };
         let mut bridge = Box::new(depth_control::Bridge::new(sink));
-        let table = bridge.table();
         // Native copies the table and calls it on its engine thread. This
         // stable boxed owner remains live until destroy joins that thread.
-        self.check(unsafe { install(self.ptr.as_ptr(), &table) })?;
+        if let Some(install_v2) = self.api.set_depth_control_v2 {
+            let table = bridge.table_v2();
+            self.check(unsafe { install_v2(self.ptr.as_ptr(), &table) })?;
+        } else if let Some(install_v1) = self.api.set_depth_control {
+            let table = bridge.table();
+            self.check(unsafe { install_v1(self.ptr.as_ptr(), &table) })?;
+        } else {
+            return Ok(false);
+        }
         self.depth_control = Some(bridge);
         Ok(true)
     }
