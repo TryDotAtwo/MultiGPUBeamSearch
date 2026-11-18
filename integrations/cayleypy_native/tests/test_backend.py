@@ -79,6 +79,18 @@ def test_native_options_keep_python_validation_for_old_extensions(monkeypatch):
         NativeOptions(solution_mode="unknown")
 
 
+def test_native_options_keep_python_validation_when_extension_import_fails(monkeypatch):
+    from multigpubeamsearch import rust_control
+
+    def failed_import():
+        raise ImportError("native extension dependency is unavailable")
+
+    monkeypatch.setattr(rust_control, "extension", failed_import)
+
+    with pytest.raises(ValueError, match="solution_mode must be first or collect"):
+        NativeOptions(solution_mode="unknown")
+
+
 def test_native_options_keep_python_fallback_outside_rust_integer_ranges(monkeypatch):
     from multigpubeamsearch import rust_control
 
