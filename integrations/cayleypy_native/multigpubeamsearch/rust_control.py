@@ -83,7 +83,7 @@ def validate_options(options):
         return False
     try:
         native = extension()
-    except NativeUnavailable:
+    except (NativeUnavailable, ImportError):
         return False
     validator = getattr(native, 'validate_options', None)
     if validator is None:
