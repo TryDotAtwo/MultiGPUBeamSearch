@@ -106,6 +106,87 @@ def test_checked_stage_keeps_python_fallback_for_older_extensions(monkeypatch):
     assert world.checked("prepare CNOT stage", lambda: expected) is expected
 
 
+def _configure_row_gather(world, local_rows, calls, remote_rows):
+    world.rank = 0
+    world.size = 2
+    world.longs = lambda items: torch.as_tensor(items, dtype=torch.int64)
+
+    def gather_fixed(tensor):
+        calls.append(("gather_fixed", tensor.tolist()))
+        counts = torch.tensor([len(local_rows), len(remote_rows)], dtype=tensor.dtype)
+        return counts.unsqueeze(1)
+
+    def broadcast(tensor, source):
+        calls.append(("broadcast", source, tuple(tensor.shape)))
+        if source == 1:
+            tensor.copy_(remote_rows)
+        return tensor
+
+    world.gather_fixed = gather_fixed
+    world.broadcast = broadcast
+
+
+def test_rust_gather_rows_preserves_order_and_empty_rank():
+    gather = getattr(rust_control.extension(), "run_cnot_native_gather_rows")
+    for local_rows, expected_calls in (
+        (torch.tensor([[10, 11], [12, 13]], dtype=torch.int64),
+         [("broadcast", 0, (2, 2)), ("broadcast", 1, (1, 2))]),
+        (torch.empty((0, 2), dtype=torch.int64),
+         [("broadcast", 1, (1, 2))]),
+    ):
+        world = _two_rank_world()
+        calls = []
+        remote_rows = torch.tensor([[20, 21]], dtype=torch.int64)
+        _configure_row_gather(world, local_rows, calls, remote_rows)
+
+        result = gather(world, local_rows)
+
+        assert result.tolist() == local_rows.tolist() + remote_rows.tolist()
+        assert calls[0] == ("gather_fixed", [len(local_rows)])
+        assert calls[1:] == expected_calls
+
+
+def test_world_gather_rows_uses_the_rust_abi_when_available(monkeypatch):
+    world = _two_rank_world()
+    local_rows = torch.tensor([[1, 2]], dtype=torch.int64)
+    native_calls = []
+    python_calls = []
+    _configure_row_gather(
+        world, local_rows, python_calls, torch.tensor([[3, 4]], dtype=torch.int64)
+    )
+    expected = object()
+
+    def gather(actual_world, rows):
+        native_calls.append((actual_world, rows))
+        return expected
+
+    monkeypatch.setattr(
+        rust_control,
+        "extension",
+        lambda: SimpleNamespace(run_cnot_native_gather_rows=gather),
+    )
+
+    assert world.gather_rows(local_rows) is expected
+    assert native_calls == [(world, local_rows)]
+    assert python_calls == []
+
+
+def test_world_gather_rows_keeps_python_fallback_for_older_extensions(monkeypatch):
+    world = _two_rank_world()
+    local_rows = torch.tensor([[1, 2]], dtype=torch.int64)
+    python_calls = []
+    remote_rows = torch.tensor([[3, 4]], dtype=torch.int64)
+    _configure_row_gather(world, local_rows, python_calls, remote_rows)
+    monkeypatch.setattr(rust_control, "extension", lambda: SimpleNamespace())
+
+    assert world.gather_rows(local_rows).tolist() == [[1, 2], [3, 4]]
+    assert python_calls == [
+        ("gather_fixed", [1]),
+        ("broadcast", 0, (1, 2)),
+        ("broadcast", 1, (1, 2)),
+    ]
+
+
 def test_rust_transport_requires_exchange_and_collective_abi(monkeypatch):
     class NativeLibrary:
         def __init__(self, _path):
