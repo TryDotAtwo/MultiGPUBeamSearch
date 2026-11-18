@@ -35,9 +35,7 @@ impl PyTqpScorer {
             return Err(PyValueError::new_err("n must be a valid CNOT dimension"));
         }
         if inference_batch < 1 {
-            return Err(PyValueError::new_err(
-                "inference_batch must be positive",
-            ));
+            return Err(PyValueError::new_err("inference_batch must be positive"));
         }
         if !experimental_native_batch.is_instance_of::<PyBool>() {
             return Err(PyValueError::new_err(
@@ -158,7 +156,11 @@ impl PyTqpScorer {
         let head = match mode {
             "qhat" => 0,
             "proposal" => 1,
-            _ => return Err(PyValueError::new_err("parent scorer mode must be qhat or proposal")),
+            _ => {
+                return Err(PyValueError::new_err(
+                    "parent scorer mode must be qhat or proposal",
+                ))
+            }
         };
         self.score(py, rows, head)
     }
@@ -180,7 +182,10 @@ impl PyTqpScorer {
         head: u32,
     ) -> PyResult<Bound<'py, PyAny>> {
         let torch = py.import("torch")?;
-        if !torch.call_method1("is_tensor", (&rows,))?.extract::<bool>()? {
+        if !torch
+            .call_method1("is_tensor", (&rows,))?
+            .extract::<bool>()?
+        {
             return Err(PyValueError::new_err(
                 "rows must be rank-local CUDA int64 [batch, n, ceil(n/64)]",
             ));
@@ -262,9 +267,11 @@ impl PyTqpScorer {
         }
 
         let contiguous_rows = rows.call_method0("contiguous")?;
-        let status_shape = PyTuple::new(py, [usize::try_from(count).map_err(|_| {
-            PyOverflowError::new_err("CNOT packet size overflow")
-        })?])?;
+        let status_shape = PyTuple::new(
+            py,
+            [usize::try_from(count)
+                .map_err(|_| PyOverflowError::new_err("CNOT packet size overflow"))?],
+        )?;
         let status_kwargs = PyDict::new(py);
         status_kwargs.set_item("dtype", torch.getattr("int64")?)?;
         status_kwargs.set_item("device", self.device.bind(py))?;
@@ -275,8 +282,7 @@ impl PyTqpScorer {
             .scorer
             .as_ref()
             .ok_or_else(|| PyRuntimeError::new_err("CNOT scorer is closed"))?;
-        scorer
-            .score_tensors(py, head, self.batch, &contiguous_rows, &output, &status)?;
+        scorer.score_tensors(py, head, self.batch, &contiguous_rows, &output, &status)?;
         self.check_scores(py, &output, &status, count)?;
         Ok(output)
     }
@@ -292,16 +298,17 @@ impl PyTqpScorer {
             .call_method0("isfinite")?
             .call_method1("reshape", (count, -1))?
             .call_method1("all", (1,))?;
-        let failed = py
-            .import("operator")?
-            .call_method1(
-                "or_",
-                (
-                    status.call_method1("ne", (0,))?,
-                    py.import("operator")?.call_method1("invert", (finite,))?,
-                ),
-            )?;
-        let any_failed: bool = failed.call_method0("any")?.call_method0("item")?.extract()?;
+        let failed = py.import("operator")?.call_method1(
+            "or_",
+            (
+                status.call_method1("ne", (0,))?,
+                py.import("operator")?.call_method1("invert", (finite,))?,
+            ),
+        )?;
+        let any_failed: bool = failed
+            .call_method0("any")?
+            .call_method0("item")?
+            .extract()?;
         if !any_failed {
             return Ok(());
         }
@@ -310,10 +317,7 @@ impl PyTqpScorer {
             .call_method0("argmax")?
             .call_method0("item")?
             .extract()?;
-        let coverage: i64 = status
-            .get_item(row)?
-            .call_method0("item")?
-            .extract()?;
+        let coverage: i64 = status.get_item(row)?.call_method0("item")?.extract()?;
         if coverage != 0 {
             let slot = coverage.div_euclid(256);
             let value = coverage.rem_euclid(256);

@@ -5,6 +5,8 @@
 //! of Python without changing its chunk sizes or call order.
 use super::Error;
 use libloading::Library;
+#[cfg(feature = "python")]
+use pyo3::{exceptions::PyValueError, prelude::*};
 use std::{
     ffi::{c_char, c_void, CStr, CString},
     marker::PhantomData,
@@ -12,21 +14,11 @@ use std::{
     ptr::NonNull,
     rc::Rc,
 };
-#[cfg(feature = "python")]
-use pyo3::{exceptions::PyValueError, prelude::*};
-
 type AbiVersion = unsafe extern "C" fn() -> u32;
 type LastError = unsafe extern "C" fn() -> *const c_char;
 type Open = unsafe extern "C" fn(*const c_char, u32, u32) -> *mut c_void;
 type Metadata = unsafe extern "C" fn(*const c_void) -> *const c_char;
-type Score = unsafe extern "C" fn(
-    *const c_void,
-    u32,
-    i64,
-    *const u8,
-    *mut u8,
-    *mut u8,
-) -> i32;
+type Score = unsafe extern "C" fn(*const c_void, u32, i64, *const u8, *mut u8, *mut u8) -> i32;
 type ScoreMany = unsafe extern "C" fn(
     *const c_void,
     u32,
@@ -117,7 +109,9 @@ impl TqpScorer {
                 ($name:literal, $ty:ty) => {
                     *library
                         .get::<$ty>(concat!($name, "\0").as_bytes())
-                        .map_err(|error| Error(format!("CNOT scorer {} unavailable: {error}", $name)))?
+                        .map_err(|error| {
+                            Error(format!("CNOT scorer {} unavailable: {error}", $name))
+                        })?
                 };
             }
             let api = Api {
@@ -157,9 +151,7 @@ impl TqpScorer {
                 Ok(metadata) => metadata.to_owned(),
                 Err(error) => {
                     (api.close)(handle.as_ptr());
-                    return Err(Error(format!(
-                        "CNOT scorer metadata is not UTF-8: {error}"
-                    )));
+                    return Err(Error(format!("CNOT scorer metadata is not UTF-8: {error}")));
                 }
             };
             Ok(Self {
@@ -218,14 +210,17 @@ impl TqpScorer {
             return Err(Error("CNOT scorer is closed".into()));
         }
         if head > 2 || batch < 0 || batch_limit < 1 {
-            return Err(Error("invalid scorer head, packet size or batch limit".into()));
+            return Err(Error(
+                "invalid scorer head, packet size or batch limit".into(),
+            ));
         }
         if batch == 0 {
             return Ok(());
         }
-        let count = usize::try_from(batch).map_err(|_| Error("CNOT packet size overflow".into()))?;
-        let limit = usize::try_from(batch_limit)
-            .map_err(|_| Error("CNOT batch limit overflow".into()))?;
+        let count =
+            usize::try_from(batch).map_err(|_| Error("CNOT packet size overflow".into()))?;
+        let limit =
+            usize::try_from(batch_limit).map_err(|_| Error("CNOT batch limit overflow".into()))?;
         let (row_stride, output_stride, votes_stride) = packet_strides(self.wires, head)?;
         validate_extent("rows", rows, rows_bytes, count, row_stride)?;
         validate_extent("output", output, output_bytes, count, output_stride)?;
@@ -341,9 +336,10 @@ impl TqpScorer {
             vec![row_shape[0]]
         } else {
             let columns = n
-                .checked_mul(n.checked_sub(1).ok_or_else(|| {
-                    PyValueError::new_err("invalid CNOT dimension")
-                })?)
+                .checked_mul(
+                    n.checked_sub(1)
+                        .ok_or_else(|| PyValueError::new_err("invalid CNOT dimension"))?,
+                )
                 .ok_or_else(|| PyValueError::new_err("CNOT score width overflow"))?;
             vec![row_shape[0], columns]
         };
@@ -352,10 +348,22 @@ impl TqpScorer {
         let output_buffer = tensor_buffer(py, &torch, output, "float32", &device, &output_shape)?;
         let votes_buffer = tensor_buffer(py, &torch, votes, "int64", &device, &status_shape)?;
 
-        if ranges_overlap(rows_buffer.address, rows_buffer.bytes, output_buffer.address, output_buffer.bytes)
-            || ranges_overlap(rows_buffer.address, rows_buffer.bytes, votes_buffer.address, votes_buffer.bytes)
-            || ranges_overlap(output_buffer.address, output_buffer.bytes, votes_buffer.address, votes_buffer.bytes)
-        {
+        if ranges_overlap(
+            rows_buffer.address,
+            rows_buffer.bytes,
+            output_buffer.address,
+            output_buffer.bytes,
+        ) || ranges_overlap(
+            rows_buffer.address,
+            rows_buffer.bytes,
+            votes_buffer.address,
+            votes_buffer.bytes,
+        ) || ranges_overlap(
+            output_buffer.address,
+            output_buffer.bytes,
+            votes_buffer.address,
+            votes_buffer.bytes,
+        ) {
             return Err(PyValueError::new_err(
                 "CNOT scorer buffers must be disjoint PyTorch allocations",
             ));
@@ -402,8 +410,11 @@ fn packet_strides(wires: u32, head: u32) -> Result<(usize, usize, usize), Error>
     let columns = if head == 2 {
         1
     } else {
-        n.checked_mul(n.checked_sub(1).ok_or_else(|| Error("invalid CNOT dimension".into()))?)
-            .ok_or_else(|| Error("CNOT score width overflow".into()))?
+        n.checked_mul(
+            n.checked_sub(1)
+                .ok_or_else(|| Error("invalid CNOT dimension".into()))?,
+        )
+        .ok_or_else(|| Error("CNOT score width overflow".into()))?
     };
     let output_stride = columns
         .checked_mul(4)
@@ -455,8 +466,13 @@ fn tensor_buffer(
     device: &Bound<'_, PyAny>,
     expected_shape: &[usize],
 ) -> PyResult<TensorBuffer> {
-    if !torch.call_method1("is_tensor", (tensor,))?.extract::<bool>()? {
-        return Err(PyValueError::new_err("CNOT scorer storage must be a PyTorch tensor"));
+    if !torch
+        .call_method1("is_tensor", (tensor,))?
+        .extract::<bool>()?
+    {
+        return Err(PyValueError::new_err(
+            "CNOT scorer storage must be a PyTorch tensor",
+        ));
     }
     let operator = py.import("operator")?;
     let dtype_ok = operator
