@@ -117,6 +117,9 @@
   `test_results/refactor_20261119/rust-session-reuse/GITHUB_STATUS.md`.
   Это hosted CPU проверка Python owner; реальный PyO3 runtime, CUDA/NCCL и
   физическая multi-GPU работа этим запуском не проверялись.
+- Изменения опубликованы fast-forward в `main` на `7e07a5a5`. Main Actions run
+  44417405012 также прошёл: 78 passed за 5.59 секунды; артефакт и SHA-256
+  указаны в status note.
 
 ## 2026-11-18 - CNOT identity-root control in Rust
 
