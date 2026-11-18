@@ -98,19 +98,19 @@ def test_rust_top_level_controller_owns_cnot_admission_and_stage_dispatch():
     def forbidden(*args, **kwargs):
         raise AssertionError("unexpected Python CNOT fallback callback")
 
-    options = (5, 9, 4, "qhat", True, "auto", "rust")
+    options = (5, 9, 4, "qhat", True, "python", "rust")
     callbacks = (prepare_input, identity_builder, native_stages, forbidden, forbidden,
                  cnot.CnotResult)
     assert controller(world, caller_root, scorer, options, callbacks) is result
     import hashlib
     import json
 
-    config = (5, 9, 4, "qhat", True, "auto", "rust", (1, 3, 1),
+    config = (5, 9, 4, "qhat", True, "python", "rust", (1, 3, 1),
               ("commit", "checkpoint", "registry", "manifest", "result"))
     expected_digest = hashlib.sha256(raw)
     expected_digest.update(json.dumps(config).encode())
     assert events == [
-        ("prepare-input", caller_root, 5, 9, 4, "qhat", "auto"),
+        ("prepare-input", caller_root, 5, 9, 4, "qhat", "python"),
         ("consensus", expected_digest.digest()),
         ("transport", True),
         ("identity", 3, "cpu"),
@@ -217,7 +217,7 @@ def test_rust_top_level_controller_preserves_compatibility_stage_fallback():
     def forbidden(*args, **kwargs):
         raise AssertionError("unexpected Python reference CNOT search")
 
-    options = (7, 12, 8, "proposal", False, "rust", "auto")
+    options = (7, 12, 8, "proposal", False, "python", "auto")
     callbacks = (prepare_input, identity_builder, native_stages, make_stages, forbidden,
                  cnot.CnotResult)
     result = controller(world, caller_root, scorer, options, callbacks)
@@ -226,12 +226,12 @@ def test_rust_top_level_controller_preserves_compatibility_stage_fallback():
     import hashlib
     import json
 
-    config = (7, 12, 8, "proposal", False, "rust", "rust", (1, 4, 1),
+    config = (7, 12, 8, "proposal", False, "python", "rust", (1, 4, 1),
               (None, None, None, None, None))
     expected_digest = hashlib.sha256(b"packed-root")
     expected_digest.update(json.dumps(config).encode())
     assert events == [
-        ("prepare-input", caller_root, 7, 12, 8, "proposal", "rust"),
+        ("prepare-input", caller_root, 7, 12, 8, "proposal", "python"),
         ("longs", [0]),
         ("sum", [0]),
         ("consensus", expected_digest.digest()),
@@ -282,7 +282,7 @@ def test_rust_top_level_controller_routes_python_engine_and_unbounded_depth(
         raise AssertionError("unexpected Rust CNOT stage")
 
     monkeypatch.setattr(torch, "equal", lambda *_: False)
-    options = (1, 1, max_depth, "qhat", False, "auto", engine)
+    options = (1, 1, max_depth, "qhat", False, "python", engine)
     callbacks = (prepare_input, identity_builder, forbidden, forbidden, reference,
                  cnot.CnotResult)
     world = World()
@@ -291,12 +291,12 @@ def test_rust_top_level_controller_routes_python_engine_and_unbounded_depth(
     import hashlib
     import json
 
-    config = (1, 1, max_depth, "qhat", False, "auto", "python", (1, 2, 1),
+    config = (1, 1, max_depth, "qhat", False, "python", "python", (1, 2, 1),
               (None, None, None, None, None))
     expected_digest = hashlib.sha256(b"packed-root")
     expected_digest.update(json.dumps(config).encode())
     assert events == [
-        ("prepare-input", caller_root, 1, 1, max_depth, "qhat", "auto"),
+        ("prepare-input", caller_root, 1, 1, max_depth, "qhat", "python"),
         ("consensus", expected_digest.digest()),
         ("transport", False),
         ("identity", 2, "cpu"),
@@ -328,7 +328,7 @@ def test_rust_top_level_controller_rejects_invalid_engine_before_consensus(
     def forbidden(*args, **kwargs):
         raise AssertionError("search continued after invalid engine configuration")
 
-    options = (1, 1, max_depth, "qhat", False, "auto", engine)
+    options = (1, 1, max_depth, "qhat", False, "python", engine)
     callbacks = (prepare_input, forbidden, forbidden, forbidden, forbidden, cnot.CnotResult)
     with pytest.raises(ValueError, match=message):
         controller(World(), caller_root, scorer, options, callbacks)

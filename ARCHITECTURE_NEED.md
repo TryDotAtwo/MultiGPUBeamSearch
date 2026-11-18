@@ -1183,3 +1183,13 @@ The old capacity equation:
 is invalid for production config search.
 ```
 
+## CNOT input admission ownership, 2026-11-19
+
+For the matching Rust extension, `validation="auto"` and `validation="rust"`
+must prepare the owned typed CNOT input inside the Rust controller and inside
+the existing rank-wide admission error boundary. The Python input-builder
+callback remains for explicit `validation="python"` and old-extension
+compatibility. The snapshot remains detached, cloned and contiguous; packed
+byte encoding, matrix validation, admission digest, collective order, scorer
+callbacks, search decisions, and multi-rank topology remain unchanged.
+

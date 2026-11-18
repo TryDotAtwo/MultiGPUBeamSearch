@@ -411,14 +411,27 @@ fn run_cnot_native_search<'py>(
     let result_type = callbacks.get_item(5)?;
 
     let admission = (|| -> PyResult<Bound<'py, PyAny>> {
-        let input_matrix = input_builder.call1((
-            root.clone(),
-            width.clone(),
-            shortlist.clone(),
-            max_depth.clone(),
-            mode.clone(),
-            validation.clone(),
-        ))?;
+        let validation_mode = validation.extract::<String>().ok();
+        let input_matrix = if matches!(validation_mode.as_deref(), Some("auto") | Some("rust")) {
+            let prepared = prepare_cnot_input(
+                py,
+                &root,
+                &width,
+                &shortlist,
+                &max_depth,
+                &mode,
+            )?;
+            Py::new(py, prepared)?.into_bound(py).into_any()
+        } else {
+            input_builder.call1((
+                root.clone(),
+                width.clone(),
+                shortlist.clone(),
+                max_depth.clone(),
+                mode.clone(),
+                validation.clone(),
+            ))?
+        };
         let selected_engine = select_cnot_engine(py, &engine, &max_depth)?;
         let digest = cnot_admission_digest(
             py,
