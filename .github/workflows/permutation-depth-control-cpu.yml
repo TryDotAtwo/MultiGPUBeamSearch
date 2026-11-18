@@ -1,0 +1,60 @@
+name: Permutation depth control CPU validation
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/permutation-depth-control-cpu.yml
+      - native/beam_native.cpp
+      - native/beam_native.h
+      - native/engine_control.hpp
+      - native/depth_control_bridge.hpp
+      - tests/native_abi_tests.cpp
+      - rust/beam-native-sys/src/**
+      - rust/beam-native-sys/tests/depth_control.rs
+      - rust/beam-runtime/src/**
+      - rust/beam-runtime/tests/depth_control.rs
+      - tools/production_runner.cu
+
+permissions:
+  contents: read
+
+jobs:
+  depth-control:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust toolchain
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+      - name: Run Rust contract tests and checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p test_results/refactor_20261118/permutation-depth-control
+          {
+            cargo test --locked -p beam-runtime --test depth_control
+            cargo test --locked -p beam-native-sys --test depth_control
+            cargo check --locked -p beam-python
+          } 2>&1 | tee test_results/refactor_20261118/permutation-depth-control/rust.log
+      - name: Build and run the native C ABI CPU fixture
+        shell: bash
+        run: |
+          set -euo pipefail
+          c++ -std=c++17 -Wall -Wextra -Werror -pthread -I native \
+            native/beam_native.cpp tests/native_abi_tests.cpp \
+            -o "${RUNNER_TEMP}/native_abi_tests"
+          "${RUNNER_TEMP}/native_abi_tests" \
+            2>&1 | tee test_results/refactor_20261118/permutation-depth-control/native-abi.log
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: permutation-depth-control-cpu-validation
+          path: test_results/refactor_20261118/permutation-depth-control
+          if-no-files-found: ignore
+          retention-days: 7
