@@ -20,10 +20,11 @@ public API are unchanged.
 | [44604046633](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44604046633) | rustfmt failed before compilation/tests; 605-byte diagnostic artifact | [14569182918](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44604046633/artifacts/14569182918) |
 | [44604475999](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44604475999) | Rust/PyO3 CPU validation passed; 224 passed, 2 skipped | [14570037387](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44604475999/artifacts/14570037387) |
 | [44604945533](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44604945533) | Corrected owner comparison; Rust checks, PyO3 build and compatibility suite passed; 224 passed, 2 skipped | [14570022898](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44604945533/artifacts/14570022898) |
+| [44606108341](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44606108341) | Main after fast-forward; Rust checks, PyO3 build and compatibility suite passed; 224 passed, 2 skipped | [14569653026](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44606108341/artifacts/14569653026) |
 
 Corrected artifact SHA-256:
 `7192da508d6bfa3f05dbcf2b4ba05fd2f85c5a4d07ebbf1c7badd22297f30a84`.
 
 The Actions log also passed Python syntax checking for the two-rank NCCL
 probe. This does not execute the probe. Physical CUDA/NCCL and multi-GPU
-runtime acceptance remain unverified. Main-branch verification is pending.
+runtime acceptance remain unverified. Main-branch verification passed on `acd3305ce4ccfa9389e24b3b596c76729ef0453d`. Artifact SHA-256: `b4ad12f9dda7dab2583a1a2b819d8a1447413a3b0e27d1d2f95ad3915f021ee5`.
