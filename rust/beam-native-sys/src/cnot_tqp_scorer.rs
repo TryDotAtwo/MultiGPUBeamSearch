@@ -5,9 +5,9 @@
 //! of Python without changing its chunk sizes or call order.
 use super::Error;
 use libloading::Library;
-use serde_json::Value;
 #[cfg(feature = "python")]
 use pyo3::{exceptions::PyValueError, prelude::*};
+use serde_json::Value;
 use std::{
     ffi::{c_char, c_void, CStr, CString},
     marker::PhantomData,
@@ -72,21 +72,14 @@ struct CnotScorerMetadata {
 
 impl CnotScorerMetadata {
     fn parse(metadata: &str) -> Result<Self, Error> {
-        let value: Value = serde_json::from_str(metadata).map_err(|error| {
-            Error(format!(
-                "CNOT scorer metadata is not valid JSON: {error}"
-            ))
-        })?;
+        let value: Value = serde_json::from_str(metadata)
+            .map_err(|error| Error(format!("CNOT scorer metadata is not valid JSON: {error}")))?;
         let object = value
             .as_object()
             .ok_or_else(|| Error("expected all 102 registered field inputs".into()))?;
-        let feature_inputs = object
-            .get("feature_model_inputs")
-            .and_then(Value::as_u64);
+        let feature_inputs = object.get("feature_model_inputs").and_then(Value::as_u64);
         let Some(features) = object.get("feature_ids").and_then(Value::as_array) else {
-            return Err(Error(
-                "expected all 102 registered field inputs".into(),
-            ));
+            return Err(Error("expected all 102 registered field inputs".into()));
         };
         if feature_inputs != Some(102) || features.len() != 102 {
             return Err(Error(
@@ -96,9 +89,10 @@ impl CnotScorerMetadata {
         let feature_ids = features
             .iter()
             .map(|feature| {
-                feature.as_str().map(str::to_owned).ok_or_else(|| {
-                    Error("expected all 102 registered field inputs".into())
-                })
+                feature
+                    .as_str()
+                    .map(str::to_owned)
+                    .ok_or_else(|| Error("expected all 102 registered field inputs".into()))
             })
             .collect::<Result<Vec<_>, _>>()?;
         let max_packet_rows = object
@@ -117,9 +111,7 @@ impl CnotScorerMetadata {
     fn effective_batch(&self, inference_batch: i64) -> Result<i64, Error> {
         let batch = inference_batch.min(self.max_packet_rows);
         if batch < 1 {
-            return Err(Error(
-                "the feature policy cannot admit a single row".into(),
-            ));
+            return Err(Error("the feature policy cannot admit a single row".into()));
         }
         Ok(batch)
     }
