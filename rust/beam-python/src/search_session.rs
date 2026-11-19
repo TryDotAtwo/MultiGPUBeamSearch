@@ -68,6 +68,20 @@ impl SearchSession {
         self.cancel.store(true, Ordering::Release);
         py.allow_threads(|| self.inner.lock().map_err(error)?.close().map_err(error))
     }
+    fn preparation_matches(&self, identity: &str) -> PyResult<bool> {
+        self.inner
+            .try_lock()
+            .map_err(|_| PyRuntimeError::new_err("concurrent native session searches are unsupported"))?
+            .preparation_matches(identity)
+            .map_err(error)
+    }
+    fn remember_preparation(&self, identity: &str) -> PyResult<()> {
+        self.inner
+            .try_lock()
+            .map_err(|_| PyRuntimeError::new_err("concurrent native session searches are unsupported"))?
+            .remember_preparation(identity)
+            .map_err(error)
+    }
     #[getter]
     fn pids(&self) -> PyResult<Vec<u32>> {
         Ok(self.inner.lock().map_err(error)?.pids())
@@ -99,3 +113,4 @@ pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(parse_terminal, module)?)?;
     Ok(())
 }
+

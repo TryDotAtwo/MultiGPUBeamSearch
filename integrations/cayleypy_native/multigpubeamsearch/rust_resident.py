@@ -74,6 +74,22 @@ class RustResidentWorkers:
     def pids(self):
         return self._owner.pids
 
+    def preparation_matches(self, identity):
+        """Ask a capable Rust owner whether the prepared session identity matches."""
+        check = getattr(self._owner, 'preparation_matches', None)
+        if not callable(check):
+            return None
+        result = check(identity)
+        return result if type(result) is bool else None
+
+    def remember_preparation(self, identity):
+        """Record the prepared identity in Rust; return false for older extensions."""
+        remember = getattr(self._owner, 'remember_preparation', None)
+        if not callable(remember):
+            return False
+        remember(identity)
+        return True
+
     def submit(self, start, directory, *, timeout):
         self._terminal = None
         self._last_reused = False
@@ -120,3 +136,4 @@ class RustResidentWorkers:
     def close(self):
         self._terminal = None
         self._owner.close()
+

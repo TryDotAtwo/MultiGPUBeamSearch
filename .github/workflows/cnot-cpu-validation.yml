@@ -77,11 +77,14 @@ jobs:
               rust/beam-python/src/cnot_scorer_dispatch.rs \
               rust/beam-native-sys/src/cnot_stream5.rs \
               rust/beam-native-sys/src/cnot_tqp_scorer.rs \
-              rust/beam-python/src/cnot_stream5.rs
+              rust/beam-python/src/search_session.rs \
+              rust/beam-python/src/cnot_stream5.rs \
+              rust/beam-runtime/tests/search_session.rs
             rustfmt --check --edition 2021 rust/beam-core/src/cnot.rs rust/beam-core/tests/cnot.rs
             cargo test --locked -p beam-core --test cnot
             cargo test --locked -p beam-core --test search
             cargo test --locked -p beam-runtime cnot_search
+            cargo test --locked -p beam-runtime --test search_session
             cargo test --locked -p beam-native-sys cnot_tqp_scorer
             cargo check --locked -p beam-python
           } 2>&1 | tee test_results/refactor_20261119/cnot-compat-root-goal/cnot-rust-cpu.log
@@ -106,6 +109,7 @@ jobs:
             integrations/cayleypy_native/tests/test_cnot_rust_exchange.py \
             integrations/cayleypy_native/tests/test_cnot_scorer_runtime_dispatch.py \
             integrations/cayleypy_native/tests/test_cnot_scorer_batch_api.py \
+            integrations/cayleypy_native/tests/test_rust_persistent_search.py \
             integrations/cayleypy_native/tests/test_cnot_rust_controller.py::test_rust_search_owns_stages_without_python_stage_object \
             integrations/cayleypy_native/tests/test_cnot_rust_controller.py::test_rust_search_owns_batch_stages_without_python_helpers \
             integrations/cayleypy_native/tests/test_cnot_rust_controller.py::test_rust_top_level_controller_owns_cnot_admission_and_stage_dispatch \
@@ -124,4 +128,5 @@ jobs:
           path: test_results/refactor_20261119/cnot-compat-root-goal
           if-no-files-found: ignore
           retention-days: 7
+
 

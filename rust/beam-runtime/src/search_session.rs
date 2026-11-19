@@ -120,6 +120,7 @@ pub fn parse_terminal(
 pub struct SearchSession {
     workers: Option<ResidentWorkers>,
     identity: Option<SessionIdentity>,
+    preparation_identity: Option<String>,
     metadata: Option<Value>,
     cancellation: Arc<AtomicBool>,
     closed: bool,
@@ -135,6 +136,7 @@ impl SearchSession {
         Self {
             workers: None,
             identity: None,
+            preparation_identity: None,
             metadata: None,
             cancellation: Arc::new(AtomicBool::new(false)),
             closed: false,
@@ -152,6 +154,24 @@ impl SearchSession {
     pub fn is_closed(&self) -> bool {
         self.closed
     }
+    pub fn preparation_matches(&self, identity: &str) -> Result<bool> {
+        self.check_owner()?;
+        if self.closed || self.cancellation.load(Ordering::Acquire) {
+            return Err(Error::Message("native session cancelled or closed".into()));
+        }
+        Ok(self.preparation_identity.as_deref() == Some(identity))
+    }
+    pub fn remember_preparation(&mut self, identity: &str) -> Result<()> {
+        self.check_owner()?;
+        if self.closed || self.cancellation.load(Ordering::Acquire) {
+            return Err(Error::Message("native session cancelled or closed".into()));
+        }
+        if identity.is_empty() {
+            return Err(Error::Message("empty session preparation identity".into()));
+        }
+        self.preparation_identity = Some(identity.to_owned());
+        Ok(())
+    }
     fn check_owner(&self) -> Result<()> {
         if self.owner != std::process::id() {
             return Err(Error::Message(
@@ -162,6 +182,7 @@ impl SearchSession {
     }
     fn release(&mut self) -> Result<()> {
         self.identity.take();
+        self.preparation_identity.take();
         self.metadata.take();
         if let Some(mut workers) = self.workers.take() {
             workers.close()?;
@@ -395,3 +416,4 @@ impl Drop for SearchSession {
         let _ = self.close();
     }
 }
+

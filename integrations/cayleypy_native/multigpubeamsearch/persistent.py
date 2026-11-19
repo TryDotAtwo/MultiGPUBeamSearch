@@ -301,10 +301,17 @@ class NativeSession:
                 beam_width,max_steps,repr(options),
                 os.environ.get('CUDA_VISIBLE_DEVICES'),os.environ.get('CUDA_DEVICE_ORDER'),
                 json.dumps(runtime.build_metadata,sort_keys=True) if runtime is not None else None)
+            identity_key = repr(identity)
             if (self.model_snapshot_cache is None
                     or not self.model_snapshot_cache.verify_for_launch(model, contract)):
                 verify_prepared_model(model,contract)
-            identity_changed = identity != self._identity
+            rust_identity_match = None
+            if self._engine == 'rust' and self._workers is not None:
+                matcher = getattr(self._workers, 'preparation_matches', None)
+                if callable(matcher):
+                    rust_identity_match = matcher(identity_key)
+            identity_changed = (identity != self._identity if rust_identity_match is None
+                                else not rust_identity_match)
             preserve_rust_owner = (identity_changed and self._engine == 'rust'
                 and self._workers is not None
                 and callable(getattr(self._workers, 'configure', None)))
@@ -339,7 +346,10 @@ class NativeSession:
                     if preserve_rust_owner and not launch_started:
                         self._release()
                     else:
-                        self._identity=identity
+                        recorder = getattr(self._workers, 'remember_preparation', None)
+                        rust_owns_identity = (self._engine == 'rust' and callable(recorder)
+                                              and recorder(identity_key))
+                        self._identity = None if rust_owns_identity else identity
                         self._metadata=deepcopy(outcome.metadata)
                 reused=bool(self._workers is not None
                     and getattr(self._workers, '_last_reused', False))
@@ -379,3 +389,4 @@ class NativeSession:
         finally:
             self._run_owner = None
             self._lock.release()
+

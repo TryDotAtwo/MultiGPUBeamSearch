@@ -61,6 +61,19 @@ launch. Служебный вложенный ключ в `options` включа
 на hosted CPU; фактическая PyO3/CUDA/NCCL и multi-GPU runtime-проверка остаётся
 отдельной задачей.
 
+### Ключ повторного использования Rust-сессии, 2026-11-19
+
+Когда Rust owner поддерживает новый optional PyO3 API, он сохраняет и сравнивает
+сводный ключ подготовленной конфигурации. Python передаёт текущие поля
+`NativeSession` как непрозрачный текстовый ключ; Rust решает, можно ли пропустить
+повторную подготовку группы рангов. Старые расширения продолжают сравнивать тот
+же ключ в Python, а `engine="python"` не меняется. Нативный `SessionIdentity`
+по-прежнему независимо проверяется Rust при запуске поиска.
+
+Этот перенос касается владения решением о переиспользовании. Он не меняет
+вычислительные стадии, CUDA/NCCL операции, порядок поиска или публичные
+результаты. Hosted CPU/PyO3 проверка не подтверждает физический multi-GPU runtime.
+
 ## Контракт публичного поиска в beam-core, 2026-11-18
 
 После адаптации сигнатуры установленной CayleyPy версии Python передаёт
@@ -1214,4 +1227,5 @@ are unchanged. This is a control/domain ownership transfer, not a search or
 kernel optimization. CPU tests cover packed identity boundaries and the public
 Rust CNOT root-goal path; physical CUDA/NCCL multi-GPU execution remains a
 separate unverified gate.
+
 
