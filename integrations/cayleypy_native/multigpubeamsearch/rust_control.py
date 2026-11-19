@@ -253,6 +253,28 @@ def build_graph_contract(center, start, generators, generator_names):
 
 
 
+def write_search_inputs(contract, run_dir):
+    """Write legacy runner task files through Rust when this extension supports it."""
+    try:
+        native = extension()
+    except (NativeUnavailable, ImportError):
+        return False
+    writer = getattr(native, "write_search_inputs", None)
+    if not callable(writer):
+        return False
+    request = {
+        "center": [str(value) for value in contract.center],
+        "start": [str(value) for value in contract.start],
+        "generators": [[str(value) for value in row] for row in contract.generators],
+        "generator_name_count": len(contract.generator_names),
+    }
+    try:
+        writer(json.dumps(request, allow_nan=False), str(run_dir))
+    except (TypeError, ValueError, OverflowError) as error:
+        raise NativeUnavailable(str(error)) from error
+    return True
+
+
 def inference_coarse_batches(cap):
     """Use Rust candidate ordering when this extension exposes the optional API."""
     try:
@@ -523,5 +545,6 @@ def tune_downstream(contract, model, runtime, options, devices, beam_width,
         raise NativeBackendError(str(error)) from error
     verify_prepared_model(model, contract)
     return result
+
 
 

@@ -71,6 +71,7 @@ jobs:
             rustfmt --check --edition 2021 \
               rust/beam-runtime/src/cnot_search.rs \
               rust/beam-runtime/src/search_session.rs \
+              rust/beam-runtime/src/search_inputs.rs \
               rust/beam-core/src/permutation.rs \
               rust/beam-core/src/search.rs \
               rust/beam-python/src/configuration.rs \
@@ -155,4 +156,5 @@ jobs:
           path: test_results/refactor_20261120/cnot-rust-domain-fallback
           if-no-files-found: ignore
           retention-days: 7
+
 

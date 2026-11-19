@@ -1,5 +1,5 @@
 use pyo3::{
-    exceptions::{PyRuntimeError, PyValueError},
+    exceptions::{PyOSError, PyRuntimeError, PyValueError},
     prelude::*,
 };
 use std::sync::{
@@ -51,6 +51,20 @@ fn build_graph_contract(request: &str) -> PyResult<String> {
         .map_err(|message| PyValueError::new_err(message))?;
     serde_json::to_string(&contract).map_err(|error| PyValueError::new_err(error.to_string()))
 }
+#[pyfunction]
+fn write_search_inputs(request: &str, run_dir: std::path::PathBuf) -> PyResult<()> {
+    let request: beam_core::search::PublicGraphContractRequest =
+        serde_json::from_str(request).map_err(|error| PyValueError::new_err(error.to_string()))?;
+    let contract = beam_core::search::build_public_graph_contract(request)
+        .map_err(|message| PyValueError::new_err(message))?;
+    beam_runtime::search_inputs::write_legacy_search_inputs(&contract, &run_dir).map_err(
+        |error| match error {
+            beam_runtime::Error::Io(source) => PyOSError::new_err(source.to_string()),
+            other => PyRuntimeError::new_err(other.to_string()),
+        },
+    )
+}
+
 #[pyfunction]
 fn inference_coarse_batches(cap: u64) -> PyResult<Vec<u64>> {
     beam_core::inference::coarse_batches(cap)
@@ -209,6 +223,7 @@ pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(validate_options, module)?)?;
     module.add_function(wrap_pyfunction!(validate_search_controls, module)?)?;
     module.add_function(wrap_pyfunction!(build_graph_contract, module)?)?;
+    module.add_function(wrap_pyfunction!(write_search_inputs, module)?)?;
     module.add_function(wrap_pyfunction!(inference_coarse_batches, module)?)?;
     module.add_function(wrap_pyfunction!(inference_refinement_batches, module)?)?;
     module.add_function(wrap_pyfunction!(inference_probe_time_allowance, module)?)?;
@@ -219,3 +234,4 @@ pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<FrontierCalibration>()?;
     Ok(())
 }
+

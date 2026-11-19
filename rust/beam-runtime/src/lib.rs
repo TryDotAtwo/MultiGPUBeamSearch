@@ -27,6 +27,7 @@ pub mod probes;
 pub mod profile_cache;
 mod resident;
 pub mod search_session;
+pub mod search_inputs;
 pub mod telemetry;
 mod worker;
 pub mod working_capacity;
@@ -72,3 +73,4 @@ pub(crate) fn atomic_json(path: &std::path::Path, value: &impl serde::Serialize)
     std::fs::rename(temporary, path)?;
     Ok(())
 }
+

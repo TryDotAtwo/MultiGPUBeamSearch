@@ -590,10 +590,12 @@ def _run_native_once(contract, model, options, beam_width, max_steps, run_dir, d
             raise NativeBackendError("prepared native runner does not match graph/model")
     build_metadata = runtime.build_metadata
     puzzle = run_dir / "puzzle_info.json"
-    puzzle.write_text(json.dumps(contract.to_puzzle_info()) + "\n", encoding="utf-8")
     inputs = run_dir / "test.csv"
-    # The native CSV reader requires a bare numeric ID and a quoted state cell.
-    inputs.write_text('initial_state_id,initial_state\n0,"' + ",".join(map(str, contract.start)) + '"\n', encoding="utf-8")
+    from . import rust_control
+    if not rust_control.write_search_inputs(contract, run_dir):
+        puzzle.write_text(json.dumps(contract.to_puzzle_info()) + "\n", encoding="utf-8")
+        # The native CSV reader requires a bare numeric ID and a quoted state cell.
+        inputs.write_text('initial_state_id,initial_state\n0,"' + ",".join(map(str, contract.start)) + '"\n', encoding="utf-8")
     env = child_environment(tuple(devices), run_dir)
     env.update({"BEAM_GENERATOR_PATH": str(puzzle), "BEAM_PUZZLE_INFO_JSON": str(puzzle),
                 "BEAM_TEST_CSV": str(inputs), "BEAM_WEIGHT_DIR": str(model.weights_dir),
@@ -861,3 +863,4 @@ def _run_native_once(contract, model, options, beam_width, max_steps, run_dir, d
     outcome = NativeOutcome(path, elapsed, effective, run_dir, metadata)
     _persist_native_outcome(run_dir, outcome)
     return outcome
+
