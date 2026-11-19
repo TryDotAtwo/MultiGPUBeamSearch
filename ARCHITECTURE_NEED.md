@@ -2730,6 +2730,14 @@ inputs. Python-only inputs and older stage providers retain the existing
 search order, CUDA operators, scorer calls, and collective sequence are
 unchanged.
 
+## CNOT compatibility goal-stage dispatch, 2026-11-19
+
+For a typed Rust `CnotSearchInput`, the compatibility `PyStages` backend now
+calls the same Rust `cnot_native_goal::goal` helper as `NativeStages`. It
+retains the Python stage-method fallback for Python-only inputs and older stage
+providers. The goal predicate, packed tensor operations, error coordination,
+rank collectives, stage order, and result semantics are unchanged.
+
 ## CNOT input admission ownership, 2026-11-19
 
 For the matching Rust extension, `validation="auto"` and `validation="rust"`
