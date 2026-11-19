@@ -343,14 +343,15 @@ impl Backend for PyStages<'_> {
                             .call_method1("cnot_owners", (&root, size))?
                             .call_method0("item")
                     })();
-                    let owner: u32 = crate::cnot_native_checked::checked_compat(
+                    let owns_root = crate::cnot_native_checked::checked_compat(
                         self.py,
                         &world,
                         "initialize CNOT domain",
                         owner_result,
                     )?
-                    .extract()?;
-                    let closed = if owner == rank {
+                    .call_method1("__eq__", (rank,))?
+                    .is_truthy()?;
+                    let closed = if owns_root {
                         root
                     } else {
                         let empty = self
