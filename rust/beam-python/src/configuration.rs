@@ -58,12 +58,10 @@ fn inference_coarse_batches(cap: u64) -> PyResult<Vec<u64>> {
 }
 
 #[pyfunction]
-fn inference_refinement_batches(
-    winner: u64,
-    cap: u64,
-    visited: Vec<u64>,
-) -> PyResult<Vec<u64>> {
-    let visited = visited.into_iter().collect::<std::collections::BTreeSet<_>>();
+fn inference_refinement_batches(winner: u64, cap: u64, visited: Vec<u64>) -> PyResult<Vec<u64>> {
+    let visited = visited
+        .into_iter()
+        .collect::<std::collections::BTreeSet<_>>();
     beam_core::inference::refinement_batches(winner, cap, &visited)
         .map_err(|error| PyValueError::new_err(error.to_string()))
 }
