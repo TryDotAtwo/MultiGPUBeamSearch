@@ -3,7 +3,7 @@
 ## 2026-11-19 - Align the Rust identity builder test with session reuse
 
 - The owner-reuse test now expects one identity build for the initial configuration and one after the model artifact changes. It checks that the second Rust-built identity carries the new model hash. Reusing an unchanged session does not rebuild this identity.
-- This corrects test expectations only; production search and multi-GPU behavior are unchanged. Hosted verification is pending.
+- This corrects test expectations only; production search and multi-GPU behavior are unchanged. Hosted Python-owner run [44535162475](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44535162475) passed (83 passed, 3 skipped). CNOT CPU run [44535162234](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44535162234) passed Rust CNOT checks, PyO3 build, 180 tests (2 skipped), and NCCL probe syntax. Artifact digests and physical-GPU limits are recorded in `test_results/refactor_20261119/rust-session-identity-builder/GITHUB_STATUS.md`.
 
 ## 2026-11-19 - Rust owns native outcome-file persistence
 
