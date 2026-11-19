@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-11-19 - Move CNOT admission collective dispatch into Rust
+
+- `run_cnot_native_search` now calls the existing Rust helpers directly for root/config/scorer consensus and the all-rank native-stage support vote. Python `World` still supplies the same process-group collective primitives and the Stream 5 startup adapter. CNOT search ordering, fallback stage selection, transport, scoring, and state equality are unchanged.
+- The RED run [44576411236](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44576411236) failed at the expected legacy `World.require_consensus` call (218 passed, 2 skipped). The final CPU run [44577927456](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44577927456) passed Rust checks, PyO3 build, 219 Python tests (2 skipped), and NCCL probe syntax. Artifact [14556663231](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44577927456/artifacts/14556663231), SHA-256 `e78d64e5ed298260ac113b20f0cb6b3b419ff56a0b1cbdbbc6a20f76b2ca5b6d`.
+- Hosted CPU/compile verification only. It did not run CUDA or a physical multi-GPU NCCL collective. Details and the intermediate test-double correction are recorded in `test_results/refactor_20261119/cnot-rust-admission-vote/GITHUB_STATUS.md`.
+
+
 ## 2026-11-19 - Rust owns CNOT checkpoint scorer metadata validation
 
 - The native-sys `TqpScorer` now parses and validates the JSON contract for 102 registered feature inputs and stores `max_packet_rows`; Rust computes the effective inference batch and closes the native handle if metadata validation fails. PyO3 still materializes the same public Python metadata dictionary. The scorer ABI, chunk boundaries, checkpoint model, output ordering, and numerical policy are unchanged.
