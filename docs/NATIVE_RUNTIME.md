@@ -471,3 +471,6 @@ These checks do not establish trained-model quality or a performance improvement
 Performance promotion requires the paired full-step measurements in the approved
 plan. Per-device compilation and physical acceptance remain separate records.
 
+## Rust-owned outcome-file finalization
+
+The Python backend constructs the same NativeOutcome object used by public callers. For a capable Rust resident session, it does not overwrite native-outcome.json after the Rust worker has written the initial result. The Python preparation callback then supplies full metadata to SearchSession, which atomically finalizes the file. Calls without an active capable Rust owner, Python sessions, and older or incapable extensions retain the Python fallback writer and its existing JSON formatting. This changes result-file ownership only; search behavior and GPU stages are unchanged.
