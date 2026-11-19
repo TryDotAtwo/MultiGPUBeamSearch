@@ -21,6 +21,7 @@ not a search optimization.
 | [44611473601](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44611473601) | RED as expected: callback rejection only; 2 failed, 226 passed, 2 skipped | [14572841818](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44611473601/artifacts/14572841818) |
 | [44611898645](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44611898645) | rustfmt differences only; no compile or tests | [14571313686](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44611898645/artifacts/14571313686) |
 | [44612192213](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44612192213) | Full Rust/PyO3 validation passed; 228 passed, 2 skipped; NCCL probe syntax check passed | [14573550966](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44612192213/artifacts/14573550966) |
+| [44612790620](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44612790620) | Main after fast-forward; full Rust/PyO3 validation passed; 228 passed, 2 skipped; NCCL probe syntax check passed | [14574490208](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44612790620/artifacts/14574490208) |
 
 GREEN artifact SHA-256:
 `720500058c0a0654440c7e15b6aed0c9f019ca1bc417abf236e34095cfd4da20`.
