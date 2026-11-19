@@ -17,10 +17,13 @@ API are unchanged. No search optimization is included.
 | Run | Result | Artifact |
 |---|---|---|
 | [44607543751](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44607543751) | RED as expected: callback rejection only; 2 failed, 224 passed, 2 skipped | [14570771948](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44607543751/artifacts/14570771948) |
-| [44608338814](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44608338814) | Rust/PyO3 validation passed; 226 passed, 2 skipped; NCCL probe syntax check passed | [14572455904](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44608338814/artifacts/14572455904) |
+| [44608338814](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44608338814) | CPU/PyO3 tests passed before the new module was added to explicit rustfmt coverage; 226 passed, 2 skipped | [14572455904](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44608338814/artifacts/14572455904) |
+| [44609082589](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44609082589) | rustfmt differences only; no compile or tests | [14571746432](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44609082589/artifacts/14571746432) |
+| [44609439668](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44609439668) | Remaining rustfmt difference only; no compile or tests | [14571183469](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44609439668/artifacts/14571183469) |
+| [44609624223](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44609624223) | Full Rust/PyO3 validation passed; 226 passed, 2 skipped; NCCL probe syntax check passed | [14572517003](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44609624223/artifacts/14572517003) |
 
-GREEN artifact SHA-256:
-`d12b7297f82aa3f1f9fd22190ff01415a47453a4386541273be5e5d0bc360096`.
+Final GREEN artifact SHA-256:
+`1fb7af8be19bbc97a8e5d5bdf1d65bdf94017a2d904c557ae26f7424f858ae71`.
 
 The current Actions checks run on hosted CPU and verify only the syntax of the
 two-rank NCCL probe. Physical CUDA/NCCL multi-GPU execution remains unverified.
