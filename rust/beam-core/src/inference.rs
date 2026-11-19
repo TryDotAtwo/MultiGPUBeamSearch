@@ -203,9 +203,8 @@ fn compatible_estimate(
     }
     if selected
         .iter()
-        .any(|sample| {
-            !sample.correctness_passed || !sample.memory_admitted || sample.throttled
-        }) {
+        .any(|sample| !sample.correctness_passed || !sample.memory_admitted || sample.throttled)
+    {
         return Err("reject incorrect, unadmitted or throttled profile".into());
     }
     let cohorts: BTreeSet<_> = selected
