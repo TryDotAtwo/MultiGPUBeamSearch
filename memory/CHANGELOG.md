@@ -7,8 +7,13 @@
   uses that Rust-owned matrix when available and retains `torch.equal` for
   older extensions and Python-only input. Search order, CUDA operators,
   scoring, collectives, and state storage are unchanged.
-- Hosted validation is pending. The regression checks both identity and a
-  non-identity matrix without calling `torch.equal`.
+- Test-first run 44429473842 failed only on the two new root-check cases
+  (165 passed, 2 skipped), as expected. Green branch run 44430494875 and
+  published-main run 44431181310 each passed Rust checks, PyO3 build,
+  167 Python tests (2 skipped), and NCCL probe syntax. Their artifacts are
+  recorded in `test_results/refactor_20261119/cnot-compat-root-goal/GITHUB_STATUS.md`.
+- Physical CUDA/NCCL and multi-GPU CNOT execution remain unverified; the
+  existing Vast instance is stopped. No GPU instance state changed.
 
 ## 2026-11-18 - Rust controls permutation depth continuation
 
