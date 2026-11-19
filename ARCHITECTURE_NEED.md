@@ -1,5 +1,21 @@
 # Конфиг
 
+## Rust-владелец CNOT selection, 2026-11-20
+
+Для typed `PyCnotSearchInput` compatibility adapter вызывает существующий
+`cnot_native_selection::select` напрямую и записывает его результат в
+`ranks`, `local` и `new_lex`. Он больше не создаёт Python
+`SelectionStages` и не вызывает `prepare_selection/commit_selection`.
+Python-only input и старые stage providers сохраняют callback fallback.
+
+Реализация использует тот же Rust radix schedule, score/word keys, существующие
+CUDA selection operators или прежние Torch fallback операции, process-group
+reductions, stable ordering и размер глобального beam. Алгоритм, scoring,
+точность, transport и collectives не менялись. Проверка с width=5 подтверждает
+cutoff и совпадение audit слоёв с Python эталоном для qhat/proposal. Проверка
+hosted CPU/PyO3 не подтверждает физический CUDA/NCCL multi-GPU runtime.
+Результат: `test_results/refactor_20261120/cnot-rust-selection/GITHUB_STATUS.md`.
+
 ## Rust-владелец CNOT redistribution, 2026-11-20
 
 Для типизированного `PyCnotSearchInput` compatibility adapter теперь

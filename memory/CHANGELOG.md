@@ -2466,3 +2466,30 @@ Preserved 26 checkouts and their source/index overlays; verified restoration of 
   `e761f9675a1fd90a7c46333635c4a7edf932dfc7a38b4eaa54906e154eaebbc1`.
 - Физическая проверка CUDA/NCCL и нескольких GPU остаётся невыполненной.
   Evidence: `test_results/refactor_20261119/cnot-rust-redistribute/GITHUB_STATUS.md`.
+
+## 2026-11-20 - Typed CNOT selection dispatch перенесён в Rust
+
+- Compatibility backend теперь напрямую вызывает существующий
+  `cnot_native_selection::select` для typed `PyCnotSearchInput`, записывает
+  `ranks/local/new_lex` и не создаёт Python `SelectionStages`.
+  Старые providers и Python-only input сохраняют callbacks.
+- Сохранены radix schedule, CUDA operators/Torch fallback, score и word keys,
+  collectives и ordering; алгоритм и precision не менялись.
+- RED: hosted run
+  [44618218529](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44618218529)
+  подтвердил два вызова запрещённого Python selection callback
+  (2 failed, 230 passed, 2 skipped; artifact 14576716078,
+  SHA256 `4f540d712ba29f03b084638097b00f3efd6ce858de65e81e4c43cf8c01ebe2a3`).
+- Исправлены две промежуточные ошибки: rustfmt в run
+  [44618613883](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44618613883)
+  и избыточная проверка ещё не созданных output attributes в run
+  [44618983198](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44618983198).
+- GREEN: branch run
+  [44619334509](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44619334509)
+  и main run
+  [44619796548](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44619796548)
+  прошли Rust checks, PyO3 build и CPU suite (232 passed, 2 skipped).
+  Main artifact 14575103927, SHA256
+  `25aa5f670c65f98d86a40cfa56dcc3926bac67e75e7a1cf8a6ab54f5c2b54bd2`.
+- Физическая CUDA/NCCL multi-GPU проверка остаётся невыполненной.
+  Evidence: `test_results/refactor_20261120/cnot-rust-selection/GITHUB_STATUS.md`.
