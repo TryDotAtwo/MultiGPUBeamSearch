@@ -139,6 +139,21 @@ pub fn refinement_batches(winner: u64, cap: u64, visited: &BTreeSet<u64>) -> Res
     shuffle(&mut values, 20261010);
     Ok(values)
 }
+pub fn capacity_cache_reusable(
+    previous: Option<&BTreeMap<String, u64>>,
+    current: Option<&BTreeMap<String, u64>>,
+) -> bool {
+    let (Some(previous), Some(current)) = (previous, current) else {
+        return false;
+    };
+    if previous.is_empty() || current.is_empty() || !previous.keys().eq(current.keys()) {
+        return false;
+    }
+    current
+        .iter()
+        .all(|(uuid, free_memory)| free_memory.saturating_sub(previous[uuid]) <= 32)
+}
+
 pub fn probe_time_allowance(records: &[Vec<f64>], default: f64) -> Result<f64> {
     if !default.is_finite() {
         return Err(ContractError::Invalid("inference probe default"));

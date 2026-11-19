@@ -138,12 +138,22 @@ def free_memory_snapshot(signature):
     except (OSError,subprocess.SubprocessError,KeyError,TypeError,ValueError):return None
 
 
-def capacity_cache_reusable(data,signature):
-    if not data.get('capacity_limited_search'):return True
-    previous=data.get('initial_free_memory_mib');current=free_memory_snapshot(signature)
-    if not previous or not current or previous.keys()!=current.keys():return False
+def _python_capacity_cache_decision(previous, current):
+    if not previous or not current or previous.keys() != current.keys():
+        return False
     # A previously rejected larger batch must be retried after pressure lifts.
-    return all(current[uuid]<=previous[uuid]+32 for uuid in previous)
+    return all(current[uuid] <= previous[uuid] + 32 for uuid in previous)
+
+
+def capacity_cache_reusable(data, signature):
+    if not data.get('capacity_limited_search'):
+        return True
+    previous = data.get('initial_free_memory_mib')
+    current = free_memory_snapshot(signature)
+    from .rust_control import inference_capacity_cache_reusable
+
+    native = inference_capacity_cache_reusable(previous, current)
+    return _python_capacity_cache_decision(previous, current) if native is None else native
 
 
 def tune_inference(contract,model,runtime,options,devices,beam_width,run_dir,environment,*,capacity_bootstrap=False):

@@ -71,6 +71,20 @@ fn inference_probe_time_allowance(records: Vec<Vec<f64>>, default: f64) -> PyRes
         .map_err(|error| PyValueError::new_err(error.to_string()))
 }
 
+#[pyfunction]
+fn inference_capacity_cache_reusable(previous: &str, current: &str) -> PyResult<bool> {
+    let previous: Option<std::collections::BTreeMap<String, u64>> =
+        serde_json::from_str(previous)
+            .map_err(|error| PyValueError::new_err(error.to_string()))?;
+    let current: Option<std::collections::BTreeMap<String, u64>> =
+        serde_json::from_str(current)
+            .map_err(|error| PyValueError::new_err(error.to_string()))?;
+    Ok(beam_core::inference::capacity_cache_reusable(
+        previous.as_ref(),
+        current.as_ref(),
+    ))
+}
+
 #[pyclass]
 struct InferenceCalibration {
     request: beam_runtime::inference_job::Request,
@@ -182,6 +196,7 @@ pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(inference_coarse_batches, module)?)?;
     module.add_function(wrap_pyfunction!(inference_refinement_batches, module)?)?;
     module.add_function(wrap_pyfunction!(inference_probe_time_allowance, module)?)?;
+    module.add_function(wrap_pyfunction!(inference_capacity_cache_reusable, module)?)?;
     module.add_class::<InferenceCalibration>()?;
     module.add_class::<DownstreamCalibration>()?;
     module.add_class::<FrontierCalibration>()?;

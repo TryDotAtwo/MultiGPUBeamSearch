@@ -338,6 +338,39 @@ def inference_probe_time_allowance(records, default=12.0):
     return float(result)
 
 
+
+def inference_capacity_cache_reusable(previous, current):
+    """Apply Rust cache policy to ordinary per-GPU memory snapshots."""
+    for snapshot in (previous, current):
+        if snapshot is None:
+            continue
+        if type(snapshot) is not dict:
+            return None
+        if any(
+            type(uuid) is not str
+            or type(free_memory) is not int
+            or free_memory < 0
+            or free_memory > 0xFFFF_FFFF_FFFF_FFFF
+            for uuid, free_memory in snapshot.items()
+        ):
+            return None
+    try:
+        native = extension()
+    except (NativeUnavailable, ImportError):
+        return None
+    builder = getattr(native, "inference_capacity_cache_reusable", None)
+    if not callable(builder):
+        return None
+    try:
+        result = builder(
+            json.dumps(previous, sort_keys=True),
+            json.dumps(current, sort_keys=True),
+        )
+    except (TypeError, ValueError, OverflowError):
+        return None
+    return result if type(result) is bool else None
+
+
 def _inference_request(contract, model, runtime, options, devices, beam_width,
                        run_dir, environment, *, capacity_bootstrap=False):
     from .autotune import calibration_signature
