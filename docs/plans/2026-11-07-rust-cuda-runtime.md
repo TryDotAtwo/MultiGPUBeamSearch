@@ -33,6 +33,8 @@ Total authorization: USD 50, including associated costs. Initial allocations: US
 
 ## Progress and evidence
 
+- Inference profile selection now delegates to `beam-core` through an optional PyO3 adapter while retaining the existing Python fallback and exact selector behavior. Hosted CPU parity tests passed (217 passed, 2 skipped); NCCL probe syntax passed without running a physical collective. See `test_results/refactor_20261119/rust-inference-selection/GITHUB_STATUS.md`. Search stages and GPU/multi-GPU execution remain unchanged by this slice.
+
 - An opt-in Rust supervisor now owns the externally scheduled torchrun/Slurm rank child and its failure/timeout/cancellation loop. The CUDA/NCCL runner and launch protocol are unchanged; the Python supervisor remains the default pending broader comparison. The public search and CNOT control migrations remain separate.
 
 - Source/index recovery: 26 checkouts, 24,134 recovered files, 8,017 distinct archived objects. Independent Git bundle restore and full fsck passed for all 26 original checkout heads.
