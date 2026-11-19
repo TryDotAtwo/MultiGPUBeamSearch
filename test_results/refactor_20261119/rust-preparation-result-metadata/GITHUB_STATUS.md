@@ -17,3 +17,8 @@ Full job output and test logs are retained in the Actions artifacts above. No ph
 ## Scope
 
 Rust owns and refreshes the full prepared metadata for compatible resident sessions. The PyO3 boundary remains coarse and serializes one result per search; no calls were added per candidate or CUDA kernel. Older extensions retain the Python metadata-cache/merge path. Search ordering, CUDA kernels, rank exchange and public Python result formats are unchanged.
+
+
+## Follow-up
+
+The initial implementation cached full callback metadata in Rust and used it for repeated outcomes, but the public Python session still rewrote the assembled outcome file. Commit 9a9064e moves that first-result finalization into Rust and removes the duplicate Python write on the supported path. See test_results/refactor_20261119/rust-preparation-outcome-finalization/GITHUB_STATUS.md.
