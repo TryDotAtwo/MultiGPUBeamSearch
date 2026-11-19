@@ -2722,11 +2722,13 @@ Hosted validation covered CPU/control flow and extension build/import. CUDA exec
 
 ## CNOT root identity from the typed Rust input, 2026-11-19
 
-The compatibility stage uses `CnotSearchInput` or its `CnotMatrix` owner to
-check whether the root is identity. The check compares the packed matrix in
-Rust; older extensions and Python-only inputs retain `torch.equal`. This moves
-only the root check. Tensor ownership, the distributed search order, CUDA
-operators, scorer calls, and collective sequence remain unchanged.
+The compatibility `PyStages` backend checks a typed `CnotSearchInput` through
+the existing Rust `search_input_is_identity` helper before dispatching the root
+goal to Python. This removes the Python stage-method call for Rust-owned typed
+inputs. Python-only inputs and older stage providers retain the existing
+`root_is_goal` callback. The packed matrix check, tensor ownership, distributed
+search order, CUDA operators, scorer calls, and collective sequence are
+unchanged.
 
 ## CNOT input admission ownership, 2026-11-19
 
