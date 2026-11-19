@@ -7,6 +7,7 @@ mod cnot_native_checked;
 mod cnot_native_dedup_score;
 mod cnot_native_exchange;
 mod cnot_native_expand;
+mod cnot_native_redistribute;
 mod cnot_native_goal;
 mod cnot_native_selection;
 mod cnot_native_stages;

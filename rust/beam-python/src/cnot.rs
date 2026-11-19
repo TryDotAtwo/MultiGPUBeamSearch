@@ -502,6 +502,33 @@ impl Backend for PyStages<'_> {
         Ok(())
     }
     fn redistribute(&mut self, depth: u64) -> PyResult<Round<Self::Layer, Self::Records>> {
+        if self.stages.hasattr("input_matrix")? {
+            let input = self.stages.getattr("input_matrix")?;
+            if input.is_instance_of::<PyCnotSearchInput>()
+                && self.stages.hasattr("world")?
+                && self.stages.hasattr("ranks")?
+                && self.stages.hasattr("local")?
+                && self.stages.hasattr("new_lex")?
+                && self.stages.hasattr("meta")?
+                && self.stages.hasattr("children")?
+                && self.stages.hasattr("closed")?
+                && self.stages.hasattr("parents")?
+                && self.stages.hasattr("candidates")?
+                && self.stages.hasattr("owners")?
+                && self.stages.hasattr("values")?
+                && self.stages.hasattr("audit")?
+                && self.stages.hasattr("n")?
+                && self.stages.hasattr("words")?
+            {
+                let (count, layer, records) =
+                    crate::cnot_native_redistribute::redistribute(self.py, &self.stages, depth)?;
+                return Ok(Round {
+                    count,
+                    layer,
+                    records,
+                });
+            }
+        }
         let (count, layer, records) = self
             .stages
             .call_method1("redistribute", (depth,))?
