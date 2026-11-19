@@ -2296,4 +2296,5 @@ Preserved 26 checkouts and their source/index overlays; verified restoration of 
   object-gather fallback. Search stages, scorer order, matrix handling and
   winner semantics are unchanged. The first multi-rank checked call gains one
   capability vote; physical CUDA/NCCL recovery remains unverified.
-- RED: hosted run [44560022663](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44560022663) reproduced the Python `all_gather_object` call in the new test (217 passed, 2 skipped; artifact 14546707888). GREEN run pending.
+- RED: hosted run [44560022663](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44560022663) reproduced the Python `all_gather_object` call in the new test (217 passed, 2 skipped; artifact 14546707888). GREEN: hosted run [44562629629](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44562629629) passed Rust formatting/tests/checks, PyO3 build, 219 Python tests (2 skipped) and NCCL-probe syntax. Artifact 14549203505 SHA-256: `53d387fea8c2694bf8b2c5d22aeae5771bf11394a6855ed18dfbf4b6576bc374`.
+- The separate existing-instance check [44562629392](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44562629392) found Vast instance 61080396 `exited`; it skipped GPU work and issued no start, stop or rent request. Physical CUDA/NCCL error propagation remains unverified.

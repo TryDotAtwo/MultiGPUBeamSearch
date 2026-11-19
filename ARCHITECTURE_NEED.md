@@ -2622,7 +2622,7 @@ v2, используется прежний ABI/object-gather или его Pyth
 
 Изменён только failure-only diagnostic transport. Обычные поисковые стадии,
 матрицы, scorer, выбор победителя и порядок rank-local вычислений не меняются.
-На первом multi-rank `World.checked` добавлен один cached capability vote.
+На первом multi-rank `World.checked` добавлен один cached capability vote. Hosted CPU/PyO3 evidence: `test_results/refactor_20261119/cnot-error-message-gather/GITHUB_STATUS.md`; physical CUDA/NCCL error propagation remains unverified.
 
 
 ## Rust-сборка распределённых CNOT-строк, 2026-11-18

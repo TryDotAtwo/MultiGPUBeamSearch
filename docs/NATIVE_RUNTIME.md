@@ -109,7 +109,7 @@ cached all-rank support vote before selecting the optional v2 ABI; if any rank
 has an older PyO3 extension, all ranks retain the legacy checker or Python
 object-gather fallback. Admission now runs under the Rust rank controller and
 retains the same Python world adapter for the existing process-group operations.
-Older extensions without the controller keep the former Python orchestration.
+Older extensions without the controller keep the former Python orchestration. Hosted CPU/PyO3 evidence (219 passed, 2 skipped) is recorded in `test_results/refactor_20261119/cnot-error-message-gather/GITHUB_STATUS.md`; physical CUDA/NCCL error recovery remains unverified.
 Old externally provided operator libraries fall back to the existing tensor
 implementation, whose expansion, distinct preparation and score validation
 are now orchestrated by Rust. The operations and full-matrix comparisons are
