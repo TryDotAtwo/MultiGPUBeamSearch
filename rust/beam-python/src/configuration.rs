@@ -74,11 +74,9 @@ fn inference_probe_time_allowance(records: Vec<Vec<f64>>, default: f64) -> PyRes
 #[pyfunction]
 fn inference_capacity_cache_reusable(previous: &str, current: &str) -> PyResult<bool> {
     let previous: Option<std::collections::BTreeMap<String, u64>> =
-        serde_json::from_str(previous)
-            .map_err(|error| PyValueError::new_err(error.to_string()))?;
+        serde_json::from_str(previous).map_err(|error| PyValueError::new_err(error.to_string()))?;
     let current: Option<std::collections::BTreeMap<String, u64>> =
-        serde_json::from_str(current)
-            .map_err(|error| PyValueError::new_err(error.to_string()))?;
+        serde_json::from_str(current).map_err(|error| PyValueError::new_err(error.to_string()))?;
     Ok(beam_core::inference::capacity_cache_reusable(
         previous.as_ref(),
         current.as_ref(),
