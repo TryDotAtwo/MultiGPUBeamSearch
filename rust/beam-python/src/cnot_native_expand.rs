@@ -40,9 +40,8 @@ pub(crate) fn expand<'py>(
         );
     }
 
-    let ops = native_ops.ok_or_else(|| {
-        PyRuntimeError::new_err("CNOT expansion operators are unavailable")
-    })?;
+    let ops = native_ops
+        .ok_or_else(|| PyRuntimeError::new_err("CNOT expansion operators are unavailable"))?;
     let count = parents.len()?;
     let n: u64 = stages.getattr("n")?.extract()?;
     let alphabet = n
