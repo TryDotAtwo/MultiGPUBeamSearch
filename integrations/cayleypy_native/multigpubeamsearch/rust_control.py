@@ -252,6 +252,45 @@ def build_graph_contract(center, start, generators, generator_names):
 
 
 
+def inference_coarse_batches(cap):
+    """Use Rust candidate ordering when this extension exposes the optional API."""
+    try:
+        native = extension()
+    except (NativeUnavailable, ImportError):
+        return None
+    builder = getattr(native, "inference_coarse_batches", None)
+    if not callable(builder):
+        return None
+    try:
+        result = builder(cap)
+    except (TypeError, ValueError, OverflowError):
+        return None
+    if type(result) is not list or any(type(value) is not int for value in result):
+        return None
+    return result
+
+
+def inference_refinement_batches(winner, cap, visited):
+    """Use Rust refinement ordering for ordinary integer candidate sets."""
+    if type(visited) not in (set, frozenset, list, tuple):
+        return None
+    if any(type(value) is not int for value in visited):
+        return None
+    try:
+        native = extension()
+    except (NativeUnavailable, ImportError):
+        return None
+    builder = getattr(native, "inference_refinement_batches", None)
+    if not callable(builder):
+        return None
+    try:
+        result = builder(winner, cap, sorted(set(visited)))
+    except (TypeError, ValueError, OverflowError):
+        return None
+    if type(result) is not list or any(type(value) is not int for value in result):
+        return None
+    return result
+
 def _inference_request(contract, model, runtime, options, devices, beam_width,
                        run_dir, environment, *, capacity_bootstrap=False):
     from .autotune import calibration_signature

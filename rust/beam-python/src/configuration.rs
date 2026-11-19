@@ -51,6 +51,22 @@ fn build_graph_contract(request: &str) -> PyResult<String> {
         .map_err(|message| PyValueError::new_err(message))?;
     serde_json::to_string(&contract).map_err(|error| PyValueError::new_err(error.to_string()))
 }
+#[pyfunction]
+fn inference_coarse_batches(cap: u64) -> PyResult<Vec<u64>> {
+    beam_core::inference::coarse_batches(cap)
+        .map_err(|error| PyValueError::new_err(error.to_string()))
+}
+
+#[pyfunction]
+fn inference_refinement_batches(
+    winner: u64,
+    cap: u64,
+    visited: Vec<u64>,
+) -> PyResult<Vec<u64>> {
+    let visited = visited.into_iter().collect::<std::collections::BTreeSet<_>>();
+    beam_core::inference::refinement_batches(winner, cap, &visited)
+        .map_err(|error| PyValueError::new_err(error.to_string()))
+}
 #[pyclass]
 struct InferenceCalibration {
     request: beam_runtime::inference_job::Request,
@@ -159,6 +175,8 @@ pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(validate_options, module)?)?;
     module.add_function(wrap_pyfunction!(validate_search_controls, module)?)?;
     module.add_function(wrap_pyfunction!(build_graph_contract, module)?)?;
+    module.add_function(wrap_pyfunction!(inference_coarse_batches, module)?)?;
+    module.add_function(wrap_pyfunction!(inference_refinement_batches, module)?)?;
     module.add_class::<InferenceCalibration>()?;
     module.add_class::<DownstreamCalibration>()?;
     module.add_class::<FrontierCalibration>()?;

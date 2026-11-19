@@ -83,7 +83,7 @@ jobs:
               rust/beam-python/src/cnot_stream5.rs \
               rust/beam-runtime/tests/search_session.rs \
               rust/beam-runtime/tests/session_preparation_identity.rs
-            rustfmt --check --edition 2021 rust/beam-core/src/cnot.rs rust/beam-core/tests/cnot.rs
+            rustfmt --check --edition 2021 rust/beam-core/src/inference.rs rust/beam-core/src/cnot.rs rust/beam-core/tests/cnot.rs
             cargo test --locked -p beam-core --test cnot
             cargo test --locked -p beam-core --test search
             cargo test --locked -p beam-runtime cnot_search

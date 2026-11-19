@@ -16,21 +16,26 @@ from .build import file_sha256
 from .calibration_telemetry import CalibrationTelemetry, verified_telemetry
 
 
-def coarse_batches(cap):
-    """Include the real beam/user cap, even when it is not a power of two."""
+def _python_coarse_batches(cap):
+    """Compatibility policy for Python-only and older Rust extensions."""
     if type(cap) is not int or not 1 <= cap <= 65536:
         raise ValueError('inference cap must be in [1,65536]')
     baseline=min(256,cap)
     values=[x for x in (32,64,128,256,512,1024,2048,4096,8192,16384,32768,65536)
             if x<=cap and x!=baseline]
-    if cap!=baseline and cap not in values:values.append(cap)
-    # Throughput candidates precede expensive tiny capacity-floor probes.
     larger=[x for x in values if x>=baseline and x!=cap]
     smaller=[x for x in values if x<baseline]
     random.Random(20261009).shuffle(larger)
     random.Random(20261009).shuffle(smaller)
     return [baseline]+([cap] if cap!=baseline else [])+larger+smaller
 
+
+def coarse_batches(cap):
+    if type(cap) is not int or not 1 <= cap <= 65536:
+        raise ValueError('inference cap must be in [1,65536]')
+    from .rust_control import inference_coarse_batches
+    native = inference_coarse_batches(cap)
+    return _python_coarse_batches(cap) if native is None else native
 
 def probe_time_allowance(records, default=12.0):
     """Measured repeats plus warmup/oracle and control overhead."""
@@ -55,8 +60,8 @@ def select_inference(samples, *, baseline):
     return winner,dict(rejected,**other_rejected)
 
 
-def refinement_batches(winner,cap,visited):
-    """Bounded local search; performance is measured rather than inferred."""
+def _python_refinement_batches(winner,cap,visited):
+    """Compatibility policy for Python-only and older Rust extensions."""
     if type(winner) is not int or not 1 <= winner <= cap:
         raise ValueError('inference winner must fit its cap')
     grain=max(1,min(32,winner//8))
@@ -68,6 +73,13 @@ def refinement_batches(winner,cap,visited):
     random.Random(20261010).shuffle(result)
     return result
 
+
+def refinement_batches(winner,cap,visited):
+    if type(winner) is not int or not 1 <= winner <= cap:
+        raise ValueError('inference winner must fit its cap')
+    from .rust_control import inference_refinement_batches
+    native = inference_refinement_batches(winner,cap,visited)
+    return _python_refinement_batches(winner,cap,visited) if native is None else native
 
 def graph_samples(contract, count=128):
     rng=random.Random(20261009)

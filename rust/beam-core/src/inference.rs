@@ -6,14 +6,96 @@ use crate::{
 use std::collections::{BTreeMap, BTreeSet};
 type Result<T> = std::result::Result<T, ContractError>;
 
-fn shuffle(values: &mut [u64], mut seed: u64) {
+const MT_N: usize = 624;
+const MT_M: usize = 397;
+
+/// Reproduce Python random.Random(seed).shuffle so persisted calibration policy
+/// keeps the exact candidate order used by the public Python implementation.
+struct PythonMt19937 {
+    state: [u32; MT_N],
+    index: usize,
+}
+impl PythonMt19937 {
+    fn seeded(seed: u64) -> Self {
+        let high = (seed >> 32) as u32;
+        let key = if high == 0 {
+            vec![seed as u32]
+        } else {
+            vec![seed as u32, high]
+        };
+        let mut state = [0u32; MT_N];
+        state[0] = 19_650_218;
+        for i in 1..MT_N {
+            let previous = state[i - 1];
+            state[i] = 1_812_433_253u32
+                .wrapping_mul(previous ^ (previous >> 30))
+                .wrapping_add(i as u32);
+        }
+        let mut i = 1;
+        let mut j = 0;
+        for _ in 0..MT_N.max(key.len()) {
+            let previous = state[i - 1];
+            let mixed = (previous ^ (previous >> 30)).wrapping_mul(1_664_525);
+            state[i] = (state[i] ^ mixed)
+                .wrapping_add(key[j])
+                .wrapping_add(j as u32);
+            i += 1;
+            j += 1;
+            if i >= MT_N {
+                state[0] = state[MT_N - 1];
+                i = 1;
+            }
+            if j >= key.len() {
+                j = 0;
+            }
+        }
+        for _ in 0..MT_N - 1 {
+            let previous = state[i - 1];
+            let mixed = (previous ^ (previous >> 30)).wrapping_mul(1_566_083_941);
+            state[i] = (state[i] ^ mixed).wrapping_sub(i as u32);
+            i += 1;
+            if i >= MT_N {
+                state[0] = state[MT_N - 1];
+                i = 1;
+            }
+        }
+        state[0] = 0x8000_0000;
+        Self { state, index: MT_N }
+    }
+
+    fn next_u32(&mut self) -> u32 {
+        if self.index >= MT_N {
+            for i in 0..MT_N {
+                let joined = (self.state[i] & 0x8000_0000)
+                    | (self.state[(i + 1) % MT_N] & 0x7fff_ffff);
+                let odd = if joined & 1 == 0 { 0 } else { 0x9908_b0df };
+                self.state[i] = self.state[(i + MT_M) % MT_N] ^ (joined >> 1) ^ odd;
+            }
+            self.index = 0;
+        }
+        let mut value = self.state[self.index];
+        self.index += 1;
+        value ^= value >> 11;
+        value ^= (value << 7) & 0x9d2c_5680;
+        value ^= (value << 15) & 0xefc6_0000;
+        value ^= value >> 18;
+        value
+    }
+
+    fn below(&mut self, upper: usize) -> usize {
+        let bits = 32 - (upper as u32).leading_zeros();
+        loop {
+            let value = self.next_u32() >> (32 - bits);
+            if (value as usize) < upper {
+                return value as usize;
+            }
+        }
+    }
+}
+fn shuffle(values: &mut [u64], seed: u64) {
+    let mut rng = PythonMt19937::seeded(seed);
     for i in (1..values.len()).rev() {
-        seed = seed.wrapping_add(0x9e3779b97f4a7c15);
-        let mut z = seed;
-        z = (z ^ (z >> 30)).wrapping_mul(0xbf58476d1ce4e5b9);
-        z = (z ^ (z >> 27)).wrapping_mul(0x94d049bb133111eb);
-        z ^= z >> 31;
-        let j = ((z as u128 * (i + 1) as u128) >> 64) as usize;
+        let j = rng.below(i + 1);
         values.swap(i, j);
     }
 }
