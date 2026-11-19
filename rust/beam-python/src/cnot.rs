@@ -471,10 +471,7 @@ impl Backend for PyStages<'_> {
                         self.py,
                         &world,
                         "deduplicate and evaluate distinct children",
-                        crate::cnot_native_dedup_score::deduplicate_score(
-                            self.py,
-                            &self.stages,
-                        ),
+                        crate::cnot_native_dedup_score::deduplicate_score(self.py, &self.stages),
                     )?;
                     let result = result.downcast::<PyTuple>()?;
                     if result.len() != 3 {

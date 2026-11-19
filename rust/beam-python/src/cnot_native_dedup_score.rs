@@ -53,10 +53,8 @@ pub(crate) fn deduplicate_score<'py>(
     let values = if child_count != 0 {
         let raw = scorer.call_method1("child_values", (&children,))?;
         let shape = PyTuple::new(py, [child_count])?;
-        py.import("multigpubeamsearch.cnot")?.call_method1(
-            "_scores",
-            (raw, shape, world.getattr("device")?),
-        )?
+        py.import("multigpubeamsearch.cnot")?
+            .call_method1("_scores", (raw, shape, world.getattr("device")?))?
     } else {
         let torch = py.import("torch")?;
         let kwargs = PyDict::new(py);
