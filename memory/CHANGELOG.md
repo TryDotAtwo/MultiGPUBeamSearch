@@ -2318,3 +2318,23 @@ Preserved 26 checkouts and their source/index overlays; verified restoration of 
   capability vote; physical CUDA/NCCL recovery remains unverified.
 - RED: hosted run [44560022663](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44560022663) reproduced the Python `all_gather_object` call in the new test (217 passed, 2 skipped; artifact 14546707888). GREEN: hosted run [44562629629](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44562629629) passed Rust formatting/tests/checks, PyO3 build, 219 Python tests (2 skipped) and NCCL-probe syntax. Artifact 14549203505 SHA-256: `53d387fea8c2694bf8b2c5d22aeae5771bf11394a6855ed18dfbf4b6576bc374`.
 - The separate existing-instance check [44562629392](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44562629392) found Vast instance 61080396 `exited`; it skipped GPU work and issued no start, stop or rent request. Physical CUDA/NCCL error propagation remains unverified.
+
+## 2026-11-19 - Rust compatibility backend checks typed CNOT root goal
+
+- The Rust `PyStages` backend now checks typed `CnotSearchInput` through the
+  existing `search_input_is_identity` helper before invoking the Python
+  `root_is_goal` stage method. Python-only input and old stage providers keep
+  the previous callback fallback.
+- Search selection, matrix and tensor ownership, CUDA operations, scorer calls,
+  layer ordering and collectives are unchanged; this transfers one compatibility
+  stage decision to Rust without changing search behavior.
+- RED: hosted run [44585776893](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44585776893)
+  failed on the Python stage callback as expected (1 failed, 218 passed, 2
+  skipped; artifact 14559869836). GREEN: hosted run
+  [44586229891](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44586229891)
+  passed Rust checks, PyO3 build and the selected CPU suite (219 passed, 2
+  skipped; artifact 14561312765).
+- An earlier test run did not force the compatibility-stage path; the regression
+  test was corrected to disable native-stage dispatch before recording RED.
+  Physical CUDA/NCCL and multi-GPU acceptance remain unverified. Evidence:
+  `test_results/refactor_20261119/cnot-rust-root-goal/GITHUB_STATUS.md`.
