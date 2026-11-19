@@ -96,7 +96,6 @@ impl PythonMt19937 {
         let low = (self.next_u32() >> 6) as u64;
         ((high << 26) + low) as f64 * (1.0 / 9_007_199_254_740_992.0)
     }
-
 }
 fn shuffle(values: &mut [u64], seed: u64) {
     let mut rng = PythonMt19937::seeded(seed);
@@ -181,7 +180,6 @@ pub fn probe_time_allowance(records: &[Vec<f64>], default: f64) -> Result<f64> {
     Ok(allowance)
 }
 
-
 fn compatible_median(values: &mut [f64]) -> f64 {
     values.sort_by(f64::total_cmp);
     let half = values.len() / 2;
@@ -196,13 +194,18 @@ fn compatible_estimate(
     profile: &str,
     samples: &[Measurement],
 ) -> std::result::Result<Estimate, String> {
-    let selected: Vec<_> = samples.iter().filter(|sample| sample.profile == profile).collect();
+    let selected: Vec<_> = samples
+        .iter()
+        .filter(|sample| sample.profile == profile)
+        .collect();
     if selected.len() < 5 {
         return Err("insufficient measured repeats".into());
     }
-    if selected.iter().any(|sample| {
-        !sample.correctness_passed || !sample.memory_admitted || sample.throttled
-    }) {
+    if selected
+        .iter()
+        .any(|sample| {
+            !sample.correctness_passed || !sample.memory_admitted || sample.throttled
+        }) {
         return Err("reject incorrect, unadmitted or throttled profile".into());
     }
     let cohorts: BTreeSet<_> = selected
