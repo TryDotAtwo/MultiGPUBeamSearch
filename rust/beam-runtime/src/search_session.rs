@@ -141,6 +141,7 @@ pub struct SearchSession {
     identity: Option<SessionIdentity>,
     preparation_identity: Option<PreparationIdentity>,
     metadata: Option<Value>,
+    last_outcome_path: Option<PathBuf>,
     cancellation: Arc<AtomicBool>,
     closed: bool,
     owner: u32,
@@ -157,6 +158,7 @@ impl SearchSession {
             identity: None,
             preparation_identity: None,
             metadata: None,
+            last_outcome_path: None,
             cancellation: Arc::new(AtomicBool::new(false)),
             closed: false,
             owner: std::process::id(),
@@ -203,7 +205,7 @@ impl SearchSession {
         &mut self,
         identity: &PreparationIdentity,
         metadata: &Value,
-    ) -> Result<()> {
+    ) -> Result<bool> {
         self.check_owner()?;
         if self.closed || self.cancellation.load(Ordering::Acquire) {
             return Err(Error::Message("native session cancelled or closed".into()));
@@ -213,7 +215,16 @@ impl SearchSession {
         }
         self.preparation_identity = Some(identity.clone());
         self.metadata = Some(metadata.clone());
-        Ok(())
+        let Some(path) = self.last_outcome_path.as_ref() else {
+            return Ok(false);
+        };
+        let mut outcome: Value = serde_json::from_reader(File::open(path)?)?;
+        outcome
+            .as_object_mut()
+            .ok_or_else(|| Error::Message("invalid resident outcome".into()))?
+            .insert("metadata".into(), metadata.clone());
+        crate::atomic_json(path, &outcome)?;
+        Ok(true)
     }
     fn check_owner(&self) -> Result<()> {
         if self.owner != std::process::id() {
@@ -227,6 +238,7 @@ impl SearchSession {
         self.identity.take();
         self.preparation_identity = None;
         self.metadata.take();
+        self.last_outcome_path = None;
         if let Some(mut workers) = self.workers.take() {
             workers.close()?;
         }
@@ -251,6 +263,7 @@ impl SearchSession {
         if self.closed || self.cancellation.load(Ordering::Acquire) {
             return Err(Error::Message("native session cancelled or closed".into()));
         }
+        self.last_outcome_path = None;
         let result = self.run_inner(identity, launch, start, run_dir, timeout, metadata);
         if result.is_err() {
             let _ = self.release();
@@ -450,7 +463,9 @@ impl SearchSession {
             metadata: output,
         };
         remaining()?;
-        crate::atomic_json(&run_dir.join("native-outcome.json"), &outcome)?;
+        let outcome_path = run_dir.join("native-outcome.json");
+        crate::atomic_json(&outcome_path, &outcome)?;
+        self.last_outcome_path = Some(outcome_path);
         Ok(outcome)
     }
 }

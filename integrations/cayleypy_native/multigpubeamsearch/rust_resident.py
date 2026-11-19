@@ -109,7 +109,9 @@ class RustResidentWorkers:
             return False
         if type(metadata) is not dict:
             raise NativeBackendError('Rust resident preparation metadata must be an object')
-        remember(identity, json.dumps(metadata))
+        finalized = remember(identity, json.dumps(metadata))
+        if finalized is not True:
+            return False
         self._metadata_owned = True
         self._outcome = None
         self._terminal = None

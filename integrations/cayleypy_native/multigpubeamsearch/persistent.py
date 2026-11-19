@@ -348,6 +348,7 @@ class NativeSession:
                 and callable(getattr(self._workers, 'configure', None)))
             if identity_changed and not preserve_rust_owner:self._release()
             rust_outcome_owned = False
+            remember_preparation = False
             if self._workers is None or identity_changed:
                 if (self.model_snapshot_cache is not None
                         and self.model_snapshot_cache.needs_fresh_worker_snapshot(model, contract)):
@@ -378,18 +379,7 @@ class NativeSession:
                     if preserve_rust_owner and not launch_started:
                         self._release()
                     else:
-                        result_recorder = getattr(self._workers, 'remember_preparation_result', None)
-                        rust_owns_metadata = (self._engine == 'rust'
-                            and callable(result_recorder)
-                            and result_recorder(identity_key, outcome.metadata))
-                        self._rust_metadata_owned = rust_owns_metadata
-                        recorder = getattr(self._workers, 'remember_preparation', None)
-                        rust_owns_identity = rust_owns_metadata or (
-                            self._engine == 'rust' and callable(recorder)
-                            and recorder(identity_key))
-                        self._identity = None if rust_owns_identity else identity
-                        self._metadata = (None if rust_owns_metadata
-                                          else deepcopy(outcome.metadata))
+                        remember_preparation = True
                 reused=bool(self._workers is not None
                     and getattr(self._workers, '_last_reused', False))
             else:
@@ -429,6 +419,22 @@ class NativeSession:
             persistent_metadata = dict(reused=reused,
                 worker_pids=[] if self._workers is None else self._workers.pids,
                 request_count=0 if self._workers is None else self._workers.sequence)
+            if not rust_outcome_owned:
+                outcome.metadata['persistent_session'] = persistent_metadata
+            if remember_preparation and self._workers is not None:
+                result_recorder = getattr(self._workers, 'remember_preparation_result', None)
+                rust_owns_metadata = (self._engine == 'rust'
+                    and callable(result_recorder)
+                    and result_recorder(identity_key, outcome.metadata))
+                self._rust_metadata_owned = rust_owns_metadata
+                recorder = getattr(self._workers, 'remember_preparation', None)
+                rust_owns_identity = rust_owns_metadata or (
+                    self._engine == 'rust' and callable(recorder)
+                    and recorder(identity_key))
+                self._identity = None if rust_owns_identity else identity
+                self._metadata = (None if rust_owns_metadata
+                                  else deepcopy(outcome.metadata))
+                rust_outcome_owned = rust_owns_metadata
             if rust_outcome_owned:
                 owner_metadata = outcome.metadata.get('persistent_session')
                 if (type(owner_metadata) is not dict
@@ -436,23 +442,9 @@ class NativeSession:
                         or owner_metadata.get('request_count') != persistent_metadata['request_count']):
                     raise NativeBackendError('Rust resident session metadata is inconsistent')
             else:
-                outcome.metadata['persistent_session'] = persistent_metadata
-            if not rust_outcome_owned:
                 Path(run_dir,'native-outcome.json').write_text(json.dumps(dict(path=outcome.path,
                     elapsed_seconds=outcome.elapsed_seconds,effective_beam_width=outcome.effective_beam_width,
                     metadata=outcome.metadata),indent=2),encoding='utf-8')
-            # Distributed reconstruction prints the solved path only on its
-            # controller. Unsolved searches print one record on every rank.
-            # ResidentWorkers separately requires a completion receipt from all ranks.
-            expected_records = 1 if outcome.path is not None else len(devices)
-            if self._workers is not None and outcome.metadata.get('terminal_records') != expected_records:
-                raise NativeBackendError('resident search has unexpected terminal record count')
-            outcome.metadata['persistent_session']=dict(reused=reused,
-                worker_pids=[] if self._workers is None else self._workers.pids,
-                request_count=0 if self._workers is None else self._workers.sequence)
-            Path(run_dir,'native-outcome.json').write_text(json.dumps(dict(path=outcome.path,
-                elapsed_seconds=outcome.elapsed_seconds,effective_beam_width=outcome.effective_beam_width,
-                metadata=outcome.metadata),indent=2),encoding='utf-8')
             return outcome
         except BaseException:
             self._release()

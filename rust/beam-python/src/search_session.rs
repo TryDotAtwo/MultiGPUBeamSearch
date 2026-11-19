@@ -92,7 +92,7 @@ impl SearchSession {
         let identity: PreparationIdentity = serde_json::from_str(identity).map_err(error)?;
         inner.remember_preparation(&identity).map_err(error)
     }
-    fn remember_preparation_result(&self, identity: &str, metadata: &str) -> PyResult<()> {
+    fn remember_preparation_result(&self, identity: &str, metadata: &str) -> PyResult<bool> {
         let identity: PreparationIdentity = serde_json::from_str(identity).map_err(error)?;
         let metadata: serde_json::Value = serde_json::from_str(metadata).map_err(error)?;
         let mut inner = self.inner.try_lock().map_err(|_| {
