@@ -2738,6 +2738,15 @@ retains the Python stage-method fallback for Python-only inputs and older stage
 providers. The goal predicate, packed tensor operations, error coordination,
 rank collectives, stage order, and result semantics are unchanged.
 
+## CNOT typed history-edge broadcast in Rust, 2026-11-19
+
+For typed Rust `CnotSearchInput`, the compatibility `PyStages` backend now
+selects and copies the owner-held history record in Rust, then uses the same
+`World.broadcast` operation and validates the resulting three-field edge.
+Python-only input and older stage providers retain the previous callback.
+Record layout, owner rank, broadcast order, path reconstruction, and result
+semantics are unchanged.
+
 ## CNOT input admission ownership, 2026-11-19
 
 For the matching Rust extension, `validation="auto"` and `validation="rust"`
