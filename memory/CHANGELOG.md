@@ -2456,13 +2456,13 @@ Preserved 26 checkouts and their source/index overlays; verified restoration of 
   [44613780854](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44613780854)
   упал только на запрещённом Python callback для qhat/proposal
   (2 failed, 228 passed, 2 skipped; artifact 14574401283,
-  SHA256 `b193d6bba0fd599faef7afaedcac9840...`).
+  SHA256 `b193d6bba0fd599faef7afaedcac9840d40aa4d10564aa0be32270e97c08c6e2`).
 - GREEN: hosted branch run
   [44615705900](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44615705900)
   и последующая проверка `main`
   [44616358356](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44616358356)
   прошли Rust checks, PyO3 build и CPU suite (230 passed, 2 skipped).
   Main artifact 14576135151, SHA256
-  `e761f9675a1fd90a7c46333635c4a7ed...`.
+  `e761f9675a1fd90a7c46333635c4a7edf932dfc7a38b4eaa54906e154eaebbc1`.
 - Физическая проверка CUDA/NCCL и нескольких GPU остаётся невыполненной.
   Evidence: `test_results/refactor_20261119/cnot-rust-redistribute/GITHUB_STATUS.md`.
