@@ -2493,3 +2493,28 @@ Preserved 26 checkouts and their source/index overlays; verified restoration of 
   `25aa5f670c65f98d86a40cfa56dcc3926bac67e75e7a1cf8a6ab54f5c2b54bd2`.
 - Физическая CUDA/NCCL multi-GPU проверка остаётся невыполненной.
   Evidence: `test_results/refactor_20261120/cnot-rust-selection/GITHUB_STATUS.md`.
+
+## 2026-11-20 - Typed CNOT batch fallback dispatch перенесён в Rust
+
+- Typed compatibility stages больше не вызывают `cnot._expand`,
+  `cnot._distinct` или `cnot._scores`. Они используют существующий
+  `cnot_native_batch` с прежними Torch/CUDA domain primitives и scorer API.
+  У fused CUDA hooks приоритет сохранён.
+- Сохранены режимы qhat/proposal, scoring, стабильная сортировка по
+  generation/route, state equality, metadata и output tensors. Новые CUDA
+  kernels и алгоритмические изменения не добавлялись.
+- RED: hosted run
+  [44621164737](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44621164737)
+  подтвердил четыре forbidden helper вызова (4 failed, 232 passed, 2 skipped;
+  artifact 14578940035, SHA256
+  `f7e237eae76057521ec0d48cca544c231abde09cfe5c8ed7810e761ccd80b0f3`).
+- GREEN: branch run
+  [44622029810](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44622029810)
+  и main run
+  [44622384926](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44622384926)
+  прошли Rust checks, PyO3 build и CPU suite (236 passed, 2 skipped).
+  Main artifact 14575724693, SHA256
+  `f80dd0f54adb6e497bfc7b762ec37c7f63df71d4a94054493fea56d521c2c00f`.
+- CPU/reference implementations of low-level CNOT primitives still use Torch
+  in `cnot_native.py`; this is not physical CUDA/NCCL acceptance.
+  Evidence: `test_results/refactor_20261120/cnot-rust-domain-fallback/GITHUB_STATUS.md`.

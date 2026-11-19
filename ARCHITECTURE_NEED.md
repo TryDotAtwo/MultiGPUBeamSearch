@@ -1,5 +1,26 @@
 # Конфиг
 
+## Rust-владелец CNOT CPU/legacy batch fallback, 2026-11-20
+
+Typed `PyCnotSearchInput` compatibility dispatch больше не вызывает
+высокоуровневые `cnot._expand`, `cnot._distinct` и `cnot._scores`.
+При отсутствии соответствующего fused CUDA hook Rust вызывает существующий
+`cnot_native_batch`: он сохраняет порядок scoring, выбор ходов,
+generation-order deduplication, score validation и формы выходных tensors.
+При наличии fused CUDA hooks они остаются приоритетным путём.
+
+Нижнеуровневые CNOT-примитивы `cnot_children`, `cnot_first_unseen`,
+`pack_cnot_route` и `cnot_owners` остаются существующим доменным интерфейсом:
+на CUDA он вызывает текущие C++/CUDA kernels; его CPU/reference реализация
+по-прежнему использует Torch. Перенос этих CPU primitives отдельно не завершён.
+Python-only engine и старые stage providers сохраняют fallback.
+Алгоритм поиска, scoring, precision, state layout и transport не менялись.
+
+Hosted CPU suite сравнивает qhat/proposal с Python эталоном и запрещает
+высокоуровневые helper callbacks. Он не заменяет физическую CUDA/NCCL
+multi-GPU проверку.
+Результат: `test_results/refactor_20261120/cnot-rust-domain-fallback/GITHUB_STATUS.md`.
+
 ## Rust-владелец CNOT selection, 2026-11-20
 
 Для typed `PyCnotSearchInput` compatibility adapter вызывает существующий
