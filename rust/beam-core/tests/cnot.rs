@@ -114,10 +114,11 @@ fn identity_check_covers_the_complete_packed_matrix() {
 
         let stride = (n as usize).div_ceil(64);
         let row = n as usize - 1;
-        let word = row / 64;
-        let bit = row % 64;
+        let control = row - 1;
+        let word = control / 64;
+        let bit = control % 64;
         let byte = (row * stride + word) * 8 + bit / 8;
-        packed[byte] ^= 1 << (bit % 8);
+        packed[byte] |= 1 << (bit % 8);
         let changed = CnotMatrix::from_le_bytes(n, &packed).unwrap();
         assert!(!changed.is_identity(), "changed matrix n={n}");
     }
