@@ -282,3 +282,25 @@ def test_rust_session_rejects_launch_without_prepared_context(tmp_path):
                        env={}, world=1, timeout=1)
     session.close()
 
+
+@pytest.mark.parametrize("defer", [False, True])
+def test_backend_native_outcome_file_uses_rust_owner_when_available(tmp_path, monkeypatch, defer):
+    from multigpubeamsearch import backend, persistent
+
+    session = SimpleNamespace(defer_native_outcome_write=lambda: defer)
+    monkeypatch.setattr(persistent, "current_session", lambda: session)
+    outcome = NativeOutcome((2, 3), 0.25, 64, tmp_path, {"owner": "rust"})
+
+    written = backend._persist_native_outcome(tmp_path, outcome)
+
+    target = tmp_path / "native-outcome.json"
+    assert written is (not defer)
+    assert target.exists() is (not defer)
+    if not defer:
+        saved = json.loads(target.read_text(encoding="utf-8"))
+        assert saved == {
+            "path": [2, 3],
+            "elapsed_seconds": 0.25,
+            "effective_beam_width": 64,
+            "metadata": {"owner": "rust"},
+        }
