@@ -73,4 +73,3 @@ pub(crate) fn atomic_json(path: &std::path::Path, value: &impl serde::Serialize)
     std::fs::rename(temporary, path)?;
     Ok(())
 }
-

@@ -4,10 +4,7 @@ use std::path::Path;
 use crate::Result;
 
 /// Write the runner's legacy task files from the validated Rust graph contract.
-pub fn write_legacy_search_inputs(
-    contract: &PublicGraphContract,
-    run_dir: &Path,
-) -> Result<()> {
+pub fn write_legacy_search_inputs(contract: &PublicGraphContract, run_dir: &Path) -> Result<()> {
     let center = contract
         .center
         .iter()
@@ -48,4 +45,3 @@ pub fn write_legacy_search_inputs(
     std::fs::write(run_dir.join("test.csv"), test_csv)?;
     Ok(())
 }
-
