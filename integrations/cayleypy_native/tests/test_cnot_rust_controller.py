@@ -818,3 +818,49 @@ def test_rust_compatibility_backend_owns_cnot_selection_dispatch(monkeypatch, mo
         rows, scorer, mode, options["width"], options["shortlist"],
         result.layers, torch.device("cpu"),
     )
+
+
+@pytest.mark.parametrize("mode", ["qhat", "proposal"])
+def test_rust_compatibility_backend_bypasses_cnot_python_expand(monkeypatch, mode):
+    require_controller()
+
+    rows = cnot.replay_cnot(4, (0, 1))
+    options = dict(width=12, shortlist=12, max_depth=2, mode=mode, audit=True)
+    reference = cnot.search_cnot(
+        cnot.pack_rows(rows), WireFixture(9), engine="python", **options
+    )
+
+    def forbidden(*_args, **_kwargs):
+        pytest.fail("typed Rust expansion must not call cnot._expand")
+
+    monkeypatch.setattr(cnot, "_expand", forbidden)
+    monkeypatch.setattr(cnot, "_native_stages_runner", lambda: None)
+    result = cnot.search_cnot(
+        cnot.pack_rows(rows), WireFixture(9), engine="rust", **options
+    )
+    assert asdict(result) == asdict(reference)
+    assert result.status == "solved"
+    assert cnot.replay_cnot(4, result.gates) == rows
+
+
+@pytest.mark.parametrize("mode", ["qhat", "proposal"])
+def test_rust_compatibility_backend_bypasses_cnot_python_distinct(monkeypatch, mode):
+    require_controller()
+
+    rows = cnot.replay_cnot(4, (0, 1))
+    options = dict(width=12, shortlist=12, max_depth=2, mode=mode, audit=True)
+    reference = cnot.search_cnot(
+        cnot.pack_rows(rows), WireFixture(9), engine="python", **options
+    )
+
+    def forbidden(*_args, **_kwargs):
+        pytest.fail("typed Rust deduplication must not call cnot._distinct")
+
+    monkeypatch.setattr(cnot, "_distinct", forbidden)
+    monkeypatch.setattr(cnot, "_native_stages_runner", lambda: None)
+    result = cnot.search_cnot(
+        cnot.pack_rows(rows), WireFixture(9), engine="rust", **options
+    )
+    assert asdict(result) == asdict(reference)
+    assert result.status == "solved"
+    assert cnot.replay_cnot(4, result.gates) == rows
