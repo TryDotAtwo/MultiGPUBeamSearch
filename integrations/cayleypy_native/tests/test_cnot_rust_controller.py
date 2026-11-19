@@ -210,7 +210,7 @@ def test_rust_top_level_controller_preserves_compatibility_stage_fallback():
 
         def sum(self, tensor):
             events.append(("sum", tensor.tolist()))
-            return torch.tensor(1, dtype=torch.int64)
+            return tensor.sum()
 
         def start_transport(self, *, prefer_rust):
             events.append(("transport", prefer_rust))
@@ -259,6 +259,8 @@ def test_rust_top_level_controller_preserves_compatibility_stage_fallback():
     digest_values = list(expected_digest.digest())
     assert events == [
         ("prepare-input", caller_root, 7, 12, 8, "proposal", "python"),
+        ("longs", [0]),
+        ("sum", [0]),
         ("longs", digest_values),
         ("gather-fixed", digest_values),
         ("transport", True),
