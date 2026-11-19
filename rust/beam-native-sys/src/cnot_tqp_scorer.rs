@@ -5,6 +5,7 @@
 //! of Python without changing its chunk sizes or call order.
 use super::Error;
 use libloading::Library;
+use serde_json::Value;
 #[cfg(feature = "python")]
 use pyo3::{exceptions::PyValueError, prelude::*};
 use std::{
@@ -63,12 +64,74 @@ impl Api {
     }
 }
 
+#[derive(Debug, PartialEq, Eq)]
+struct CnotScorerMetadata {
+    feature_ids: Vec<String>,
+    max_packet_rows: i64,
+}
+
+impl CnotScorerMetadata {
+    fn parse(metadata: &str) -> Result<Self, Error> {
+        let value: Value = serde_json::from_str(metadata).map_err(|error| {
+            Error(format!(
+                "CNOT scorer metadata is not valid JSON: {error}"
+            ))
+        })?;
+        let object = value
+            .as_object()
+            .ok_or_else(|| Error("expected all 102 registered field inputs".into()))?;
+        let feature_inputs = object
+            .get("feature_model_inputs")
+            .and_then(Value::as_u64);
+        let Some(features) = object.get("feature_ids").and_then(Value::as_array) else {
+            return Err(Error(
+                "expected all 102 registered field inputs".into(),
+            ));
+        };
+        if feature_inputs != Some(102) || features.len() != 102 {
+            return Err(Error(
+                "expected all 102 registered field inputs".into(),
+            ));
+        }
+        let feature_ids = features
+            .iter()
+            .map(|feature| {
+                feature.as_str().map(str::to_owned).ok_or_else(|| {
+                    Error("expected all 102 registered field inputs".into())
+                })
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        let max_packet_rows = object
+            .get("max_packet_rows")
+            .and_then(Value::as_i64)
+            .ok_or_else(|| {
+                Error("CNOT scorer metadata max_packet_rows must be an integer".into())
+            })?;
+
+        Ok(Self {
+            feature_ids,
+            max_packet_rows,
+        })
+    }
+
+    fn effective_batch(&self, inference_batch: i64) -> Result<i64, Error> {
+        let batch = inference_batch.min(self.max_packet_rows);
+        if batch < 1 {
+            return Err(Error(
+                "the feature policy cannot admit a single row".into(),
+            ));
+        }
+        Ok(batch)
+    }
+}
+
 /// A thread-bound scorer handle. Device addresses are accepted only for the
 /// duration of an unsafe call and are never turned into Rust references.
 pub struct TqpScorer {
     api: Api,
     handle: Option<NonNull<c_void>>,
     metadata: String,
+    metadata_contract: CnotScorerMetadata,
     wires: u32,
     device: u32,
     native_batch: bool,
@@ -154,10 +217,18 @@ impl TqpScorer {
                     return Err(Error(format!("CNOT scorer metadata is not UTF-8: {error}")));
                 }
             };
+            let metadata_contract = match CnotScorerMetadata::parse(&metadata) {
+                Ok(metadata) => metadata,
+                Err(error) => {
+                    (api.close)(handle.as_ptr());
+                    return Err(error);
+                }
+            };
             Ok(Self {
                 api,
                 handle: Some(handle),
                 metadata,
+                metadata_contract,
                 wires,
                 device,
                 native_batch,
@@ -168,6 +239,14 @@ impl TqpScorer {
 
     pub fn metadata(&self) -> &str {
         &self.metadata
+    }
+
+    pub fn feature_ids(&self) -> &[String] {
+        &self.metadata_contract.feature_ids
+    }
+
+    pub fn effective_batch(&self, inference_batch: i64) -> Result<i64, Error> {
+        self.metadata_contract.effective_batch(inference_batch)
     }
 
     pub fn supports_native_batch(&self) -> bool {

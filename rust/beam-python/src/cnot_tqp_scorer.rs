@@ -69,23 +69,16 @@ impl PyTqpScorer {
             .map_err(crate::runtime_error)
         })?;
 
+        let feature_ids = scorer.feature_ids().to_vec();
+        let batch = scorer
+            .effective_batch(inference_batch)
+            .map_err(crate::runtime_error)?;
+
+        // Preserve the public Python metadata dictionary; Rust has already
+        // parsed and validated the scorer contract.
         let metadata = py
             .import("json")?
             .call_method1("loads", (scorer.metadata(),))?;
-        let feature_inputs: usize = metadata.get_item("feature_model_inputs")?.extract()?;
-        let feature_ids: Vec<String> = metadata.get_item("feature_ids")?.extract()?;
-        if feature_inputs != 102 || feature_ids.len() != 102 {
-            return Err(PyRuntimeError::new_err(
-                "expected all 102 registered field inputs",
-            ));
-        }
-        let capacity: i64 = metadata.get_item("max_packet_rows")?.extract()?;
-        let batch = inference_batch.min(capacity);
-        if batch < 1 {
-            return Err(PyRuntimeError::new_err(
-                "the feature policy cannot admit a single row",
-            ));
-        }
 
         Ok(Self {
             scorer: Some(scorer),
