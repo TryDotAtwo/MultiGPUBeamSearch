@@ -67,15 +67,21 @@ def test_rust_top_level_controller_owns_cnot_admission_and_stage_dispatch():
     class World:
         rank, size, device = 0, 1, "cpu"
 
-        def require_consensus(self, value):
-            events.append(("consensus", value))
+        def longs(self, values):
+            events.append(("longs", values))
+            return torch.tensor(values, dtype=torch.int64)
+
+        def gather_fixed(self, tensor):
+            values = tensor.tolist()
+            events.append(("gather-fixed", values))
+            return torch.stack([tensor for _ in range(self.size)])
+
+        def sum(self, tensor):
+            events.append(("sum", tensor.tolist()))
+            return tensor.sum()
 
         def start_transport(self, *, prefer_rust):
             events.append(("transport", prefer_rust))
-
-        def all_ranks_support(self, available):
-            events.append(("support", available))
-            return True
 
     world = World()
 
@@ -109,13 +115,16 @@ def test_rust_top_level_controller_owns_cnot_admission_and_stage_dispatch():
               ("commit", "checkpoint", "registry", "manifest", "result"))
     expected_digest = hashlib.sha256(raw)
     expected_digest.update(json.dumps(config).encode())
+    digest_values = list(expected_digest.digest())
     assert events == [
         ("prepare-input", caller_root, 5, 9, 4, "qhat", "python"),
-        ("consensus", expected_digest.digest()),
+        ("longs", digest_values),
+        ("gather-fixed", digest_values),
         ("transport", True),
         ("identity", 3, "cpu"),
         ("native-runner",),
-        ("support", True),
+        ("longs", [1]),
+        ("sum", [1]),
         ("native-stages", world, admitted_root, identity, input_matrix, scorer,
          "qhat", True, 5, 6, 6, 4),
     ]
