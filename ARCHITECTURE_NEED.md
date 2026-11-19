@@ -1193,3 +1193,17 @@ compatibility. The snapshot remains detached, cloned and contiguous; packed
 byte encoding, matrix validation, admission digest, collective order, scorer
 callbacks, search decisions, and multi-rank topology remain unchanged.
 
+## Rust-owned CNOT identity and construction checks, 2026-11-19
+
+The Rust native stage owner reads identity and construction validity from the
+already-owned `CnotMatrix` inside `CnotSearchInput`. The matching typed path no
+longer dispatches these two checks through Python tensor/object methods; legacy
+Python input objects keep the previous compatibility fallback. Identity checks
+compare every packed row and word, and construction replay uses the existing
+physical-gate order and full-matrix equality. Tensor ownership, frontier
+transitions, scorer calls, rank collectives, stage order, and result semantics
+are unchanged. This is a control/domain ownership transfer, not a search or
+kernel optimization. CPU tests cover packed identity boundaries and the public
+Rust CNOT root-goal path; physical CUDA/NCCL multi-GPU execution remains a
+separate unverified gate.
+

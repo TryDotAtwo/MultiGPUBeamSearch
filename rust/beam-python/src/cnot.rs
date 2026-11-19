@@ -21,6 +21,30 @@ struct PyCnotSearchInput {
     matrix: beam_core::cnot::CnotMatrix,
 }
 
+pub(crate) fn search_input_is_identity(input: &Bound<'_, PyAny>) -> PyResult<Option<bool>> {
+    if !input.is_instance_of::<PyCnotSearchInput>() {
+        return Ok(None);
+    }
+    let typed = input.extract::<PyRef<'_, PyCnotSearchInput>>()?;
+    Ok(Some(typed.matrix.is_identity()))
+}
+
+pub(crate) fn search_input_verifies_construction(
+    py: Python<'_>,
+    input: &Bound<'_, PyAny>,
+    moves: &[u32],
+) -> PyResult<Option<bool>> {
+    if !input.is_instance_of::<PyCnotSearchInput>() {
+        return Ok(None);
+    }
+    let typed = input.extract::<PyRef<'_, PyCnotSearchInput>>()?;
+    let matrix = &typed.matrix;
+    let moves = moves.to_vec();
+    py.allow_threads(|| matrix.verifies_construction(&moves))
+        .map(Some)
+        .map_err(|error| PyValueError::new_err(error.to_string()))
+}
+
 #[pyfunction]
 fn validate_cnot_search_controls(
     wires: u32,

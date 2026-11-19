@@ -104,3 +104,26 @@ fn construction_replay_checks_order_all_words_and_move_bounds() {
     assert!(target.verifies_construction(&[65279]).unwrap());
     assert!(!target.verifies_construction(&[]).unwrap());
 }
+
+#[test]
+fn identity_check_covers_the_complete_packed_matrix() {
+    for n in [2, 63, 64, 65, 127, 128, 129, 256] {
+        let mut packed = identity(n as usize);
+        let target = CnotMatrix::from_le_bytes(n, &packed).unwrap();
+        assert!(target.is_identity(), "identity matrix n={n}");
+
+        let stride = (n as usize).div_ceil(64);
+        let row = n as usize - 1;
+        let word = row / 64;
+        let bit = row % 64;
+        let byte = (row * stride + word) * 8 + bit / 8;
+        packed[byte] ^= 1 << (bit % 8);
+        let changed = CnotMatrix::from_le_bytes(n, &packed).unwrap();
+        assert!(!changed.is_identity(), "changed matrix n={n}");
+    }
+
+    let mut packed = identity(129);
+    packed[2 * 8] |= 1; // A non-diagonal bit in the third word of row zero.
+    let changed = CnotMatrix::from_le_bytes(129, &packed).unwrap();
+    assert!(!changed.is_identity());
+}

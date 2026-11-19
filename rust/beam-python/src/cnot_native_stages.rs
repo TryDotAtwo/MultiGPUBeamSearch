@@ -321,6 +321,9 @@ impl Backend for NativeStages<'_> {
     type Records = Py<PyAny>;
 
     fn root_is_goal(&mut self) -> PyResult<bool> {
+        if let Some(is_identity) = crate::cnot::search_input_is_identity(&self.input)? {
+            return Ok(is_identity);
+        }
         self.py
             .import("torch")?
             .call_method1("equal", (&self.root, &self.identity))?
@@ -592,6 +595,11 @@ impl Backend for NativeStages<'_> {
     }
 
     fn verifies_construction(&mut self, gates: &[u32]) -> PyResult<bool> {
+        if let Some(valid) =
+            crate::cnot::search_input_verifies_construction(self.py, &self.input, gates)?
+        {
+            return Ok(valid);
+        }
         self.input
             .call_method1("verifies_construction", (gates.to_vec(),))?
             .extract()

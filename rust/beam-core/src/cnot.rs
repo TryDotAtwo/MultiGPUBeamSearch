@@ -129,6 +129,21 @@ impl CnotMatrix {
         Ok(Self { wires, words })
     }
 
+    /// Whether every packed row equals the corresponding identity row.
+    pub fn is_identity(&self) -> bool {
+        let stride = self.wires.div_ceil(64) as usize;
+        self.words.iter().enumerate().all(|(index, &word)| {
+            let row = index / stride;
+            let part = index % stride;
+            let expected = if part == row / 64 {
+                1u64 << (row % 64)
+            } else {
+                0
+            };
+            word == expected
+        })
+    }
+
     /// Replay construction from identity, in the returned gate order.
     pub fn verifies_construction(&self, moves: &[u32]) -> Result<bool> {
         let n = self.wires as usize;

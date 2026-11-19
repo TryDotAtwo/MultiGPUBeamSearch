@@ -62,3 +62,5 @@ Keep an active goal until the migration and required verification are complete.
 
 2026-11-18 follow-up: Ivan confirmed use of the existing `VAST_API_KEY` as the GitHub Actions repository secret. A working status workflow already verifies that the secret is available; do not print or copy its value into source or logs.
 2026-11-18: Ivan reaffirmed the full Rust + CUDA/C++ migration including CNOT, with no new optimizations; preserve multi-GPU and Python/notebook/CLI/torchrun/Slurm compatibility, publish to GitHub main and synchronize the local checkout. Replacement AGENTS instructions require source-only local work, hosted GitHub Actions for builds/tests, logs and test artifacts in remote `test_results/` and Actions artifacts, and spending only within the user-set budget.
+
+2026-11-19: Иван попросил продолжать полный перенос beam search на Rust + CUDA/C++, включая CNOT, с сохранением multi-GPU и публичной Python-совместимости; пока переносим существующее поведение без оптимизаций.

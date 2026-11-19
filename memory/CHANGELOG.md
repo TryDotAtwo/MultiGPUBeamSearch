@@ -2147,3 +2147,17 @@ Preserved 26 checkouts and their source/index overlays; verified restoration of 
 - Test-first Actions run 44420817709 failed only on the new ownership assertion (163 passed, 2 skipped); artifact 14482655492 retains the remote test log. Follow-up run 44421729086 stopped at the Rust formatting gate before compilation; the reported line-wrap was corrected, and that run produced no test result.
 - Green branch run 44422140414 passed Rust formatting/checks, PyO3 build, 164 CNOT CPU compatibility tests (2 skipped), and NCCL probe syntax. Artifact 14480614488 SHA-256: `368f3dca736109bbebe750b2a4017cf322f7a545faeee795db16e6c912afba7f`. Physical CUDA/NCCL multi-GPU execution remains unverified. See `test_results/refactor_20261119/cnot-native-input-admission/GITHUB_STATUS.md`.
 - Published main revision `eb58643834af29cb9fb39b6d50a37f48e2a53748` passed the same workflow as run 44422680720 (164 passed, 2 skipped). Artifact 14482048754 SHA-256: `c2f1a2384390934e3696748912363bc036b6469f41e75d46242f75c31bebf897`.
+
+## 2026-11-19 - Rust-owned CNOT identity and construction checks
+
+- The Rust CNOT stage owner now reads identity and path replay directly from
+  its already-owned packed `CnotMatrix`. Legacy Python input objects retain the
+  previous method/tensor fallback. The new core identity check compares every
+  packed row and word; search order, CUDA operators, scorer calls, collectives,
+  and result semantics are unchanged.
+- Test-first Actions run 44425293831 confirmed the intended failure at
+  `torch.equal` after 164 passed and 2 skipped; artifact 14482909047 contains
+  the remote logs. A preceding fixture-only run 44424830164 failed before the
+  assertion because its test used a nonexistent helper; the fixture was fixed
+  before the confirmed RED run. The post-change hosted verification is pending.
+- Physical CUDA/NCCL and multi-GPU CNOT runtime remain unverified.
