@@ -117,4 +117,3 @@ pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(parse_terminal, module)?)?;
     Ok(())
 }
-

@@ -416,4 +416,3 @@ impl Drop for SearchSession {
         let _ = self.close();
     }
 }
-
