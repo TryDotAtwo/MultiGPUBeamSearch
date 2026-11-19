@@ -28,3 +28,21 @@ fn preparation_identity_is_typed_structurally_compared_and_invalidated_by_close(
     session.close().unwrap();
     assert!(session.preparation_matches(&preparation).is_err());
 }
+
+#[test]
+fn begin_preparation_reuses_matches_and_invalidates_changes() {
+    let mut session = SearchSession::new();
+    let preparation = identity(PREPARATION);
+    let reordered = identity(REORDERED);
+    let mut changed = identity(PREPARATION);
+    changed.model_artifact_hash = "d".into();
+
+    assert!(!session.begin_preparation(&preparation).unwrap());
+    session.remember_preparation(&preparation).unwrap();
+    assert!(session.begin_preparation(&reordered).unwrap());
+    assert!(!session.begin_preparation(&changed).unwrap());
+    assert!(!session.preparation_matches(&preparation).unwrap());
+
+    session.close().unwrap();
+    assert!(session.begin_preparation(&preparation).is_err());
+}

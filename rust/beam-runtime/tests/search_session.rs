@@ -1,5 +1,5 @@
 use beam_core::search::PermutationGraph;
-use beam_runtime::search_session::{Launch, SearchSession, SessionIdentity};
+use beam_runtime::search_session::{Launch, PreparationIdentity, SearchSession, SessionIdentity};
 use serde_json::json;
 use std::{fs, time::Duration};
 #[test]
@@ -133,6 +133,30 @@ while not (directory/'stop').exists():
             }
         );
     }
+    let preparation = PreparationIdentity {
+        graph_hash: Some(identity.graph_hash.clone()),
+        geometry: [Some(4), Some(4), Some(2)],
+        center: Some(identity.graph.center.clone()),
+        generators: Some(identity.graph.generators.clone()),
+        model_artifact_hash: identity.model_artifact_hash.clone(),
+        artifact_sizes: Some(vec![17]),
+        model_backend: identity.model_backend.clone(),
+        devices: identity.devices.clone(),
+        binding_scope: false,
+        beam_width: identity.beam_width,
+        max_steps: identity.max_steps,
+        options_repr: "NativeOptions()".into(),
+        cuda_visible_devices: None,
+        cuda_device_order: None,
+        runtime_build: Some(identity.runtime_build.clone()),
+    };
+    session.remember_preparation(&preparation).unwrap();
+    assert!(session.begin_preparation(&preparation).unwrap());
+    let mut changed_preparation = preparation.clone();
+    changed_preparation.model_artifact_hash = "e".repeat(64);
+    assert!(!session.begin_preparation(&changed_preparation).unwrap());
+    assert!(session.pids().is_empty());
+
     identity.model_artifact_hash = "d".repeat(64);
     let dir = root.join("model-change");
     fs::create_dir(&dir).unwrap();

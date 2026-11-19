@@ -51,11 +51,23 @@ def test_rust_session_reuses_and_releases_rank_owner(tmp_path, monkeypatch, worl
             self.identity = None
             self.prepared_identity = None
             self.preparation_checks = []
+            self.preparation_begins = []
+            self.preparation_resets = 0
             self.preparation_records = []
             self.count = 0
             self.requests = []
             self.fail = False
             owners.append(self)
+
+        def begin_preparation(self, identity):
+            self.preparation_begins.append(identity)
+            if identity == self.prepared_identity:
+                return True
+            self.prepared_identity = None
+            self.identity = None
+            self.count = 0
+            self.preparation_resets += 1
+            return False
 
         def preparation_matches(self, identity):
             self.preparation_checks.append(identity)
@@ -137,12 +149,14 @@ def test_rust_session_reuses_and_releases_rank_owner(tmp_path, monkeypatch, worl
         assert changed.metadata["persistent_session"]["request_count"] == 1
         assert len(owners) == 1 and len(calls) == 2 and not owners[0].closed
         assert len(owners[0].requests) == 3
-        assert len(owners[0].preparation_checks) == 2
+        assert owners[0].preparation_checks == []
+        assert len(owners[0].preparation_begins) == 2
+        assert owners[0].preparation_resets == 1
         assert len(owners[0].preparation_records) == 2
-        assert owners[0].preparation_checks[0] == owners[0].preparation_records[0]
-        assert owners[0].preparation_checks[1] != owners[0].preparation_records[0]
-        assert owners[0].preparation_checks[1] == owners[0].preparation_records[1]
-        assert json.loads(owners[0].preparation_checks[0]) == {
+        assert owners[0].preparation_begins[0] == owners[0].preparation_records[0]
+        assert owners[0].preparation_begins[1] != owners[0].preparation_records[0]
+        assert owners[0].preparation_begins[1] == owners[0].preparation_records[1]
+        assert json.loads(owners[0].preparation_begins[0]) == {
             "graph_hash": "a" * 64,
             "geometry": [2, 2, 1],
             "center": [0, 1],
@@ -199,12 +213,13 @@ def test_rust_session_owner_compares_typed_preparation_identity_when_extension_i
     changed["model_artifact_hash"] = "d" * 64
     owner = extension.SearchSession()
     try:
-        assert owner.preparation_matches(identity) is False
+        assert owner.begin_preparation(identity) is False
         owner.remember_preparation(identity)
-        assert owner.preparation_matches(reordered) is True
-        assert owner.preparation_matches(json.dumps(changed)) is False
+        assert owner.begin_preparation(reordered) is True
+        assert owner.begin_preparation(json.dumps(changed)) is False
+        assert owner.preparation_matches(identity) is False
         with pytest.raises(RuntimeError):
-            owner.preparation_matches("{}")
+            owner.begin_preparation("{}")
     finally:
         owner.close()
 
@@ -215,8 +230,14 @@ def test_rust_resident_keeps_python_fallback_for_older_search_session_extensions
     owner = SimpleNamespace()
     workers = RustResidentWorkers.__new__(RustResidentWorkers)
     workers._owner = owner
+    assert workers.begin_preparation("identity") is None
     assert workers.preparation_matches("identity") is None
     assert workers.remember_preparation("identity") is False
+
+    older_owner = SimpleNamespace(preparation_matches=lambda identity: identity == "identity")
+    workers._owner = older_owner
+    assert workers.begin_preparation("identity") is None
+    assert workers.preparation_matches("identity") is True
 
 
 def test_rust_session_rejects_launch_without_prepared_context(tmp_path):
