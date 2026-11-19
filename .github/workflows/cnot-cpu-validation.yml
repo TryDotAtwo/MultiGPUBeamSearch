@@ -13,6 +13,7 @@ on:
       - integrations/cayleypy_native/multigpubeamsearch/cnot_collectives.py
       - integrations/cayleypy_native/multigpubeamsearch/cnot_stream5.py
       - integrations/cayleypy_native/multigpubeamsearch/cnot_rust_stages.py
+      - rust/beam-python/src/cnot_native_redistribute.rs
       - integrations/cayleypy_native/multigpubeamsearch/cnot_scorer.py
       - integrations/cayleypy_native/multigpubeamsearch/backend.py
       - integrations/cayleypy_native/multigpubeamsearch/dispatch.py
@@ -80,7 +81,6 @@ jobs:
               rust/beam-python/src/cnot_native_dedup_score.rs \
               rust/beam-python/src/cnot_native_exchange.rs \
               rust/beam-python/src/cnot_native_expand.rs \
-              rust/beam-python/src/cnot_native_redistribute.rs \
               rust/beam-python/src/cnot_native_stages.rs \
               rust/beam-python/src/cnot_scorer_dispatch.rs \
               rust/beam-native-sys/src/cnot_stream5.rs \
