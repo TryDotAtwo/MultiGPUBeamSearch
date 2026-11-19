@@ -144,8 +144,7 @@ def test_rust_controller_prepares_typed_input_without_python_builder(monkeypatch
         def gather_fixed(self, tensor):
             return torch.stack([tensor for _ in range(self.size)])
 
-        def start_transport(self, *, prefer_rust):
-            assert not prefer_rust
+        _stream5_library = None
 
     def python_input_builder(*_args):
         pytest.fail("Rust admission must construct the typed CNOT input directly")
@@ -210,8 +209,7 @@ def test_rust_top_level_controller_preserves_compatibility_stage_fallback():
             events.append(("sum", tensor.tolist()))
             return tensor.sum()
 
-        def start_transport(self, *, prefer_rust):
-            events.append(("transport", prefer_rust))
+        _stream5_library = None
 
     world = World()
 
@@ -261,7 +259,6 @@ def test_rust_top_level_controller_preserves_compatibility_stage_fallback():
         ("sum", [0]),
         ("longs", digest_values),
         ("gather-fixed", digest_values),
-        ("transport", True),
         ("identity", 4, "cpu"),
         ("native-runner",),
         ("longs", [1]),
@@ -296,8 +293,7 @@ def test_rust_top_level_controller_routes_python_engine_and_unbounded_depth(
             events.append(("gather-fixed", values))
             return torch.stack([tensor for _ in range(self.size)])
 
-        def start_transport(self, *, prefer_rust):
-            events.append(("transport", prefer_rust))
+        _stream5_library = None
 
     def prepare_input(root, width, shortlist, depth, mode, validation):
         events.append(("prepare-input", root, width, shortlist, depth, mode, validation))
@@ -333,7 +329,6 @@ def test_rust_top_level_controller_routes_python_engine_and_unbounded_depth(
         ("prepare-input", caller_root, 1, 1, max_depth, "qhat", "python"),
         ("longs", digest_values),
         ("gather-fixed", digest_values),
-        ("transport", False),
         ("identity", 2, "cpu"),
         ("reference", world, admitted_root, identity, input_matrix, scorer,
          1, 1, max_depth, "qhat", False),

@@ -494,9 +494,7 @@ fn run_cnot_native_search<'py>(
     let use_rust = selected_engine == "rust";
 
     run_cnot_native_require_consensus(world.clone(), digest)?;
-    let transport_args = PyDict::new(py);
-    transport_args.set_item("prefer_rust", use_rust)?;
-    world.call_method("start_transport", (), Some(&transport_args))?;
+    crate::cnot_stream5::run_cnot_native_start_transport(py, world.clone(), use_rust)?;
 
     let wires: u32 = input_matrix.getattr("n")?.extract()?;
     let identity_args = PyDict::new(py);

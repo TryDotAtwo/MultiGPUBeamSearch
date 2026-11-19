@@ -196,7 +196,7 @@ impl<'py> Backend for TensorExchange<'_, 'py> {
 }
 
 #[pyfunction]
-fn run_cnot_native_start_transport<'py>(
+pub(crate) fn run_cnot_native_start_transport<'py>(
     py: Python<'py>,
     world: Bound<'py, PyAny>,
     prefer_rust: bool,
