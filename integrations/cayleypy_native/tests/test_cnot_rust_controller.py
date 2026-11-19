@@ -181,6 +181,7 @@ def test_rust_native_root_goal_uses_typed_matrix_without_torch_equal(monkeypatch
     monkeypatch.setattr(torch, "equal", forbidden)
     from multigpubeamsearch.cnot_rust_stages import CnotStages
     monkeypatch.setattr(CnotStages, "root_is_goal", forbidden)
+    monkeypatch.setattr(cnot, "_native_stages_runner", lambda: None)
     result = cnot.search_cnot(root, scorer, width=4, shortlist=6, max_depth=3,
                               validation="auto", engine="rust")
 
