@@ -191,23 +191,65 @@ def test_world_exchange_preserves_python_fallback_for_older_extensions(monkeypat
     assert transport.calls[0][2].tolist() == [1, 2]
 
 
-def test_checked_stage_delegates_rank_error_coordination_to_rust(monkeypatch):
+def test_checked_stage_keeps_legacy_rust_abi_when_v2_is_not_universal(monkeypatch):
     world = _two_rank_world()
     calls = []
     expected = object()
 
+    def rank_support(actual_world, supported):
+        calls.append(("support", actual_world, supported))
+        return False
+
     def run_native_checked(actual_world, stage, callback):
-        calls.append((actual_world, stage))
+        calls.append(("legacy", actual_world, stage))
         return callback()
 
     monkeypatch.setattr(
         rust_control,
         "extension",
-        lambda: SimpleNamespace(run_cnot_native_checked=run_native_checked),
+        lambda: SimpleNamespace(
+            run_cnot_native_checked=run_native_checked,
+            run_cnot_native_all_ranks_support=rank_support,
+        ),
     )
 
     assert world.checked("prepare CNOT stage", lambda: expected) is expected
-    assert calls == [(world, "prepare CNOT stage")]
+    assert calls == [
+        ("support", world, False),
+        ("legacy", world, "prepare CNOT stage"),
+    ]
+
+
+def test_checked_stage_uses_v2_only_after_rank_support_vote(monkeypatch):
+    world = _two_rank_world()
+    calls = []
+    expected = object()
+
+    def rank_support(actual_world, supported):
+        calls.append(("support", actual_world, supported))
+        return supported
+
+    def run_native_checked_v2(actual_world, stage, callback):
+        calls.append(("v2", actual_world, stage))
+        return callback()
+
+    monkeypatch.setattr(
+        rust_control,
+        "extension",
+        lambda: SimpleNamespace(
+            run_cnot_native_checked_v2=run_native_checked_v2,
+            run_cnot_native_all_ranks_support=rank_support,
+        ),
+    )
+
+    assert world.checked("prepare CNOT stage", lambda: expected) is expected
+    second = object()
+    assert world.checked("expand CNOT stage", lambda: second) is second
+    assert calls == [
+        ("support", world, True),
+        ("v2", world, "prepare CNOT stage"),
+        ("v2", world, "expand CNOT stage"),
+    ]
 
 
 def test_checked_stage_keeps_python_fallback_for_older_extensions(monkeypatch):
@@ -619,6 +661,11 @@ def test_rust_checked_stage_gathers_error_messages_without_object_collective(mon
 
     monkeypatch.setattr(
         world,
+        "all_ranks_support",
+        lambda supported: supported,
+    )
+    monkeypatch.setattr(
+        world,
         "longs",
         lambda values: torch.tensor(values, dtype=torch.int64),
     )
@@ -648,10 +695,11 @@ def test_rust_checked_stage_gathers_error_messages_without_object_collective(mon
     def fail_local_stage():
         raise ValueError("local failure")
 
-    with pytest.raises(
-        RuntimeError,
-        match=r"build CNOT stage failed: rank 0: ValueError: local failure \\| rank 1: RuntimeError: remote failure",
-    ):
+    with pytest.raises(RuntimeError) as exc_info:
         world.checked("build CNOT stage", fail_local_stage)
 
+    assert str(exc_info.value) == (
+        "build CNOT stage failed: rank 0: ValueError: local failure | "
+        "rank 1: RuntimeError: remote failure"
+    )
     assert len(gathered) == 2

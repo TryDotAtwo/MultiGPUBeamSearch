@@ -14,6 +14,7 @@ class World:
         self.size = dist.get_world_size() if dist.is_initialized() else 1
         self.transport = None
         self._stream5_library = None
+        self._checked_error_gather_v2 = None
         if self.size > 65536:
             raise ValueError("CNOT physical routes support at most 65536 world ranks")
 
@@ -105,18 +106,28 @@ class World:
         return tensor
 
     def checked(self, stage, fn):
-        """Coordinate local model/validation failures before peers enter the next exchange."""
+        """Coordinate local failures and agree on the rank-wide diagnostic ABI."""
         if self.size == 1:
             return fn()
         try:
             from .errors import NativeUnavailable
             from .rust_control import extension
 
-            checker = getattr(extension(), "run_cnot_native_checked", None)
+            native = extension()
+            checker_v2 = getattr(native, "run_cnot_native_checked_v2", None)
+            legacy_checker = getattr(native, "run_cnot_native_checked", None)
         except NativeUnavailable:
-            checker = None
-        if callable(checker):
-            return checker(self, stage, fn)
+            checker_v2 = legacy_checker = None
+
+        if self._checked_error_gather_v2 is None:
+            supported = callable(checker_v2)
+            self._checked_error_gather_v2 = (
+                checker_v2 if self.all_ranks_support(supported) else False
+            )
+        if callable(self._checked_error_gather_v2):
+            return self._checked_error_gather_v2(self, stage, fn)
+        if callable(legacy_checker):
+            return legacy_checker(self, stage, fn)
 
         # Compatibility path for older PyO3 modules without the checked ABI.
         result, error = None, None

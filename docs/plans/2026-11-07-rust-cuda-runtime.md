@@ -35,6 +35,8 @@ Total authorization: USD 50, including associated costs. Initial allocations: US
 
 - Inference profile selection now delegates to `beam-core` through an optional PyO3 adapter while retaining the existing Python fallback and exact selector behavior. Hosted CPU parity tests passed (217 passed, 2 skipped); NCCL probe syntax passed without running a physical collective. See `test_results/refactor_20261119/rust-inference-selection/GITHUB_STATUS.md`. Search stages and GPU/multi-GPU execution remain unchanged by this slice.
 
+- CNOT error diagnostics gain an optional v2 Rust path using rank-ordered UTF-8 tensor gathers after the existing error vote. `World.checked` negotiates v2 once across ranks and retains the legacy path if any extension lacks it. Test-first RED run [44560022663](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44560022663) reproduced the existing object-gather call (217 passed, 2 skipped); GREEN hosted validation is pending. Physical CUDA/NCCL error recovery is not yet verified.
+
 - An opt-in Rust supervisor now owns the externally scheduled torchrun/Slurm rank child and its failure/timeout/cancellation loop. The CUDA/NCCL runner and launch protocol are unchanged; the Python supervisor remains the default pending broader comparison. The public search and CNOT control migrations remain separate.
 
 - Source/index recovery: 26 checkouts, 24,134 recovered files, 8,017 distinct archived objects. Independent Git bundle restore and full fsck passed for all 26 original checkout heads.

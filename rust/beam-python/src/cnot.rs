@@ -481,7 +481,7 @@ fn run_cnot_native_search<'py>(
         Ok(admitted.into_any())
     })();
     let admitted =
-        crate::cnot_native_checked::checked(py, &world, "validate CNOT input", admission)?;
+        crate::cnot_native_checked::checked_v2(py, &world, "validate CNOT input", admission)?;
     let admitted = admitted.downcast::<PyTuple>()?;
     if admitted.len() != 3 {
         return Err(PyRuntimeError::new_err(

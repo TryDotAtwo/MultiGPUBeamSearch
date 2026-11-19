@@ -2284,3 +2284,16 @@ Preserved 26 checkouts and their source/index overlays; verified restoration of 
 - The deterministic capacity-cache reuse predicate now runs in `beam-core`, exposed through optional PyO3. Python still gathers current free memory and keeps the same non-capacity short-circuit; ordinary UUID-to-MiB maps go to Rust, while unusual maps or absent/older extensions use the equivalent Python fallback. Key matching and the existing 32 MiB pressure threshold are unchanged.
 - RED run [44549277542](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44549277542) executed the new tests and reported 9 expected failures (202 passed, 2 skipped). Run 44548798695 was not accepted as RED evidence because its explicit pytest list omitted the new file; the workflow command was corrected. GREEN: [44550275840](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44550275840), 211 passed/2 skipped, selected Rust tests, PyO3 build, and NCCL probe syntax. Artifact 14543596077 SHA-256: `8a4bea305bd3cdbaa0a00ceb2b3a37c5cfcc4214c1e15a542301d13f44903fd1`.
 - CPU/PyO3 evidence only; no physical CUDA/NCCL multi-GPU execution or Vast compute. Details: `test_results/refactor_20261119/rust-inference-cache/GITHUB_STATUS.md`.
+
+
+## 2026-11-19 - CNOT failure diagnostics use fixed tensor gathers
+
+- Added optional `run_cnot_native_checked_v2`; the Rust controller uses the
+  version that gathers diagnostic byte lengths and padded UTF-8 byte tensors in
+  rank order after the existing error vote. The public `World.checked` path
+  performs one cached capability vote across ranks before selecting v2.
+- If any rank lacks v2, the adapter retains the legacy Rust checker or Python
+  object-gather fallback. Search stages, scorer order, matrix handling and
+  winner semantics are unchanged. The first multi-rank checked call gains one
+  capability vote; physical CUDA/NCCL recovery remains unverified.
+- RED: hosted run [44560022663](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44560022663) reproduced the Python `all_gather_object` call in the new test (217 passed, 2 skipped; artifact 14546707888). GREEN run pending.

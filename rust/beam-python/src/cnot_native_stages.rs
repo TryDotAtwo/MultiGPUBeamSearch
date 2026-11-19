@@ -3,7 +3,10 @@
 //! Tensor storage remains owned by PyTorch/CUDA. Existing ATen operators and
 //! rank collectives are invoked on the caller's thread in their former order.
 use crate::{
-    cnot_native_batch, cnot_native_checked::checked, cnot_native_exchange, cnot_scorer_dispatch,
+    cnot_native_batch,
+    cnot_native_checked::checked_v2 as checked,
+    cnot_native_exchange,
+    cnot_scorer_dispatch,
 };
 use beam_runtime::cnot_search::{self, Backend, Edge, Goal, Options, Round};
 use pyo3::{
