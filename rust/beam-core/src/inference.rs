@@ -66,8 +66,8 @@ impl PythonMt19937 {
     fn next_u32(&mut self) -> u32 {
         if self.index >= MT_N {
             for i in 0..MT_N {
-                let joined = (self.state[i] & 0x8000_0000)
-                    | (self.state[(i + 1) % MT_N] & 0x7fff_ffff);
+                let joined =
+                    (self.state[i] & 0x8000_0000) | (self.state[(i + 1) % MT_N] & 0x7fff_ffff);
                 let odd = if joined & 1 == 0 { 0 } else { 0x9908_b0df };
                 self.state[i] = self.state[(i + MT_M) % MT_N] ^ (joined >> 1) ^ odd;
             }
