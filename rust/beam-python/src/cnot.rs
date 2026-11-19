@@ -341,6 +341,23 @@ impl Backend for PyStages<'_> {
         Ok(())
     }
     fn exchange_candidates(&mut self) -> PyResult<()> {
+        if self.stages.hasattr("input_matrix")? {
+            let input = self.stages.getattr("input_matrix")?;
+            if input.is_instance_of::<PyCnotSearchInput>()
+                && self.stages.hasattr("world")?
+                && self.stages.hasattr("candidates")?
+                && self.stages.hasattr("owners")?
+            {
+                let world = self.stages.getattr("world")?;
+                let candidates = self.stages.getattr("candidates")?;
+                let owners = self.stages.getattr("owners")?;
+                let incoming = crate::cnot_native_exchange::exchange(
+                    self.py, &world, &candidates, &owners, true,
+                )?;
+                self.stages.setattr("incoming", incoming)?;
+                return Ok(());
+            }
+        }
         self.stages.call_method0("exchange_candidates")?;
         Ok(())
     }
