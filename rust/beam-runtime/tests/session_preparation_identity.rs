@@ -10,7 +10,10 @@ fn preparation_identity_is_typed_structurally_compared_and_invalidated_by_close(
     assert!(!session.preparation_matches(PREPARATION).unwrap());
     session.remember_preparation(PREPARATION).unwrap();
     assert!(session.preparation_matches(REORDERED).unwrap());
-    let changed = PREPARATION.replace("\"model_artifact_hash\":\"b\"", "\"model_artifact_hash\":\"d\"");
+    let changed = PREPARATION.replace(
+        "\"model_artifact_hash\":\"b\"",
+        "\"model_artifact_hash\":\"d\"",
+    );
     assert!(!session.preparation_matches(&changed).unwrap());
     assert!(session.preparation_matches("{}").is_err());
 
