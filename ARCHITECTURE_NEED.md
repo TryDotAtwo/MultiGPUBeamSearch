@@ -2951,3 +2951,9 @@ Without an active capable Rust owner, including standard non-resident calls, Pyt
 The coarse and refinement candidate batch order is now generated in `beam-core` through optional PyO3 methods. Rust implements the CPython-compatible MT19937 sequence used by `random.Random`, including bounded draws and shuffle, so public Python calibration sees the same candidate sequence. `autotune.py` retains the Python implementation for absent or older extensions.
 
 The transferred boundary is only candidate generation. Python still owns calibration orchestration, cache policy, samples, measurements, statistics, ranking, and admission. Inference kernels, numeric behavior, global beam semantics, and multi-GPU rank exchange are unchanged. Hosted run [44543777970](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44543777970) passed Rust/PyO3 CPU checks and 194 Python tests (2 skipped); no physical CUDA/NCCL multi-GPU run was performed. Evidence: `test_results/refactor_20261119/rust-inference-candidates/GITHUB_STATUS.md`.
+
+## Rust inference probe-time allowance, 2026-11-19
+
+The deterministic probe-time estimate is now computed in `beam-core` and exposed through optional PyO3. The public Python helper sends ordinary finite rank-timing lists to Rust and retains the prior Python formula for unusual types or unavailable/older extensions. The arithmetic remains `max(default, 10 * slowest_rank_seconds + 3)` over non-empty timing rows.
+
+Only the helper's ownership changed; the Python calibration loop, candidate order, trial execution, statistical selection, caches, and GPU stages remain as before. Hosted run [44547537516](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44547537516) passed 200 Python tests (2 skipped) and the selected Rust/PyO3 checks. This is not physical CUDA/NCCL or multi-GPU acceptance. Evidence: `test_results/refactor_20261119/rust-inference-probe-time-allowance/GITHUB_STATUS.md`.
