@@ -189,6 +189,22 @@ def test_rust_native_root_goal_uses_typed_matrix_without_torch_equal(monkeypatch
     assert result.gates == ()
 
 
+def test_rust_compatibility_backend_owns_cnot_goal_dispatch(monkeypatch):
+    require_controller()
+    from multigpubeamsearch.cnot_rust_stages import CnotStages
+
+    def forbidden(*_args, **_kwargs):
+        pytest.fail("Rust compatibility backend must dispatch the CNOT goal directly")
+
+    monkeypatch.setattr(CnotStages, "goal", forbidden)
+    monkeypatch.setattr(cnot, "_native_stages_runner", lambda: None)
+    root = cnot.pack_rows(cnot.replay_cnot(4, (0,)))
+    result = cnot.search_cnot(root, object(), width=1, shortlist=1, max_depth=1,
+                              validation="auto", engine="rust")
+    assert result.status == "solved"
+    assert result.gates == (0,)
+
+
 def test_rust_top_level_controller_preserves_compatibility_stage_fallback():
     require_controller()
     controller = getattr(rust_control.extension(), "run_cnot_native_search", None)
