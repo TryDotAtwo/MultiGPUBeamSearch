@@ -49,10 +49,21 @@ def test_rust_session_reuses_and_releases_rank_owner(tmp_path, monkeypatch, worl
             self.pids = list(range(100, 100 + world))
             self.closed = False
             self.identity = None
+            self.prepared_identity = None
+            self.preparation_checks = []
+            self.preparation_records = []
             self.count = 0
             self.requests = []
             self.fail = False
             owners.append(self)
+
+        def preparation_matches(self, identity):
+            self.preparation_checks.append(identity)
+            return identity == self.prepared_identity
+
+        def remember_preparation(self, identity):
+            self.preparation_records.append(identity)
+            self.prepared_identity = identity
 
         def run(self, identity, launch, start, run_dir, timeout, metadata):
             if self.fail:
@@ -124,6 +135,11 @@ def test_rust_session_reuses_and_releases_rank_owner(tmp_path, monkeypatch, worl
         assert changed.metadata["persistent_session"]["request_count"] == 1
         assert len(owners) == 1 and len(calls) == 2 and not owners[0].closed
         assert len(owners[0].requests) == 3
+        assert len(owners[0].preparation_checks) == 2
+        assert len(owners[0].preparation_records) == 2
+        assert owners[0].preparation_checks[0] == owners[0].preparation_records[0]
+        assert owners[0].preparation_checks[1] != owners[0].preparation_records[0]
+        assert owners[0].preparation_checks[1] == owners[0].preparation_records[1]
         assert owners[0].requests[2][0]["model_artifact_hash"] == "f" * 64
         owners[0].fail = True
         with pytest.raises(NativeBackendError, match="injected rank failure"):
@@ -134,9 +150,38 @@ def test_rust_session_reuses_and_releases_rank_owner(tmp_path, monkeypatch, worl
     assert all(owner.closed for owner in owners)
 
 
+def test_rust_session_owner_remembers_preparation_identity_when_extension_is_built():
+    from multigpubeamsearch import rust_control
+    from multigpubeamsearch.errors import NativeUnavailable
+
+    try:
+        extension = rust_control.extension()
+    except (NativeUnavailable, ImportError):
+        pytest.skip("PyO3 extension is not built in this environment")
+    owner = extension.SearchSession()
+    try:
+        assert owner.preparation_matches("first") is False
+        owner.remember_preparation("first")
+        assert owner.preparation_matches("first") is True
+        assert owner.preparation_matches("second") is False
+    finally:
+        owner.close()
+
+
+def test_rust_resident_keeps_python_fallback_for_older_search_session_extensions():
+    from multigpubeamsearch.rust_resident import RustResidentWorkers
+
+    owner = SimpleNamespace()
+    workers = RustResidentWorkers.__new__(RustResidentWorkers)
+    workers._owner = owner
+    assert workers.preparation_matches("identity") is None
+    assert workers.remember_preparation("identity") is False
+
+
 def test_rust_session_rejects_launch_without_prepared_context(tmp_path):
     session = NativeSession(engine="rust")
     with pytest.raises(NativeBackendError, match="prepared"):
         session.launch(["runner", "0", "4", "64"], contract=None, run_dir=tmp_path,
                        env={}, world=1, timeout=1)
     session.close()
+
