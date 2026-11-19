@@ -4,7 +4,8 @@
 
 - Recovered the complete architecture baseline from commit `0f4729b8a7d65fc1b4c41dfbccd83361e82044c0` after discovering that commit `71fc8150f2aaa4935f9627ba097cb1921ec48cd4` had removed the CUDA memory, dispatcher, Stream 1–5, and multi-rank sections. Later Rust/CNOT ownership updates are retained in a dated addendum after the restored baseline.
 - Restored the original `beam-runtime/tests/search_session.rs` suite and moved the preparation-identity regression into its own test file. The earlier Action `44436290093` ran against the replacement one-test file and does not verify the original session suite; the corrective hosted run is recorded in `test_results/refactor_20261119/rust-session-identity/GITHUB_STATUS.md`.
-- Restored the full changelog after its later truncation. The corrective GitHub Actions result is recorded in the status note; physical CUDA/NCCL multi-GPU runtime remains unverified.
+- Corrective hosted run [44442228498](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44442228498) passed the Rust checks, restored `search_session.rs` suite (2 passed), separate preparation-identity test (1 passed), PyO3 build, Python compatibility suite (174 passed, 2 skipped), and NCCL probe syntax check. Artifact [14490574306](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44442228498/artifacts/14490574306) has SHA-256 `103d628d22a539f08646ce37e58d89ce9d45ecb4c0d1d1e7598bfbaf8098ef68`.
+- Restored the full changelog after its later truncation. Physical CUDA/NCCL multi-GPU runtime remains unverified.
 
 ## 2026-11-19 - Rust owns the prepared session reuse key
 

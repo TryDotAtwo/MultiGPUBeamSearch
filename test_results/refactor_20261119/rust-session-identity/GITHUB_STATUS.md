@@ -19,6 +19,8 @@ These hosted checks do not establish physical CUDA/NCCL or multi-GPU search acce
 
 ## Corrective recovery, 2026-11-19
 
-The earlier run 44436290093 built and ran the replacement one-test `search_session.rs` file, so it did not exercise the original session regression suite. This recovery restores the original suite from Git history and places the preparation-identity regression in `session_preparation_identity.rs`. The CNOT CPU workflow now runs both Rust test binaries; the corrective hosted result will be recorded here.
+The earlier run 44436290093 built and ran the replacement one-test `search_session.rs` file, so it did not exercise the original session regression suite. The recovery commit [f2d9696](https://github.com/TryDotAtwo/MultiGPUBeamSearch/commit/f2d9696cda1f68a56a3bb59686f755409032ee2f) restores the original file and moves the preparation-identity regression to a separate test binary.
 
-The full architecture document is also restored from the parent snapshot of commit `71fc8150f2aaa4935f9627ba097cb1921ec48cd4`; later Rust/CNOT updates remain in a dated addendum. The changelog and workflow files are restored from their complete local source versions. Physical CUDA/NCCL multi-GPU runtime remains unverified.
+Corrective CNOT CPU run [44442228498](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44442228498) passed Rust checks, the original session suite (2 passed), the new identity test (1 passed), PyO3 build, Python compatibility (174 passed, 2 skipped), and NCCL probe syntax. Logs are in artifact [14490574306](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44442228498/artifacts/14490574306), SHA-256 `103d628d22a539f08646ce37e58d89ce9d45ecb4c0d1d1e7598bfbaf8098ef68`.
+
+The full architecture contract was restored from the parent snapshot of the truncating 2026-11-15 commit, with subsequent Rust/CNOT updates retained in a dated addendum. Physical CUDA/NCCL multi-GPU runtime remains unverified; the existing `VAST_API_KEY` secret was already present, so this repair did not overwrite it or start a GPU instance.
