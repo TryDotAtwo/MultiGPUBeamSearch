@@ -530,7 +530,7 @@ def _persist_native_outcome(run_dir: Path, outcome: NativeOutcome) -> bool:
         "elapsed_seconds": outcome.elapsed_seconds,
         "effective_beam_width": outcome.effective_beam_width,
         "metadata": outcome.metadata,
-    }, indent=2), encoding="utf-8")
+    }, indent=2) + "\n", encoding="utf-8")
     return True
 
 

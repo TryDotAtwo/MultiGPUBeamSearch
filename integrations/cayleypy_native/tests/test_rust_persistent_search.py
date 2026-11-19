@@ -214,8 +214,6 @@ def test_rust_session_reuses_and_releases_rank_owner(tmp_path, monkeypatch, worl
     assert all(owner.closed for owner in owners)
 
 
-
-
 def test_native_session_defers_outcome_file_only_to_capable_rust_owner(tmp_path, monkeypatch):
     from multigpubeamsearch import backend, persistent
 
@@ -238,7 +236,9 @@ def test_native_session_defers_outcome_file_only_to_capable_rust_owner(tmp_path,
     rust_session._workers = Worker(False)
     assert rust_session.defer_native_outcome_write() is False
     assert backend._persist_native_outcome(tmp_path, outcome) is True
-    saved = json.loads((tmp_path / "native-outcome.json").read_text(encoding="utf-8"))
+    target = tmp_path / "native-outcome.json"
+    assert target.read_text(encoding="utf-8").endswith("\n")
+    saved = json.loads(target.read_text(encoding="utf-8"))
     assert saved == {
         "path": [2, 3],
         "elapsed_seconds": 0.25,
