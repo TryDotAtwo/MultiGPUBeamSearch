@@ -12,7 +12,7 @@ providers remain in place. Search semantics and transport were not changed.
   `CnotStages.redistribute` callback for both qhat and proposal. The test
   suite reported 2 failed, 228 passed, 2 skipped.
   Artifact [14574401283](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44613780854/artifacts/14574401283),
-  SHA256 `b193d6bba0fd599faef7afaedcac9840...`.
+  SHA256 `b193d6bba0fd599faef7afaedcac9840d40aa4d10564aa0be32270e97c08c6e2`.
 - An initial implementation run, [44615323541](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44615323541),
   stopped at rustfmt before compilation or tests. Formatting was corrected.
 - Branch GREEN, [run 44615705900](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44615705900),
