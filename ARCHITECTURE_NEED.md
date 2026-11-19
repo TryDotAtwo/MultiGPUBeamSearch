@@ -2957,3 +2957,9 @@ The transferred boundary is only candidate generation. Python still owns calibra
 The deterministic probe-time estimate is now computed in `beam-core` and exposed through optional PyO3. The public Python helper sends ordinary finite rank-timing lists to Rust and retains the prior Python formula for unusual types or unavailable/older extensions. The arithmetic remains `max(default, 10 * slowest_rank_seconds + 3)` over non-empty timing rows.
 
 Only the helper's ownership changed; the Python calibration loop, candidate order, trial execution, statistical selection, caches, and GPU stages remain as before. Hosted run [44547537516](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44547537516) passed 200 Python tests (2 skipped) and the selected Rust/PyO3 checks. This is not physical CUDA/NCCL or multi-GPU acceptance. Evidence: `test_results/refactor_20261119/rust-inference-probe-time-allowance/GITHUB_STATUS.md`.
+
+## Rust capacity-cache reuse decision, 2026-11-19
+
+Rust now owns the deterministic decision for reusing a capacity-limited inference cache: previous/current GPU UUID keys must match and no current free-memory value may exceed the recorded value by more than 32 MiB. Python still performs the GPU memory query, keeps the non-capacity short-circuit, and falls back to the prior predicate for unusual map values or unavailable/older extensions.
+
+No cache schema, candidate selection, calibration order, GPU kernel, or multi-GPU protocol changed. Hosted run [44550275840](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44550275840) passed 211 Python tests (2 skipped) with CPU/PyO3 checks; no physical CUDA/NCCL run occurred. Evidence: `test_results/refactor_20261119/rust-inference-cache/GITHUB_STATUS.md`.
