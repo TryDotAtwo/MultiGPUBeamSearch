@@ -16,6 +16,54 @@ def test_unknown_session_engine_is_rejected():
         NativeSession(engine="unknown")
 
 
+def test_compiled_rust_preparation_identity_builder_round_trips_fields():
+    from multigpubeamsearch import rust_control
+    from multigpubeamsearch.errors import NativeUnavailable
+
+    try:
+        runtime = rust_control.extension()
+    except NativeUnavailable:
+        pytest.skip("Rust extension is not built in this CPU-only job")
+
+    build = getattr(runtime, "build_preparation_identity", None)
+    assert callable(build), "Rust preparation identity builder is missing"
+    runtime_build = {"binary_sha256": "c" * 64, "inference_backend": "cutlass"}
+    result = build(
+        "a" * 64,
+        [4, 4, 2],
+        [0, 1],
+        [[1, 0]],
+        "b" * 64,
+        [17],
+        "mlp",
+        [0, 1],
+        False,
+        64,
+        4,
+        "NativeOptions()",
+        "0,1",
+        "PCI_BUS_ID",
+        json.dumps(runtime_build),
+    )
+    assert json.loads(result) == {
+        "graph_hash": "a" * 64,
+        "geometry": [4, 4, 2],
+        "center": [0, 1],
+        "generators": [[1, 0]],
+        "model_artifact_hash": "b" * 64,
+        "artifact_sizes": [17],
+        "model_backend": "mlp",
+        "devices": [0, 1],
+        "binding_scope": False,
+        "beam_width": 64,
+        "max_steps": 4,
+        "options_repr": "NativeOptions()",
+        "cuda_visible_devices": "0,1",
+        "cuda_device_order": "PCI_BUS_ID",
+        "runtime_build": runtime_build,
+    }
+
+
 def test_rust_session_rejects_stale_terminal_protocol_before_native_build(tmp_path, monkeypatch):
     from multigpubeamsearch import native_library, rust_control
     from multigpubeamsearch.errors import NativeUnavailable
@@ -34,7 +82,7 @@ def test_rust_session_rejects_stale_terminal_protocol_before_native_build(tmp_pa
 def test_rust_session_reuses_and_releases_rank_owner(tmp_path, monkeypatch, world):
     from multigpubeamsearch import models, native_library, rust_control
 
-    calls, owners = [], []
+    calls, owners, identity_builds = [], [], []
     monkeypatch.setattr(models, "verify_prepared_model", lambda *args: None)
     worker = tmp_path / "beam-runner"
     library = tmp_path / "libbeam_native.so"
@@ -122,8 +170,22 @@ def test_rust_session_reuses_and_releases_rank_owner(tmp_path, monkeypatch, worl
             self.closed = True
             self.pids = []
 
+    def build_preparation_identity(*values):
+        identity_builds.append(values)
+        names = (
+            "graph_hash", "geometry", "center", "generators", "model_artifact_hash",
+            "artifact_sizes", "model_backend", "devices", "binding_scope", "beam_width",
+            "max_steps", "options_repr", "cuda_visible_devices", "cuda_device_order",
+            "runtime_build",
+        )
+        identity = dict(zip(names, values))
+        if identity["runtime_build"] is not None:
+            identity["runtime_build"] = json.loads(identity["runtime_build"])
+        return json.dumps(identity, sort_keys=True)
+
     monkeypatch.setattr(rust_control, "extension", lambda: SimpleNamespace(
-        SearchSession=Owner, SEARCH_TERMINAL_RESULT_VERSION=1))
+        SearchSession=Owner, SEARCH_TERMINAL_RESULT_VERSION=1,
+        build_preparation_identity=build_preparation_identity))
     contract = GraphContract(2, 2, ((1, 0),), ("swap",), (0, 1), (1, 0), "a" * 64)
     model = SimpleNamespace(artifact_hash="b" * 64, backend="mlp")
     runtime = SimpleNamespace(runner=tmp_path / "runner", architectures=(86,),
@@ -205,6 +267,9 @@ def test_rust_session_reuses_and_releases_rank_owner(tmp_path, monkeypatch, worl
             "runtime_build": {"binary_sha256": "c" * 64},
         }
         assert owners[0].requests[2][0]["model_artifact_hash"] == "f" * 64
+        assert len(identity_builds) == 3
+        assert identity_builds[0][0:4] == ("a" * 64, [2, 2, 1], [0, 1], [[1, 0]])
+        assert identity_builds[0][4:8] == ("b" * 64, [], "mlp", list(range(world)))
         owners[0].fail = True
         with pytest.raises(NativeBackendError, match="injected rank failure"):
             run(4)
