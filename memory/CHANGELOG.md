@@ -2399,3 +2399,20 @@ Preserved 26 checkouts and their source/index overlays; verified restoration of 
   passed the same CPU/PyO3 checks (222 passed, 2 skipped; artifact 14566448047).
 - Physical CUDA/NCCL and multi-GPU acceptance remain unverified. Evidence:
   `test_results/refactor_20261119/cnot-rust-exchange/GITHUB_STATUS.md`.
+
+## 2026-11-19 - Typed CNOT construction verification is dispatched by Rust
+
+- For typed `PyCnotSearchInput`, compatibility `PyStages` now calls the
+  existing `search_input_verifies_construction` helper. Python-only input and
+  older stage providers retain the `CnotStages.verifies_construction` callback.
+- Path reconstruction, gate acceptance, rank ownership, search semantics and
+  scorer behavior are unchanged; this migrates verification dispatch only.
+- RED: hosted run
+  [44600364785](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44600364785)
+  failed on the Python verification callback as expected (1 failed, 222 passed,
+  2 skipped; artifact 14567308560). GREEN: hosted run
+  [44600777706](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44600777706)
+  passed Rust checks, PyO3 build and CPU compatibility tests (223 passed,
+  2 skipped; artifact 14566579277).
+- Physical CUDA/NCCL and multi-GPU acceptance remain unverified. Evidence:
+  `test_results/refactor_20261119/cnot-rust-verify/GITHUB_STATUS.md`.

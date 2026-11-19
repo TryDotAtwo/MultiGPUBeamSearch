@@ -3047,3 +3047,18 @@ collective order, and wire semantics are unchanged. No kernel, search rule, or
 transport behavior was changed. Hosted CPU/PyO3 checks passed; physical
 CUDA/NCCL multi-GPU execution remains unverified. Evidence:
 `test_results/refactor_20261119/cnot-rust-exchange/GITHUB_STATUS.md`.
+
+## Rust CNOT construction verification dispatch, 2026-11-19
+
+For typed `PyCnotSearchInput`, compatibility
+`PyStages::verifies_construction` now calls the existing
+`search_input_verifies_construction` helper. The owned packed matrix remains
+the source of truth; Rust `CnotMatrix` checks the reconstructed gate sequence.
+Python-only inputs and older stage providers retain the
+`CnotStages.verifies_construction` callback.
+
+Only verification dispatch moves into Rust. Path construction, accepted gate
+sequences, rank ownership, search semantics and scorer behavior are unchanged.
+Hosted CPU/PyO3 checks passed. Physical CUDA/NCCL multi-GPU execution remains
+unverified. Evidence:
+`test_results/refactor_20261119/cnot-rust-verify/GITHUB_STATUS.md`.
