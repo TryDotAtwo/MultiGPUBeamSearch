@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-11-19 - Move CNOT deduplicate/score dispatch into Rust
+
+- For typed `PyCnotSearchInput`, the Rust compatibility adapter now owns distinct-state dispatch, score validation, rank-wide error coordination, and result assignment. It reuses the existing CUDA `distinct_candidates` operator and scorer; CPU and older operator libraries retain `cnot._distinct`.
+- RED hosted run [44611473601](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44611473601) failed only the new callback-rejection cases (2 failed, 226 passed, 2 skipped; artifact 14572841818). Run [44611227980](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44611227980) stopped before tests because its rustfmt list named the not-yet-created source module (artifact 14571503063). Formatting-only run [44611898645](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44611898645) reported rustfmt differences before compile/tests (artifact 14571313686).
+- Corrected hosted run [44612192213](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44612192213) passed Rust formatting/checks, PyO3 build, and CPU/PyO3 compatibility tests (228 passed, 2 skipped); the NCCL probe passed syntax checking. Artifact [14573550966](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44612192213/artifacts/14573550966), SHA-256 `720500058c0a0654440c7e15b6aed0c9f019ca1bc417abf236e34095cfd4da20`.
+- No search, deduplication, scoring, or transport policy changed. Physical CUDA/NCCL multi-GPU runtime acceptance remains unverified. Evidence: `test_results/refactor_20261119/cnot-rust-dedup-score/GITHUB_STATUS.md`.
+
 ## 2026-11-19 - Move CNOT expansion dispatch into Rust
 
 - For typed `PyCnotSearchInput`, the Rust compatibility adapter now owns expansion dispatch, result assignment, and rank-wide error coordination. The CUDA path uses the existing parent scorer and `expand_candidates` operator; CPU and older operator libraries keep the existing `cnot._expand` fallback. Python-only providers retain the stage callback.

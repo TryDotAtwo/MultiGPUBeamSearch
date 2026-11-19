@@ -1,5 +1,20 @@
 # Конфиг
 
+## Rust-владелец CNOT deduplicate/score, 2026-11-19
+
+Для типизированного `PyCnotSearchInput` Rust compatibility adapter теперь
+выполняет dispatch distinct-state и scoring, затем назначает `children`,
+`meta` и `values` результату. GPU путь использует прежние CUDA-операторы
+`distinct_candidates` и checkpoint/model scorer; CPU или библиотека без
+этого optional operator сохраняет `cnot._distinct`. Ошибки обрабатываются
+прежним rank-wide протоколом `checked_v2`/legacy `checked`.
+Python-only и старые stage providers сохраняют callback fallback.
+
+Полное сравнение CNOT состояний, стабильный порядок кандидатов, метаданные,
+оценки и порядок collectives не менялись. Новые копирования не добавлены.
+Проверки hosted CPU/PyO3 не подтверждают физический CUDA/NCCL multi-GPU runtime.
+Результат: `test_results/refactor_20261119/cnot-rust-dedup-score/GITHUB_STATUS.md`.
+
 ## Rust-владелец стадии CNOT expansion, 2026-11-19
 
 Для типизированного `PyCnotSearchInput` Rust compatibility adapter теперь
