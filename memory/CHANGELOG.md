@@ -2355,3 +2355,22 @@ Preserved 26 checkouts and their source/index overlays; verified restoration of 
   artifact 14562407176).
 - Physical CUDA/NCCL and multi-GPU acceptance remain unverified. Evidence:
   `test_results/refactor_20261119/cnot-rust-goal-stage/GITHUB_STATUS.md`.
+
+## 2026-11-19 - Typed CNOT history edges are assembled in Rust
+
+- For typed Rust `CnotSearchInput`, the compatibility `PyStages` backend now
+  copies the owner-held history record into the rank-local tensor, invokes the
+  existing `World.broadcast`, and validates the parent/route/owner values in
+  Rust. Python-only input and older providers retain the previous callback.
+- History record layout, target rank, collective sequence, path reconstruction
+  and returned path remain unchanged.
+- RED: hosted run [44592673898](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44592673898)
+  failed on the Python `history_edge` callback as expected (1 failed, 220
+  passed, 2 skipped; artifact 14563163386). An intermediate run
+  [44593184432](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44593184432)
+  stopped at rustfmt; formatting was corrected. GREEN: hosted run
+  [44593458330](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44593458330)
+  passed Rust checks, PyO3 build and selected CPU suite (221 passed, 2 skipped;
+  artifact 14565280008).
+- Physical CUDA/NCCL and multi-GPU acceptance remain unverified. Evidence:
+  `test_results/refactor_20261119/cnot-rust-history-edge/GITHUB_STATUS.md`.
