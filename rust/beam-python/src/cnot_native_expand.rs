@@ -20,7 +20,6 @@ pub(crate) fn expand<'py>(
     let lex = stages.getattr("lex")?;
     let scorer = stages.getattr("scorer")?;
     let mode = stages.getattr("mode")?;
-    let input = stages.getattr("input_matrix")?;
 
     let native_ops = if parents.getattr("is_cuda")?.is_truthy()? {
         Some(
@@ -35,16 +34,17 @@ pub(crate) fn expand<'py>(
         None => false,
     };
     if !has_cuda_expand {
-        return py
-            .import("multigpubeamsearch.cnot")?
-            .call_method1("_expand", (&world, &parents, &lex, begin, &scorer, &mode, k));
+        return py.import("multigpubeamsearch.cnot")?.call_method1(
+            "_expand",
+            (&world, &parents, &lex, begin, &scorer, &mode, k),
+        );
     }
 
     let ops = native_ops.ok_or_else(|| {
         PyRuntimeError::new_err("CNOT expansion operators are unavailable")
     })?;
     let count = parents.len()?;
-    let n: u64 = input.getattr("n")?.extract()?;
+    let n: u64 = stages.getattr("n")?.extract()?;
     let alphabet = n
         .checked_mul(n.saturating_sub(1))
         .ok_or_else(|| PyOverflowError::new_err("CNOT move alphabet exceeds uint64"))?;
