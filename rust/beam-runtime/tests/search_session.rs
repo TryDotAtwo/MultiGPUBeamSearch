@@ -86,6 +86,30 @@ while not (directory/'stop').exists():
     launch.environment.remove("FIXTURE_LEGACY_PROBE");
     let mut session = SearchSession::new();
     let mut previous = Vec::new();
+    let preparation_for_metadata = PreparationIdentity {
+        graph_hash: Some(identity.graph_hash.clone()),
+        geometry: [Some(4), Some(4), Some(2)],
+        center: Some(
+            identity
+                .graph
+                .center
+                .iter()
+                .map(|&value| u32::from(value))
+                .collect(),
+        ),
+        generators: Some(identity.graph.generators.clone()),
+        model_artifact_hash: identity.model_artifact_hash.clone(),
+        artifact_sizes: Some(vec![17]),
+        model_backend: identity.model_backend.clone(),
+        devices: identity.devices.clone(),
+        binding_scope: false,
+        beam_width: identity.beam_width,
+        max_steps: identity.max_steps,
+        options_repr: "NativeOptions()".into(),
+        cuda_visible_devices: None,
+        cuda_device_order: None,
+        runtime_build: Some(identity.runtime_build.clone()),
+    };
     for (index, start) in [vec![1, 0, 2, 3], vec![0, 1, 3, 2], vec![1, 0, 3, 2]]
         .iter()
         .enumerate()
@@ -104,6 +128,12 @@ while not (directory/'stop').exists():
             .unwrap();
         assert_eq!(result.effective_beam_width, Some(64));
         assert_eq!(result.metadata["persistent_session"]["reused"], index > 0);
+        if index == 1 {
+            assert_eq!(
+                result.metadata["preparation_result_marker"],
+                "python-callback"
+            );
+        }
         if index == 0 {
             assert_eq!(
                 result.metadata["observed_parent_batch_by_rank_values"],
@@ -122,6 +152,17 @@ while not (directory/'stop').exists():
                 result.metadata["profile"]["calibration_total_wall_seconds"],
                 0.0
             );
+        }
+        if index == 0 {
+            session
+                .remember_preparation_result(
+                    &preparation_for_metadata,
+                    &json!({
+                        "profile": {"calibration_total_wall_seconds": 12.0},
+                        "preparation_result_marker": "python-callback"
+                    }),
+                )
+                .unwrap();
         }
         previous = session.pids();
         assert_eq!(

@@ -54,6 +54,8 @@ def test_rust_session_reuses_and_releases_rank_owner(tmp_path, monkeypatch, worl
             self.preparation_begins = []
             self.preparation_resets = 0
             self.preparation_records = []
+            self.preparation_results = []
+            self.prepared_metadata = None
             self.count = 0
             self.requests = []
             self.fail = False
@@ -77,6 +79,12 @@ def test_rust_session_reuses_and_releases_rank_owner(tmp_path, monkeypatch, worl
             self.preparation_records.append(identity)
             self.prepared_identity = identity
 
+        def remember_preparation_result(self, identity, metadata):
+            prepared = json.loads(metadata)
+            self.preparation_results.append((identity, prepared))
+            self.prepared_identity = identity
+            self.prepared_metadata = prepared
+
         def run(self, identity, launch, start, run_dir, timeout, metadata):
             if self.fail:
                 raise RuntimeError("injected rank failure")
@@ -91,11 +99,14 @@ def test_rust_session_reuses_and_releases_rank_owner(tmp_path, monkeypatch, worl
                 "GLOBAL_BEAM_WIDTH_EFFECTIVE=64\n"
                 "puzzle_solved=1 puzzle_id=0 seconds=0.1 solution_length=1 solution=m0\n"
             )
+            result_metadata = dict(self.prepared_metadata or {})
+            result_metadata.update({"native_seconds": 0.1, "terminal_records": 1,
+                "observed_parent_batch": None, "observed_inference_rows": None,
+                "observed_stream3_batch_candidates": None})
+            result_metadata["persistent_session"] = {
+                "reused": reused, "request_count": self.count}
             return json.dumps({"path": [0], "effective_beam_width": 64,
-                "elapsed_seconds": 0.1, "metadata": {"native_seconds": 0.1,
-                "terminal_records": 1, "observed_parent_batch": None,
-                "observed_inference_rows": None, "observed_stream3_batch_candidates": None,
-                "persistent_session": {"reused": reused, "request_count": self.count}}})
+                "elapsed_seconds": 0.1, "metadata": result_metadata})
 
         def close(self):
             self.closed = True
@@ -116,7 +127,8 @@ def test_rust_session_reuses_and_releases_rank_owner(tmp_path, monkeypatch, worl
         session.launch(["old-runner", "0", str(depth), str(beam)], contract=contract,
                        run_dir=run_dir, env={"TEST_ENV": "retained"}, world=len(devices), timeout=5)
         return NativeOutcome((0,), 0.1, beam, run_dir,
-                             {"requested_beam_width": beam, "profile": {}, "terminal_records": 1})
+                             {"requested_beam_width": beam, "profile": {}, "terminal_records": 1,
+                              "callback_metadata_owner": "python-execute"})
 
     def run(number):
         directory = tmp_path / f"run-{number}"
@@ -129,6 +141,7 @@ def test_rust_session_reuses_and_releases_rank_owner(tmp_path, monkeypatch, worl
         assert not first.metadata["persistent_session"]["reused"]
         assert second.metadata["persistent_session"]["reused"]
         assert second.metadata["persistent_session"]["request_count"] == 2
+        assert second.metadata["callback_metadata_owner"] == "python-execute"
         assert len(owners) == len(calls) == 1
         identity, launch, start, timeout = owners[0].requests[0]
         assert identity["graph"] == {"center": [0, 1], "generators": [[1, 0]]}
@@ -152,10 +165,12 @@ def test_rust_session_reuses_and_releases_rank_owner(tmp_path, monkeypatch, worl
         assert owners[0].preparation_checks == []
         assert len(owners[0].preparation_begins) == 2
         assert owners[0].preparation_resets == 1
-        assert len(owners[0].preparation_records) == 2
-        assert owners[0].preparation_begins[0] == owners[0].preparation_records[0]
-        assert owners[0].preparation_begins[1] != owners[0].preparation_records[0]
-        assert owners[0].preparation_begins[1] == owners[0].preparation_records[1]
+        assert owners[0].preparation_records == []
+        assert len(owners[0].preparation_results) == 2
+        assert owners[0].preparation_begins[0] == owners[0].preparation_results[0][0]
+        assert owners[0].preparation_begins[1] != owners[0].preparation_results[0][0]
+        assert owners[0].preparation_begins[1] == owners[0].preparation_results[1][0]
+        assert owners[0].preparation_results[0][1]["callback_metadata_owner"] == "python-execute"
         assert json.loads(owners[0].preparation_begins[0]) == {
             "graph_hash": "a" * 64,
             "geometry": [2, 2, 1],
@@ -214,7 +229,10 @@ def test_rust_session_owner_compares_typed_preparation_identity_when_extension_i
     owner = extension.SearchSession()
     try:
         assert owner.begin_preparation(identity) is False
-        owner.remember_preparation(identity)
+        owner.remember_preparation_result(
+            identity,
+            json.dumps({"profile": {"calibration_total_wall_seconds": 12.0}}),
+        )
         assert owner.begin_preparation(reordered) is True
         assert owner.begin_preparation(json.dumps(changed)) is False
         assert owner.preparation_matches(identity) is False
@@ -233,6 +251,7 @@ def test_rust_resident_keeps_python_fallback_for_older_search_session_extensions
     assert workers.begin_preparation("identity") is None
     assert workers.preparation_matches("identity") is None
     assert workers.remember_preparation("identity") is False
+    assert workers.remember_preparation_result("identity", {}) is False
 
     older_owner = SimpleNamespace(preparation_matches=lambda identity: identity == "identity")
     workers._owner = older_owner
