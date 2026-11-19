@@ -16,8 +16,8 @@ search algorithm, state layout, or transport changed.
 - RED, [run 44621164737](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44621164737),
   hit the forbidden `cnot._expand` and `cnot._distinct` helpers for qhat and
   proposal. The run reported 4 failed, 232 passed, 2 skipped.
-  Artifact [14578940035](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44621164737/artifacts/14578940035),
-  SHA256 `f7e237eae76057521ec0d48cca544c231abde09cfe5c8ed7810e761ccd80b0f3`.
+  Artifact [14576679253](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44621164737/artifacts/14576679253),
+  SHA256 `96799f794f77e29c0dfb09e1cb6a3dfc438406f019cd2a266de58963661f98bf`.
 - Branch GREEN, [run 44622029810](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44622029810),
   at code commit `ef0ca2ad35f729f15a492b39bc91f504ff6a0725`: Rust checks,
   PyO3 build and CPU compatibility suite succeeded; 236 passed, 2 skipped.

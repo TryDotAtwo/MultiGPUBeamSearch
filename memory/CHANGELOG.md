@@ -2506,8 +2506,8 @@ Preserved 26 checkouts and their source/index overlays; verified restoration of 
 - RED: hosted run
   [44621164737](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44621164737)
   подтвердил четыре forbidden helper вызова (4 failed, 232 passed, 2 skipped;
-  artifact 14578940035, SHA256
-  `f7e237eae76057521ec0d48cca544c231abde09cfe5c8ed7810e761ccd80b0f3`).
+  artifact 14576679253, SHA256
+  `96799f794f77e29c0dfb09e1cb6a3dfc438406f019cd2a266de58963661f98bf`).
 - GREEN: branch run
   [44622029810](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44622029810)
   и main run
