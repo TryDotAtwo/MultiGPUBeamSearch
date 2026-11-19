@@ -57,12 +57,12 @@ fn write_search_inputs(request: &str, run_dir: std::path::PathBuf) -> PyResult<(
         serde_json::from_str(request).map_err(|error| PyValueError::new_err(error.to_string()))?;
     let contract = beam_core::search::build_public_graph_contract(request)
         .map_err(|message| PyValueError::new_err(message))?;
-    beam_runtime::search_inputs::write_legacy_search_inputs(&contract, &run_dir).map_err(
-        |error| match error {
+    beam_runtime::search_inputs::write_legacy_search_inputs(&contract, &run_dir).map_err(|error| {
+        match error {
             beam_runtime::Error::Io(source) => PyOSError::new_err(source.to_string()),
             other => PyRuntimeError::new_err(other.to_string()),
-        },
-    )
+        }
+    })
 }
 
 #[pyfunction]
