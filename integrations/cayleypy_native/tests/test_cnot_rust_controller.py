@@ -140,8 +140,11 @@ def test_rust_controller_prepares_typed_input_without_python_builder(monkeypatch
     class World:
         rank, size, device = 0, 1, "cpu"
 
-        def require_consensus(self, _digest):
-            pass
+        def longs(self, values):
+            return torch.tensor(values, dtype=torch.int64)
+
+        def gather_fixed(self, tensor):
+            return torch.stack([tensor for _ in range(self.size)])
 
         def start_transport(self, *, prefer_rust):
             assert not prefer_rust
@@ -198,21 +201,19 @@ def test_rust_top_level_controller_preserves_compatibility_stage_fallback():
 
         def longs(self, values):
             events.append(("longs", values))
-            return values
+            return torch.tensor(values, dtype=torch.int64)
 
-        def sum(self, values):
-            events.append(("sum", values))
-            return SimpleNamespace(item=lambda: 0)
+        def gather_fixed(self, tensor):
+            values = tensor.tolist()
+            events.append(("gather-fixed", values))
+            return torch.stack([tensor for _ in range(self.size)])
 
-        def require_consensus(self, value):
-            events.append(("consensus", value))
+        def sum(self, tensor):
+            events.append(("sum", tensor.tolist()))
+            return torch.tensor(1, dtype=torch.int64)
 
         def start_transport(self, *, prefer_rust):
             events.append(("transport", prefer_rust))
-
-        def all_ranks_support(self, available):
-            events.append(("support", available))
-            return False
 
     world = World()
 
@@ -255,15 +256,16 @@ def test_rust_top_level_controller_preserves_compatibility_stage_fallback():
               (None, None, None, None, None))
     expected_digest = hashlib.sha256(b"packed-root")
     expected_digest.update(json.dumps(config).encode())
+    digest_values = list(expected_digest.digest())
     assert events == [
         ("prepare-input", caller_root, 7, 12, 8, "proposal", "python"),
-        ("longs", [0]),
-        ("sum", [0]),
-        ("consensus", expected_digest.digest()),
+        ("longs", digest_values),
+        ("gather-fixed", digest_values),
         ("transport", True),
         ("identity", 4, "cpu"),
         ("native-runner",),
-        ("support", True),
+        ("longs", [1]),
+        ("sum", [1]),
         ("make-stages", world, admitted_root, identity, input_matrix, scorer,
          "proposal", False),
         ("root-is-goal",),
@@ -285,8 +287,14 @@ def test_rust_top_level_controller_routes_python_engine_and_unbounded_depth(
     class World:
         rank, size, device = 0, 1, "cpu"
 
-        def require_consensus(self, digest):
-            events.append(("consensus", digest))
+        def longs(self, values):
+            events.append(("longs", values))
+            return torch.tensor(values, dtype=torch.int64)
+
+        def gather_fixed(self, tensor):
+            values = tensor.tolist()
+            events.append(("gather-fixed", values))
+            return torch.stack([tensor for _ in range(self.size)])
 
         def start_transport(self, *, prefer_rust):
             events.append(("transport", prefer_rust))
@@ -320,9 +328,11 @@ def test_rust_top_level_controller_routes_python_engine_and_unbounded_depth(
               (None, None, None, None, None))
     expected_digest = hashlib.sha256(b"packed-root")
     expected_digest.update(json.dumps(config).encode())
+    digest_values = list(expected_digest.digest())
     assert events == [
         ("prepare-input", caller_root, 1, 1, max_depth, "qhat", "python"),
-        ("consensus", expected_digest.digest()),
+        ("longs", digest_values),
+        ("gather-fixed", digest_values),
         ("transport", False),
         ("identity", 2, "cpu"),
         ("reference", world, admitted_root, identity, input_matrix, scorer,

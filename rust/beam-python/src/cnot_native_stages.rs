@@ -640,7 +640,7 @@ fn run_cnot_native<'py>(
 }
 
 #[pyfunction]
-fn run_cnot_native_all_ranks_support(
+pub(crate) fn run_cnot_native_all_ranks_support(
     world: Bound<'_, PyAny>,
     local_support: bool,
 ) -> PyResult<bool> {

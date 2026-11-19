@@ -493,7 +493,7 @@ fn run_cnot_native_search<'py>(
     let selected_engine: String = admitted.get_item(2)?.extract()?;
     let use_rust = selected_engine == "rust";
 
-    world.call_method1("require_consensus", (digest,))?;
+    run_cnot_native_require_consensus(world.clone(), digest)?;
     let transport_args = PyDict::new(py);
     transport_args.set_item("prefer_rust", use_rust)?;
     world.call_method("start_transport", (), Some(&transport_args))?;
@@ -506,9 +506,10 @@ fn run_cnot_native_search<'py>(
 
     if use_rust {
         let native_stages = native_stages_builder.call0()?;
-        let supports_native = world
-            .call_method1("all_ranks_support", (!native_stages.is_none(),))?
-            .extract::<bool>()?;
+        let supports_native = crate::cnot_native_stages::run_cnot_native_all_ranks_support(
+            world.clone(),
+            !native_stages.is_none(),
+        )?;
         let rank: u32 = world.getattr("rank")?.extract()?;
         let world_size: u32 = world.getattr("size")?.extract()?;
         let width: u64 = width.extract()?;
