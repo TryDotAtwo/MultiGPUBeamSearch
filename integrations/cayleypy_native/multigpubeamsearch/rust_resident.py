@@ -74,6 +74,14 @@ class RustResidentWorkers:
     def pids(self):
         return self._owner.pids
 
+    def begin_preparation(self, identity):
+        """Let Rust retain or invalidate the prepared rank group."""
+        begin = getattr(self._owner, 'begin_preparation', None)
+        if not callable(begin):
+            return None
+        result = begin(identity)
+        return result if type(result) is bool else None
+
     def preparation_matches(self, identity):
         """Ask a capable Rust owner whether the prepared session identity matches."""
         check = getattr(self._owner, 'preparation_matches', None)

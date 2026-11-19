@@ -69,6 +69,15 @@ impl SearchSession {
         self.cancel.store(true, Ordering::Release);
         py.allow_threads(|| self.inner.lock().map_err(error)?.close().map_err(error))
     }
+    fn begin_preparation(&self, py: Python<'_>, identity: &str) -> PyResult<bool> {
+        let identity: PreparationIdentity = serde_json::from_str(identity).map_err(error)?;
+        py.allow_threads(|| {
+            let mut inner = self.inner.try_lock().map_err(|_| {
+                PyRuntimeError::new_err("concurrent native session searches are unsupported")
+            })?;
+            inner.begin_preparation(&identity).map_err(error)
+        })
+    }
     fn preparation_matches(&self, identity: &str) -> PyResult<bool> {
         let inner = self.inner.try_lock().map_err(|_| {
             PyRuntimeError::new_err("concurrent native session searches are unsupported")

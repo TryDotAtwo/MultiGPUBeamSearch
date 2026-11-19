@@ -332,9 +332,13 @@ class NativeSession:
                 verify_prepared_model(model,contract)
             rust_identity_match = None
             if self._engine == 'rust' and self._workers is not None:
-                matcher = getattr(self._workers, 'preparation_matches', None)
-                if callable(matcher):
-                    rust_identity_match = matcher(identity_key)
+                preparer = getattr(self._workers, 'begin_preparation', None)
+                if callable(preparer):
+                    rust_identity_match = preparer(identity_key)
+                if rust_identity_match is None:
+                    matcher = getattr(self._workers, 'preparation_matches', None)
+                    if callable(matcher):
+                        rust_identity_match = matcher(identity_key)
             identity_changed = (identity != self._identity if rust_identity_match is None
                                 else not rust_identity_match)
             preserve_rust_owner = (identity_changed and self._engine == 'rust'

@@ -173,6 +173,17 @@ impl SearchSession {
     pub fn is_closed(&self) -> bool {
         self.closed
     }
+    pub fn begin_preparation(&mut self, identity: &PreparationIdentity) -> Result<bool> {
+        self.check_owner()?;
+        if self.closed || self.cancellation.load(Ordering::Acquire) {
+            return Err(Error::Message("native session cancelled or closed".into()));
+        }
+        if self.preparation_identity.as_ref() == Some(identity) {
+            return Ok(true);
+        }
+        self.release()?;
+        Ok(false)
+    }
     pub fn preparation_matches(&self, identity: &PreparationIdentity) -> Result<bool> {
         self.check_owner()?;
         if self.closed || self.cancellation.load(Ordering::Acquire) {
