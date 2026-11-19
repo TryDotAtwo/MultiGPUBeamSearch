@@ -21,10 +21,11 @@ API are unchanged. No search optimization is included.
 | [44609082589](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44609082589) | rustfmt differences only; no compile or tests | [14571746432](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44609082589/artifacts/14571746432) |
 | [44609439668](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44609439668) | Remaining rustfmt difference only; no compile or tests | [14571183469](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44609439668/artifacts/14571183469) |
 | [44609624223](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44609624223) | Full Rust/PyO3 validation passed; 226 passed, 2 skipped; NCCL probe syntax check passed | [14572517003](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44609624223/artifacts/14572517003) |
+| [44610197406](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44610197406) | Main after fast-forward; Rust/PyO3 validation passed; 226 passed, 2 skipped; NCCL probe syntax check passed | [14572542673](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44610197406/artifacts/14572542673) |
 
 Final GREEN artifact SHA-256:
 `1fb7af8be19bbc97a8e5d5bdf1d65bdf94017a2d904c557ae26f7424f858ae71`.
 
 The current Actions checks run on hosted CPU and verify only the syntax of the
 two-rank NCCL probe. Physical CUDA/NCCL multi-GPU execution remains unverified.
-Main-branch verification is pending.
+Main-branch verification passed on `1f08dc15c22f692baccd8b732b971c6f023deb65`. Artifact SHA-256: `b6f273918591dec7bc9914061faa3026f8fae1cb7787d7cc70162d6b3290f2bf`.
