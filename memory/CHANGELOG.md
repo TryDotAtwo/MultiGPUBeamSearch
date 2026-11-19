@@ -1,5 +1,22 @@
 # Changelog
 
+## 2026-11-19 - Rust owns prepared rank-group invalidation
+
+- `NativeSession` delegates preparation transitions to Rust. An equal typed
+  identity retains the resident rank group; a changed identity closes old
+  workers and clears session metadata before Python's next preparation callback.
+  PyO3 releases the GIL while Rust closes workers. Older extensions retain the
+  `preparation_matches` and Python fallback.
+- CNOT CPU workflow [44481115716](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44481115716)
+  passed Rust formatting/tests, the PyO3 build, 174 Python tests (2 skipped),
+  and NCCL probe syntax. The execution log is in artifact
+  [14507489644](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44481115716/artifacts/14507489644);
+  summary and test counts are in
+  `test_results/refactor_20261119/rust-preparation-transition/GITHUB_STATUS.md`.
+- This changes only prepared-session ownership. Search stages, multi-GPU ordering,
+  CUDA execution, and result formats are unchanged. Physical CUDA/NCCL multi-GPU
+  runtime remains unverified.
+
 ## 2026-11-19 - Restore the full multi-GPU architecture and session test contract
 
 - Recovered the complete architecture baseline from commit `0f4729b8a7d65fc1b4c41dfbccd83361e82044c0` after discovering that commit `71fc8150f2aaa4935f9627ba097cb1921ec48cd4` had removed the CUDA memory, dispatcher, Stream 1–5, and multi-rank sections. Later Rust/CNOT ownership updates are retained in a dated addendum after the restored baseline.
