@@ -182,7 +182,7 @@ impl SearchSession {
     }
     fn release(&mut self) -> Result<()> {
         self.identity.take();
-        self.preparation_identity.take();
+        self.preparation_identity = None;
         self.metadata.take();
         if let Some(mut workers) = self.workers.take() {
             workers.close()?;

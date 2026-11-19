@@ -71,14 +71,18 @@ impl SearchSession {
     fn preparation_matches(&self, identity: &str) -> PyResult<bool> {
         self.inner
             .try_lock()
-            .map_err(|_| PyRuntimeError::new_err("concurrent native session searches are unsupported"))?
+            .map_err(|_| {
+                PyRuntimeError::new_err("concurrent native session searches are unsupported")
+            })?
             .preparation_matches(identity)
             .map_err(error)
     }
     fn remember_preparation(&self, identity: &str) -> PyResult<()> {
         self.inner
             .try_lock()
-            .map_err(|_| PyRuntimeError::new_err("concurrent native session searches are unsupported"))?
+            .map_err(|_| {
+                PyRuntimeError::new_err("concurrent native session searches are unsupported")
+            })?
             .remember_preparation(identity)
             .map_err(error)
     }
