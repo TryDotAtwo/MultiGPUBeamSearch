@@ -725,3 +725,26 @@ def distributed(rank, rendezvous):
 def test_two_gloo_ranks_exact_results_failure_and_recovery(tmp_path):
     require_controller()
     mp.spawn(distributed, args=((tmp_path / "cnot-rust-gloo").resolve().as_uri(),), nprocs=2)
+
+@pytest.mark.parametrize("mode", ["qhat", "proposal"])
+def test_rust_compatibility_backend_owns_cnot_expand_dispatch(monkeypatch, mode):
+    require_controller()
+    from multigpubeamsearch.cnot_rust_stages import CnotStages
+
+    rows = cnot.replay_cnot(4, (0, 1))
+    options = dict(width=12, shortlist=12, max_depth=2, mode=mode, audit=True)
+    reference = cnot.search_cnot(
+        cnot.pack_rows(rows), WireFixture(9), engine="python", **options
+    )
+
+    def forbidden(*_args, **_kwargs):
+        pytest.fail("Rust compatibility backend must dispatch expansion directly")
+
+    monkeypatch.setattr(CnotStages, "expand", forbidden)
+    monkeypatch.setattr(cnot, "_native_stages_runner", lambda: None)
+    result = cnot.search_cnot(
+        cnot.pack_rows(rows), WireFixture(9), engine="rust", **options
+    )
+    assert asdict(result) == asdict(reference)
+    assert result.status == "solved"
+    assert cnot.replay_cnot(4, result.gates) == rows

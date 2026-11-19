@@ -64,7 +64,7 @@ jobs:
           rustup default stable
       - name: Run Rust CNOT checks
         run: |
-          mkdir -p test_results/refactor_20261119/cnot-rust-initialize
+          mkdir -p test_results/refactor_20261119/cnot-rust-expand
           set -o pipefail
           {
             rustfmt --check --edition 2021 \
@@ -94,7 +94,7 @@ jobs:
             cargo test --locked -p beam-runtime --test session_preparation_identity
             cargo test --locked -p beam-native-sys cnot_tqp_scorer
             cargo check --locked -p beam-python
-          } 2>&1 | tee test_results/refactor_20261119/cnot-rust-initialize/cnot-rust-cpu.log
+          } 2>&1 | tee test_results/refactor_20261119/cnot-rust-expand/cnot-rust-cpu.log
       - name: Build PyO3 extension for Python integration tests
         run: |
           cargo build --locked -p beam-python
@@ -130,8 +130,9 @@ jobs:
             integrations/cayleypy_native/tests/test_cnot_rust_controller.py::test_rust_compatibility_backend_owns_cnot_candidate_exchange_dispatch \
             integrations/cayleypy_native/tests/test_cnot_rust_controller.py::test_rust_compatibility_backend_owns_cnot_construction_verification_dispatch \
             integrations/cayleypy_native/tests/test_cnot_rust_controller.py::test_rust_compatibility_backend_owns_cnot_initialization_dispatch \
+            integrations/cayleypy_native/tests/test_cnot_rust_controller.py::test_rust_compatibility_backend_owns_cnot_expand_dispatch \
             integrations/cayleypy_native/tests/test_cnot_rust_controller.py::test_rust_top_level_controller_preserves_compatibility_stage_fallback \
-            2>&1 | tee test_results/refactor_20261119/cnot-rust-initialize/cnot-search-cpu.log
+            2>&1 | tee test_results/refactor_20261119/cnot-rust-expand/cnot-search-cpu.log
       - name: Check the two-rank NCCL probe syntax
         run: |
           python -m py_compile integrations/cayleypy_native/tests/cnot_stream5_control_nccl.py
@@ -139,7 +140,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: cnot-rust-initialize-cpu-validation
-          path: test_results/refactor_20261119/cnot-rust-initialize
+          name: cnot-rust-expand-cpu-validation
+          path: test_results/refactor_20261119/cnot-rust-expand
           if-no-files-found: ignore
           retention-days: 7
