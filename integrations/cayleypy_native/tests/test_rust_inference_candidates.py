@@ -96,3 +96,47 @@ def test_python_candidate_policy_remains_as_fallback(monkeypatch):
     assert autotune.refinement_batches(1024, 1536, {32, 64}) == (
         _legacy_refinement_batches(1024, 1536, {32, 64})
     )
+
+def _legacy_probe_time_allowance(records, default=12.0):
+    estimates = [10 * max(row["seconds"]) + 3 for row in records if row.get("seconds")]
+    return max(default, max(estimates, default=default))
+
+
+@pytest.mark.parametrize(
+    "records,default,expected",
+    [
+        ([], 12.0, 12.0),
+        ([[], [0.1, 0.2], [0.3]], 12.0, 6.0),
+        ([[0.15, 0.25]], 1.0, 5.5),
+        ([[], []], 4.25, 4.25),
+    ],
+)
+def test_rust_probe_time_allowance_matches_existing_formula(records, default, expected):
+    native = _native_extension()
+    builder = getattr(native, "inference_probe_time_allowance", None)
+    assert callable(builder), "Rust inference probe-time allowance is missing"
+    assert builder(records, default) == pytest.approx(expected)
+
+
+def test_public_probe_time_allowance_uses_rust_builder(monkeypatch):
+    expected = 23.75
+    monkeypatch.setattr(
+        rust_control,
+        "inference_probe_time_allowance",
+        lambda records, default=12.0: expected,
+        raising=False,
+    )
+    assert autotune.probe_time_allowance([{"seconds": [0.2]}], default=3.0) == expected
+
+
+def test_python_probe_time_allowance_remains_as_fallback(monkeypatch):
+    monkeypatch.setattr(
+        rust_control,
+        "inference_probe_time_allowance",
+        lambda records, default=12.0: None,
+        raising=False,
+    )
+    records = [{"seconds": [0.1, 0.25]}, {"seconds": []}, {"seconds": [0.3]}]
+    assert autotune.probe_time_allowance(records, default=4.0) == (
+        _legacy_probe_time_allowance(records, default=4.0)
+    )
