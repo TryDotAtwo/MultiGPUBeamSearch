@@ -371,6 +371,61 @@ def inference_capacity_cache_reusable(previous, current):
     return result if type(result) is bool else None
 
 
+
+def inference_select_compatible(samples, baseline):
+    """Use Rust only for ordinary Measurement rows; preserve Python fallback."""
+    if type(samples) not in (list, tuple) or type(baseline) is not str:
+        return None
+    from .calibration_stats import Estimate, Measurement
+
+    normalized = []
+    for row in samples:
+        if type(row) is not Measurement:
+            return None
+        if (
+            type(row.profile) is not str
+            or type(row.parents) is not int
+            or row.parents <= 0
+            or row.parents > (1 << 53)
+            or type(row.seconds_by_rank) not in (tuple, list)
+            or type(row.correctness_passed) is not bool
+            or type(row.memory_admitted) is not bool
+            or type(row.throttled) is not bool
+        ):
+            return None
+        if any(type(value) is not float or not math.isfinite(value) or value <= 0.0
+               for value in row.seconds_by_rank):
+            return None
+        if row.seconds_by_rank:
+            per_parent = max(row.seconds_by_rank) / row.parents
+            if not math.isfinite(per_parent) or per_parent <= 0.0:
+                return None
+        normalized.append(asdict(row))
+
+    try:
+        native = extension()
+    except (NativeUnavailable, ImportError):
+        return None
+    builder = getattr(native, "inference_select_compatible", None)
+    if not callable(builder):
+        return None
+    try:
+        request = json.dumps(
+            {"baseline": baseline, "samples": normalized},
+            allow_nan=False,
+            separators=(",", ":"),
+        )
+        selected, rejected = json.loads(builder(request))
+        if type(selected) is not dict or type(rejected) is not dict:
+            return None
+        if any(type(key) is not str or type(value) is not str
+               for key, value in rejected.items()):
+            return None
+        return Estimate(**selected), rejected
+    except (TypeError, ValueError, OverflowError):
+        return None
+
+
 def _inference_request(contract, model, runtime, options, devices, beam_width,
                        run_dir, environment, *, capacity_bootstrap=False):
     from .autotune import calibration_signature

@@ -83,6 +83,21 @@ fn inference_capacity_cache_reusable(previous: &str, current: &str) -> PyResult<
     ))
 }
 
+
+#[pyfunction]
+fn inference_select_compatible(request: &str) -> PyResult<String> {
+    #[derive(serde::Deserialize)]
+    struct Request {
+        baseline: String,
+        samples: Vec<beam_core::calibration::Measurement>,
+    }
+    let request: Request =
+        serde_json::from_str(request).map_err(|error| PyValueError::new_err(error.to_string()))?;
+    let selected =
+        beam_core::inference::select_inference_compatible(&request.samples, &request.baseline)
+            .map_err(PyValueError::new_err)?;
+    serde_json::to_string(&selected).map_err(|error| PyValueError::new_err(error.to_string()))
+}
 #[pyclass]
 struct InferenceCalibration {
     request: beam_runtime::inference_job::Request,
@@ -195,6 +210,7 @@ pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(inference_refinement_batches, module)?)?;
     module.add_function(wrap_pyfunction!(inference_probe_time_allowance, module)?)?;
     module.add_function(wrap_pyfunction!(inference_capacity_cache_reusable, module)?)?;
+    module.add_function(wrap_pyfunction!(inference_select_compatible, module)?)?;
     module.add_class::<InferenceCalibration>()?;
     module.add_class::<DownstreamCalibration>()?;
     module.add_class::<FrontierCalibration>()?;

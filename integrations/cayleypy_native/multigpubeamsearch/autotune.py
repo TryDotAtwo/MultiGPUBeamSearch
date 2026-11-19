@@ -50,7 +50,7 @@ def probe_time_allowance(records, default=12.0):
     return _python_probe_time_allowance(records, default) if native is None else native
 
 
-def select_inference(samples, *, baseline):
+def _python_select_inference(samples, *, baseline):
     """A noisy reference cannot disqualify another complete, stable cohort."""
     rejected={}
     try:
@@ -65,6 +65,14 @@ def select_inference(samples, *, baseline):
         baseline=min(valid,key=lambda row:(row.median,row.profile)).profile
     winner,other_rejected=select(samples,baseline=baseline)
     return winner,dict(rejected,**other_rejected)
+
+
+
+def select_inference(samples, *, baseline):
+    from .rust_control import inference_select_compatible
+
+    native = inference_select_compatible(samples, baseline)
+    return _python_select_inference(samples, baseline=baseline) if native is None else native
 
 
 def _python_refinement_batches(winner,cap,visited):

@@ -91,6 +91,12 @@ impl PythonMt19937 {
             }
         }
     }
+    fn random_f64(&mut self) -> f64 {
+        let high = (self.next_u32() >> 5) as u64;
+        let low = (self.next_u32() >> 6) as u64;
+        ((high << 26) + low) as f64 * (1.0 / 9_007_199_254_740_992.0)
+    }
+
 }
 fn shuffle(values: &mut [u64], seed: u64) {
     let mut rng = PythonMt19937::seeded(seed);
@@ -173,6 +179,177 @@ pub fn probe_time_allowance(records: &[Vec<f64>], default: f64) -> Result<f64> {
         allowance = allowance.max(10.0 * slowest + 3.0);
     }
     Ok(allowance)
+}
+
+
+fn compatible_median(values: &mut [f64]) -> f64 {
+    values.sort_by(f64::total_cmp);
+    let half = values.len() / 2;
+    if values.len() % 2 == 0 {
+        (values[half - 1] + values[half]) / 2.0
+    } else {
+        values[half]
+    }
+}
+
+fn compatible_estimate(
+    profile: &str,
+    samples: &[Measurement],
+) -> std::result::Result<Estimate, String> {
+    let selected: Vec<_> = samples.iter().filter(|sample| sample.profile == profile).collect();
+    if selected.len() < 5 {
+        return Err("insufficient measured repeats".into());
+    }
+    if selected.iter().any(|sample| {
+        !sample.correctness_passed || !sample.memory_admitted || sample.throttled
+    }) {
+        return Err("reject incorrect, unadmitted or throttled profile".into());
+    }
+    let cohorts: BTreeSet<_> = selected
+        .iter()
+        .map(|sample| (sample.parents, sample.seconds_by_rank.len()))
+        .collect();
+    if cohorts.len() != 1 {
+        return Err("mixed workload or rank cohort".into());
+    }
+
+    let mut values = Vec::with_capacity(selected.len());
+    for sample in selected {
+        if sample.parents == 0 {
+            return Err("parent count must be a positive integer".into());
+        }
+        if sample.seconds_by_rank.is_empty()
+            || sample
+                .seconds_by_rank
+                .iter()
+                .any(|value| !value.is_finite() || *value <= 0.0)
+        {
+            return Err("all rank timings must be finite and positive".into());
+        }
+        let slowest = sample
+            .seconds_by_rank
+            .iter()
+            .copied()
+            .fold(f64::NEG_INFINITY, f64::max);
+        values.push(slowest / sample.parents as f64);
+    }
+
+    let center = compatible_median(&mut values.clone());
+    let mut deviations: Vec<_> = values.iter().map(|value| (value - center).abs()).collect();
+    let relative_mad = compatible_median(&mut deviations) / center;
+    if relative_mad > 0.10 {
+        return Err("unstable timing samples".into());
+    }
+
+    let mut rng = PythonMt19937::seeded(0);
+    let mut bootstrap = Vec::with_capacity(2000);
+    let mut resample = vec![0.0; values.len()];
+    for _ in 0..2000 {
+        for value in &mut resample {
+            let index = (rng.random_f64() * values.len() as f64).floor() as usize;
+            *value = values[index];
+        }
+        bootstrap.push(compatible_median(&mut resample));
+    }
+    bootstrap.sort_by(f64::total_cmp);
+    Ok(Estimate {
+        profile: profile.into(),
+        median: center,
+        low: bootstrap[50],
+        high: bootstrap[1950],
+        relative_mad,
+        repeats: values.len(),
+    })
+}
+
+fn compatible_select(
+    samples: &[Measurement],
+    baseline: &str,
+) -> std::result::Result<(Estimate, BTreeMap<String, String>), String> {
+    let cohorts: BTreeSet<_> = samples
+        .iter()
+        .map(|sample| (sample.parents, sample.seconds_by_rank.len()))
+        .collect();
+    if cohorts.len() != 1 {
+        return Err("all candidates must share workload and rank cohort".into());
+    }
+
+    let mut chosen = compatible_estimate(baseline, samples)?;
+    let mut rejected = BTreeMap::new();
+    let mut valid = Vec::new();
+    for profile in samples
+        .iter()
+        .map(|sample| sample.profile.as_str())
+        .collect::<BTreeSet<_>>()
+    {
+        if profile == baseline {
+            continue;
+        }
+        match compatible_estimate(profile, samples) {
+            Ok(estimate) => valid.push(estimate),
+            Err(error) => {
+                rejected.insert(profile.to_string(), error);
+            }
+        }
+    }
+    valid.sort_by(|left, right| {
+        left.median
+            .total_cmp(&right.median)
+            .then_with(|| left.profile.cmp(&right.profile))
+    });
+    for candidate in valid {
+        if candidate.high < chosen.low * (1.0 - 0.02) {
+            chosen = candidate;
+            break;
+        }
+        rejected.insert(
+            candidate.profile,
+            "no statistically separated material gain".into(),
+        );
+    }
+    Ok((chosen, rejected))
+}
+
+pub fn select_inference_compatible(
+    samples: &[Measurement],
+    baseline: &str,
+) -> std::result::Result<(Estimate, BTreeMap<String, String>), String> {
+    let mut rejected = BTreeMap::new();
+    let baseline = match compatible_estimate(baseline, samples) {
+        Ok(_) => baseline.to_string(),
+        Err(error) => {
+            rejected.insert(baseline.to_string(), error);
+            let mut valid = Vec::new();
+            for profile in samples
+                .iter()
+                .map(|sample| sample.profile.as_str())
+                .collect::<BTreeSet<_>>()
+            {
+                if profile == baseline {
+                    continue;
+                }
+                match compatible_estimate(profile, samples) {
+                    Ok(estimate) => valid.push(estimate),
+                    Err(error) => {
+                        rejected.insert(profile.to_string(), error);
+                    }
+                }
+            }
+            valid.sort_by(|left, right| {
+                left.median
+                    .total_cmp(&right.median)
+                    .then_with(|| left.profile.cmp(&right.profile))
+            });
+            valid
+                .first()
+                .ok_or_else(|| "no stable complete inference candidate".to_string())?
+                .profile
+                .clone()
+        }
+    };
+    let (winner, other_rejected) = compatible_select(samples, &baseline)?;
+    rejected.extend(other_rejected);
+    Ok((winner, rejected))
 }
 
 pub fn select_inference(
