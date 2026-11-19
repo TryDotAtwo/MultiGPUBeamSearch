@@ -298,6 +298,12 @@ impl Backend for PyStages<'_> {
     type Records = Py<PyAny>;
 
     fn root_is_goal(&mut self) -> PyResult<bool> {
+        if self.stages.hasattr("input_matrix")? {
+            let input_matrix = self.stages.getattr("input_matrix")?;
+            if let Some(is_identity) = search_input_is_identity(&input_matrix)? {
+                return Ok(is_identity);
+            }
+        }
         if !self.stages.hasattr("root_is_goal")? {
             return Ok(false);
         }
