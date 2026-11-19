@@ -85,16 +85,20 @@ fn inference_capacity_cache_reusable(previous: &str, current: &str) -> PyResult<
 
 #[pyfunction]
 fn inference_select_compatible(request: &str) -> PyResult<String> {
-    #[derive(serde::Deserialize)]
-    struct Request {
-        baseline: String,
-        samples: Vec<beam_core::calibration::Measurement>,
-    }
-    let request: Request =
+    let request: serde_json::Value =
         serde_json::from_str(request).map_err(|error| PyValueError::new_err(error.to_string()))?;
-    let selected =
-        beam_core::inference::select_inference_compatible(&request.samples, &request.baseline)
-            .map_err(PyValueError::new_err)?;
+    let baseline = request
+        .get("baseline")
+        .and_then(serde_json::Value::as_str)
+        .ok_or_else(|| PyValueError::new_err("missing inference baseline"))?;
+    let samples = request
+        .get("samples")
+        .cloned()
+        .ok_or_else(|| PyValueError::new_err("missing inference samples"))?;
+    let samples: Vec<beam_core::calibration::Measurement> =
+        serde_json::from_value(samples).map_err(|error| PyValueError::new_err(error.to_string()))?;
+    let selected = beam_core::inference::select_inference_compatible(&samples, baseline)
+        .map_err(PyValueError::new_err)?;
     serde_json::to_string(&selected).map_err(|error| PyValueError::new_err(error.to_string()))
 }
 #[pyclass]
