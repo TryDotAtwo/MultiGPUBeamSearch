@@ -17,6 +17,39 @@ fn slice<'py>(
     py.import("builtins")?.getattr("slice")?.call1((begin, end))
 }
 
+fn pack_route<'py>(
+    py: Python<'py>,
+    source_rank: u32,
+    moves: &Bound<'py, PyAny>,
+) -> PyResult<Bound<'py, PyAny>> {
+    if source_rank > u32::from(u16::MAX) {
+        return Err(PyValueError::new_err(
+            "CNOT source rank must fit uint16",
+        ));
+    }
+    let torch = py.import("torch")?;
+    let dtype = moves.getattr("dtype")?;
+    let int64 = torch.getattr("int64")?;
+    let uint16 = torch.getattr("uint16")?;
+    let is_int64 = dtype.call_method1("__eq__", (&int64,))?.is_truthy()?;
+    let is_uint16 = dtype.call_method1("__eq__", (&uint16,))?.is_truthy()?;
+    if !is_int64 && !is_uint16 {
+        return Err(PyValueError::new_err("CNOT moves must be uint16 or int64"));
+    }
+    if is_int64 {
+        let nonnegative = moves.call_method1("__ge__", (0,))?;
+        let below_limit = moves.call_method1("__le__", (i64::from(u16::MAX),))?;
+        let valid = torch
+            .call_method1("logical_and", (nonnegative, below_limit))?
+            .call_method0("all")?;
+        torch.call_method1(
+            "_assert_async",
+            (valid, "CNOT move must fit uint16"),
+        )?;
+    }
+    let moves = moves.call_method1("to", (&int64,))?;
+    moves.call_method1("__or__", (i64::from(source_rank) << 16,))
+}
 pub(crate) fn scores<'py>(
     py: Python<'py>,
     tensor: Bound<'py, PyAny>,
@@ -109,7 +142,8 @@ pub(crate) fn expand<'py>(
         .get_item(&indices)?
         .call_method1("__mul__", (alphabet,))?
         .call_method1("__add__", (&moves,))?;
-    let route = native.call_method1("pack_cnot_route", (world.getattr("rank")?, &moves))?;
+    let source_rank: u32 = world.getattr("rank")?.extract()?;
+    let route = pack_route(py, source_rank, &moves)?;
     let meta = torch.call_method1(
         "stack",
         (
