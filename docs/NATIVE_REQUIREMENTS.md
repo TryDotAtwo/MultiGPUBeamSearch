@@ -143,6 +143,7 @@ rank processes after their ABI/layout and specialization checks.
   request invalidates an unconsumed predecessor. Reject an older PyO3 module
   without terminal-result protocol version 1 before building the native library.
   Per-run terminal metadata must not inherit stale rank or collection fields.
+- A capable Rust persistent session owns the complete preparation callback outcome metadata paired with the typed preparation identity. Repeated Rust outcomes are directory-bound and consumed once; Rust refreshes the per-run terminal fields and writes the result. Extensions without this optional method retain the Python metadata fallback and existing result contract.
 - Unscoped public native searches and `NativeSession()` select the Rust session
   owner when the matching PyO3 API and packaged `beam-runner` are present.
   Missing optional Rust runtime files retain the legacy Python owner; explicit

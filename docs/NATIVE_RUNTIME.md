@@ -246,6 +246,8 @@ dispatch selects this Rust owner by default when the matching extension and work
 are installed. Old installations and explicit `NativeSession(engine="python")`
 continue through the Python compatibility owner; `engine="rust"` fails closed.
 
+For capable PyO3 runtimes, Rust also retains the complete prepared outcome metadata paired with its typed preparation identity. Each repeated search refreshes run-specific terminal fields and writes native-outcome.json; Python consumes the directory-bound Rust outcome without a second metadata merge or file write. Older extensions keep the previous Python cache and merge path. This does not change the search algorithm or GPU stages.
+
 The optional ABI-1 depth-control table is installed with
 `beam_context_set_depth_control` before `prepare`; the blocking CLI counterpart is
 `beam_native_main_with_history_and_depth_control`. It keeps its original

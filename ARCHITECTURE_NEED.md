@@ -2927,3 +2927,9 @@ or metadata synchronization. The device overflow guard remains diagnostic.
 This is a guarantee for each admitted round, not a proof that every arbitrary
 score distribution can be admitted by the current average-based planner. Ties
 and adversarial shard skew are not silently discarded or handled by shard top-k.
+
+## Rust-owned preparation result metadata, 2026-11-19
+
+A compatible Rust SearchSession now retains the complete result metadata produced by the Python preparation callback together with its typed PreparationIdentity. On a repeated search Rust removes stale terminal fields, merges the current run's terminal record, and writes native-outcome.json. The Python adapter consumes a one-shot, run-directory-bound outcome instead of rebuilding metadata or rewriting the file. Older PyO3 extensions without this optional method keep the existing Python metadata cache and merge path. Search semantics, rank order, inference kernels, and multi-GPU exchange are unchanged.
+
+Hosted checks: public-owner CPU tests 79 passed/1 skipped; CNOT CPU compatibility 174 passed/2 skipped; Rust depth-control tests 5 and 2 passed. These checks do not run a physical CUDA/NCCL collective or establish multi-GPU acceptance. Details: test_results/refactor_20261119/rust-preparation-result-metadata/GITHUB_STATUS.md.
