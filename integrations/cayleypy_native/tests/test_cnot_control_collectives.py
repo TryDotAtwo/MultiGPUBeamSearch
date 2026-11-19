@@ -611,3 +611,47 @@ def test_rust_start_transport_preserves_rank_consensus_and_fallback(monkeypatch)
     assert world.transport is selected[-1][3]
     assert len(collectives) == before
 
+def test_rust_checked_stage_gathers_error_messages_without_object_collective(monkeypatch):
+    world = _two_rank_world()
+    local_message = b"rank 0: ValueError: local failure"
+    remote_message = b"rank 1: RuntimeError: remote failure"
+    gathered = []
+
+    monkeypatch.setattr(
+        world,
+        "longs",
+        lambda values: torch.tensor(values, dtype=torch.int64),
+    )
+    monkeypatch.setattr(world, "sum", lambda tensor: torch.tensor([1], dtype=torch.int64))
+
+    def gather_fixed(tensor):
+        gathered.append(tensor)
+        if len(gathered) == 1:
+            return torch.tensor(
+                [[len(local_message)], [len(remote_message)]],
+                dtype=torch.int64,
+            )
+        if len(gathered) == 2:
+            assert tensor.numel() == max(len(local_message), len(remote_message))
+            local = tensor.tolist()
+            remote = list(remote_message) + [0] * (tensor.numel() - len(remote_message))
+            return torch.tensor([local, remote], dtype=torch.int64)
+        raise AssertionError("unexpected fixed gather")
+
+    monkeypatch.setattr(world, "gather_fixed", gather_fixed)
+    monkeypatch.setattr(
+        dist,
+        "all_gather_object",
+        lambda *_args, **_kwargs: pytest.fail("object collective must not be used"),
+    )
+
+    def fail_local_stage():
+        raise ValueError("local failure")
+
+    with pytest.raises(
+        RuntimeError,
+        match=r"build CNOT stage failed: rank 0: ValueError: local failure \\| rank 1: RuntimeError: remote failure",
+    ):
+        world.checked("build CNOT stage", fail_local_stage)
+
+    assert len(gathered) == 2
