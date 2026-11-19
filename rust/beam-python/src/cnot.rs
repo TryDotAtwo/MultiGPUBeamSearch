@@ -496,9 +496,6 @@ impl Backend for PyStages<'_> {
                 && self.stages.hasattr("world")?
                 && self.stages.hasattr("values")?
                 && self.stages.hasattr("meta")?
-                && self.stages.hasattr("ranks")?
-                && self.stages.hasattr("local")?
-                && self.stages.hasattr("new_lex")?
             {
                 let world = self.stages.getattr("world")?;
                 let values = self.stages.getattr("values")?;
