@@ -324,7 +324,8 @@ def test_rust_session_reuses_and_releases_rank_owner(tmp_path, monkeypatch, worl
         }
         assert owners[0].requests[2][0]["model_artifact_hash"] == "f" * 64
         assert len(identity_builds) == 3
-        assert len(session_identity_builds) == 3
+        assert len(session_identity_builds) == 2
+        assert session_identity_builds[1][3] == "f" * 64
         assert session_identity_builds[0][0:6] == (
             [0, 1], [[1, 0]], "a" * 64, "b" * 64, "mlp", list(range(world)))
         assert json.loads(session_identity_builds[0][9])["python_session_identity"]["geometry"] == [2, 2, 1]
