@@ -517,6 +517,23 @@ def native_depth_budget(max_steps: int, touch_bfs_radius: int) -> tuple[int, int
     return max_steps - effective_radius, effective_radius
 
 
+def _persist_native_outcome(run_dir: Path, outcome: NativeOutcome) -> bool:
+    """Persist from Python unless the active Rust owner will finalize this file."""
+    from .persistent import current_session
+
+    session = current_session()
+    defer = getattr(session, "defer_native_outcome_write", None)
+    if callable(defer) and defer():
+        return False
+    Path(run_dir, "native-outcome.json").write_text(json.dumps({
+        "path": outcome.path,
+        "elapsed_seconds": outcome.elapsed_seconds,
+        "effective_beam_width": outcome.effective_beam_width,
+        "metadata": outcome.metadata,
+    }, indent=2), encoding="utf-8")
+    return True
+
+
 def run_native(contract, model, options, beam_width, max_steps, run_dir, devices, *, runtime=None) -> NativeOutcome:
     from .persistent import current_session
     session=current_session()
@@ -841,6 +858,6 @@ def _run_native_once(contract, model, options, beam_width, max_steps, run_dir, d
     metadata.update(execution_parameters=execution_parameters, model_manifest=model.manifest,
                     solution_mode=options.solution_mode, collect_extra_depths=options.collect_extra_depths,
                     max_collected_solutions=options.max_collected_solutions)
-    (run_dir / "native-outcome.json").write_text(json.dumps({"path": path, "elapsed_seconds": elapsed,
-        "effective_beam_width": effective, "metadata": metadata}, indent=2) + "\n", encoding="utf-8")
-    return NativeOutcome(path, elapsed, effective, run_dir, metadata)
+    outcome = NativeOutcome(path, elapsed, effective, run_dir, metadata)
+    _persist_native_outcome(run_dir, outcome)
+    return outcome

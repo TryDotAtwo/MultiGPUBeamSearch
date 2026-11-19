@@ -214,6 +214,54 @@ def test_rust_session_reuses_and_releases_rank_owner(tmp_path, monkeypatch, worl
     assert all(owner.closed for owner in owners)
 
 
+
+
+def test_native_session_defers_outcome_file_only_to_capable_rust_owner(tmp_path, monkeypatch):
+    from multigpubeamsearch import backend, persistent
+
+    class Worker:
+        def __init__(self, capable):
+            self.capable = capable
+
+        def can_finalize_preparation_result(self):
+            return self.capable
+
+    rust_session = NativeSession(engine="rust")
+    rust_session._workers = Worker(True)
+    monkeypatch.setattr(persistent, "current_session", lambda: rust_session)
+    outcome = NativeOutcome((2, 3), 0.25, 64, tmp_path, {"owner": "rust"})
+
+    assert rust_session.defer_native_outcome_write() is True
+    assert backend._persist_native_outcome(tmp_path, outcome) is False
+    assert not (tmp_path / "native-outcome.json").exists()
+
+    rust_session._workers = Worker(False)
+    assert rust_session.defer_native_outcome_write() is False
+    assert backend._persist_native_outcome(tmp_path, outcome) is True
+    saved = json.loads((tmp_path / "native-outcome.json").read_text(encoding="utf-8"))
+    assert saved == {
+        "path": [2, 3],
+        "elapsed_seconds": 0.25,
+        "effective_beam_width": 64,
+        "metadata": {"owner": "rust"},
+    }
+
+
+def test_python_session_keeps_python_outcome_writer(tmp_path, monkeypatch):
+    from multigpubeamsearch import backend, persistent
+
+    session = NativeSession(engine="python")
+    session._workers = SimpleNamespace(can_finalize_preparation_result=lambda: True)
+    monkeypatch.setattr(persistent, "current_session", lambda: session)
+    outcome = NativeOutcome(None, 0.0, None, tmp_path, {"owner": "python"})
+
+    assert session.defer_native_outcome_write() is False
+    assert backend._persist_native_outcome(tmp_path, outcome) is True
+    assert json.loads((tmp_path / "native-outcome.json").read_text(encoding="utf-8"))["metadata"] == {
+        "owner": "python"
+    }
+
+
 def test_rust_session_owner_compares_typed_preparation_identity_when_extension_is_built():
     from multigpubeamsearch import rust_control
     from multigpubeamsearch.errors import NativeUnavailable

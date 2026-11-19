@@ -266,6 +266,13 @@ class NativeSession:
             directory=Path(run_dir)/'resident-session',cwd=run_dir,env=env)
         return self._workers.submit(contract.start, run_dir, timeout=timeout)
 
+    def defer_native_outcome_write(self):
+        """Let a capable Rust resident owner publish the outcome atomically."""
+        if self._engine != 'rust' or self._workers is None:
+            return False
+        can_finalize = getattr(self._workers, 'can_finalize_preparation_result', None)
+        return callable(can_finalize) and can_finalize() is True
+
     def terminal_result(self, log_path, contract, *, max_steps=None):
         if self._engine == 'rust':
             if self._workers is None:

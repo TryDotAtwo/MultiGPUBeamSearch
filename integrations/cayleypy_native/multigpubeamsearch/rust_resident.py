@@ -117,6 +117,11 @@ class RustResidentWorkers:
         self._terminal = None
         return True
 
+    def can_finalize_preparation_result(self):
+        """Whether this run has a Rust outcome and its owner exposes finalization."""
+        return (self._outcome is not None
+                and callable(getattr(self._owner, 'remember_preparation_result', None)))
+
     def submit(self, start, directory, *, timeout):
         self._terminal = None
         self._outcome = None
