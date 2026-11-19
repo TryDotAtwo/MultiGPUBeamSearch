@@ -82,9 +82,7 @@ impl CnotScorerMetadata {
             return Err(Error("expected all 102 registered field inputs".into()));
         };
         if feature_inputs != Some(102) || features.len() != 102 {
-            return Err(Error(
-                "expected all 102 registered field inputs".into(),
-            ));
+            return Err(Error("expected all 102 registered field inputs".into()));
         }
         let feature_ids = features
             .iter()
