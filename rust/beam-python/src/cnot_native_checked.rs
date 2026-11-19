@@ -151,7 +151,6 @@ pub(crate) fn checked_v2<'py>(
     checked_impl(py, world, stage, result, true)
 }
 
-
 /// Preserve the rank-wide checker negotiation used by Python `World.checked`,
 /// then coordinate an operation result without calling a Python stage callback.
 pub(crate) fn checked_compat<'py>(
@@ -172,9 +171,11 @@ pub(crate) fn checked_compat<'py>(
             .import("multigpubeamsearch.rust_control")?
             .call_method0("extension")?;
         let builtins = py.import("builtins")?;
-        let checker = builtins
-            .getattr("getattr")?
-            .call1((extension, "run_cnot_native_checked_v2", py.None()))?;
+        let checker = builtins.getattr("getattr")?.call1((
+            extension,
+            "run_cnot_native_checked_v2",
+            py.None(),
+        ))?;
         let callable = builtins.getattr("callable")?.call1((&checker,))?;
         let supported: bool = world
             .call_method1("all_ranks_support", (&callable,))?
