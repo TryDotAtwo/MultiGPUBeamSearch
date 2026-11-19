@@ -453,6 +453,42 @@ impl Backend for PyStages<'_> {
         Ok(())
     }
     fn deduplicate_and_score(&mut self) -> PyResult<()> {
+        if self.stages.hasattr("input_matrix")? {
+            let input = self.stages.getattr("input_matrix")?;
+            if input.is_instance_of::<PyCnotSearchInput>()
+                && self.stages.hasattr("world")?
+                && self.stages.hasattr("incoming")?
+                && self.stages.hasattr("closed")?
+                && self.stages.hasattr("scorer")?
+                && self.stages.hasattr("n")?
+                && self.stages.hasattr("words")?
+            {
+                let world = self.stages.getattr("world")?;
+                if world.hasattr("_checked_error_gather_v2")?
+                    && world.hasattr("all_ranks_support")?
+                {
+                    let result = crate::cnot_native_checked::checked_compat(
+                        self.py,
+                        &world,
+                        "deduplicate and evaluate distinct children",
+                        crate::cnot_native_dedup_score::deduplicate_score(
+                            self.py,
+                            &self.stages,
+                        ),
+                    )?;
+                    let result = result.downcast::<PyTuple>()?;
+                    if result.len() != 3 {
+                        return Err(PyRuntimeError::new_err(
+                            "CNOT deduplication returned an invalid adapter result",
+                        ));
+                    }
+                    self.stages.setattr("children", result.get_item(0)?)?;
+                    self.stages.setattr("meta", result.get_item(1)?)?;
+                    self.stages.setattr("values", result.get_item(2)?)?;
+                    return Ok(());
+                }
+            }
+        }
         self.stages.call_method0("deduplicate_and_score")?;
         Ok(())
     }
