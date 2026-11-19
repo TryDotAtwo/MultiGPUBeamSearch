@@ -2210,3 +2210,9 @@ Preserved 26 checkouts and their source/index overlays; verified restoration of 
 - Existing-Vast status run 44427129602 reported instance 61080396 as `exited`
   and skipped the two-rank GPU test without changing instance state.
 - Physical CUDA/NCCL and multi-GPU CNOT runtime remain unverified.
+
+## 2026-11-19 - Типизированный Rust preparation identity
+
+- Rust `SearchSession` хранит подготовленную identity в `PreparationIdentity` с фиксированными полями и сравнивает десериализованные значения. Python больше не передаёт `repr(tuple)`: он сериализует граф, модель, геометрию, устройства, параметры и build metadata в JSON через прежнюю границу PyO3. Совместимые старые расширения принимают JSON-строку, а расширения без optional identity методов сохраняют локальный Python fallback.
+- RED: Actions run 44445381559 выявил два сбоя JSON-проверки прежнего `repr(tuple)`; run 44445580149 упал на структурном сравнении переставленных полей. GREEN: run 44446065188 — 79 passed, 1 skipped (artifact 14492743778); run 44446065116 — 174 passed, 2 skipped (artifact 14492993116); run 44446065115 — Rust наборы 5 и 2 passed (artifact 14493132685). Полные логи сохранены в Actions artifacts, сводка — в `test_results/refactor_20261119/rust-preparation-identity/GITHUB_STATUS.md`.
+- Это проверка Rust/PyO3 и CPU-контроля. Алгоритм и multi-GPU протокол не менялись; CUDA/NCCL runtime на физических GPU не проверялся. Python всё ещё строит descriptor и запускает подготовительный callback.
