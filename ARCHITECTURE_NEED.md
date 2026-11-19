@@ -1,5 +1,20 @@
 # Конфиг
 
+## Rust-владелец стадии CNOT expansion, 2026-11-19
+
+Для типизированного `PyCnotSearchInput` Rust compatibility adapter теперь
+сам вызывает stage expansion и распределяет результат в `candidates` и
+`owners`. GPU-режим повторяет существующую связку scorer → `expand_candidates`;
+CPU и CUDA-библиотеки без этого оператора сохраняют прежний helper
+`cnot._expand`. Ошибки стадии используют тот же rank-wide выбор
+`checked_v2`/legacy `checked`. Python-only и старые stage providers сохраняют
+callback fallback.
+
+Формат кандидатов, владельцы, диапазон ходов, scoring, последовательность
+collectives и публичный API не изменились; новые копирования не добавлены.
+Проверки hosted CPU/PyO3 не являются проверкой физического CUDA/NCCL runtime.
+Результат: `test_results/refactor_20261119/cnot-rust-expand/GITHUB_STATUS.md`.
+
 ## Rust-владелец инициализации поиска CNOT, 2026-11-19
 
 Для типизированного `PyCnotSearchInput` совместимый Rust-`PyStages`

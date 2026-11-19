@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-11-19 - Move CNOT expansion dispatch into Rust
+
+- For typed `PyCnotSearchInput`, the Rust compatibility adapter now owns expansion dispatch, result assignment, and rank-wide error coordination. The CUDA path uses the existing parent scorer and `expand_candidates` operator; CPU and older operator libraries keep the existing `cnot._expand` fallback. Python-only providers retain the stage callback.
+- RED hosted run [44607543751](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44607543751) failed only the new callback-rejection regression cases (2 failed, 224 passed, 2 skipped; artifact 14570771948). GREEN hosted run [44608338814](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44608338814) passed Rust checks, PyO3 build and CPU/PyO3 compatibility tests (226 passed, 2 skipped); the NCCL probe passed syntax checking. Artifact [14572455904](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44608338814/artifacts/14572455904), SHA-256 `d12b7297f82aa3f1f9fd22190ff01415a47453a4386541273be5e5d0bc360096`.
+- This changes stage ownership only; candidate bytes, scoring, rank assignment and collective order remain the same. Physical CUDA/NCCL and multi-GPU runtime execution remain unverified. Evidence: `test_results/refactor_20261119/cnot-rust-expand/GITHUB_STATUS.md`.
+
 ## 2026-11-19 - Move CNOT initialization dispatch into Rust
 
 - For typed `PyCnotSearchInput`, the compatibility Rust stage adapter now creates the initial parent, `lex`, and `closed` values directly, using the existing CNOT owner operator. Rank-wide error negotiation uses the existing v2/legacy checker semantics; unsupported Python stage providers retain the callback fallback.
