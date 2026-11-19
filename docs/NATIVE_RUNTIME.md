@@ -492,3 +492,9 @@ This slice moves candidate list generation only. Python still owns calibration r
 The public Python probe-time helper now delegates its ordinary finite timing records to `beam-core` through an optional PyO3 function. The Rust formula uses the same per-record slowest-rank time, multiplier, overhead, and caller default. The adapter passes only ordinary list/tuple numeric values; unsupported values and missing or older extensions keep the existing Python calculation.
 
 This moves one deterministic helper only. Calibration orchestration, probe order, caches, selection, inference kernels, and multi-GPU behavior are unchanged. Hosted run [44547537516](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44547537516) passed 200 Python tests (2 skipped), scoped Rust tests, the PyO3 build, and NCCL probe syntax. No physical CUDA/NCCL execution was performed. See `test_results/refactor_20261119/rust-inference-probe-time-allowance/GITHUB_STATUS.md`.
+
+## Rust capacity-cache reuse decision
+
+The per-GPU capacity-cache predicate now runs in `beam-core` through optional PyO3. Python continues to query `nvidia-smi` for the current memory snapshot and keeps the existing short-circuit for profiles that were not capacity-limited. Rust receives only the previous and current UUID-to-MiB maps and applies the same key equality and 32 MiB threshold. Unsupported map values or missing/older extensions retain the Python predicate.
+
+This moves the decision only; memory sampling, cache loading, calibration work, and GPU behavior are unchanged. Hosted run [44550275840](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44550275840) passed 211 Python tests (2 skipped), scoped Rust/PyO3 checks, and NCCL probe syntax. Physical CUDA/NCCL was not run. Evidence: `test_results/refactor_20261119/rust-inference-cache/GITHUB_STATUS.md`.
