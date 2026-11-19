@@ -80,8 +80,7 @@ def test_rust_top_level_controller_owns_cnot_admission_and_stage_dispatch():
             events.append(("sum", tensor.tolist()))
             return tensor.sum()
 
-        def start_transport(self, *, prefer_rust):
-            events.append(("transport", prefer_rust))
+        _stream5_library = None
 
     world = World()
 
@@ -120,7 +119,6 @@ def test_rust_top_level_controller_owns_cnot_admission_and_stage_dispatch():
         ("prepare-input", caller_root, 5, 9, 4, "qhat", "python"),
         ("longs", digest_values),
         ("gather-fixed", digest_values),
-        ("transport", True),
         ("identity", 3, "cpu"),
         ("native-runner",),
         ("longs", [1]),
