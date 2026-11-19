@@ -377,6 +377,33 @@ impl Backend for PyStages<'_> {
         target: u32,
         local_index: u64,
     ) -> PyResult<Edge> {
+        if self.stages.hasattr("input_matrix")? {
+            let input = self.stages.getattr("input_matrix")?;
+            if input.is_instance_of::<PyCnotSearchInput>() && self.stages.hasattr("world")? {
+                let world = self.stages.getattr("world")?;
+                let rank: u32 = world.getattr("rank")?.extract()?;
+                let edge = world.call_method1("longs", (vec![0_i64, 0, 0],))?;
+                if target == rank {
+                    edge.call_method1(
+                        "copy_",
+                        (records.bind(self.py).get_item(local_index)?,),
+                    )?;
+                }
+                world.call_method1("broadcast", (&edge, target))?;
+                let row: Vec<i64> = edge.call_method0("tolist")?.extract()?;
+                if row.len() != 3 {
+                    return Err(PyValueError::new_err("invalid CNOT history edge"));
+                }
+                return Ok(Edge {
+                    parent: u64::try_from(row[0])
+                        .map_err(|_| PyValueError::new_err("invalid CNOT history parent"))?,
+                    route: u32::try_from(row[1])
+                        .map_err(|_| PyValueError::new_err("invalid CNOT history route"))?,
+                    owner: u32::try_from(row[2])
+                        .map_err(|_| PyValueError::new_err("invalid CNOT history owner"))?,
+                });
+            }
+        }
         let (parent, route, owner) = self
             .stages
             .call_method1("history_edge", (records.bind(self.py), target, local_index))?
