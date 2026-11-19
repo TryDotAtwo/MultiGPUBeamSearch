@@ -95,8 +95,8 @@ fn inference_select_compatible(request: &str) -> PyResult<String> {
         .get("samples")
         .cloned()
         .ok_or_else(|| PyValueError::new_err("missing inference samples"))?;
-    let samples: Vec<beam_core::calibration::Measurement> =
-        serde_json::from_value(samples).map_err(|error| PyValueError::new_err(error.to_string()))?;
+    let samples: Vec<beam_core::calibration::Measurement> = serde_json::from_value(samples)
+        .map_err(|error| PyValueError::new_err(error.to_string()))?;
     let selected = beam_core::inference::select_inference_compatible(&samples, baseline)
         .map_err(PyValueError::new_err)?;
     serde_json::to_string(&selected).map_err(|error| PyValueError::new_err(error.to_string()))
