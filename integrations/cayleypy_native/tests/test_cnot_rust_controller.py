@@ -771,3 +771,26 @@ def test_rust_compatibility_backend_owns_cnot_deduplicate_score_dispatch(monkeyp
     assert asdict(result) == asdict(reference)
     assert result.status == "solved"
     assert cnot.replay_cnot(4, result.gates) == rows
+
+@pytest.mark.parametrize("mode", ["qhat", "proposal"])
+def test_rust_compatibility_backend_owns_cnot_redistribute_dispatch(monkeypatch, mode):
+    require_controller()
+    from multigpubeamsearch.cnot_rust_stages import CnotStages
+
+    rows = cnot.replay_cnot(4, (0, 1))
+    options = dict(width=12, shortlist=12, max_depth=2, mode=mode, audit=True)
+    reference = cnot.search_cnot(
+        cnot.pack_rows(rows), WireFixture(9), engine="python", **options
+    )
+
+    def forbidden(*_args, **_kwargs):
+        pytest.fail("Rust compatibility backend must dispatch redistribution directly")
+
+    monkeypatch.setattr(CnotStages, "redistribute", forbidden)
+    monkeypatch.setattr(cnot, "_native_stages_runner", lambda: None)
+    result = cnot.search_cnot(
+        cnot.pack_rows(rows), WireFixture(9), engine="rust", **options
+    )
+    assert asdict(result) == asdict(reference)
+    assert result.status == "solved"
+    assert cnot.replay_cnot(4, result.gates) == rows
