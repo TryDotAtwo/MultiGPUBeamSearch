@@ -18,6 +18,7 @@ on:
       - integrations/cayleypy_native/multigpubeamsearch/dispatch.py
       - integrations/cayleypy_native/tests/test_search_controls.py
       - integrations/cayleypy_native/tests/test_rust_inference_candidates.py
+      - integrations/cayleypy_native/tests/test_rust_inference_cache.py
       - integrations/cayleypy_native/tests/test_rust_persistent_search.py
       - integrations/cayleypy_native/tests/test_cnot_search.py
       - integrations/cayleypy_native/tests/test_cnot_rust_controller.py
