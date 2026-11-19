@@ -314,6 +314,24 @@ impl Backend for PyStages<'_> {
         Ok(())
     }
     fn goal(&mut self, begin: u64) -> PyResult<Option<Goal>> {
+        if self.stages.hasattr("input_matrix")? {
+            let input = self.stages.getattr("input_matrix")?;
+            if input.is_instance_of::<PyCnotSearchInput>()
+                && self.stages.hasattr("world")?
+                && self.stages.hasattr("parents")?
+                && self.stages.hasattr("lex")?
+                && self.stages.hasattr("identity")?
+            {
+                let world = self.stages.getattr("world")?;
+                let parents = self.stages.getattr("parents")?;
+                let lex = self.stages.getattr("lex")?;
+                let identity = self.stages.getattr("identity")?;
+                let goal = crate::cnot_native_goal::goal(
+                    self.py, &world, &parents, &lex, begin, &identity,
+                )?;
+                return Ok(goal.map(|(slot, movement)| Goal { slot, movement }));
+            }
+        }
         let value = self.stages.call_method1("goal", (begin,))?;
         let result: Option<(u64, u32)> = value.extract()?;
         Ok(result.map(|(slot, movement)| Goal { slot, movement }))
