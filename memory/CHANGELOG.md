@@ -2414,5 +2414,8 @@ Preserved 26 checkouts and their source/index overlays; verified restoration of 
   [44600777706](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44600777706)
   passed Rust checks, PyO3 build and CPU compatibility tests (223 passed,
   2 skipped; artifact 14566579277).
+- MAIN verification after fast-forward: hosted run
+  [44601261874](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44601261874)
+  passed the same CPU/PyO3 checks (223 passed, 2 skipped; artifact 14568081625).
 - Physical CUDA/NCCL and multi-GPU acceptance remain unverified. Evidence:
   `test_results/refactor_20261119/cnot-rust-verify/GITHUB_STATUS.md`.
