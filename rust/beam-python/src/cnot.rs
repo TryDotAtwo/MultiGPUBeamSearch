@@ -352,7 +352,11 @@ impl Backend for PyStages<'_> {
                 let candidates = self.stages.getattr("candidates")?;
                 let owners = self.stages.getattr("owners")?;
                 let incoming = crate::cnot_native_exchange::exchange(
-                    self.py, &world, &candidates, &owners, true,
+                    self.py,
+                    &world,
+                    &candidates,
+                    &owners,
+                    true,
                 )?;
                 self.stages.setattr("incoming", incoming)?;
                 return Ok(());
