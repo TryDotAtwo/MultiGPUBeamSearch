@@ -83,7 +83,6 @@ fn inference_capacity_cache_reusable(previous: &str, current: &str) -> PyResult<
     ))
 }
 
-
 #[pyfunction]
 fn inference_select_compatible(request: &str) -> PyResult<String> {
     #[derive(serde::Deserialize)]
