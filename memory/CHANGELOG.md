@@ -2374,3 +2374,25 @@ Preserved 26 checkouts and their source/index overlays; verified restoration of 
   artifact 14565280008).
 - Physical CUDA/NCCL and multi-GPU acceptance remain unverified. Evidence:
   `test_results/refactor_20261119/cnot-rust-history-edge/GITHUB_STATUS.md`.
+
+## 2026-11-19 - Typed CNOT candidate exchange is dispatched by Rust
+
+- For typed `PyCnotSearchInput`, compatibility `PyStages` now calls the
+  existing Rust `cnot_native_exchange::exchange` helper with
+  `native_packet=true` and stores the result in `incoming`. Python-only input
+  and older stage providers retain the Python callback.
+- The helper, candidate rows, owner IDs, rank membership, collective order,
+  transport selection, payload representation and search semantics are
+  unchanged; this migrates dispatch only.
+- RED: hosted run
+  [44596999245](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44596999245)
+  failed at the Python exchange callback as expected (1 failed, 221 passed,
+  2 skipped; artifact 14566162577). An intermediate run
+  [44597579671](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44597579671)
+  stopped at rustfmt before compilation or tests; formatting was corrected.
+  GREEN: hosted run
+  [44597954192](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44597954192)
+  passed Rust checks, PyO3 build and selected CPU suite (222 passed,
+  2 skipped; artifact 14565748082).
+- Physical CUDA/NCCL and multi-GPU acceptance remain unverified. Evidence:
+  `test_results/refactor_20261119/cnot-rust-exchange/GITHUB_STATUS.md`.

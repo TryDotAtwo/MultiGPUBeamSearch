@@ -3031,3 +3031,19 @@ Only the helper's ownership changed; the Python calibration loop, candidate orde
 Rust now owns the deterministic decision for reusing a capacity-limited inference cache: previous/current GPU UUID keys must match and no current free-memory value may exceed the recorded value by more than 32 MiB. Python still performs the GPU memory query, keeps the non-capacity short-circuit, and falls back to the prior predicate for unusual map values or unavailable/older extensions.
 
 No cache schema, candidate selection, calibration order, GPU kernel, or multi-GPU protocol changed. Hosted run [44550275840](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44550275840) passed 211 Python tests (2 skipped) with CPU/PyO3 checks; no physical CUDA/NCCL run occurred. Evidence: `test_results/refactor_20261119/rust-inference-cache/GITHUB_STATUS.md`.
+
+## Rust CNOT candidate exchange dispatch, 2026-11-19
+
+For typed `PyCnotSearchInput`, Rust `PyStages::exchange_candidates` reads
+`world`, `candidates` and `owners` from the compatibility stage object and
+calls the existing `cnot_native_exchange::exchange(..., native_packet=true)`.
+The returned tensor is assigned to `incoming`. Python-only inputs and older
+stage providers keep the existing callback fallback.
+
+The exchange helper retains the established single-rank path, optional CUDA
+packet generation, Stream5 transport selection, and PyTorch
+`all_to_all_single` fallback. Candidate rows, owner IDs, rank membership,
+collective order, and wire semantics are unchanged. No kernel, search rule, or
+transport behavior was changed. Hosted CPU/PyO3 checks passed; physical
+CUDA/NCCL multi-GPU execution remains unverified. Evidence:
+`test_results/refactor_20261119/cnot-rust-exchange/GITHUB_STATUS.md`.
