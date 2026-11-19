@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-11-19 - Move CNOT Stream 5 startup dispatch into Rust
+
+- `run_cnot_native_search` now calls the existing Rust Stream 5 setup helper directly. The helper keeps the same Rust-versus-Python transport choice, rank-wide capability vote, Python transport objects and `world.transport` assignment. The Python `World.start_transport` method remains for compatibility with older extension paths.
+- RED Action [44580579687](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44580579687) failed at the removed `World.start_transport` call (218 passed, 2 skipped). GREEN Action [44581088466](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44581088466) passed Rust checks, PyO3 build, 219 Python tests (2 skipped), and NCCL probe syntax. Artifact [14559050896](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44581088466/artifacts/14559050896), SHA-256 `c74344cd0f026fa31d2ae70264023d438c86649f551a2e7e174073f5814d7ba8`.
+- This is hosted CPU/compile verification. No CUDA execution or multi-GPU NCCL runtime was performed. Details are in `test_results/refactor_20261119/cnot-rust-stream5-dispatch/GITHUB_STATUS.md`.
+
+
 ## 2026-11-19 - Move CNOT admission collective dispatch into Rust
 
 - `run_cnot_native_search` now calls the existing Rust helpers directly for root/config/scorer consensus and the all-rank native-stage support vote. Python `World` still supplies the same process-group collective primitives and the Stream 5 startup adapter. CNOT search ordering, fallback stage selection, transport, scoring, and state equality are unchanged.
