@@ -65,6 +65,12 @@ fn inference_refinement_batches(winner: u64, cap: u64, visited: Vec<u64>) -> PyR
     beam_core::inference::refinement_batches(winner, cap, &visited)
         .map_err(|error| PyValueError::new_err(error.to_string()))
 }
+#[pyfunction]
+fn inference_probe_time_allowance(records: Vec<Vec<f64>>, default: f64) -> PyResult<f64> {
+    beam_core::inference::probe_time_allowance(&records, default)
+        .map_err(|error| PyValueError::new_err(error.to_string()))
+}
+
 #[pyclass]
 struct InferenceCalibration {
     request: beam_runtime::inference_job::Request,
@@ -175,6 +181,7 @@ pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(build_graph_contract, module)?)?;
     module.add_function(wrap_pyfunction!(inference_coarse_batches, module)?)?;
     module.add_function(wrap_pyfunction!(inference_refinement_batches, module)?)?;
+    module.add_function(wrap_pyfunction!(inference_probe_time_allowance, module)?)?;
     module.add_class::<InferenceCalibration>()?;
     module.add_class::<DownstreamCalibration>()?;
     module.add_class::<FrontierCalibration>()?;

@@ -37,10 +37,17 @@ def coarse_batches(cap):
     native = inference_coarse_batches(cap)
     return _python_coarse_batches(cap) if native is None else native
 
+def _python_probe_time_allowance(records, default=12.0):
+    """Compatibility formula for Python-only and older Rust extensions."""
+    estimates = [10 * max(row['seconds']) + 3 for row in records if row.get('seconds')]
+    return max(default, max(estimates, default=default))
+
+
 def probe_time_allowance(records, default=12.0):
-    """Measured repeats plus warmup/oracle and control overhead."""
-    estimates=[10*max(row['seconds'])+3 for row in records if row.get('seconds')]
-    return max(default,max(estimates,default=default))
+    from .rust_control import inference_probe_time_allowance
+
+    native = inference_probe_time_allowance(records, default)
+    return _python_probe_time_allowance(records, default) if native is None else native
 
 
 def select_inference(samples, *, baseline):

@@ -6,6 +6,7 @@ switching is a separate acceptance stage.
 from dataclasses import asdict
 import importlib
 import json
+import math
 import os
 from pathlib import Path
 from .errors import NativeBackendError, NativeUnavailable
@@ -290,6 +291,52 @@ def inference_refinement_batches(winner, cap, visited):
     if type(result) is not list or any(type(value) is not int for value in result):
         return None
     return result
+
+
+def inference_probe_time_allowance(records, default=12.0):
+    """Use the Rust formula for the ordinary timing records emitted by autotune."""
+    if type(records) not in (list, tuple) or type(default) is not float:
+        return None
+    if not math.isfinite(default):
+        return None
+
+    normalized = []
+    for row in records:
+        if type(row) is not dict:
+            return None
+        try:
+            seconds = row.get("seconds")
+            if not seconds:
+                continue
+        except Exception:
+            return None
+        if type(seconds) not in (list, tuple):
+            return None
+        if any(type(value) not in (int, float) for value in seconds):
+            return None
+        try:
+            values = [float(value) for value in seconds]
+        except (OverflowError, TypeError, ValueError):
+            return None
+        if any(not math.isfinite(value) or value <= 0.0 for value in values):
+            return None
+        normalized.append(values)
+
+    try:
+        native = extension()
+    except (NativeUnavailable, ImportError):
+        return None
+    builder = getattr(native, "inference_probe_time_allowance", None)
+    if not callable(builder):
+        return None
+    try:
+        result = builder(normalized, default)
+    except (TypeError, ValueError, OverflowError):
+        return None
+    if type(result) not in (int, float) or not math.isfinite(result):
+        return None
+    return float(result)
+
 
 def _inference_request(contract, model, runtime, options, devices, beam_width,
                        run_dir, environment, *, capacity_bootstrap=False):

@@ -139,6 +139,24 @@ pub fn refinement_batches(winner: u64, cap: u64, visited: &BTreeSet<u64>) -> Res
     shuffle(&mut values, 20261010);
     Ok(values)
 }
+pub fn probe_time_allowance(records: &[Vec<f64>], default: f64) -> Result<f64> {
+    if !default.is_finite() {
+        return Err(ContractError::Invalid("inference probe default"));
+    }
+    let mut allowance = default;
+    for row in records {
+        if row.is_empty() {
+            continue;
+        }
+        if row.iter().any(|seconds| !seconds.is_finite() || *seconds <= 0.0) {
+            return Err(ContractError::Invalid("inference probe timing"));
+        }
+        let slowest = row.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+        allowance = allowance.max(10.0 * slowest + 3.0);
+    }
+    Ok(allowance)
+}
+
 pub fn select_inference(
     samples: &[Measurement],
     baseline: &str,
