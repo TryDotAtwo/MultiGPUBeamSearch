@@ -57,7 +57,11 @@ pub(crate) fn redistribute<'py>(
                 &ranks, &local, &new_lex, &meta, &children, &closed, rank, world_size,
             ),
         )?;
-        (packet.get_item(0)?, packet.get_item(1)?, packet.get_item(2)?)
+        (
+            packet.get_item(0)?,
+            packet.get_item(1)?,
+            packet.get_item(2)?,
+        )
     } else {
         let torch = py.import("torch")?;
         let slots = ranks
@@ -66,10 +70,8 @@ pub(crate) fn redistribute<'py>(
             .call_method0("flatten")?;
         let kept = local.get_item(&slots)?;
         let owned = children.get_item(&kept)?;
-        let new_closed = torch.call_method1(
-            "cat",
-            (PyTuple::new(py, [closed.clone(), owned.clone()])?,),
-        )?;
+        let new_closed =
+            torch.call_method1("cat", (PyTuple::new(py, [closed.clone(), owned.clone()])?,))?;
         let records = torch.call_method1(
             "stack",
             (
@@ -97,8 +99,7 @@ pub(crate) fn redistribute<'py>(
     // Preserve the existing mutation order: closed rows update before the
     // collective exchange begins.
     stages.setattr("closed", new_closed)?;
-    let received =
-        crate::cnot_native_exchange::exchange(py, &world, &wire, &targets, true)?;
+    let received = crate::cnot_native_exchange::exchange(py, &world, &wire, &targets, true)?;
     let received = if use_native {
         ops.as_ref()
             .ok_or_else(|| PyRuntimeError::new_err("CNOT winner operators unavailable"))?
@@ -130,7 +131,10 @@ pub(crate) fn redistribute<'py>(
             .map_err(|_| PyOverflowError::new_err("CNOT winner count exceeds int64"))?,
     ];
     let stats = world
-        .call_method1("gather_fixed", (world.call_method1("longs", (stat_values,))?,))?
+        .call_method1(
+            "gather_fixed",
+            (world.call_method1("longs", (stat_values,))?,),
+        )?
         .call_method0("tolist")?;
     let rows: Vec<Vec<i64>> = stats.extract()?;
     let distinct = rows.iter().try_fold(0_i64, |sum, row| {
@@ -159,8 +163,7 @@ pub(crate) fn redistribute<'py>(
             .call_method1("view", (torch.getattr("int64")?,))?
             .call_method1("unsqueeze", (1,))?;
         let flat = children.call_method1("reshape", (children.len()?, columns))?;
-        let payload =
-            torch.call_method1("cat", (PyTuple::new(py, [values, meta, flat])?, 1))?;
+        let payload = torch.call_method1("cat", (PyTuple::new(py, [values, meta, flat])?, 1))?;
         let candidate_rows = world
             .call_method1("gather_rows", (payload,))?
             .call_method0("cpu")?
