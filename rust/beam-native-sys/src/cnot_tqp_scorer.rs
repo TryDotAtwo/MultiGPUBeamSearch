@@ -71,6 +71,10 @@ struct CnotScorerMetadata {
 }
 
 impl CnotScorerMetadata {
+    fn feature_ids(&self) -> &[String] {
+        &self.feature_ids
+    }
+
     fn parse(metadata: &str) -> Result<Self, Error> {
         let value: Value = serde_json::from_str(metadata)
             .map_err(|error| Error(format!("CNOT scorer metadata is not valid JSON: {error}")))?;
@@ -232,7 +236,7 @@ impl TqpScorer {
     }
 
     pub fn feature_ids(&self) -> &[String] {
-        &self.metadata_contract.feature_ids
+        self.metadata_contract.feature_ids()
     }
 
     pub fn effective_batch(&self, inference_batch: i64) -> Result<i64, Error> {
