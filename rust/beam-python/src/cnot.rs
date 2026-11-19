@@ -433,6 +433,12 @@ impl Backend for PyStages<'_> {
         })
     }
     fn verifies_construction(&mut self, gates: &[u32]) -> PyResult<bool> {
+        if self.stages.hasattr("input_matrix")? {
+            let input = self.stages.getattr("input_matrix")?;
+            if let Some(valid) = search_input_verifies_construction(self.py, &input, gates)? {
+                return Ok(valid);
+            }
+        }
         self.stages
             .call_method1("verifies_construction", (gates.to_vec(),))?
             .extract()
