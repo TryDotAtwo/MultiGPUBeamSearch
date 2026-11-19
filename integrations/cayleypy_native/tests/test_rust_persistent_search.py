@@ -96,6 +96,8 @@ def test_rust_session_reuses_and_releases_rank_owner(tmp_path, monkeypatch, worl
     runtime = SimpleNamespace(runner=tmp_path / "runner", architectures=(86,),
                               build_metadata={"binary_sha256": "c" * 64})
     options = NativeOptions(cache_dir=tmp_path)
+    monkeypatch.setenv("CUDA_VISIBLE_DEVICES", "0,1")
+    monkeypatch.setenv("CUDA_DEVICE_ORDER", "PCI_BUS_ID")
     session = NativeSession(engine="rust")
 
     def execute(contract, model, options, beam, depth, run_dir, devices, *, runtime):
@@ -140,6 +142,23 @@ def test_rust_session_reuses_and_releases_rank_owner(tmp_path, monkeypatch, worl
         assert owners[0].preparation_checks[0] == owners[0].preparation_records[0]
         assert owners[0].preparation_checks[1] != owners[0].preparation_records[0]
         assert owners[0].preparation_checks[1] == owners[0].preparation_records[1]
+        assert json.loads(owners[0].preparation_checks[0]) == {
+            "graph_hash": "a" * 64,
+            "geometry": [2, 2, 1],
+            "center": [0, 1],
+            "generators": [[1, 0]],
+            "model_artifact_hash": "b" * 64,
+            "artifact_sizes": [],
+            "model_backend": "mlp",
+            "devices": list(range(world)),
+            "binding_scope": False,
+            "beam_width": 64,
+            "max_steps": 4,
+            "options_repr": repr(options),
+            "cuda_visible_devices": "0,1",
+            "cuda_device_order": "PCI_BUS_ID",
+            "runtime_build": {"binary_sha256": "c" * 64},
+        }
         assert owners[0].requests[2][0]["model_artifact_hash"] == "f" * 64
         owners[0].fail = True
         with pytest.raises(NativeBackendError, match="injected rank failure"):
@@ -150,7 +169,7 @@ def test_rust_session_reuses_and_releases_rank_owner(tmp_path, monkeypatch, worl
     assert all(owner.closed for owner in owners)
 
 
-def test_rust_session_owner_remembers_preparation_identity_when_extension_is_built():
+def test_rust_session_owner_compares_typed_preparation_identity_when_extension_is_built():
     from multigpubeamsearch import rust_control
     from multigpubeamsearch.errors import NativeUnavailable
 
@@ -158,12 +177,34 @@ def test_rust_session_owner_remembers_preparation_identity_when_extension_is_bui
         extension = rust_control.extension()
     except (NativeUnavailable, ImportError):
         pytest.skip("PyO3 extension is not built in this environment")
+    identity = json.dumps({
+        "graph_hash": "a" * 64,
+        "geometry": [2, 2, 1],
+        "center": [0, 1],
+        "generators": [[1, 0]],
+        "model_artifact_hash": "b" * 64,
+        "artifact_sizes": [17],
+        "model_backend": "mlp",
+        "devices": [0, 1],
+        "binding_scope": False,
+        "beam_width": 64,
+        "max_steps": 4,
+        "options_repr": "NativeOptions()",
+        "cuda_visible_devices": "0,1",
+        "cuda_device_order": "PCI_BUS_ID",
+        "runtime_build": {"binary_sha256": "c" * 64, "inference_backend": "cutlass"},
+    })
+    reordered = json.dumps(dict(reversed(list(json.loads(identity).items()))))
+    changed = json.loads(identity)
+    changed["model_artifact_hash"] = "d" * 64
     owner = extension.SearchSession()
     try:
-        assert owner.preparation_matches("first") is False
-        owner.remember_preparation("first")
-        assert owner.preparation_matches("first") is True
-        assert owner.preparation_matches("second") is False
+        assert owner.preparation_matches(identity) is False
+        owner.remember_preparation(identity)
+        assert owner.preparation_matches(reordered) is True
+        assert owner.preparation_matches(json.dumps(changed)) is False
+        with pytest.raises(RuntimeError):
+            owner.preparation_matches("{}")
     finally:
         owner.close()
 
