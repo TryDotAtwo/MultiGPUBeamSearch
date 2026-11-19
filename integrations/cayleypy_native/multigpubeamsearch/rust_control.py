@@ -50,6 +50,46 @@ def options_descriptor(options):
             for name, value in values.items()}
 
 
+def build_preparation_identity(*, graph_hash, geometry, center, generators,
+                               model_artifact_hash, artifact_sizes, model_backend,
+                               devices, binding_scope, beam_width, max_steps,
+                               options_repr, cuda_visible_devices, cuda_device_order,
+                               runtime_build):
+    """Build the typed resident-session identity in Rust when supported."""
+    try:
+        native = extension()
+    except (NativeUnavailable, ImportError):
+        return None
+    builder = getattr(native, 'build_preparation_identity', None)
+    if not callable(builder):
+        return None
+    runtime_build_json = (None if runtime_build is None
+                          else json.dumps(runtime_build, sort_keys=True))
+    try:
+        result = builder(
+            graph_hash,
+            [None if value is None else int(value) for value in geometry],
+            None if center is None else [int(value) for value in center],
+            None if generators is None else [
+                [int(value) for value in move] for move in generators],
+            model_artifact_hash,
+            None if artifact_sizes is None else [int(size) for size in artifact_sizes],
+            model_backend,
+            [int(device) for device in devices],
+            bool(binding_scope),
+            int(beam_width),
+            int(max_steps),
+            options_repr,
+            cuda_visible_devices,
+            cuda_device_order,
+            runtime_build_json,
+        )
+    except (TypeError, ValueError, OverflowError):
+        # Older Python-compatible values remain on the existing typed wire path.
+        return None
+    return result if isinstance(result, str) else None
+
+
 def _native_options_supported(options):
     # Keep Python's historical acceptance of values that its public validator
     # permits but beam-core cannot represent in its fixed-width fields.

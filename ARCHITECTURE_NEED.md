@@ -2513,8 +2513,10 @@ launch. Служебный вложенный ключ в `options` включа
 
 Rust `SearchSession` хранит подготовленный ключ как структуру
 `PreparationIdentity` с полями графа, модели, устройств, опций и runtime build.
-Python сериализует их в JSON для прежней PyO3 границы; Rust десериализует поля
-и сравнивает значения структурно.
+Совместимое PyO3-расширение собирает и сериализует эту структуру в Rust из
+типизированных полей. Python вызывает builder в Rust-owned пути; расширения без
+этого optional метода используют прежнюю Python-сборку JSON. Rust сравнивает
+десериализованные значения структурно.
 
 Перед Python callback подготовки `NativeSession` вызывает
 `SearchSession::begin_preparation`. Совпадающая identity сохраняет resident

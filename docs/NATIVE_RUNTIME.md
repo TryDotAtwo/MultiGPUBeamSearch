@@ -474,3 +474,7 @@ plan. Per-device compilation and physical acceptance remain separate records.
 ## Rust-owned outcome-file finalization
 
 The Python backend constructs the same NativeOutcome object used by public callers. For a capable Rust resident session, it does not overwrite native-outcome.json after the Rust worker has written the initial result. The Python preparation callback then supplies full metadata to SearchSession, which atomically finalizes the file. Calls without an active capable Rust owner, Python sessions, and older or incapable extensions retain the Python fallback writer and its existing JSON formatting. This changes result-file ownership only; search behavior and GPU stages are unchanged.
+
+## Rust-owned preparation identity construction
+
+The Rust PyO3 extension now builds and serializes the typed PreparationIdentity from graph, model, device, option, and runtime fields. The Rust-owned NativeSession path uses this builder before asking SearchSession to compare or retain the identity. Python still builds the prior JSON payload when an older optional extension does not expose the builder, and the Python-owned session path is unchanged. This transfers identity construction only; search stages, ordering, numerical behavior, and multi-GPU protocol do not change.

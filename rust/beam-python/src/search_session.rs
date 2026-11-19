@@ -14,6 +14,51 @@ use std::{
 fn error(e: impl std::fmt::Display) -> PyErr {
     PyRuntimeError::new_err(e.to_string())
 }
+#[pyfunction]
+#[pyo3(signature=(graph_hash, geometry, center, generators, model_artifact_hash, artifact_sizes, model_backend, devices, binding_scope, beam_width, max_steps, options_repr, cuda_visible_devices, cuda_device_order, runtime_build))]
+fn build_preparation_identity(
+    graph_hash: Option<String>,
+    geometry: Vec<Option<u64>>,
+    center: Option<Vec<u32>>,
+    generators: Option<Vec<Vec<u32>>>,
+    model_artifact_hash: String,
+    artifact_sizes: Option<Vec<u64>>,
+    model_backend: String,
+    devices: Vec<u32>,
+    binding_scope: bool,
+    beam_width: u64,
+    max_steps: u32,
+    options_repr: String,
+    cuda_visible_devices: Option<String>,
+    cuda_device_order: Option<String>,
+    runtime_build: Option<String>,
+) -> PyResult<String> {
+    let geometry: [Option<u64>; 3] = geometry.try_into().map_err(|_| {
+        PyValueError::new_err("preparation geometry must contain exactly three values")
+    })?;
+    let runtime_build: Option<serde_json::Value> = runtime_build
+        .map(|raw| serde_json::from_str(&raw))
+        .transpose()
+        .map_err(error)?;
+    let identity = PreparationIdentity::new(
+        graph_hash,
+        geometry,
+        center,
+        generators,
+        model_artifact_hash,
+        artifact_sizes,
+        model_backend,
+        devices,
+        binding_scope,
+        beam_width,
+        max_steps,
+        options_repr,
+        cuda_visible_devices,
+        cuda_device_order,
+        runtime_build,
+    );
+    serde_json::to_string(&identity).map_err(error)
+}
 #[pyclass]
 struct SearchSession {
     inner: Mutex<beam_runtime::search_session::SearchSession>,
@@ -129,6 +174,7 @@ fn parse_terminal(
 }
 pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add("SEARCH_TERMINAL_RESULT_VERSION", 1)?;
+    module.add_function(wrap_pyfunction!(build_preparation_identity, module)?)?;
     module.add_class::<SearchSession>()?;
     module.add_function(wrap_pyfunction!(parse_terminal, module)?)?;
     Ok(())

@@ -75,7 +75,7 @@ impl SessionIdentity {
         Ok(())
     }
 }
-#[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct PreparationIdentity {
     pub graph_hash: Option<String>,
@@ -93,6 +93,44 @@ pub struct PreparationIdentity {
     pub cuda_visible_devices: Option<String>,
     pub cuda_device_order: Option<String>,
     pub runtime_build: Option<Value>,
+}
+impl PreparationIdentity {
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        graph_hash: Option<String>,
+        geometry: [Option<u64>; 3],
+        center: Option<Vec<u32>>,
+        generators: Option<Vec<Vec<u32>>>,
+        model_artifact_hash: String,
+        artifact_sizes: Option<Vec<u64>>,
+        model_backend: String,
+        devices: Vec<u32>,
+        binding_scope: bool,
+        beam_width: u64,
+        max_steps: u32,
+        options_repr: String,
+        cuda_visible_devices: Option<String>,
+        cuda_device_order: Option<String>,
+        runtime_build: Option<Value>,
+    ) -> Self {
+        Self {
+            graph_hash,
+            geometry,
+            center,
+            generators,
+            model_artifact_hash,
+            artifact_sizes,
+            model_backend,
+            devices,
+            binding_scope,
+            beam_width,
+            max_steps,
+            options_repr,
+            cuda_visible_devices,
+            cuda_device_order,
+            runtime_build,
+        }
+    }
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
