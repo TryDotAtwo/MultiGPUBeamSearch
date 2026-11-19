@@ -296,12 +296,37 @@ class NativeSession:
             generators=getattr(contract,'generators',None)
             graph_content=(None if center is None else tuple(center),
                            None if generators is None else tuple(tuple(move) for move in generators))
-            identity=(contract.graph_hash,geometry,graph_content,model.artifact_hash,getattr(model,'artifact_sizes',()),
-                model.backend,tuple(devices),binding_scope,
-                beam_width,max_steps,repr(options),
-                os.environ.get('CUDA_VISIBLE_DEVICES'),os.environ.get('CUDA_DEVICE_ORDER'),
-                json.dumps(runtime.build_metadata,sort_keys=True) if runtime is not None else None)
-            identity_key = repr(identity)
+            artifact_sizes=getattr(model,'artifact_sizes',())
+            device_order=tuple(devices)
+            visible_devices=os.environ.get('CUDA_VISIBLE_DEVICES')
+            cuda_device_order=os.environ.get('CUDA_DEVICE_ORDER')
+            options_repr=repr(options)
+            runtime_build=runtime.build_metadata if runtime is not None else None
+            runtime_build_key=json.dumps(runtime_build,sort_keys=True) if runtime is not None else None
+            identity=(contract.graph_hash,geometry,graph_content,model.artifact_hash,artifact_sizes,
+                model.backend,device_order,binding_scope,
+                beam_width,max_steps,options_repr,visible_devices,cuda_device_order,
+                runtime_build_key)
+            preparation_identity = {
+                'graph_hash': contract.graph_hash,
+                'geometry': [None if value is None else int(value) for value in geometry],
+                'center': None if center is None else [int(value) for value in center],
+                'generators': None if generators is None else [
+                    [int(value) for value in move] for move in generators],
+                'model_artifact_hash': model.artifact_hash,
+                'artifact_sizes': None if artifact_sizes is None else [
+                    int(size) for size in artifact_sizes],
+                'model_backend': model.backend,
+                'devices': [int(device) for device in device_order],
+                'binding_scope': bool(binding_scope),
+                'beam_width': int(beam_width),
+                'max_steps': int(max_steps),
+                'options_repr': options_repr,
+                'cuda_visible_devices': visible_devices,
+                'cuda_device_order': cuda_device_order,
+                'runtime_build': runtime_build,
+            }
+            identity_key = json.dumps(preparation_identity, sort_keys=True)
             if (self.model_snapshot_cache is None
                     or not self.model_snapshot_cache.verify_for_launch(model, contract)):
                 verify_prepared_model(model,contract)

@@ -1,3 +1,4 @@
+use beam_runtime::search_session::PreparationIdentity;
 use pyo3::{
     exceptions::{PyRuntimeError, PyValueError},
     prelude::*,
@@ -69,22 +70,18 @@ impl SearchSession {
         py.allow_threads(|| self.inner.lock().map_err(error)?.close().map_err(error))
     }
     fn preparation_matches(&self, identity: &str) -> PyResult<bool> {
-        self.inner
-            .try_lock()
-            .map_err(|_| {
-                PyRuntimeError::new_err("concurrent native session searches are unsupported")
-            })?
-            .preparation_matches(identity)
-            .map_err(error)
+        let inner = self.inner.try_lock().map_err(|_| {
+            PyRuntimeError::new_err("concurrent native session searches are unsupported")
+        })?;
+        let identity: PreparationIdentity = serde_json::from_str(identity).map_err(error)?;
+        inner.preparation_matches(&identity).map_err(error)
     }
     fn remember_preparation(&self, identity: &str) -> PyResult<()> {
-        self.inner
-            .try_lock()
-            .map_err(|_| {
-                PyRuntimeError::new_err("concurrent native session searches are unsupported")
-            })?
-            .remember_preparation(identity)
-            .map_err(error)
+        let mut inner = self.inner.try_lock().map_err(|_| {
+            PyRuntimeError::new_err("concurrent native session searches are unsupported")
+        })?;
+        let identity: PreparationIdentity = serde_json::from_str(identity).map_err(error)?;
+        inner.remember_preparation(&identity).map_err(error)
     }
     #[getter]
     fn pids(&self) -> PyResult<Vec<u32>> {

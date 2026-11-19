@@ -75,6 +75,25 @@ impl SessionIdentity {
         Ok(())
     }
 }
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PreparationIdentity {
+    pub graph_hash: Option<String>,
+    pub geometry: [Option<u64>; 3],
+    pub center: Option<Vec<u32>>,
+    pub generators: Option<Vec<Vec<u32>>>,
+    pub model_artifact_hash: String,
+    pub artifact_sizes: Option<Vec<u64>>,
+    pub model_backend: String,
+    pub devices: Vec<u32>,
+    pub binding_scope: bool,
+    pub beam_width: u64,
+    pub max_steps: u32,
+    pub options_repr: String,
+    pub cuda_visible_devices: Option<String>,
+    pub cuda_device_order: Option<String>,
+    pub runtime_build: Option<Value>,
+}
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Launch {
@@ -120,7 +139,7 @@ pub fn parse_terminal(
 pub struct SearchSession {
     workers: Option<ResidentWorkers>,
     identity: Option<SessionIdentity>,
-    preparation_identity: Option<String>,
+    preparation_identity: Option<PreparationIdentity>,
     metadata: Option<Value>,
     cancellation: Arc<AtomicBool>,
     closed: bool,
@@ -154,22 +173,19 @@ impl SearchSession {
     pub fn is_closed(&self) -> bool {
         self.closed
     }
-    pub fn preparation_matches(&self, identity: &str) -> Result<bool> {
+    pub fn preparation_matches(&self, identity: &PreparationIdentity) -> Result<bool> {
         self.check_owner()?;
         if self.closed || self.cancellation.load(Ordering::Acquire) {
             return Err(Error::Message("native session cancelled or closed".into()));
         }
-        Ok(self.preparation_identity.as_deref() == Some(identity))
+        Ok(self.preparation_identity.as_ref() == Some(identity))
     }
-    pub fn remember_preparation(&mut self, identity: &str) -> Result<()> {
+    pub fn remember_preparation(&mut self, identity: &PreparationIdentity) -> Result<()> {
         self.check_owner()?;
         if self.closed || self.cancellation.load(Ordering::Acquire) {
             return Err(Error::Message("native session cancelled or closed".into()));
         }
-        if identity.is_empty() {
-            return Err(Error::Message("empty session preparation identity".into()));
-        }
-        self.preparation_identity = Some(identity.to_owned());
+        self.preparation_identity = Some(identity.clone());
         Ok(())
     }
     fn check_owner(&self) -> Result<()> {
