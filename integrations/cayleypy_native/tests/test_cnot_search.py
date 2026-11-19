@@ -199,6 +199,33 @@ def test_compatibility_cnot_stage_goal_delegates_to_rust(monkeypatch):
     assert calls == [(world, parents, lex, 7, identity)]
 
 
+@pytest.mark.parametrize(
+    ("rows", "expected"),
+    [(replay_cnot(2, ()), True), (replay_cnot(3, (0,)), False)],
+)
+def test_compatibility_cnot_stage_root_goal_uses_typed_rust_matrix(
+    monkeypatch, rows, expected
+):
+    from multigpubeamsearch import cnot_rust_stages, rust_control
+    from multigpubeamsearch.errors import NativeUnavailable
+
+    try:
+        native = rust_control.extension()
+    except NativeUnavailable as error:
+        pytest.skip(f"matching Rust runtime is unavailable: {error}")
+    root = pack_rows(rows)
+    input_matrix = native.prepare_cnot_input(root, 1, 1, 1, "qhat")
+    stages = cnot_rust_stages.CnotStages(
+        None, input_matrix.root, object(), input_matrix, object(), "qhat", False
+    )
+
+    def forbidden(*_args, **_kwargs):
+        pytest.fail("compatibility CNOT root check must use the Rust-owned matrix")
+
+    monkeypatch.setattr(torch, "equal", forbidden)
+    assert stages.root_is_goal() is expected
+
+
 def test_compatibility_cnot_stage_goal_keeps_old_extension_fallback(monkeypatch):
     from types import SimpleNamespace
     from multigpubeamsearch import cnot_rust_stages, rust_control
