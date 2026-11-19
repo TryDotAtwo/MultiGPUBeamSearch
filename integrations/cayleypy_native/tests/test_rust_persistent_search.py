@@ -56,6 +56,8 @@ def test_rust_session_reuses_and_releases_rank_owner(tmp_path, monkeypatch, worl
             self.preparation_records = []
             self.preparation_results = []
             self.prepared_metadata = None
+            self.last_outcome = None
+            self.last_outcome_path = None
             self.count = 0
             self.requests = []
             self.fail = False
@@ -84,6 +86,11 @@ def test_rust_session_reuses_and_releases_rank_owner(tmp_path, monkeypatch, worl
             self.preparation_results.append((identity, prepared))
             self.prepared_identity = identity
             self.prepared_metadata = prepared
+            if self.last_outcome_path is None:
+                return False
+            self.last_outcome["metadata"] = prepared
+            self.last_outcome_path.write_text(json.dumps(self.last_outcome), encoding="utf-8")
+            return True
 
         def run(self, identity, launch, start, run_dir, timeout, metadata):
             if self.fail:
@@ -104,9 +111,12 @@ def test_rust_session_reuses_and_releases_rank_owner(tmp_path, monkeypatch, worl
                 "observed_parent_batch": None, "observed_inference_rows": None,
                 "observed_stream3_batch_candidates": None})
             result_metadata["persistent_session"] = {
-                "reused": reused, "request_count": self.count}
-            return json.dumps({"path": [0], "effective_beam_width": 64,
-                "elapsed_seconds": 0.1, "metadata": result_metadata})
+                "reused": reused, "worker_pids": list(self.pids), "request_count": self.count}
+            self.last_outcome = {"path": [0], "effective_beam_width": 64,
+                "elapsed_seconds": 0.1, "metadata": result_metadata}
+            self.last_outcome_path = Path(run_dir) / "native-outcome.json"
+            self.last_outcome_path.write_text(json.dumps(self.last_outcome), encoding="utf-8")
+            return json.dumps(self.last_outcome)
 
         def close(self):
             self.closed = True
@@ -171,6 +181,12 @@ def test_rust_session_reuses_and_releases_rank_owner(tmp_path, monkeypatch, worl
         assert owners[0].preparation_begins[1] != owners[0].preparation_results[0][0]
         assert owners[0].preparation_begins[1] == owners[0].preparation_results[1][0]
         assert owners[0].preparation_results[0][1]["callback_metadata_owner"] == "python-execute"
+        expected_first_session = {
+            "reused": False, "worker_pids": list(range(100, 100 + world)),
+            "request_count": 1,
+        }
+        assert owners[0].preparation_results[0][1]["persistent_session"] == expected_first_session
+        assert owners[0].last_outcome["metadata"] == first.metadata
         assert json.loads(owners[0].preparation_begins[0]) == {
             "graph_hash": "a" * 64,
             "geometry": [2, 2, 1],

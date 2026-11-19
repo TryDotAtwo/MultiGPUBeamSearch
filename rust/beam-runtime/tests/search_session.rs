@@ -159,10 +159,17 @@ while not (directory/'stop').exists():
                     &preparation_for_metadata,
                     &json!({
                         "profile": {"calibration_total_wall_seconds": 12.0},
-                        "preparation_result_marker": "python-callback"
+                        "preparation_result_marker": "python-callback",
+                        "persistent_session": result.metadata["persistent_session"].clone()
                     }),
                 )
                 .unwrap();
+            let persisted: serde_json::Value = serde_json::from_slice(
+                &fs::read(dir.join("native-outcome.json")).unwrap(),
+            )
+            .unwrap();
+            assert_eq!(persisted["metadata"]["preparation_result_marker"], "python-callback");
+            assert_eq!(persisted["metadata"]["persistent_session"]["request_count"], 1);
         }
         previous = session.pids();
         assert_eq!(
