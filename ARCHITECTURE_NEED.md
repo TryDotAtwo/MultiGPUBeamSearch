@@ -247,6 +247,14 @@ With the matching module, all ranks use the Rust CNOT controller and native stag
 
 Hosted validation covered CPU/control flow and extension build/import. CUDA execution, NCCL runtime, and physical multi-GPU search remain unverified.
 
+## CNOT root identity from the typed Rust input, 2026-11-19
+
+The compatibility stage uses `CnotSearchInput` or its `CnotMatrix` owner to
+check whether the root is identity. The check compares the packed matrix in
+Rust; older extensions and Python-only inputs retain `torch.equal`. This moves
+only the root check. Tensor ownership, the distributed search order, CUDA
+operators, scorer calls, and collective sequence remain unchanged.
+
 ## Переход CNOT на Rust, 2026-11-16
 
 `search_cnot` по умолчанию выбирает Rust-контроллер, когда установлен

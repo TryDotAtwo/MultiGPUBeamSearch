@@ -18,6 +18,10 @@ class CnotStages:
         self.n, self.words = root.shape[1:]
 
     def root_is_goal(self):
+        matrix = getattr(self.input_matrix, "rust_matrix", self.input_matrix)
+        is_identity = getattr(matrix, "is_identity", None)
+        if callable(is_identity):
+            return is_identity()
         return torch.equal(self.root, self.identity)
 
     def initialize(self):

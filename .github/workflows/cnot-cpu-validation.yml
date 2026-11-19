@@ -60,7 +60,7 @@ jobs:
           rustup default stable
       - name: Run Rust CNOT checks
         run: |
-          mkdir -p test_results/refactor_20261119/cnot-owned-matrix
+          mkdir -p test_results/refactor_20261119/cnot-compat-root-goal
           set -o pipefail
           {
             rustfmt --check --edition 2021 \
@@ -84,7 +84,7 @@ jobs:
             cargo test --locked -p beam-runtime cnot_search
             cargo test --locked -p beam-native-sys cnot_tqp_scorer
             cargo check --locked -p beam-python
-          } 2>&1 | tee test_results/refactor_20261119/cnot-owned-matrix/cnot-rust-cpu.log
+          } 2>&1 | tee test_results/refactor_20261119/cnot-compat-root-goal/cnot-rust-cpu.log
       - name: Build PyO3 extension for Python integration tests
         run: |
           cargo build --locked -p beam-python
@@ -112,7 +112,7 @@ jobs:
             integrations/cayleypy_native/tests/test_cnot_rust_controller.py::test_rust_controller_prepares_typed_input_without_python_builder \
             integrations/cayleypy_native/tests/test_cnot_rust_controller.py::test_rust_native_root_goal_uses_typed_matrix_without_torch_equal\
             integrations/cayleypy_native/tests/test_cnot_rust_controller.py::test_rust_top_level_controller_preserves_compatibility_stage_fallback \
-            2>&1 | tee test_results/refactor_20261119/cnot-owned-matrix/cnot-search-cpu.log
+            2>&1 | tee test_results/refactor_20261119/cnot-compat-root-goal/cnot-search-cpu.log
       - name: Check the two-rank NCCL probe syntax
         run: |
           python -m py_compile integrations/cayleypy_native/tests/cnot_stream5_control_nccl.py
@@ -120,8 +120,8 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: cnot-owned-matrix-cpu-validation
-          path: test_results/refactor_20261119/cnot-owned-matrix
+          name: cnot-compat-root-goal-cpu-validation
+          path: test_results/refactor_20261119/cnot-compat-root-goal
           if-no-files-found: ignore
           retention-days: 7
 

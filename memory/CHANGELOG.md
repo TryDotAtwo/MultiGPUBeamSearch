@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-11-19 - CNOT compatibility root check uses the Rust matrix owner
+
+- Exposed the existing packed-matrix identity check on the PyO3
+  `CnotSearchInput` and `CnotMatrix` types. The compatibility CNOT stage now
+  uses that Rust-owned matrix when available and retains `torch.equal` for
+  older extensions and Python-only input. Search order, CUDA operators,
+  scoring, collectives, and state storage are unchanged.
+- Hosted validation is pending. The regression checks both identity and a
+  non-identity matrix without calling `torch.equal`.
+
 ## 2026-11-18 - Rust controls permutation depth continuation
 
 - Preserved the original ABI-1 depth callback layouts and two checkpoints, and

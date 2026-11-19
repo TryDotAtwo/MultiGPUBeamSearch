@@ -250,6 +250,10 @@ impl PyCnotMatrix {
         Ok(Self { inner })
     }
 
+    fn is_identity(&self) -> bool {
+        self.inner.is_identity()
+    }
+
     fn verifies_construction(&self, py: Python<'_>, moves: Vec<u32>) -> PyResult<bool> {
         py.allow_threads(|| self.inner.verifies_construction(&moves))
             .map_err(|error| PyValueError::new_err(error.to_string()))
@@ -271,6 +275,10 @@ impl PyCnotSearchInput {
     #[getter]
     fn root(&self, py: Python<'_>) -> Py<PyAny> {
         self.root.clone_ref(py)
+    }
+
+    fn is_identity(&self) -> bool {
+        self.matrix.is_identity()
     }
 
     fn verifies_construction(&self, py: Python<'_>, moves: Vec<u32>) -> PyResult<bool> {

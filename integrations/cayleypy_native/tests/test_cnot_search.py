@@ -215,6 +215,7 @@ def test_compatibility_cnot_stage_root_goal_uses_typed_rust_matrix(
         pytest.skip(f"matching Rust runtime is unavailable: {error}")
     root = pack_rows(rows)
     input_matrix = native.prepare_cnot_input(root, 1, 1, 1, "qhat")
+    assert native.CnotMatrix(input_matrix.n, input_matrix.raw).is_identity() is expected
     stages = cnot_rust_stages.CnotStages(
         None, input_matrix.root, object(), input_matrix, object(), "qhat", False
     )
