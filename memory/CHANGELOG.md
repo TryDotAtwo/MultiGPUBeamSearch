@@ -2338,3 +2338,20 @@ Preserved 26 checkouts and their source/index overlays; verified restoration of 
   test was corrected to disable native-stage dispatch before recording RED.
   Physical CUDA/NCCL and multi-GPU acceptance remain unverified. Evidence:
   `test_results/refactor_20261119/cnot-rust-root-goal/GITHUB_STATUS.md`.
+
+## 2026-11-19 - Typed CNOT compatibility goal dispatches in Rust
+
+- For typed Rust `CnotSearchInput`, the Rust compatibility backend now calls
+  the shared `cnot_native_goal::goal` helper directly. Python-only input and
+  older stage providers retain the existing `goal` callback.
+- Goal semantics, tensor operations, error coordination, stage order and
+  collectives remain unchanged; the change removes only the Rust-to-Python
+  callback on this typed compatibility path.
+- RED: hosted run [44589295992](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44589295992)
+  failed on the Python goal callback as expected (1 failed, 219 passed, 2
+  skipped; artifact 14563611172). GREEN: hosted run
+  [44589852872](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44589852872)
+  passed Rust checks, PyO3 build and selected CPU suite (220 passed, 2 skipped;
+  artifact 14562407176).
+- Physical CUDA/NCCL and multi-GPU acceptance remain unverified. Evidence:
+  `test_results/refactor_20261119/cnot-rust-goal-stage/GITHUB_STATUS.md`.
