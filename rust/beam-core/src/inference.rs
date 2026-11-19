@@ -148,7 +148,10 @@ pub fn probe_time_allowance(records: &[Vec<f64>], default: f64) -> Result<f64> {
         if row.is_empty() {
             continue;
         }
-        if row.iter().any(|seconds| !seconds.is_finite() || *seconds <= 0.0) {
+        if row
+            .iter()
+            .any(|seconds| !seconds.is_finite() || *seconds <= 0.0)
+        {
             return Err(ContractError::Invalid("inference probe timing"));
         }
         let slowest = row.iter().copied().fold(f64::NEG_INFINITY, f64::max);
