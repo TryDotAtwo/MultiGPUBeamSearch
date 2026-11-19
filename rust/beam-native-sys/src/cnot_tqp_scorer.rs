@@ -594,14 +594,19 @@ mod tests {
     fn scorer_metadata_rejects_a_partial_registered_feature_contract() {
         for raw in [metadata_json(101, 102, 17), metadata_json(102, 101, 17)] {
             let error = CnotScorerMetadata::parse(&raw).unwrap_err();
-            assert_eq!(error.to_string(), "expected all 102 registered field inputs");
+            assert_eq!(
+                error.to_string(),
+                "expected all 102 registered field inputs"
+            );
         }
     }
 
     #[test]
     fn scorer_metadata_rejects_malformed_json() {
         let error = CnotScorerMetadata::parse("{").unwrap_err();
-        assert!(error.to_string().starts_with("CNOT scorer metadata is not valid JSON:"));
+        assert!(error
+            .to_string()
+            .starts_with("CNOT scorer metadata is not valid JSON:"));
     }
 
     #[test]
