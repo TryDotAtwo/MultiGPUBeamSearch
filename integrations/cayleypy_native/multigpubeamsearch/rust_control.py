@@ -262,12 +262,15 @@ def write_search_inputs(contract, run_dir):
     writer = getattr(native, "write_search_inputs", None)
     if not callable(writer):
         return False
-    request = {
-        "center": [str(value) for value in contract.center],
-        "start": [str(value) for value in contract.start],
-        "generators": [[str(value) for value in row] for row in contract.generators],
-        "generator_name_count": len(contract.generator_names),
-    }
+    try:
+        request = {
+            "center": [str(value) for value in contract.center],
+            "start": [str(value) for value in contract.start],
+            "generators": [[str(value) for value in row] for row in contract.generators],
+            "generator_name_count": len(contract.generator_names),
+        }
+    except AttributeError:
+        return False
     try:
         writer(json.dumps(request, allow_nan=False), str(run_dir))
     except (TypeError, ValueError, OverflowError) as error:
@@ -545,6 +548,5 @@ def tune_downstream(contract, model, runtime, options, devices, beam_width,
         raise NativeBackendError(str(error)) from error
     verify_prepared_model(model, contract)
     return result
-
 
 
