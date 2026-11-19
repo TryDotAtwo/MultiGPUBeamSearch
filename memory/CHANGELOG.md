@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-11-19 - Preserve Python inference selection while moving its owner to Rust
+
+- Added a `beam-core` implementation of the existing profile selection behavior, including the CPython-compatible deterministic bootstrap and rejection messages. The optional PyO3 adapter is used for ordinary `Measurement` records; older extensions and unusual Python values retain the Python fallback.
+- GitHub Actions [44554484032](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44554484032) passed formatting, scoped Rust checks, the PyO3 build and 217 CPU tests (2 skipped). NCCL probe syntax passed, but no physical multi-GPU collective ran. Full evidence: `test_results/refactor_20261119/rust-inference-selection/GITHUB_STATUS.md`.
+- This moves control/statistics ownership without changing the search algorithm, scores, precision, GPU stages or multi-GPU transport. Physical CUDA/NCCL acceptance remains unverified.
+
 ## 2026-11-19 - Align the Rust identity builder test with session reuse
 
 - The owner-reuse test now expects one identity build for the initial configuration and one after the model artifact changes. It checks that the second Rust-built identity carries the new model hash. Reusing an unchanged session does not rebuild this identity.
