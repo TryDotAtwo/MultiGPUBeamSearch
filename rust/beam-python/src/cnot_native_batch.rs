@@ -23,9 +23,7 @@ fn pack_route<'py>(
     moves: &Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyAny>> {
     if source_rank > u32::from(u16::MAX) {
-        return Err(PyValueError::new_err(
-            "CNOT source rank must fit uint16",
-        ));
+        return Err(PyValueError::new_err("CNOT source rank must fit uint16"));
     }
     let torch = py.import("torch")?;
     let dtype = moves.getattr("dtype")?;
@@ -42,10 +40,7 @@ fn pack_route<'py>(
         let valid = torch
             .call_method1("logical_and", (nonnegative, below_limit))?
             .call_method0("all")?;
-        torch.call_method1(
-            "_assert_async",
-            (valid, "CNOT move must fit uint16"),
-        )?;
+        torch.call_method1("_assert_async", (valid, "CNOT move must fit uint16"))?;
     }
     let moves = moves.call_method1("to", (&int64,))?;
     moves.call_method1("__or__", (i64::from(source_rank) << 16,))
