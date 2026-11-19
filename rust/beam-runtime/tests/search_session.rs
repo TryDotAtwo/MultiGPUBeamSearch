@@ -164,12 +164,17 @@ while not (directory/'stop').exists():
                     }),
                 )
                 .unwrap();
-            let persisted: serde_json::Value = serde_json::from_slice(
-                &fs::read(dir.join("native-outcome.json")).unwrap(),
-            )
-            .unwrap();
-            assert_eq!(persisted["metadata"]["preparation_result_marker"], "python-callback");
-            assert_eq!(persisted["metadata"]["persistent_session"]["request_count"], 1);
+            let persisted: serde_json::Value =
+                serde_json::from_slice(&fs::read(dir.join("native-outcome.json")).unwrap())
+                    .unwrap();
+            assert_eq!(
+                persisted["metadata"]["preparation_result_marker"],
+                "python-callback"
+            );
+            assert_eq!(
+                persisted["metadata"]["persistent_session"]["request_count"],
+                1
+            );
         }
         previous = session.pids();
         assert_eq!(
