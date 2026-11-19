@@ -834,6 +834,7 @@ def test_rust_compatibility_backend_bypasses_cnot_python_expand(monkeypatch, mod
         pytest.fail("typed Rust expansion must not call cnot._expand")
 
     monkeypatch.setattr(cnot, "_expand", forbidden)
+    monkeypatch.setattr(cnot, "_scores", forbidden)
     monkeypatch.setattr(cnot, "_native_stages_runner", lambda: None)
     result = cnot.search_cnot(
         cnot.pack_rows(rows), WireFixture(9), engine="rust", **options
@@ -857,6 +858,7 @@ def test_rust_compatibility_backend_bypasses_cnot_python_distinct(monkeypatch, m
         pytest.fail("typed Rust deduplication must not call cnot._distinct")
 
     monkeypatch.setattr(cnot, "_distinct", forbidden)
+    monkeypatch.setattr(cnot, "_scores", forbidden)
     monkeypatch.setattr(cnot, "_native_stages_runner", lambda: None)
     result = cnot.search_cnot(
         cnot.pack_rows(rows), WireFixture(9), engine="rust", **options

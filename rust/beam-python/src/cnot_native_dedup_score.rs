@@ -1,7 +1,7 @@
 //! CNOT distinct-state and scoring dispatch for the Rust-owned controller.
 //!
 //! Existing state identity, CUDA operators, scorer API and tensor ownership are
-//! unchanged. CPU and older CUDA libraries keep the established Python helper.
+//! unchanged. The Rust tensor batch path handles CPU and older CUDA libraries.
 use pyo3::{
     exceptions::PyRuntimeError,
     prelude::*,
@@ -32,9 +32,15 @@ pub(crate) fn deduplicate_score<'py>(
         None => false,
     };
     if !has_native_distinct {
-        return py.import("multigpubeamsearch.cnot")?.call_method1(
-            "_distinct",
-            (&world, &incoming, &closed, &n, &words, &scorer),
+        return crate::cnot_native_batch::distinct(
+            py,
+            &world,
+            &incoming,
+            &closed,
+            n.extract()?,
+            words.extract()?,
+            &scorer,
+            None,
         );
     }
 
@@ -52,9 +58,11 @@ pub(crate) fn deduplicate_score<'py>(
     let child_count = children.len()?;
     let values = if child_count != 0 {
         let raw = scorer.call_method1("child_values", (&children,))?;
-        let shape = PyTuple::new(py, [child_count])?;
-        py.import("multigpubeamsearch.cnot")?
-            .call_method1("_scores", (raw, shape, world.getattr("device")?))?
+        let expected = [i64::try_from(child_count).map_err(|_| {
+            pyo3::exceptions::PyOverflowError::new_err("CNOT distinct count exceeds int64")
+        })?];
+        let device = world.getattr("device")?;
+        crate::cnot_native_batch::scores(py, raw, &expected, &device)?
     } else {
         let torch = py.import("torch")?;
         let kwargs = PyDict::new(py);
