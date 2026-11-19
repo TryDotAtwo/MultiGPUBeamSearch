@@ -384,10 +384,7 @@ impl Backend for PyStages<'_> {
                 let rank: u32 = world.getattr("rank")?.extract()?;
                 let edge = world.call_method1("longs", (vec![0_i64, 0, 0],))?;
                 if target == rank {
-                    edge.call_method1(
-                        "copy_",
-                        (records.bind(self.py).get_item(local_index)?,),
-                    )?;
+                    edge.call_method1("copy_", (records.bind(self.py).get_item(local_index)?,))?;
                 }
                 world.call_method1("broadcast", (&edge, target))?;
                 let row: Vec<i64> = edge.call_method0("tolist")?.extract()?;
