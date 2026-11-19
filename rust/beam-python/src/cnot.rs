@@ -504,10 +504,9 @@ impl Backend for PyStages<'_> {
                 let values = self.stages.getattr("values")?;
                 let meta = self.stages.getattr("meta")?;
                 let word_keys = meta.call_method1("select", (1, 1))?;
-                let result = crate::cnot_native_selection::select(
-                    self.py, world, values, word_keys, width,
-                )?
-                .into_bound(self.py);
+                let result =
+                    crate::cnot_native_selection::select(self.py, world, values, word_keys, width)?
+                        .into_bound(self.py);
                 let result = result.downcast::<PyTuple>()?;
                 if result.len() != 3 {
                     return Err(PyRuntimeError::new_err(
