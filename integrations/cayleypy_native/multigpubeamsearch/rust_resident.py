@@ -27,6 +27,8 @@ class RustResidentWorkers:
         self._owner = None
         self.sequence = 0
         self._terminal = None
+        self._outcome = None
+        self._metadata_owned = False
         self._last_reused = False
         self._identity = None
         self._launch = None
@@ -68,6 +70,8 @@ class RustResidentWorkers:
         self._identity = json.dumps(identity)
         self._launch = json.dumps(launch)
         self._terminal = None
+        self._outcome = None
+        self._metadata_owned = False
         self._last_reused = False
 
     @property
@@ -98,8 +102,22 @@ class RustResidentWorkers:
         remember(identity)
         return True
 
+    def remember_preparation_result(self, identity, metadata):
+        """Let capable Rust owners retain the full prepared result metadata."""
+        remember = getattr(self._owner, 'remember_preparation_result', None)
+        if not callable(remember):
+            return False
+        if type(metadata) is not dict:
+            raise NativeBackendError('Rust resident preparation metadata must be an object')
+        remember(identity, json.dumps(metadata))
+        self._metadata_owned = True
+        self._outcome = None
+        self._terminal = None
+        return True
+
     def submit(self, start, directory, *, timeout):
         self._terminal = None
+        self._outcome = None
         self._last_reused = False
         try:
             result = json.loads(self._owner.run(self._identity, self._launch, list(start),
@@ -126,6 +144,7 @@ class RustResidentWorkers:
             terminal = {name: metadata[name] for name in TERMINAL_FIELDS if name in metadata}
             self._terminal = (Path(directory).resolve(),
                               (None if path is None else tuple(path), width, terminal))
+            self._outcome = (Path(directory).resolve(), result)
             self.sequence = sequence
             self._last_reused = reused
             return elapsed
@@ -141,7 +160,22 @@ class RustResidentWorkers:
         self._terminal = None
         return terminal
 
+    def take_outcome(self, directory):
+        """Return one full Rust-owned outcome for the matching run directory."""
+        if not self._metadata_owned:
+            return None
+        if self._outcome is None:
+            raise NativeBackendError('Rust resident outcome is unavailable or already consumed')
+        expected, outcome = self._outcome
+        if Path(directory).resolve() != expected:
+            raise NativeBackendError('Rust resident outcome belongs to a different directory')
+        self._outcome = None
+        self._terminal = None
+        return outcome
+
     def close(self):
         self._terminal = None
+        self._outcome = None
+        self._metadata_owned = False
         self._owner.close()
 

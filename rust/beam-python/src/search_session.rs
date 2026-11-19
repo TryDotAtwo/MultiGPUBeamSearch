@@ -92,6 +92,16 @@ impl SearchSession {
         let identity: PreparationIdentity = serde_json::from_str(identity).map_err(error)?;
         inner.remember_preparation(&identity).map_err(error)
     }
+    fn remember_preparation_result(&self, identity: &str, metadata: &str) -> PyResult<()> {
+        let identity: PreparationIdentity = serde_json::from_str(identity).map_err(error)?;
+        let metadata: serde_json::Value = serde_json::from_str(metadata).map_err(error)?;
+        let mut inner = self.inner.try_lock().map_err(|_| {
+            PyRuntimeError::new_err("concurrent native session searches are unsupported")
+        })?;
+        inner
+            .remember_preparation_result(&identity, &metadata)
+            .map_err(error)
+    }
     #[getter]
     fn pids(&self) -> PyResult<Vec<u32>> {
         Ok(self.inner.lock().map_err(error)?.pids())

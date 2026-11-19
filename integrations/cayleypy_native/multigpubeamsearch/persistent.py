@@ -80,6 +80,7 @@ class NativeSession:
         self._workers = None
         self._identity = None
         self._metadata = None
+        self._rust_metadata_owned = False
         self._token = None
         self._lock = threading.Lock()
         self._operation_lock = threading.Lock()
@@ -181,6 +182,7 @@ class NativeSession:
         self._workers = None
         self._identity = None
         self._metadata = None
+        self._rust_metadata_owned = False
 
     def close(self):
         self._check_owner()
@@ -345,6 +347,7 @@ class NativeSession:
                 and self._workers is not None
                 and callable(getattr(self._workers, 'configure', None)))
             if identity_changed and not preserve_rust_owner:self._release()
+            rust_outcome_owned = False
             if self._workers is None or identity_changed:
                 if (self.model_snapshot_cache is not None
                         and self.model_snapshot_cache.needs_fresh_worker_snapshot(model, contract)):
@@ -375,30 +378,69 @@ class NativeSession:
                     if preserve_rust_owner and not launch_started:
                         self._release()
                     else:
+                        result_recorder = getattr(self._workers, 'remember_preparation_result', None)
+                        rust_owns_metadata = (self._engine == 'rust'
+                            and callable(result_recorder)
+                            and result_recorder(identity_key, outcome.metadata))
+                        self._rust_metadata_owned = rust_owns_metadata
                         recorder = getattr(self._workers, 'remember_preparation', None)
-                        rust_owns_identity = (self._engine == 'rust' and callable(recorder)
-                                              and recorder(identity_key))
+                        rust_owns_identity = rust_owns_metadata or (
+                            self._engine == 'rust' and callable(recorder)
+                            and recorder(identity_key))
                         self._identity = None if rust_owns_identity else identity
-                        self._metadata=deepcopy(outcome.metadata)
+                        self._metadata = (None if rust_owns_metadata
+                                          else deepcopy(outcome.metadata))
                 reused=bool(self._workers is not None
                     and getattr(self._workers, '_last_reused', False))
             else:
                 directory=Path(run_dir)
                 elapsed=self._workers.submit(contract.start,directory,timeout=options.timeout_seconds)
-                path,effective,terminal=self.terminal_result(directory/'native.log',contract,max_steps=max_steps)
-                if effective != self._metadata['requested_beam_width']:
-                    raise NativeBackendError('resident effective beam changed')
-                metadata=deepcopy(self._metadata)
-                from .rust_resident import TERMINAL_FIELDS
-                for name in TERMINAL_FIELDS:
-                    metadata.pop(name, None)
-                metadata.update(terminal,log_path=str(directory/'native.log'),replay_valid=path is not None)
-                metadata['profile'].pop('observed_saturated_depths',None)
-                metadata['profile']['resident_profile_reused']=True
-                metadata['profile']['original_calibration_wall_seconds']=metadata['profile'].get('calibration_total_wall_seconds')
-                metadata['profile']['calibration_total_wall_seconds']=0.0
-                outcome=NativeOutcome(path,elapsed,effective,directory,metadata)
+                rust_outcome_owned = self._engine == 'rust' and self._rust_metadata_owned
+                if rust_outcome_owned:
+                    take_outcome = getattr(self._workers, 'take_outcome', None)
+                    if not callable(take_outcome):
+                        raise NativeBackendError('Rust-owned result metadata is unavailable')
+                    result = take_outcome(directory)
+                    outcome = NativeOutcome(result['path'], result['elapsed_seconds'],
+                        result['effective_beam_width'], directory, result['metadata'])
+                    if outcome.effective_beam_width != beam_width:
+                        raise NativeBackendError('resident effective beam changed')
+                else:
+                    path,effective,terminal=self.terminal_result(directory/'native.log',contract,max_steps=max_steps)
+                    if effective != self._metadata['requested_beam_width']:
+                        raise NativeBackendError('resident effective beam changed')
+                    metadata=deepcopy(self._metadata)
+                    from .rust_resident import TERMINAL_FIELDS
+                    for name in TERMINAL_FIELDS:
+                        metadata.pop(name, None)
+                    metadata.update(terminal,log_path=str(directory/'native.log'),replay_valid=path is not None)
+                    metadata['profile'].pop('observed_saturated_depths',None)
+                    metadata['profile']['resident_profile_reused']=True
+                    metadata['profile']['original_calibration_wall_seconds']=metadata['profile'].get('calibration_total_wall_seconds')
+                    metadata['profile']['calibration_total_wall_seconds']=0.0
+                    outcome=NativeOutcome(path,elapsed,effective,directory,metadata)
                 reused=True
+            # Distributed reconstruction prints the solved path only on its
+            # controller. Unsolved searches print one record on every rank.
+            # ResidentWorkers separately requires a completion receipt from all ranks.
+            expected_records = 1 if outcome.path is not None else len(devices)
+            if self._workers is not None and outcome.metadata.get('terminal_records') != expected_records:
+                raise NativeBackendError('resident search has unexpected terminal record count')
+            persistent_metadata = dict(reused=reused,
+                worker_pids=[] if self._workers is None else self._workers.pids,
+                request_count=0 if self._workers is None else self._workers.sequence)
+            if rust_outcome_owned:
+                owner_metadata = outcome.metadata.get('persistent_session')
+                if (type(owner_metadata) is not dict
+                        or owner_metadata.get('reused') is not reused
+                        or owner_metadata.get('request_count') != persistent_metadata['request_count']):
+                    raise NativeBackendError('Rust resident session metadata is inconsistent')
+            else:
+                outcome.metadata['persistent_session'] = persistent_metadata
+            if not rust_outcome_owned:
+                Path(run_dir,'native-outcome.json').write_text(json.dumps(dict(path=outcome.path,
+                    elapsed_seconds=outcome.elapsed_seconds,effective_beam_width=outcome.effective_beam_width,
+                    metadata=outcome.metadata),indent=2),encoding='utf-8')
             # Distributed reconstruction prints the solved path only on its
             # controller. Unsolved searches print one record on every rank.
             # ResidentWorkers separately requires a completion receipt from all ranks.

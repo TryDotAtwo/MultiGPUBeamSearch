@@ -199,6 +199,22 @@ impl SearchSession {
         self.preparation_identity = Some(identity.clone());
         Ok(())
     }
+    pub fn remember_preparation_result(
+        &mut self,
+        identity: &PreparationIdentity,
+        metadata: &Value,
+    ) -> Result<()> {
+        self.check_owner()?;
+        if self.closed || self.cancellation.load(Ordering::Acquire) {
+            return Err(Error::Message("native session cancelled or closed".into()));
+        }
+        if !metadata.is_object() {
+            return Err(Error::Message("invalid prepared session metadata".into()));
+        }
+        self.preparation_identity = Some(identity.clone());
+        self.metadata = Some(metadata.clone());
+        Ok(())
+    }
     fn check_owner(&self) -> Result<()> {
         if self.owner != std::process::id() {
             return Err(Error::Message(
