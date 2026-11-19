@@ -13,7 +13,10 @@ The Rust-owned `NativeSession` path now asks the PyO3 extension to construct and
 
 ## GREEN verification
 
-Pending hosted Actions after implementation.
+- Rust public owner CPU: [run 44518629892](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44518629892), completed successfully.
+- CNOT CPU compatibility: [run 44518629802](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44518629802), completed successfully.
+- Permutation depth control CPU: [run 44518629764](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44518629764), completed successfully.
+- These are hosted Actions status results; full logs remain on GitHub and were not downloaded.
 
 ## Limits
 
