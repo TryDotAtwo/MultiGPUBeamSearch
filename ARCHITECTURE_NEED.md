@@ -1,5 +1,22 @@
 # Конфиг
 
+## Rust-владелец CNOT redistribution, 2026-11-20
+
+Для типизированного `PyCnotSearchInput` compatibility adapter теперь
+выполняет orchestration стадии redistribution в Rust. При наличии полного
+набора существующих CUDA hooks используются `winner_packet`,
+`sort_received` и `frontier_views`; иначе Rust собирает тот же пакет
+Torch-операциями и сортирует принятые записи прежним ключом. Обмен вызывает
+существующий `cnot_native_exchange::exchange`. Python callback остаётся для
+Python-only input и старых stage providers.
+
+Сохранены состав и порядок wire-записей, обновление `closed` до обмена,
+порядок collectives, статистика, поля audit, правило пустого локального
+beam и разбиение history/parents/lex. Алгоритм поиска, транспорт и score
+не менялись; rank-wide error negotiation не добавлялся. Аппаратный CUDA/NCCL
+multi-GPU путь этой CPU проверкой не подтверждён.
+Результат: `test_results/refactor_20261119/cnot-rust-redistribute/GITHUB_STATUS.md`.
+
 ## Rust-владелец CNOT deduplicate/score, 2026-11-19
 
 Для типизированного `PyCnotSearchInput` Rust compatibility adapter теперь

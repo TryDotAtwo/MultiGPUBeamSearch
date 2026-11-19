@@ -2442,3 +2442,27 @@ Preserved 26 checkouts and their source/index overlays; verified restoration of 
   passed the same CPU/PyO3 checks (223 passed, 2 skipped; artifact 14568081625).
 - Physical CUDA/NCCL and multi-GPU acceptance remain unverified. Evidence:
   `test_results/refactor_20261119/cnot-rust-verify/GITHUB_STATUS.md`.
+
+## 2026-11-20 - Rust владеет CNOT compatibility redistribution
+
+- Для типизированного `PyCnotSearchInput` Rust adapter перенял сборку winner
+  packet, вызов существующего обмена, сортировку received rows, статистику,
+  audit и подготовку следующего frontier. Опциональные CUDA hooks и Torch
+  fallback используют прежний формат данных; старые stage providers оставляют
+  Python callback.
+- Алгоритм, transport, collective order, precision и scoring не менялись.
+  Новый rank-wide error wrapper не добавлен.
+- RED: hosted run
+  [44613780854](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44613780854)
+  упал только на запрещённом Python callback для qhat/proposal
+  (2 failed, 228 passed, 2 skipped; artifact 14574401283,
+  SHA256 `b193d6bba0fd599faef7afaedcac9840...`).
+- GREEN: hosted branch run
+  [44615705900](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44615705900)
+  и последующая проверка `main`
+  [44616358356](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44616358356)
+  прошли Rust checks, PyO3 build и CPU suite (230 passed, 2 skipped).
+  Main artifact 14576135151, SHA256
+  `e761f9675a1fd90a7c46333635c4a7ed...`.
+- Физическая проверка CUDA/NCCL и нескольких GPU остаётся невыполненной.
+  Evidence: `test_results/refactor_20261119/cnot-rust-redistribute/GITHUB_STATUS.md`.
