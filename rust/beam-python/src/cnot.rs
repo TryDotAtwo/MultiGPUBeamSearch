@@ -490,6 +490,36 @@ impl Backend for PyStages<'_> {
         Ok(())
     }
     fn select(&mut self, width: u64) -> PyResult<()> {
+        if self.stages.hasattr("input_matrix")? {
+            let input = self.stages.getattr("input_matrix")?;
+            if input.is_instance_of::<PyCnotSearchInput>()
+                && self.stages.hasattr("world")?
+                && self.stages.hasattr("values")?
+                && self.stages.hasattr("meta")?
+                && self.stages.hasattr("ranks")?
+                && self.stages.hasattr("local")?
+                && self.stages.hasattr("new_lex")?
+            {
+                let world = self.stages.getattr("world")?;
+                let values = self.stages.getattr("values")?;
+                let meta = self.stages.getattr("meta")?;
+                let word_keys = meta.call_method1("select", (1, 1))?;
+                let result = crate::cnot_native_selection::select(
+                    self.py, world, values, word_keys, width,
+                )?
+                .into_bound(self.py);
+                let result = result.downcast::<PyTuple>()?;
+                if result.len() != 3 {
+                    return Err(PyRuntimeError::new_err(
+                        "CNOT selection returned an invalid adapter result",
+                    ));
+                }
+                self.stages.setattr("ranks", result.get_item(0)?)?;
+                self.stages.setattr("local", result.get_item(1)?)?;
+                self.stages.setattr("new_lex", result.get_item(2)?)?;
+                return Ok(());
+            }
+        }
         if !self.stages.hasattr("prepare_selection")? {
             // The previous Python adapter remains usable with a newer module.
             self.stages.call_method1("select", (width,))?;
