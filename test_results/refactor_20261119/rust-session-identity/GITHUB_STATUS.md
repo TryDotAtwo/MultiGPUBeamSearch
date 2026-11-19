@@ -16,3 +16,9 @@ Full logs are retained remotely in [artifact 14489551078](https://github.com/Try
 Rust now owns the Rust-engine prepared-session cache key and equality decision. The Python adapter still builds the existing descriptor; old PyO3 extensions and the explicit Python engine keep the Python comparison. Search stages, result format, rank topology, CUDA calls, and NCCL calls did not change.
 
 These hosted checks do not establish physical CUDA/NCCL or multi-GPU search acceptance. The Vast status check [44427129602](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44427129602) confirmed the existing `VAST_API_KEY` secret was available and the instance was stopped; no GPU work was started.
+
+## Corrective recovery, 2026-11-19
+
+The earlier run 44436290093 built and ran the replacement one-test `search_session.rs` file, so it did not exercise the original session regression suite. This recovery restores the original suite from Git history and places the preparation-identity regression in `session_preparation_identity.rs`. The CNOT CPU workflow now runs both Rust test binaries; the corrective hosted result will be recorded here.
+
+The full architecture document is also restored from the parent snapshot of commit `71fc8150f2aaa4935f9627ba097cb1921ec48cd4`; later Rust/CNOT updates remain in a dated addendum. The changelog and workflow files are restored from their complete local source versions. Physical CUDA/NCCL multi-GPU runtime remains unverified.

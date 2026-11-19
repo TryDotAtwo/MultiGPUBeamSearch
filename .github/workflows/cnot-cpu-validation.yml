@@ -17,6 +17,7 @@ on:
       - integrations/cayleypy_native/multigpubeamsearch/backend.py
       - integrations/cayleypy_native/multigpubeamsearch/dispatch.py
       - integrations/cayleypy_native/tests/test_search_controls.py
+      - integrations/cayleypy_native/tests/test_rust_persistent_search.py
       - integrations/cayleypy_native/tests/test_cnot_search.py
       - integrations/cayleypy_native/tests/test_cnot_rust_controller.py
       - integrations/cayleypy_native/tests/test_cnot_control_collectives.py
@@ -79,12 +80,14 @@ jobs:
               rust/beam-native-sys/src/cnot_tqp_scorer.rs \
               rust/beam-python/src/search_session.rs \
               rust/beam-python/src/cnot_stream5.rs \
-              rust/beam-runtime/tests/search_session.rs
+              rust/beam-runtime/tests/search_session.rs \
+              rust/beam-runtime/tests/session_preparation_identity.rs
             rustfmt --check --edition 2021 rust/beam-core/src/cnot.rs rust/beam-core/tests/cnot.rs
             cargo test --locked -p beam-core --test cnot
             cargo test --locked -p beam-core --test search
             cargo test --locked -p beam-runtime cnot_search
             cargo test --locked -p beam-runtime --test search_session
+            cargo test --locked -p beam-runtime --test session_preparation_identity
             cargo test --locked -p beam-native-sys cnot_tqp_scorer
             cargo check --locked -p beam-python
           } 2>&1 | tee test_results/refactor_20261119/cnot-compat-root-goal/cnot-rust-cpu.log
@@ -128,5 +131,3 @@ jobs:
           path: test_results/refactor_20261119/cnot-compat-root-goal
           if-no-files-found: ignore
           retention-days: 7
-
-
