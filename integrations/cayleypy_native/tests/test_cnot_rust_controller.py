@@ -794,3 +794,27 @@ def test_rust_compatibility_backend_owns_cnot_redistribute_dispatch(monkeypatch,
     assert asdict(result) == asdict(reference)
     assert result.status == "solved"
     assert cnot.replay_cnot(4, result.gates) == rows
+
+
+@pytest.mark.parametrize("mode", ["qhat", "proposal"])
+def test_rust_compatibility_backend_owns_cnot_selection_dispatch(monkeypatch, mode):
+    require_controller()
+    from multigpubeamsearch.cnot_rust_stages import CnotStages
+
+    rows, scorer = (8, 4, 2, 1), WireFixture(9)
+    options = dict(width=5, shortlist=9, max_depth=4, mode=mode, audit=True)
+    reference = cnot.search_cnot(cnot.pack_rows(rows), scorer, engine="python", **options)
+    assert reference.layers and any(layer["distinct"] > options["width"] for layer in reference.layers)
+
+    def forbidden(*_args, **_kwargs):
+        pytest.fail("Rust compatibility backend must dispatch selection directly")
+
+    monkeypatch.setattr(CnotStages, "prepare_selection", forbidden)
+    monkeypatch.setattr(CnotStages, "commit_selection", forbidden)
+    monkeypatch.setattr(cnot, "_native_stages_runner", lambda: None)
+    result = cnot.search_cnot(cnot.pack_rows(rows), scorer, engine="rust", **options)
+    assert asdict(result) == asdict(reference)
+    assert verify_layers(
+        rows, scorer, mode, options["width"], options["shortlist"],
+        result.layers, torch.device("cpu"),
+    )
