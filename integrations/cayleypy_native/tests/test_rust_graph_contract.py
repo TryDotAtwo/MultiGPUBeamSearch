@@ -111,3 +111,40 @@ def test_cayleypy_contract_is_accepted_and_stale_contents_are_rejected(center, t
 def test_rust_graph_contract_rejects_invalid_state_and_generator(source, start, message):
     with pytest.raises(NativeUnavailable, match=message):
         GraphContract.from_graph(source, start)
+
+
+def _twelve_move_graph():
+    definition = SimpleNamespace(
+        is_permutation_group=lambda: True,
+        state_size=2,
+        central_state=[0, 1],
+        generators_permutations=[[1, 0] for _ in range(12)],
+        generator_names=[f"move-{index}" for index in range(12)],
+    )
+    return SimpleNamespace(definition=definition)
+
+
+def test_rust_writer_emits_legacy_runner_files_in_move_order(tmp_path):
+    contract = GraphContract.from_graph(_twelve_move_graph(), [1, 0])
+
+    assert rust_control.write_search_inputs(contract, tmp_path) is True
+    expected = (
+        '{"central_state": [0, 1], "generators": {'
+        '"m0": [1, 0], "m1": [1, 0], "m2": [1, 0], "m3": [1, 0], '
+        '"m4": [1, 0], "m5": [1, 0], "m6": [1, 0], "m7": [1, 0], '
+        '"m8": [1, 0], "m9": [1, 0], "m10": [1, 0], "m11": [1, 0]}}\n'
+    )
+    assert (tmp_path / "puzzle_info.json").read_text(encoding="utf-8") == expected
+    assert (tmp_path / "test.csv").read_text(encoding="utf-8") == (
+        'initial_state_id,initial_state\n0,"1,0"\n'
+    )
+
+
+def test_rust_writer_allows_python_fallback_for_older_extensions(monkeypatch, tmp_path):
+    contract = GraphContract.from_graph(_twelve_move_graph(), [1, 0])
+    monkeypatch.setattr(rust_control, "extension", lambda: SimpleNamespace())
+
+    assert rust_control.write_search_inputs(contract, tmp_path) is False
+    assert not (tmp_path / "puzzle_info.json").exists()
+    assert not (tmp_path / "test.csv").exists()
+

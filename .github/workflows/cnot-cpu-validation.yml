@@ -88,13 +88,15 @@ jobs:
               rust/beam-python/src/search_session.rs \
               rust/beam-python/src/cnot_stream5.rs \
               rust/beam-runtime/tests/search_session.rs \
-              rust/beam-runtime/tests/session_preparation_identity.rs
+              rust/beam-runtime/tests/session_preparation_identity.rs\
+              rust/beam-runtime/tests/search_inputs.rs\
             rustfmt --check --edition 2021 rust/beam-core/src/inference.rs rust/beam-core/src/cnot.rs rust/beam-core/tests/cnot.rs
             cargo test --locked -p beam-core --test cnot
             cargo test --locked -p beam-core --test search
             cargo test --locked -p beam-runtime cnot_search
             cargo test --locked -p beam-runtime --test search_session
             cargo test --locked -p beam-runtime --test session_preparation_identity
+            cargo test --locked -p beam-runtime --test search_inputs
             cargo test --locked -p beam-native-sys cnot_tqp_scorer
             cargo check --locked -p beam-python
           } 2>&1 | tee test_results/refactor_20261120/cnot-rust-domain-fallback/cnot-rust-cpu.log
@@ -153,3 +155,4 @@ jobs:
           path: test_results/refactor_20261120/cnot-rust-domain-fallback
           if-no-files-found: ignore
           retention-days: 7
+
