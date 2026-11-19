@@ -151,6 +151,51 @@ pub(crate) fn checked_v2<'py>(
     checked_impl(py, world, stage, result, true)
 }
 
+
+/// Preserve the rank-wide checker negotiation used by Python `World.checked`,
+/// then coordinate an operation result without calling a Python stage callback.
+pub(crate) fn checked_compat<'py>(
+    py: Python<'py>,
+    world: &Bound<'py, PyAny>,
+    stage: &str,
+    result: PyResult<Bound<'py, PyAny>>,
+) -> PyResult<Bound<'py, PyAny>> {
+    let size: usize = world.getattr("size")?.extract()?;
+    if size == 1 {
+        return result;
+    }
+
+    let mut use_v2 = false;
+    let selected = world.getattr("_checked_error_gather_v2")?;
+    if selected.is_none() {
+        let extension = py
+            .import("multigpubeamsearch.rust_control")?
+            .call_method0("extension")?;
+        let builtins = py.import("builtins")?;
+        let checker = builtins
+            .getattr("getattr")?
+            .call1((extension, "run_cnot_native_checked_v2", py.None()))?;
+        let callable = builtins.getattr("callable")?.call1((&checker,))?;
+        let supported: bool = world
+            .call_method1("all_ranks_support", (&callable,))?
+            .extract()?;
+        if supported {
+            world.setattr("_checked_error_gather_v2", &checker)?;
+            use_v2 = true;
+        } else {
+            world.setattr("_checked_error_gather_v2", false)?;
+        }
+    } else {
+        use_v2 = selected.is_callable();
+    }
+
+    if use_v2 {
+        checked_v2(py, world, stage, result)
+    } else {
+        checked(py, world, stage, result)
+    }
+}
+
 #[pyfunction]
 fn run_cnot_native_checked<'py>(
     py: Python<'py>,

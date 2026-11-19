@@ -74,6 +74,7 @@ jobs:
               rust/beam-core/src/search.rs \
               rust/beam-python/src/configuration.rs \
               rust/beam-python/src/cnot.rs \
+              rust/beam-python/src/cnot_native_checked.rs \
               rust/beam-python/src/cnot_tqp_scorer.rs \
               rust/beam-python/src/cnot_native_batch.rs \
               rust/beam-python/src/cnot_native_exchange.rs \

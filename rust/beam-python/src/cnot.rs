@@ -310,6 +310,61 @@ impl Backend for PyStages<'_> {
         self.stages.call_method0("root_is_goal")?.extract()
     }
     fn initialize(&mut self) -> PyResult<()> {
+        if self.stages.hasattr("input_matrix")? {
+            let input = self.stages.getattr("input_matrix")?;
+            if input.is_instance_of::<PyCnotSearchInput>()
+                && self.stages.hasattr("world")?
+                && self.stages.hasattr("root")?
+            {
+                let world = self.stages.getattr("world")?;
+                if world.hasattr("_checked_error_gather_v2")?
+                    && world.hasattr("all_ranks_support")?
+                {
+                    let rank: u32 = world.getattr("rank")?.extract()?;
+                    let root = self.stages.getattr("root")?;
+                    let parents = if rank == 0 {
+                        root.clone()
+                    } else {
+                        let empty = self
+                            .py
+                            .import("builtins")?
+                            .getattr("slice")?
+                            .call1((self.py.None(), 0))?;
+                        root.get_item(empty)?
+                    };
+                    self.stages.setattr("parents", parents)?;
+                    let initial = if rank == 0 { vec![0_i64] } else { Vec::new() };
+                    let lex = world.call_method1("longs", (initial,))?;
+                    self.stages.setattr("lex", lex)?;
+                    let owner_result = (|| {
+                        let native = self.py.import("multigpubeamsearch.cnot_native")?;
+                        let size = world.getattr("size")?;
+                        native
+                            .call_method1("cnot_owners", (&root, size))?
+                            .call_method0("item")
+                    })();
+                    let owner: u32 = crate::cnot_native_checked::checked_compat(
+                        self.py,
+                        &world,
+                        "initialize CNOT domain",
+                        owner_result,
+                    )?
+                    .extract()?;
+                    let closed = if owner == rank {
+                        root
+                    } else {
+                        let empty = self
+                            .py
+                            .import("builtins")?
+                            .getattr("slice")?
+                            .call1((self.py.None(), 0))?;
+                        root.get_item(empty)?
+                    };
+                    self.stages.setattr("closed", closed)?;
+                    return Ok(());
+                }
+            }
+        }
         self.stages.call_method0("initialize")?;
         Ok(())
     }
