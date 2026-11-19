@@ -266,6 +266,27 @@ def test_rust_compatibility_backend_owns_cnot_construction_verification_dispatch
     assert cnot.replay_cnot(4, result.gates) == rows
 
 
+def test_rust_compatibility_backend_owns_cnot_initialization_dispatch(monkeypatch):
+    require_controller()
+    from multigpubeamsearch.cnot_rust_stages import CnotStages
+
+    def forbidden(*_args, **_kwargs):
+        pytest.fail(
+            "Rust compatibility backend must initialize the typed CNOT stage directly"
+        )
+
+    monkeypatch.setattr(CnotStages, "initialize", forbidden)
+    monkeypatch.setattr(cnot, "_native_stages_runner", lambda: None)
+    rows = cnot.replay_cnot(4, (0, 1))
+    result = cnot.search_cnot(
+        cnot.pack_rows(rows), WireFixture(9), width=12, shortlist=12, max_depth=2,
+        validation="auto", engine="rust",
+    )
+    assert result.status == "solved"
+    assert len(result.gates) == 2
+    assert cnot.replay_cnot(4, result.gates) == rows
+
+
 
 def test_rust_top_level_controller_preserves_compatibility_stage_fallback():
     require_controller()
