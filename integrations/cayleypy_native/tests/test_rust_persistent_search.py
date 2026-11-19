@@ -64,6 +64,46 @@ def test_compiled_rust_preparation_identity_builder_round_trips_fields():
     }
 
 
+def test_compiled_rust_session_identity_builder_round_trips_fields():
+    from multigpubeamsearch import rust_control
+    from multigpubeamsearch.errors import NativeUnavailable
+
+    try:
+        runtime = rust_control.extension()
+    except NativeUnavailable:
+        pytest.skip("Rust extension is not built in this CPU-only job")
+
+    build = getattr(runtime, "build_session_identity", None)
+    assert callable(build), "Rust session identity builder is missing"
+    runtime_build = {
+        "binary_sha256": "c" * 64,
+        "native_library_sha256": "d" * 64,
+        "rust_worker_sha256": "e" * 64,
+        "abi_version": 1,
+    }
+    options = {
+        "timeout_seconds": 300,
+        "python_session_identity": {"geometry": [2, 2, 1], "binding_scope": False},
+    }
+    result = build(
+        [0, 1], [[1, 0]], "a" * 64, "b" * 64, "mlp", [0, 1], 64, 4,
+        json.dumps(runtime_build), json.dumps(options), "0,1", "PCI_BUS_ID",
+    )
+    assert json.loads(result) == {
+        "graph": {"center": [0, 1], "generators": [[1, 0]]},
+        "graph_hash": "a" * 64,
+        "model_artifact_hash": "b" * 64,
+        "model_backend": "mlp",
+        "devices": [0, 1],
+        "beam_width": 64,
+        "max_steps": 4,
+        "runtime_build": runtime_build,
+        "options": options,
+        "cuda_visible_devices": "0,1",
+        "cuda_device_order": "PCI_BUS_ID",
+    }
+
+
 def test_rust_session_rejects_stale_terminal_protocol_before_native_build(tmp_path, monkeypatch):
     from multigpubeamsearch import native_library, rust_control
     from multigpubeamsearch.errors import NativeUnavailable
@@ -83,6 +123,7 @@ def test_rust_session_reuses_and_releases_rank_owner(tmp_path, monkeypatch, worl
     from multigpubeamsearch import models, native_library, rust_control
 
     calls, owners, identity_builds = [], [], []
+    session_identity_builds = []
     monkeypatch.setattr(models, "verify_prepared_model", lambda *args: None)
     worker = tmp_path / "beam-runner"
     library = tmp_path / "libbeam_native.so"
@@ -183,9 +224,24 @@ def test_rust_session_reuses_and_releases_rank_owner(tmp_path, monkeypatch, worl
             identity["runtime_build"] = json.loads(identity["runtime_build"])
         return json.dumps(identity, sort_keys=True)
 
+    def build_session_identity(*values):
+        session_identity_builds.append(values)
+        names = (
+            "center", "generators", "graph_hash", "model_artifact_hash", "model_backend",
+            "devices", "beam_width", "max_steps", "runtime_build", "options",
+            "cuda_visible_devices", "cuda_device_order",
+        )
+        identity = dict(zip(names, values))
+        identity["runtime_build"] = json.loads(identity["runtime_build"])
+        identity["options"] = json.loads(identity["options"])
+        center = identity.pop("center")
+        generators = identity.pop("generators")
+        identity["graph"] = {"center": center, "generators": generators}
+        return json.dumps(identity, sort_keys=True)
     monkeypatch.setattr(rust_control, "extension", lambda: SimpleNamespace(
         SearchSession=Owner, SEARCH_TERMINAL_RESULT_VERSION=1,
-        build_preparation_identity=build_preparation_identity))
+        build_preparation_identity=build_preparation_identity,
+        build_session_identity=build_session_identity))
     contract = GraphContract(2, 2, ((1, 0),), ("swap",), (0, 1), (1, 0), "a" * 64)
     model = SimpleNamespace(artifact_hash="b" * 64, backend="mlp")
     runtime = SimpleNamespace(runner=tmp_path / "runner", architectures=(86,),
@@ -268,6 +324,10 @@ def test_rust_session_reuses_and_releases_rank_owner(tmp_path, monkeypatch, worl
         }
         assert owners[0].requests[2][0]["model_artifact_hash"] == "f" * 64
         assert len(identity_builds) == 3
+        assert len(session_identity_builds) == 3
+        assert session_identity_builds[0][0:6] == (
+            [0, 1], [[1, 0]], "a" * 64, "b" * 64, "mlp", list(range(world)))
+        assert json.loads(session_identity_builds[0][9])["python_session_identity"]["geometry"] == [2, 2, 1]
         assert identity_builds[0][0:4] == ("a" * 64, [2, 2, 1], [0, 1], [[1, 0]])
         assert identity_builds[0][4:8] == ("b" * 64, [], "mlp", list(range(world)))
         owners[0].fail = True
