@@ -2156,8 +2156,11 @@ Preserved 26 checkouts and their source/index overlays; verified restoration of 
   packed row and word; search order, CUDA operators, scorer calls, collectives,
   and result semantics are unchanged.
 - Test-first Actions run 44425293831 confirmed the intended failure at
-  `torch.equal` after 164 passed and 2 skipped; artifact 14482909047 contains
-  the remote logs. A preceding fixture-only run 44424830164 failed before the
-  assertion because its test used a nonexistent helper; the fixture was fixed
-  before the confirmed RED run. The post-change hosted verification is pending.
+  `torch.equal` (164 passed, 2 skipped); artifact 14482909047 contains its
+  remote logs. Run 44426096259 caught a singular negative test matrix; the
+  fixture was corrected to apply one valid CNOT before rerunning.
+- Green hosted run 44426467664 passed Rust formatting/checks, five packed CNOT
+  core tests, the Rust CNOT controller tests, PyO3 build, 165 Python tests
+  (2 skipped), and NCCL probe syntax. Artifact 14485300094 SHA-256:
+  `e11a6d4ccf9ee0203fee83c8a584606c7290ef1e056e5e4f7ed7e1632f9f1c20`.
 - Physical CUDA/NCCL and multi-GPU CNOT runtime remain unverified.
