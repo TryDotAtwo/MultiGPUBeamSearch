@@ -2537,5 +2537,10 @@ Preserved 26 checkouts and their source/index overlays; verified restoration of 
   прошёл Rust checks, PyO3 build, CNOT CPU suite (238 passed, 2 skipped) и
   NCCL probe syntax. Artifact 14579484694, SHA256
   9a420188f9dd7eed2c20bce4ae48585ecc9f639330e7190a7d7a3eaa7028db65.
+- Main GREEN
+  [44628217397](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44628217397)
+  passed the same checks at commit a82afbb172f1d7dbc68356dd632e9e65e8af3a42
+  (238 passed, 2 skipped). Main artifact 14580865888, SHA256
+  ea6be9a385dc4d5abb74d2de589adbb4318b39d6bdc8937997b73085465aacba.
 - Физическая CUDA/NCCL multi-GPU проверка не выполнялась. Полная запись:
   test_results/refactor_20261120/cnot-rust-route-dispatch/GITHUB_STATUS.md.
