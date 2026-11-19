@@ -173,9 +173,14 @@ def test_rust_native_root_goal_uses_typed_matrix_without_torch_equal(monkeypatch
     scorer = SimpleNamespace(metadata={})
 
     def forbidden(*_args, **_kwargs):
-        pytest.fail("Rust CNOT root admission must use the owned packed matrix")
+        pytest.fail(
+            "Rust CNOT root admission must use the owned packed matrix "
+            "without invoking the Python stage callback"
+        )
 
     monkeypatch.setattr(torch, "equal", forbidden)
+    from multigpubeamsearch.cnot_rust_stages import CnotStages
+    monkeypatch.setattr(CnotStages, "root_is_goal", forbidden)
     result = cnot.search_cnot(root, scorer, width=4, shortlist=6, max_depth=3,
                               validation="auto", engine="rust")
 
