@@ -2518,3 +2518,24 @@ Preserved 26 checkouts and their source/index overlays; verified restoration of 
 - CPU/reference implementations of low-level CNOT primitives still use Torch
   in `cnot_native.py`; this is not physical CUDA/NCCL acceptance.
   Evidence: `test_results/refactor_20261120/cnot-rust-domain-fallback/GITHUB_STATUS.md`.
+
+## 2026-11-20 - Rust владеет CNOT route packing
+
+- Typed CNOT expansion теперь проверяет source rank и тип move tensor в Rust,
+  применяет прежнюю проверку uint16 диапазона и формирует тот же int64 route
+  lane. Вызов cnot_native.pack_cnot_route удалён; алгоритм, metadata и
+  порядок поиска не менялись.
+- Первый Actions run 44625061344 не включал новый тест в явный список и не
+  считается RED-доказательством. После исправления workflow RED
+  [44625601360](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44625601360)
+  подтвердил оба ожидаемых callback failure (2 failed, 236 passed, 2 skipped;
+  artifact 14578637524, SHA256
+  c1b408b8c353228f22e2cc60a12f56ae3345a6acfe3fe5acfefe7881350c9d0e).
+- Промежуточный run 44626077505 остановился на rustfmt до сборки и тестов.
+  Branch GREEN
+  [44627095448](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44627095448)
+  прошёл Rust checks, PyO3 build, CNOT CPU suite (238 passed, 2 skipped) и
+  NCCL probe syntax. Artifact 14579484694, SHA256
+  9a420188f9dd7eed2c20bce4ae48585ecc9f639330e7190a7d7a3eaa7028db65.
+- Физическая CUDA/NCCL multi-GPU проверка не выполнялась. Полная запись:
+  test_results/refactor_20261120/cnot-rust-route-dispatch/GITHUB_STATUS.md.

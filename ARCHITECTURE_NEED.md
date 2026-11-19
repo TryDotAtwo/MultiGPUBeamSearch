@@ -9,12 +9,15 @@ Typed `PyCnotSearchInput` compatibility dispatch больше не вызыва�
 generation-order deduplication, score validation и формы выходных tensors.
 При наличии fused CUDA hooks они остаются приоритетным путём.
 
-Нижнеуровневые CNOT-примитивы `cnot_children`, `cnot_first_unseen`,
-`pack_cnot_route` и `cnot_owners` остаются существующим доменным интерфейсом:
-на CUDA он вызывает текущие C++/CUDA kernels; его CPU/reference реализация
-по-прежнему использует Torch. Перенос этих CPU primitives отдельно не завершён.
-Python-only engine и старые stage providers сохраняют fallback.
-Алгоритм поиска, scoring, precision, state layout и transport не менялись.
+cnot_children, cnot_first_unseen и cnot_owners остаются существующими
+доменными операциями: CUDA dispatch использует прежние C++/CUDA kernels,
+CPU/reference реализация — Torch. pack_cnot_route больше не вызывается из
+typed Rust compatibility path: Rust проверяет source rank, dtype и диапазон
+move ID, затем собирает тот же int64 route lane. Остальные CPU/reference
+primitives ещё требуют отдельного переноса.
+
+Python-only engine и старые stage providers сохраняют fallback. Алгоритм
+поиска, scoring, precision, state layout и transport не менялись.
 
 Hosted CPU suite сравнивает qhat/proposal с Python эталоном и запрещает
 высокоуровневые helper callbacks. Он не заменяет физическую CUDA/NCCL
