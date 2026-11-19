@@ -393,6 +393,37 @@ impl Backend for PyStages<'_> {
         Ok(result.map(|(slot, movement)| Goal { slot, movement }))
     }
     fn expand(&mut self, begin: u64, k: u32) -> PyResult<()> {
+        if self.stages.hasattr("input_matrix")? {
+            let input = self.stages.getattr("input_matrix")?;
+            if input.is_instance_of::<PyCnotSearchInput>()
+                && self.stages.hasattr("world")?
+                && self.stages.hasattr("parents")?
+                && self.stages.hasattr("lex")?
+                && self.stages.hasattr("scorer")?
+                && self.stages.hasattr("mode")?
+            {
+                let world = self.stages.getattr("world")?;
+                if world.hasattr("_checked_error_gather_v2")?
+                    && world.hasattr("all_ranks_support")?
+                {
+                    let expansion = crate::cnot_native_checked::checked_compat(
+                        self.py,
+                        &world,
+                        "rank parent actions and expand",
+                        crate::cnot_native_expand::expand(self.py, &self.stages, begin, k),
+                    )?;
+                    let expansion = expansion.downcast::<PyTuple>()?;
+                    if expansion.len() != 2 {
+                        return Err(PyValueError::new_err(
+                            "CNOT expansion returned an invalid adapter result",
+                        ));
+                    }
+                    self.stages.setattr("candidates", expansion.get_item(0)?)?;
+                    self.stages.setattr("owners", expansion.get_item(1)?)?;
+                    return Ok(());
+                }
+            }
+        }
         self.stages.call_method1("expand", (begin, k))?;
         Ok(())
     }

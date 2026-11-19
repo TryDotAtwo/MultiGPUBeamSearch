@@ -5,6 +5,7 @@ mod cnot;
 mod cnot_native_batch;
 mod cnot_native_checked;
 mod cnot_native_exchange;
+mod cnot_native_expand;
 mod cnot_native_goal;
 mod cnot_native_selection;
 mod cnot_native_stages;
