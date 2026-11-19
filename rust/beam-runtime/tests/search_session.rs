@@ -136,7 +136,14 @@ while not (directory/'stop').exists():
     let preparation = PreparationIdentity {
         graph_hash: Some(identity.graph_hash.clone()),
         geometry: [Some(4), Some(4), Some(2)],
-        center: Some(identity.graph.center.iter().map(|&value| u32::from(value)).collect()),
+        center: Some(
+            identity
+                .graph
+                .center
+                .iter()
+                .map(|&value| u32::from(value))
+                .collect(),
+        ),
         generators: Some(identity.graph.generators.clone()),
         model_artifact_hash: identity.model_artifact_hash.clone(),
         artifact_sizes: Some(vec![17]),
