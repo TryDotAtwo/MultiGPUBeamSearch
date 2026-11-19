@@ -99,6 +99,17 @@ PyTorch владеет CUDA-буферами, а FFI проверяет тенз
 Rust-контроллер не получает GPU-указатели. Порядок обмена NCCL и исходный
 Python-транспорт сохраняются.
 
+## Rust-контракт CNOT checkpoint scorer, 2026-11-19
+
+`beam-native-sys::TqpScorer` разбирает metadata scorer при открытии,
+проверяет наличие всех 102 зарегистрированных `feature_ids` и целое
+`max_packet_rows`. Rust вычисляет допустимый размер inference batch и
+закрывает нативный handle при ошибке metadata. PyO3 по-прежнему создаёт
+публичный Python `metadata`-словарь; ABI scorer, порционирование вызовов,
+модель, порядок выходов и численная политика не меняются. Hosted CPU/PyO3
+проверка не подтверждает физический CUDA/NCCL runtime. Результат:
+`test_results/refactor_20261119/cnot-scorer-metadata-contract/GITHUB_STATUS.md`.
+
 ## Экспериментальный Rust supervisor внешних рангов, 2026-11-16
 
 Режим `engine="rust"` для `run_cluster_rank` и `--engine rust` для
@@ -2874,6 +2885,10 @@ safe Rust-контроллер не получает GPU-указатели. PyO
 Python при необходимости создаёт непрерывную копию входа. Стандартный scalar
 цикл теперь выполняется в Rust с тем же разбиением и порядком вызовов; пакетный
 ABI остаётся опциональным. Ни копирование, ни численная политика не изменяются.
+`beam-native-sys::TqpScorer` теперь также валидирует metadata-контракт из 102
+признаков и выбирает effective batch в Rust. `json.loads` используется только
+для сохранения публичного Python-словаря metadata; scorer ABI и численная
+политика остаются прежними.
 
 ## Current update: Rust/C ABI: выполняемый переход, 2026-11-07
 

@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-11-19 - Rust owns CNOT checkpoint scorer metadata validation
+
+- The native-sys `TqpScorer` now parses and validates the JSON contract for 102 registered feature inputs and stores `max_packet_rows`; Rust computes the effective inference batch and closes the native handle if metadata validation fails. PyO3 still materializes the same public Python metadata dictionary. The scorer ABI, chunk boundaries, checkpoint model, output ordering, and numerical policy are unchanged.
+- RED Action [44569025127](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44569025127) failed because the new tests referenced the not-yet-implemented Rust metadata owner. GREEN Action [44570920822](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44570920822) passed Rust formatting/checks, 8 native scorer tests, PyO3 build, 219 Python tests (2 skipped), and NCCL probe syntax. Artifact [14553567932](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44570920822/artifacts/14553567932), SHA-256 `d24e4df850867c6f291ff6bb736eac3a4b2fc3846ed6f50c1ec1b8c11737bc54`.
+- These are hosted CPU/compile checks. No physical CUDA or multi-GPU NCCL scorer run was performed. The verification note is `test_results/refactor_20261119/cnot-scorer-metadata-contract/GITHUB_STATUS.md`.
+
 ## 2026-11-19 - Preserve Python inference selection while moving its owner to Rust
 
 - Added a `beam-core` implementation of the existing profile selection behavior, including the CPython-compatible deterministic bootstrap and rejection messages. The optional PyO3 adapter is used for ordinary `Measurement` records; older extensions and unusual Python values retain the Python fallback.

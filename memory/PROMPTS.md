@@ -1,5 +1,7 @@
 2026-11-19: Ivan authorized installing the repository Actions secret `VAST_API_KEY`. The current hosted Actions environment has already authenticated with this secret; the existing value must not be exposed in code, command arguments, or logs.
 
+2026-11-19: Ivan asked to continue the Rust + CUDA/C++ rewrite, including CNOT, without optimization; preserve multi-GPU architecture and Python compatibility, and synchronize verified changes with GitHub.
+
 2026-10-10 user requirement: Update existing public Kaggle notebook and leave only one GitHub branch in MultiGPUBeamSearch. Preserve checked source and historical reproducibility evidence. No additional GPU rentals.
 
 ## 2026-10-10 GNN requirements
