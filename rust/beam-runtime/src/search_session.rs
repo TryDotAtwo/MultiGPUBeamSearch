@@ -30,6 +30,35 @@ pub struct SessionIdentity {
     pub cuda_device_order: Option<String>,
 }
 impl SessionIdentity {
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        graph: PermutationGraph,
+        graph_hash: String,
+        model_artifact_hash: String,
+        model_backend: String,
+        runtime_build: Value,
+        devices: Vec<u32>,
+        beam_width: u64,
+        max_steps: u32,
+        options: Value,
+        cuda_visible_devices: Option<String>,
+        cuda_device_order: Option<String>,
+    ) -> Self {
+        Self {
+            graph,
+            graph_hash,
+            model_artifact_hash,
+            model_backend,
+            runtime_build,
+            devices,
+            beam_width,
+            max_steps,
+            options,
+            cuda_visible_devices,
+            cuda_device_order,
+        }
+    }
+
     pub fn validate(&self) -> Result<()> {
         self.graph.validate()?;
         let hash = |s: &str| {

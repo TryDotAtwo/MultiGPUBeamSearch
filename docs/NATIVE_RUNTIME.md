@@ -478,3 +478,5 @@ The Python backend constructs the same NativeOutcome object used by public calle
 ## Rust-owned preparation identity construction
 
 The Rust PyO3 extension now builds and serializes the typed PreparationIdentity from graph, model, device, option, and runtime fields. The Rust-owned NativeSession path uses this builder before asking SearchSession to compare or retain the identity. Python still builds the prior JSON payload when an older optional extension does not expose the builder, and the Python-owned session path is unchanged. This transfers identity construction only; search stages, ordering, numerical behavior, and multi-GPU protocol do not change.
+
+The extension also builds and serializes the typed resident SessionIdentity from graph, model, device, runtime, option, and CUDA environment fields. RustResidentWorkers uses this builder before calling SearchSession; extensions without the optional method retain the previous Python JSON path. This moves launch identity assembly only. Search stages, rank ordering, numerical behavior, and the multi-GPU protocol remain unchanged.

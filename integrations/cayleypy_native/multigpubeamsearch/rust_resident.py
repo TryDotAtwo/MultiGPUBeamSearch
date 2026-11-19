@@ -41,7 +41,7 @@ class RustResidentWorkers:
         if runtime is None or len(command) != 4 or world != len(devices):
             raise NativeBackendError("Rust resident launch has incomplete prepared inputs")
         from .native_library import ensure_native_library
-        from .rust_control import extension, options_descriptor, worker_executable
+        from .rust_control import build_session_identity, extension, options_descriptor, worker_executable
 
         module = extension()
         if (not hasattr(module, 'SearchSession')
@@ -56,18 +56,35 @@ class RustResidentWorkers:
         if session_identity is not None:
             identity_options = dict(identity_options)
             identity_options['python_session_identity'] = session_identity
-        identity = dict(graph=dict(center=contract.center, generators=contract.generators),
-            graph_hash=contract.graph_hash, model_artifact_hash=model.artifact_hash,
-            model_backend=model.backend, devices=list(devices), beam_width=int(command[3]),
-            max_steps=max_steps, runtime_build=build, options=identity_options,
-            cuda_visible_devices=os.environ.get('CUDA_VISIBLE_DEVICES'),
-            cuda_device_order=os.environ.get('CUDA_DEVICE_ORDER'))
+        cuda_visible_devices = os.environ.get('CUDA_VISIBLE_DEVICES')
+        cuda_device_order = os.environ.get('CUDA_DEVICE_ORDER')
+        identity_json = build_session_identity(
+            center=contract.center,
+            generators=contract.generators,
+            graph_hash=contract.graph_hash,
+            model_artifact_hash=model.artifact_hash,
+            model_backend=model.backend,
+            devices=devices,
+            beam_width=int(command[3]),
+            max_steps=max_steps,
+            runtime_build=build,
+            options=identity_options,
+            cuda_visible_devices=cuda_visible_devices,
+            cuda_device_order=cuda_device_order,
+        )
+        if identity_json is None:
+            identity = dict(graph=dict(center=contract.center, generators=contract.generators),
+                graph_hash=contract.graph_hash, model_artifact_hash=model.artifact_hash,
+                model_backend=model.backend, devices=list(devices), beam_width=int(command[3]),
+                max_steps=max_steps, runtime_build=build, options=identity_options,
+                cuda_visible_devices=cuda_visible_devices, cuda_device_order=cuda_device_order)
+            identity_json = json.dumps(identity)
         launch = dict(command=[str(worker), *map(str, command[1:])],
             protocol_command=[str(worker), '--resident-protocol-info'],
             environment=dict(env, BEAM_NATIVE_LIBRARY=str(library)), cwd=str(Path(run_dir).resolve()))
         owner = self._owner if self._owner is not None else module.SearchSession()
         self._owner = owner
-        self._identity = json.dumps(identity)
+        self._identity = identity_json
         self._launch = json.dumps(launch)
         self._terminal = None
         self._outcome = None

@@ -2527,11 +2527,15 @@ session metadata до следующей подготовки. PyO3 отпуск
 прежний `preparation_matches` и Python fallback. Нативный `SessionIdentity`
 отдельно проверяется Rust при запуске поиска.
 
-Перенесено только решение о повторном использовании подготовленной группы и её
-освобождении. Python всё ещё строит descriptor и выполняет callback подготовки.
-Вычислительные стадии, CUDA/NCCL операции, порядок поиска и публичные результаты
-не меняются; миграция host orchestration продолжается. Hosted evidence:
-`test_results/refactor_20261119/rust-preparation-transition/GITHUB_STATUS.md`.
+Rust дополнительно строит и сериализует типизированный `SessionIdentity` для
+resident launch через optional PyO3 builder. Расширения без этого метода
+сохраняют прежнюю Python JSON сборку. Python пока строит preparation descriptor
+и выполняет callback подготовки.
+
+Перенесено только создание launch identity; вычислительные стадии, CUDA/NCCL
+операции, порядок поиска и публичные результаты не меняются. Миграция host
+orchestration продолжается. Hosted evidence:
+`test_results/refactor_20261119/rust-session-identity-builder/GITHUB_STATUS.md`.
 CPU/PyO3 проверки не подтверждают физический multi-GPU runtime.
 ## Контракт публичного поиска в beam-core, 2026-11-18
 

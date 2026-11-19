@@ -2249,3 +2249,9 @@ Preserved 26 checkouts and their source/index overlays; verified restoration of 
 
 - The Rust-owned `NativeSession` path now passes typed identity fields through a PyO3 builder that constructs and serializes `PreparationIdentity` in Rust. Older extensions without the optional builder retain the prior Python JSON builder. Search semantics, rank ordering, CUDA/NCCL stages, and numerical behavior are unchanged.
 - Test-only revision `bea7c3c4e8f62c947c5143db2069e8083ceef67e` triggered Rust public-owner and CNOT CPU Actions runs 44509341963 and 44509341981; both concluded failure. Logs were not downloaded, so the failing assertion is not attributed. After implementation, hosted runs [44518629892](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44518629892) (Rust public owner CPU), [44518629802](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44518629802) (CNOT CPU compatibility), and [44518629764](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44518629764) (permutation depth control) completed successfully. Full logs remain in GitHub Actions.
+
+## 2026-11-19 - Rust assembles resident launch identity
+
+- `SessionIdentity` construction and serialization now run in beam-runtime via an optional PyO3 builder; RustResidentWorkers uses it for resident launch. Older extensions retain the previous Python JSON builder. This moves configuration assembly only: search stages, ranks, numerical behavior, and the multi-GPU protocol are unchanged.
+- RED: test-only commit `420d39f47d35bc64f214e45e068af0f0097f3984` produced failed hosted runs [python-owner 44524014350](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44524014350) and [cnot-cpu 44524013917](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44524013917). Logs remain remote; exact failing assertions were not inspected. GREEN pending.
+- This CPU/PyO3 slice does not verify physical CUDA/NCCL or multi-GPU CNOT runtime.

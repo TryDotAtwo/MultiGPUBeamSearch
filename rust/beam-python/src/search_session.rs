@@ -1,4 +1,5 @@
-use beam_runtime::search_session::PreparationIdentity;
+use beam_core::search::PermutationGraph;
+use beam_runtime::search_session::{PreparationIdentity, SessionIdentity};
 use pyo3::{
     exceptions::{PyRuntimeError, PyValueError},
     prelude::*,
@@ -13,6 +14,39 @@ use std::{
 };
 fn error(e: impl std::fmt::Display) -> PyErr {
     PyRuntimeError::new_err(e.to_string())
+}
+#[pyfunction]
+#[pyo3(signature=(center, generators, graph_hash, model_artifact_hash, model_backend, devices, beam_width, max_steps, runtime_build, options, cuda_visible_devices, cuda_device_order))]
+fn build_session_identity(
+    center: Vec<u8>,
+    generators: Vec<Vec<u32>>,
+    graph_hash: String,
+    model_artifact_hash: String,
+    model_backend: String,
+    devices: Vec<u32>,
+    beam_width: u64,
+    max_steps: u32,
+    runtime_build: String,
+    options: String,
+    cuda_visible_devices: Option<String>,
+    cuda_device_order: Option<String>,
+) -> PyResult<String> {
+    let runtime_build: serde_json::Value = serde_json::from_str(&runtime_build).map_err(error)?;
+    let options: serde_json::Value = serde_json::from_str(&options).map_err(error)?;
+    let identity = SessionIdentity::new(
+        PermutationGraph { center, generators },
+        graph_hash,
+        model_artifact_hash,
+        model_backend,
+        runtime_build,
+        devices,
+        beam_width,
+        max_steps,
+        options,
+        cuda_visible_devices,
+        cuda_device_order,
+    );
+    serde_json::to_string(&identity).map_err(error)
 }
 #[pyfunction]
 #[pyo3(signature=(graph_hash, geometry, center, generators, model_artifact_hash, artifact_sizes, model_backend, devices, binding_scope, beam_width, max_steps, options_repr, cuda_visible_devices, cuda_device_order, runtime_build))]
@@ -175,6 +209,7 @@ fn parse_terminal(
 pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add("SEARCH_TERMINAL_RESULT_VERSION", 1)?;
     module.add_function(wrap_pyfunction!(build_preparation_identity, module)?)?;
+    module.add_function(wrap_pyfunction!(build_session_identity, module)?)?;
     module.add_class::<SearchSession>()?;
     module.add_function(wrap_pyfunction!(parse_terminal, module)?)?;
     Ok(())

@@ -90,6 +90,37 @@ def build_preparation_identity(*, graph_hash, geometry, center, generators,
     return result if isinstance(result, str) else None
 
 
+def build_session_identity(*, center, generators, graph_hash, model_artifact_hash,
+                           model_backend, devices, beam_width, max_steps,
+                           runtime_build, options, cuda_visible_devices,
+                           cuda_device_order):
+    """Build the typed resident launch identity in Rust when supported."""
+    try:
+        native = extension()
+    except (NativeUnavailable, ImportError):
+        return None
+    builder = getattr(native, 'build_session_identity', None)
+    if not callable(builder):
+        return None
+    try:
+        result = builder(
+            [int(value) for value in center],
+            [[int(value) for value in move] for move in generators],
+            graph_hash,
+            model_artifact_hash,
+            model_backend,
+            [int(device) for device in devices],
+            int(beam_width),
+            int(max_steps),
+            json.dumps(runtime_build),
+            json.dumps(options),
+            cuda_visible_devices,
+            cuda_device_order,
+        )
+    except (TypeError, ValueError, OverflowError):
+        return None
+    return result if isinstance(result, str) else None
+
 def _native_options_supported(options):
     # Keep Python's historical acceptance of values that its public validator
     # permits but beam-core cannot represent in its fixed-width fields.
