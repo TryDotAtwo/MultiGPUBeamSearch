@@ -8,6 +8,7 @@ python = ["dep:pyo3"]
 [dependencies]
 beam-core.workspace = true
 libloading.workspace = true
+serde_json.workspace = true
 thiserror.workspace = true
 libc = "0.2"
 pyo3 = { workspace = true, optional = true }

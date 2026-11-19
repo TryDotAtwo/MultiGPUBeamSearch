@@ -567,6 +567,53 @@ mod tests {
         assert_eq!(packet_strides(4, 2).unwrap(), (32, 4, 8));
     }
 
+    fn metadata_json(feature_count: usize, id_count: usize, capacity: i64) -> String {
+        let feature_ids = (0..id_count)
+            .map(|index| format!("feature-{index}"))
+            .collect::<Vec<_>>();
+        serde_json::json!({
+            "feature_model_inputs": feature_count,
+            "feature_ids": feature_ids,
+            "max_packet_rows": capacity,
+        })
+        .to_string()
+    }
+
+    #[test]
+    fn scorer_metadata_preserves_feature_ids_and_caps_the_requested_batch() {
+        let raw = metadata_json(102, 102, 17);
+        let metadata = CnotScorerMetadata::parse(&raw).unwrap();
+        assert_eq!(metadata.feature_ids().len(), 102);
+        assert_eq!(metadata.feature_ids()[0], "feature-0");
+        assert_eq!(metadata.feature_ids()[101], "feature-101");
+        assert_eq!(metadata.effective_batch(64).unwrap(), 17);
+        assert_eq!(metadata.effective_batch(4).unwrap(), 4);
+    }
+
+    #[test]
+    fn scorer_metadata_rejects_a_partial_registered_feature_contract() {
+        for raw in [metadata_json(101, 102, 17), metadata_json(102, 101, 17)] {
+            let error = CnotScorerMetadata::parse(&raw).unwrap_err();
+            assert_eq!(error.to_string(), "expected all 102 registered field inputs");
+        }
+    }
+
+    #[test]
+    fn scorer_metadata_rejects_malformed_json() {
+        let error = CnotScorerMetadata::parse("{").unwrap_err();
+        assert!(error.to_string().starts_with("CNOT scorer metadata is not valid JSON:"));
+    }
+
+    #[test]
+    fn scorer_metadata_rejects_a_feature_policy_that_admits_no_rows() {
+        let metadata = CnotScorerMetadata::parse(&metadata_json(102, 102, 0)).unwrap();
+        let error = metadata.effective_batch(4).unwrap_err();
+        assert_eq!(
+            error.to_string(),
+            "the feature policy cannot admit a single row"
+        );
+    }
+
     #[test]
     fn score_stride_overflow_is_rejected_before_any_abi_call() {
         assert!(packet_strides(u32::MAX, 0)
