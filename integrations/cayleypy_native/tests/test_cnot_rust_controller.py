@@ -314,6 +314,9 @@ def test_rust_top_level_controller_preserves_compatibility_stage_fallback():
             events.append(("sum", tensor.tolist()))
             return tensor.sum()
 
+        def any_rank_failed(self, local_failed):
+            return bool(local_failed)
+
         _stream5_library = None
 
     world = World()
