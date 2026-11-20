@@ -510,3 +510,9 @@ This moves one deterministic helper only. Calibration orchestration, probe order
 The per-GPU capacity-cache predicate now runs in `beam-core` through optional PyO3. Python continues to query `nvidia-smi` for the current memory snapshot and keeps the existing short-circuit for profiles that were not capacity-limited. Rust receives only the previous and current UUID-to-MiB maps and applies the same key equality and 32 MiB threshold. Unsupported map values or missing/older extensions retain the Python predicate.
 
 This moves the decision only; memory sampling, cache loading, calibration work, and GPU behavior are unchanged. Hosted run [44550275840](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44550275840) passed 211 Python tests (2 skipped), scoped Rust/PyO3 checks, and NCCL probe syntax. Physical CUDA/NCCL was not run. Evidence: `test_results/refactor_20261119/rust-inference-cache/GITHUB_STATUS.md`.
+
+## Rust-owned permutation search inputs
+
+For capable extensions, backend.py asks rust_control.write_search_inputs to pass the normalized graph fields through PyO3. The extension rebuilds and validates PublicGraphContract; beam-runtime::search_inputs then writes the same puzzle_info.json and test.csv bytes as the previous Python path. Generator keys remain m0, m1, … in source order, including multi-digit IDs. If an extension lacks this optional method or receives a legacy contract shape, the backend retains the existing Python writer.
+
+Hosted run [44640784456](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44640784456) passed Rust formatting/checks, PyO3 build, 240 Python tests (2 skipped), and NCCL probe syntax. Run [44640371591](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44640371591) passed companion permutation depth-control checks. No GPU kernel, search loop, rank protocol, or CNOT path changed; physical CUDA/NCCL multi-GPU execution remains unverified.
