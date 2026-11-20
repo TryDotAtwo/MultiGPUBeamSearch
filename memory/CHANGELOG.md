@@ -1,3 +1,9 @@
+## 2026-11-20 - Preserve max beam width across resident sessions
+
+- Resident identity now keeps the requested form of beam width, including `"max"`, while retaining the accepted logical width separately. Repeated resident requests validate against that accepted width.
+- Hosted Actions run [44707125022](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44707125022) passed: 86 CPU/Python tests, 3 skipped. Artifact [14614783619](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44707125022/artifacts/14614783619), SHA-256 `afbf5615341c6260dddc4254f1d8638c06026682dd6f24ef1dd9ff4b67bf03b6`.
+- This verifies public dispatch and the resident-session adapter on hosted CPU only. It does not compile the Rust extension or validate CUDA/NCCL. Evidence: `test_results/refactor_20261120/auto-max-beam-session/GITHUB_STATUS.md`.
+
 ## 2026-11-20 - Add CNOT descriptor recovery to Vast validation
 
 - The existing-instance workflow now builds the standalone CNOT owned-domain ABI and runs the two-rank Stream 5 control and corrected descriptor-error recovery checks. It does not start, stop, or rent the Vast instance.
