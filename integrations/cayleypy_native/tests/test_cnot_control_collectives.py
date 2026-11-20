@@ -846,3 +846,33 @@ def test_compat_search_forces_python_engine_when_auto_engine_is_not_universal(mo
     assert support_calls == [True]
     assert engine_calls == ["python"]
     assert transport_calls == [False]
+
+
+def test_native_goal_uses_common_rank_capability_before_dispatch(monkeypatch):
+    from multigpubeamsearch import cnot
+    from multigpubeamsearch.cnot_rust_stages import CnotStages
+
+    world = _two_rank_world()
+    support_votes = []
+    native_calls = []
+    native_goal = lambda *_args: native_calls.append("native") or "native-result"
+    expected = "compat-result"
+    monkeypatch.setattr(
+        rust_control, "extension",
+        lambda: SimpleNamespace(run_cnot_native_goal=native_goal),
+    )
+    monkeypatch.setattr(
+        world, "all_ranks_support",
+        lambda local: support_votes.append(local) or False,
+    )
+    monkeypatch.setattr(cnot, "_goal", lambda *_args, **_kwargs: expected)
+
+    stages = object.__new__(CnotStages)
+    stages.world = world
+    stages.parents = torch.empty((0, 2, 1), dtype=torch.int64)
+    stages.lex = torch.empty((0,), dtype=torch.int64)
+    stages.identity = torch.zeros((1, 2, 1), dtype=torch.int64)
+
+    assert stages.goal(3) == expected
+    assert support_votes == [True]
+    assert native_calls == []
