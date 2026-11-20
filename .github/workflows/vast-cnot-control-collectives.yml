@@ -278,7 +278,6 @@ jobs:
             test -s "$domain_library"
 
             export BEAM_CNOT_OWNED_LIBRARY="$domain_library"
-            export MGBS_CNOT_DOMAIN_LIBRARY="$domain_library"
             export MGBS_TQP_LIBRARY="$scorer_library"
             export MGBS_TQP_MANIFEST="$manifest"
             export CNOT_RUST_EVIDENCE="${run_root}/test_results/refactor_20261121/gpu-acceptance/ranks"
