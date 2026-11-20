@@ -754,12 +754,8 @@ fn run_cnot_native_search<'py>(
     let identity_args = PyDict::new(py);
     identity_args.set_item("device", world.getattr("device")?)?;
     let identity_result = identity_builder.call((wires,), Some(&identity_args));
-    let identity = crate::cnot_native_checked::checked_v2(
-        py,
-        &world,
-        "build CNOT identity",
-        identity_result,
-    )?;
+    let identity =
+        crate::cnot_native_checked::checked_v2(py, &world, "build CNOT identity", identity_result)?;
     let alphabet = wires * (wires - 1);
 
     if use_rust {
