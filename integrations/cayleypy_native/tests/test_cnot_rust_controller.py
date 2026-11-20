@@ -802,6 +802,7 @@ def distributed_cnot_setup_failure(rank, rendezvous, failure_point):
                 shortlist=9,
                 max_depth=4,
                 mode="qhat",
+                validation="python" if failure_point == "root_goal" else "auto",
                 engine="rust",
             )
         expected = (
