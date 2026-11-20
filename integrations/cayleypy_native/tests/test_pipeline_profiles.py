@@ -119,3 +119,46 @@ def test_rank_frontier_counts_keeps_python_fallback_for_legacy_extension(monkeyp
     monkeypatch.setattr(rust_control, 'extension', lambda: LegacyExtension())
     plans = [{'GLOBAL_BEAM_WIDTH_EFFECTIVE': 5, 'WORLD_SIZE': 3} for _ in range(3)]
     assert rank_frontier_counts(plans) == [2, 2, 1]
+
+def _valid_rank_plans_for_native_validation():
+    row={'GLOBAL_BEAM_WIDTH_EFFECTIVE':5,'BEAM_WIDTH_ALIGNMENT':1,
+         'SHARD_COUNT':4,'B_MICRO':32,'WORLD_SIZE':3,'STREAM4_BATCH_ALIGNMENT':1,
+         'estimated_required_device_bytes':10,'gpu_budget_bytes':20}
+    return [dict(row,LOCAL_RANK=rank) for rank in range(3)]
+
+
+def test_rank_plan_validation_dispatches_to_rust_when_available(monkeypatch):
+    from multigpubeamsearch import pipeline_profiles, rust_control
+
+    calls=[]
+    class NativeExtension:
+        def validate_rank_plans_json(self, payload):
+            calls.append(json.loads(payload))
+            return True
+
+    plans=_valid_rank_plans_for_native_validation()
+    monkeypatch.setattr(rust_control,'extension',lambda:NativeExtension())
+    assert pipeline_profiles.validate_rank_plans(plans) is True
+    assert calls==[plans]
+
+
+def test_rank_plan_validation_keeps_python_fallback_for_legacy_extension(monkeypatch):
+    from multigpubeamsearch import pipeline_profiles, rust_control
+
+    class LegacyExtension:
+        pass
+
+    monkeypatch.setattr(rust_control,'extension',lambda:LegacyExtension())
+    assert pipeline_profiles.validate_rank_plans(
+        _valid_rank_plans_for_native_validation()) is True
+
+
+def test_rust_rank_plan_validator_checks_protocol_and_memory():
+    from multigpubeamsearch import _beam_runtime
+
+    plans=_valid_rank_plans_for_native_validation()
+    assert _beam_runtime.validate_rank_plans_json(json.dumps(plans)) is True
+    plans[-1]['SHARD_COUNT']=8
+    with pytest.raises(ValueError):
+        _beam_runtime.validate_rank_plans_json(json.dumps(plans))
+
