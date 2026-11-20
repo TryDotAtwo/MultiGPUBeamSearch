@@ -217,7 +217,11 @@ class World:
         if self.any_rank_failed(error is not None):
             errors = [None] * self.size
             dist.all_gather_object(errors, error, group=self._control_group)
-            raise RuntimeError(f"{stage} failed: " + " | ".join(e for e in errors if e))
+            messages = [message for message in errors if message]
+            diagnostic = f"{stage} failed: " + " | ".join(messages)
+            if any(": KeyboardInterrupt:" in message for message in messages):
+                raise KeyboardInterrupt(diagnostic)
+            raise RuntimeError(diagnostic)
         return result
 
     def _extension(self):

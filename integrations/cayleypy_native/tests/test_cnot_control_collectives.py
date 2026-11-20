@@ -270,7 +270,7 @@ def test_python_checked_stage_coordinates_keyboard_interrupt(monkeypatch):
     def interrupted_stage():
         raise KeyboardInterrupt("cancel requested")
 
-    with pytest.raises(RuntimeError, match="KeyboardInterrupt: cancel requested"):
+    with pytest.raises(KeyboardInterrupt, match="KeyboardInterrupt: cancel requested"):
         world.checked("CNOT checkpoint stage", interrupted_stage)
     assert gathered == [
         ("rank 0: KeyboardInterrupt: cancel requested", world._control_group)
@@ -733,7 +733,7 @@ def test_rust_checked_stage_coordinates_keyboard_interrupt(monkeypatch):
     def interrupted_stage():
         raise KeyboardInterrupt("cancel requested")
 
-    with pytest.raises(RuntimeError, match="KeyboardInterrupt: cancel requested"):
+    with pytest.raises(KeyboardInterrupt, match="KeyboardInterrupt: cancel requested"):
         checker(world, "CNOT checkpoint stage", interrupted_stage)
     assert len(gathers) == 3
 
