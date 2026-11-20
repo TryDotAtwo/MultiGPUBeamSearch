@@ -70,6 +70,13 @@ jobs:
           ):
               if required not in payload_text:
                   raise SystemExit(f"missing installed-wheel provenance guard: {required}")
+          if "tar -C '${REMOTE_ROOT}' -czf - test_results/refactor_20261121/gpu-acceptance" not in source:
+              raise SystemExit("remote GPU test_results must be collected even when the test command fails")
+          if 'result_archive="${RUNNER_TEMP}/beam-gpu-acceptance-test-results.tar.gz"' not in source:
+              raise SystemExit("the remote test_results archive must be retrieved by the runner")
+          artifact_section = source.split("      - name: Upload sanitized status and remote test log", 1)[1]
+          if "beam-gpu-acceptance-test-results.tar.gz" not in artifact_section:
+              raise SystemExit("the remote GPU test_results archive must be uploaded as an Actions artifact")
           lines = source.splitlines()
           heredoc_count = 0
           index = 0
