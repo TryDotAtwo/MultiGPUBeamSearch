@@ -2834,3 +2834,33 @@ Main commit `148b2a826a369b7601e904ea409e0cc5301c75c9` also passed the 260-test 
 - CPU/Gloo and wheel checks do not establish CUDA, NCCL, or physical 1-/2-GPU
   acceptance. Errors inside selection before an internal collective are not
   covered by this completion vote.
+
+## 2026-11-20 - Coordinate CNOT record exchange preparation
+
+- Added two two-rank Gloo regressions for rank-local exchange failures: packet
+  construction before the first data collective and receive allocation after
+  the count exchange but before payload exchange. Both tests verify identical
+  rank-wide errors and a successful follow-up Gloo all-reduce.
+- The prior packet-preparation RED run
+  [44797521897](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44797521897)
+  produced a peer-closed error on the healthy rank. The Rust exchange now
+  coordinates packet construction before any rank enters the data-plane
+  collective and coordinates fallback payload sizing/allocation before the
+  second all-to-all. Existing Stream 5 internal checks remain in place.
+- Main CPU run
+  [44798848987](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44798848987)
+  passed 304 tests with 2 skipped. Artifact
+  [14661050464](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44798848987/artifacts/14661050464),
+  SHA-256 `eee8773cdfa27fb8e5da41ec48a5afceaf6c8b3a4299520f7328f2c87c504a40`.
+- Installed wheel run
+  [44798339035](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44798339035)
+  built and installed the PEP 517 wheel outside the checkout, passed
+  `pip check`, public exports, and `resident-search-v1`. Artifact
+  [14660825488](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44798339035/artifacts/14660825488),
+  SHA-256 `525eaeeeb26246dc0f4b70675748e9c5fd960818c261e4d46aafb0d157354469`.
+- Read-only Vast run
+  [44798339107](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44798339107)
+  found instance 61080396 exited and skipped physical GPU checks. No
+  start/stop/rent request was made.
+- These checks do not establish physical CUDA/NCCL behavior. Failures inside
+  low-level data-plane collectives remain outside the local preparation votes.

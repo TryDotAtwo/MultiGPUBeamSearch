@@ -3340,3 +3340,20 @@ ranking, cutoff width, score ordering, and lexical tie-breaking are unchanged.
 The two-rank Gloo regression and installed-wheel evidence are recorded in
 `test_results/refactor_20261120/cnot-selection-gloo/GITHUB_STATUS.md`.
 Physical CUDA/NCCL multi-GPU execution remains unverified.
+
+## CNOT record exchange preparation errors are coordinated (2026-11-20)
+
+The Rust exchange stage now votes over the existing Gloo control group after
+rank-local packet construction and receive-count-buffer allocation, before a
+rank can enter the data-plane count exchange. In the fallback all-to-all path,
+it also votes after the count exchange and before local receive-size
+conversion/allocation can be followed by the payload exchange. Existing
+Stream 5 transports keep their own validation and allocation checks.
+
+This guards rank-local failures in preparation around the exchange collectives;
+it cannot recover a failure inside a low-level data-plane collective after
+some ranks have entered it. Candidate routing, stable packet order, empty
+splits, and payload contents are unchanged. The control-flow votes and hosted
+evidence are recorded in
+`test_results/refactor_20261120/cnot-exchange-gloo/GITHUB_STATUS.md`.
+Physical CUDA/NCCL multi-GPU exchange remains unverified.
