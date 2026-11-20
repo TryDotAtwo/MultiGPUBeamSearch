@@ -499,3 +499,12 @@ def test_native_session_cancel_reaches_only_active_rust_owner():
     finally:
         session.close()
     assert calls == ["cancel", "close"]
+
+
+
+def test_rust_resident_cancel_handles_missing_extension_method():
+    from multigpubeamsearch.rust_resident import RustResidentWorkers
+
+    workers = RustResidentWorkers.__new__(RustResidentWorkers)
+    workers._owner = SimpleNamespace()
+    assert workers.cancel() is False

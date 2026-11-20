@@ -134,6 +134,17 @@ class RustResidentWorkers:
         self._terminal = None
         return True
 
+    def cancel(self):
+        """Forward cancellation to a capable Rust session owner."""
+        cancel = getattr(self._owner, 'cancel', None)
+        if not callable(cancel):
+            return False
+        try:
+            cancel()
+        except RuntimeError as error:
+            raise NativeBackendError(f'Rust resident cancellation failed: {error}') from error
+        return True
+
     def can_finalize_preparation_result(self):
         """Whether this run has a Rust outcome and its owner exposes finalization."""
         return (self._outcome is not None

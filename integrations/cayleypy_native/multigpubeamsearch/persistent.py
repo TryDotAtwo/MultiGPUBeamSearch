@@ -87,6 +87,7 @@ class NativeSession:
         self._operation_lock = threading.Lock()
         self._operation_owner = None
         self._run_owner = None
+        self._cancel_requested = threading.Event()
 
     def _check_owner(self):
         if os.getpid()!=self._owner_pid:
@@ -186,6 +187,33 @@ class NativeSession:
         self._rust_metadata_owned = False
         self._resolved_beam_width = None
 
+    def cancel(self):
+        """Request cancellation of the active Rust search; the session then closes."""
+        self._check_owner()
+        if self.closed or self._engine != 'rust' or self._run_owner is None:
+            return False
+        workers = self._workers
+        if workers is None:
+            self._cancel_requested.set()
+            return True
+        cancel = getattr(workers, 'cancel', None)
+        if not callable(cancel):
+            return False
+        requested = cancel()
+        if requested is not True:
+            return False
+        self._cancel_requested.set()
+        return True
+
+    def _cancel_if_requested(self):
+        if not self._cancel_requested.is_set():
+            return
+        workers = self._workers
+        cancel = getattr(workers, 'cancel', None) if workers is not None else None
+        if callable(cancel):
+            cancel()
+        raise NativeBackendError('native session cancelled')
+
     def close(self):
         self._check_owner()
         if self.closed:return
@@ -205,6 +233,7 @@ class NativeSession:
     def launch(self, command, *, contract, run_dir, env, world, timeout, runtime=None):
         self._check_owner()
         if self._run_owner == threading.get_ident():
+            self._cancel_if_requested()
             if self.closed:raise RuntimeError('native session is closed')
             self._check_operation_owner()
             return self._launch(command, contract=contract, run_dir=run_dir, env=env,
@@ -252,6 +281,7 @@ class NativeSession:
                 if not callable(configure):
                     raise NativeBackendError('resident workers cannot be reconfigured')
                 configure(command, **launch_inputs)
+            self._cancel_if_requested()
             elapsed = self._workers.submit(contract.start, run_dir, timeout=timeout)
             prepared['launch_started'] = True
             return elapsed
@@ -296,6 +326,7 @@ class NativeSession:
         except BaseException:
             self._lock.release()
             raise
+        self._cancel_requested.clear()
         self._run_owner = threading.get_ident()
         try:
             # Runtime preparation already verifies executable bytes. Start state
@@ -405,6 +436,7 @@ class NativeSession:
                 finally:
                     launch_started = self._pending['launch_started']
                     self._pending=None
+                self._cancel_if_requested()
                 if self._workers is not None:
                     if preserve_rust_owner and not launch_started:
                         self._release()
@@ -477,11 +509,19 @@ class NativeSession:
                 Path(run_dir,'native-outcome.json').write_text(json.dumps(dict(path=outcome.path,
                     elapsed_seconds=outcome.elapsed_seconds,effective_beam_width=outcome.effective_beam_width,
                     metadata=outcome.metadata),indent=2),encoding='utf-8')
+            self._cancel_if_requested()
             return outcome
         except BaseException:
             self._release()
             raise
         finally:
-            self._run_owner = None
-            self._lock.release()
+            try:
+                if self._cancel_requested.is_set():
+                    self._release()
+                    if self.nccl_digest_cache is not None:self.nccl_digest_cache.clear()
+                    if self.model_snapshot_cache is not None:self.model_snapshot_cache.clear()
+                    self.closed = True
+            finally:
+                self._run_owner = None
+                self._lock.release()
 
