@@ -168,6 +168,7 @@ pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     )?;
     module.add_function(wrap_pyfunction!(select_profile, module)?)?;
     module.add_function(wrap_pyfunction!(rank_frontier_counts, module)?)?;
+    module.add_function(wrap_pyfunction!(validate_rank_plans_json, module)?)?;
     module.add_function(wrap_pyfunction!(promote_optimization, module)?)?;
     Ok(())
 }
@@ -208,4 +209,15 @@ fn rank_frontier_counts(plans: &str) -> PyResult<Vec<u64>> {
         .unwrap_or(0);
     beam_core::planning::rank_frontier_counts(&plans, requested)
         .map_err(|error| PyValueError::new_err(error.to_string()))
+}
+
+
+#[pyfunction]
+fn validate_rank_plans_json(plans: &str) -> PyResult<bool> {
+    let rows: Vec<beam_core::planning::RankPlan> =
+        serde_json::from_str(plans).map_err(|e| PyValueError::new_err(e.to_string()))?;
+    let requested = rows.first().map_or(0, |row| row.global_beam_width);
+    beam_core::planning::validate_rank_plans(&rows, requested)
+        .map_err(|e| PyValueError::new_err(e.to_string()))?;
+    Ok(true)
 }

@@ -63,8 +63,28 @@ def rank_frontier_counts(plans):
             for rank in range(world)]
 
 
-def validate_rank_plans(plans):
-    """Common beam/shard protocol plus exact independent memory admission."""
+def _native_validate_rank_plans(plans):
+    """Validate ordinary rank plans in beam-core when the matching extension exists."""
+    try:
+        from .errors import NativeUnavailable
+        from .rust_control import extension
+        native = extension()
+    except (ImportError, NativeUnavailable):
+        return None
+    validator = getattr(native, 'validate_rank_plans_json', None)
+    if not callable(validator):
+        return None
+    try:
+        result = validator(json.dumps(plans))
+    except (TypeError, ValueError, OverflowError):
+        # Run the established validator for unsupported values and to preserve
+        # its public error messages when Rust rejects the same input.
+        return None
+    return True if result is True else None
+
+
+def _python_validate_rank_plans(plans):
+    """Compatibility validator for old extensions and legacy plan values."""
     if not plans:raise ValueError('no rank plans')
     common={'GLOBAL_BEAM_WIDTH_EFFECTIVE','BEAM_WIDTH_ALIGNMENT','SHARD_COUNT',
             'B_MICRO','WORLD_SIZE','STREAM4_BATCH_ALIGNMENT'}
@@ -85,6 +105,13 @@ def validate_rank_plans(plans):
         if row['estimated_required_device_bytes']>row['gpu_budget_bytes']:
             raise ValueError('rank exceeds exact native memory budget')
     return True
+
+
+def validate_rank_plans(plans):
+    """Validate rank geometry in Rust, retaining exact Python compatibility."""
+    if _native_validate_rank_plans(plans) is True:
+        return True
+    return _python_validate_rank_plans(plans)
 
 
 def tune_pipeline(inference_micro, baseline, *, admit, measure, deadline,
