@@ -2864,3 +2864,36 @@ Main commit `148b2a826a369b7601e904ea409e0cc5301c75c9` also passed the 260-test 
   start/stop/rent request was made.
 - These checks do not establish physical CUDA/NCCL behavior. Failures inside
   low-level data-plane collectives remain outside the local preparation votes.
+
+## 2026-11-20 - Coordinate CNOT cancellation across ranks
+
+- Rust checked CNOT stages poll Python signals before their Gloo control-group
+  vote. A rank-local `KeyboardInterrupt` is gathered and raised as
+  `KeyboardInterrupt` on each rank; ordinary failures remain
+  `RuntimeError`. The CNOT goal vote includes a local signal before peers
+  continue. The Python compatibility fallback preserves the cancellation type.
+- Search order, scorer policy, precision, rank ownership, and NCCL data-plane
+  operations are unchanged.
+- RED: run
+  [44800867787](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44800867787)
+  reproduced the issue: rank 1's `KeyboardInterrupt` became a
+  `RuntimeError` at `check CNOT root goal`.
+- GREEN: main run
+  [44802610199](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44802610199)
+  at `1f331663cc3368b1e7a357abc5a4d5bb7b390301` passed the Rust checks,
+  PyO3 build, CNOT CPU/Gloo suite (305 passed, 2 skipped). Artifact
+  14660759672, SHA-256
+  `bad79e5f3ee7e6a3a476afef2bb7754992137564399ba4568446710aba16a889`.
+- Installed-wheel run
+  [44802610026](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44802610026)
+  passed PEP 517 build, install outside the checkout, dependency checks and
+  public API/protocol smoke checks. Artifact 14662495219, SHA-256
+  `ef7d87e8639e80c90c6ec765d599bddb26275c32fd60dedef424a2f974cb81a7`.
+- Read-only Vast run
+  [44802610013](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44802610013)
+  found instance 61080396 exited and skipped the remote CUDA/NCCL step without
+  changing instance state. Artifact 14661622569, SHA-256
+  `a499417bc4f690641a8e6d43f1c55299b6ffe25819a463e2ea78061885bcf2fc`.
+- Physical CUDA/NCCL cancellation, the штатный checkpoint scorer on GPU, and
+  physical 1-/2-GPU search remain unverified. Full test and workflow output is
+  retained in the linked Actions artifacts.

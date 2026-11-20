@@ -1,5 +1,24 @@
 # Конфиг
 
+## CNOT SIGINT handling across ranks, 2026-11-20
+
+Rust CNOT stage checks now poll Python signals at checked-stage boundaries
+before entering the existing Gloo control-group error vote. If any rank reports
+a `KeyboardInterrupt`, all ranks receive the rank diagnostics and raise
+`KeyboardInterrupt`; ordinary failures remain coordinated
+`RuntimeError` values. The Rust root-goal stage also records a signal as a
+rank-local failure and includes it in its existing goal/error exchange.
+The Python compatibility fallback preserves the same cancellation exception.
+
+Search order, goal selection, score policy, precision, rank ownership, and
+NCCL data-plane operations are unchanged. The two-rank CPU/Gloo regression
+injects SIGINT on rank 1 during root-goal checking and verifies a subsequent
+Gloo all-reduce still succeeds. This does not verify cancellation inside a
+physical CUDA kernel or NCCL data-plane collective. Hardware verification is
+still pending.
+Evidence: `test_results/refactor_20261120/cnot-cancel-gloo/GITHUB_STATUS.md`.
+
+
 ## CNOT setup failures are coordinated before search, 2026-11-20
 
 The Rust top-level controller runs CNOT identity construction, native-stage
