@@ -82,6 +82,22 @@ forces that path and `engine="rust"` fails closed. The current Rust stage
 owner dispatches packed-matrix operations to existing C++ ATen/CUDA operators.
 PyTorch owns the tensors, and arbitrary Python scorers remain supported.
 
+## Distributed bootstrap and rank agreement
+
+Each multi-rank CNOT invocation creates the same Gloo CPU control group before
+checking local backend/device state or optional PyO3 methods. It coordinates
+startup errors and capability votes, so a rank-local device mismatch or a
+missing optional native method cannot send peers into a different collective
+sequence. The engine="auto" compatibility path selects the Rust controller
+only when every rank reports the required methods; otherwise every rank uses
+the Python-compatible controller. Gloo carries only control metadata and
+diagnostics. Frontier, score, and history tensors keep their existing CPU/Gloo
+or CUDA/NCCL/Stream 5 transport.
+
+The World object closes its temporary control group when the CNOT invocation
+exits. Creating this group requires all world ranks to enter CNOT startup in
+the same order; it does not recover a process that has already disappeared.
+
 ## Rust-owned CNOT control collectives, 2026-11-18
 
 When all ranks have the matching PyO3 module and a Stream 5 library advertising
@@ -91,8 +107,7 @@ Stream 5 communicator carries CNOT `sum`, fixed `all_gather`, and history-row
 selection is collective: if any rank lacks either ABI, all ranks retain the
 previous Torch collective path. Tensor storage remains PyTorch-owned; the FFI
 borrows its device addresses on the current CUDA stream and records that stream
-before NCCL reads or writes the buffers. NCCL unique-ID bootstrap and the diagnostic fallback for older checked
-stage APIs remain on the caller's default process group. Rust CNOT goal failures
+before NCCL reads or writes the buffers. The Gloo control group carries startup diagnostics, ABI capability votes, and Python checked-stage fallback messages. The Rust checked-v2 path continues to send its fixed-size diagnostic tensors through the agreed World transport. Frontier, score, history, and Stream 5 exchange payloads remain on their existing search transport. Rust CNOT goal failures
 and the checked v2 stage path gather UTF-8 lengths and padded byte tensors via
 the current `World` transport. This transfers diagnostic dispatch only, not
 the full CNOT search or checkpoint scorer.

@@ -5,26 +5,79 @@ import torch
 import torch.distributed as dist
 
 
+_UNSET = object()
+
+
 class World:
     """Use the caller's world ranks and local device for CNOT collectives."""
 
     def __init__(self, device):
-        self.device = torch.device(device)
+        self._device_arg = device
+        self.device = None
         self.rank = dist.get_rank() if dist.is_initialized() else 0
         self.size = dist.get_world_size() if dist.is_initialized() else 1
         self.transport = None
         self._stream5_library = None
+        self._control_group = None
+        self._owns_control_group = False
+        self._native_extension = _UNSET
+        self._native_support_cache = {}
         self._checked_error_gather_v2 = None
+        self._checked_error_gather_v1 = None
         if self.size > 65536:
             raise ValueError("CNOT physical routes support at most 65536 world ranks")
 
     def __enter__(self):
-        if self.device.type == "cuda" and self.size > 1:
-            from .cnot_stream5 import load_stream5
+        if self.size == 1:
+            self.device = torch.device(self._device_arg)
+            return self
 
-            if dist.get_backend() != "nccl" or torch.cuda.current_device() != self.device.index:
-                raise ValueError("set the process's local CUDA device and initialize the NCCL world")
-            self._stream5_library = self.checked("load native Stream 5", load_stream5)
+        # Every rank creates the same CPU control group before checking local
+        # backend/device state or inspecting optional PyO3 capabilities.
+        self._control_group = dist.new_group(
+            ranks=list(range(self.size)), backend="gloo"
+        )
+        self._owns_control_group = True
+        local_error = None
+        try:
+            self.device = torch.device(self._device_arg)
+            backend = str(dist.get_backend()).lower()
+            if self.device.type == "cuda":
+                if "nccl" not in backend or torch.cuda.current_device() != self.device.index:
+                    raise ValueError(
+                        "set the process's local CUDA device and initialize the NCCL world"
+                    )
+            elif self.device.type == "cpu" and "nccl" in backend and "gloo" not in backend:
+                raise ValueError("CPU CNOT tensors require a CPU-capable distributed backend")
+
+            from .errors import NativeUnavailable
+            from .rust_control import extension
+
+            try:
+                self._native_extension = extension()
+            except (ImportError, NativeUnavailable):
+                self._native_extension = None
+        except BaseException as exc:
+            local_error = f"rank {self.rank}: {type(exc).__name__}: {exc}"
+
+        errors = [None] * self.size
+        dist.all_gather_object(errors, local_error, group=self._control_group)
+        if any(errors):
+            details = " | ".join(error for error in errors if error)
+            self._destroy_control_group()
+            raise RuntimeError(f"CNOT distributed preflight failed: {details}")
+
+        if self.device.type == "cuda":
+            def load_stream5():
+                from .cnot_stream5 import load_stream5
+
+                return load_stream5()
+
+            try:
+                self._stream5_library = self.checked("load native Stream 5", load_stream5)
+            except BaseException:
+                self._destroy_control_group()
+                raise
         return self
 
     def start_transport(self, *, prefer_rust):
@@ -45,13 +98,10 @@ class World:
             self.transport = Stream5(self._stream5_library, self)
 
     def all_ranks_support(self, local_support):
-        """Return whether every rank reports support for an optional native stage."""
-        used, result = self._rust_collective(
-            "run_cnot_native_all_ranks_support", bool(local_support)
-        )
-        if used:
-            return result
-        return self.sum(self.longs([int(local_support)])).item() == self.size
+        """Vote over the stable CPU control group, independent of optional Rust ABIs."""
+        vote = torch.tensor([int(bool(local_support))], dtype=torch.int64)
+        gathered = self._control_gather(vote)
+        return gathered.sum().item() == self.size
 
     def require_consensus(self, digest):
         """Reject CNOT setup when the ranks received different search inputs."""
@@ -65,11 +115,33 @@ class World:
             raise ValueError("CNOT root, search settings or scorer fingerprints differ between ranks")
 
     def __exit__(self, kind, value, traceback):
-        if self.transport is not None:
-            self.transport.close(abort=kind is not None)
+        try:
+            if self.transport is not None:
+                self.transport.close(abort=kind is not None)
+        finally:
+            self._destroy_control_group()
+
+    def _destroy_control_group(self):
+        group = self._control_group
+        if not self._owns_control_group or group is None:
+            return
+        self._control_group = None
+        self._owns_control_group = False
+        if dist.is_initialized():
+            dist.destroy_process_group(group)
 
     def longs(self, items):
         return torch.as_tensor(items, dtype=torch.int64, device=self.device)
+
+    def _control_gather(self, tensor):
+        if self.size == 1:
+            return tensor.unsqueeze(0)
+        if self._control_group is None:
+            raise RuntimeError("multi-rank CNOT collectives require an entered World")
+        local = tensor.detach().to(device="cpu").contiguous()
+        parts = [torch.empty_like(local) for _ in range(self.size)]
+        dist.all_gather(parts, local, group=self._control_group)
+        return torch.stack(parts)
 
     def sum(self, tensor):
         if self.size > 1:
@@ -106,30 +178,27 @@ class World:
         return tensor
 
     def checked(self, stage, fn):
-        """Coordinate local failures and agree on the rank-wide diagnostic ABI."""
+        """Coordinate local failures and negotiate the same checked-stage ABI."""
         if self.size == 1:
             return fn()
-        try:
-            from .errors import NativeUnavailable
-            from .rust_control import extension
 
-            native = extension()
-            checker_v2 = getattr(native, "run_cnot_native_checked_v2", None)
-            legacy_checker = getattr(native, "run_cnot_native_checked", None)
-        except NativeUnavailable:
-            checker_v2 = legacy_checker = None
+        native = self._extension()
+        checker_v2 = getattr(native, "run_cnot_native_checked_v2", None)
+        legacy_checker = getattr(native, "run_cnot_native_checked", None)
 
         if self._checked_error_gather_v2 is None:
-            supported = callable(checker_v2)
-            self._checked_error_gather_v2 = (
-                checker_v2 if self.all_ranks_support(supported) else False
-            )
+            supported = self.supports_native("run_cnot_native_checked_v2")
+            self._checked_error_gather_v2 = checker_v2 if supported else False
         if callable(self._checked_error_gather_v2):
             return self._checked_error_gather_v2(self, stage, fn)
-        if callable(legacy_checker):
-            return legacy_checker(self, stage, fn)
 
-        # Compatibility path for older PyO3 modules without the checked ABI.
+        if self._checked_error_gather_v1 is None:
+            supported = self.supports_native("run_cnot_native_checked")
+            self._checked_error_gather_v1 = legacy_checker if supported else False
+        if callable(self._checked_error_gather_v1):
+            return self._checked_error_gather_v1(self, stage, fn)
+
+        # Compatibility path for older PyO3 modules without either checked ABI.
         result, error = None, None
         try:
             result = fn()
@@ -137,19 +206,38 @@ class World:
             error = f"rank {self.rank}: {type(exc).__name__}: {exc}"
         if self.sum(self.longs([int(error is not None)])).item():
             errors = [None] * self.size
-            dist.all_gather_object(errors, error)
+            dist.all_gather_object(errors, error, group=self._control_group)
             raise RuntimeError(f"{stage} failed: " + " | ".join(e for e in errors if e))
         return result
 
-    def _rust_collective(self, name, *args):
-        try:
+    def _extension(self):
+        if self._native_extension is _UNSET:
             from .errors import NativeUnavailable
             from .rust_control import extension
 
-            operation = getattr(extension(), name, None)
-        except NativeUnavailable:
-            operation = None
-        if callable(operation):
+            try:
+                self._native_extension = extension()
+            except (ImportError, NativeUnavailable):
+                self._native_extension = None
+        return self._native_extension
+
+    def native_method(self, name):
+        native = self._extension()
+        return getattr(native, name, None) if native is not None else None
+
+    def supports_native(self, name):
+        if name not in self._native_support_cache:
+            operation = self.native_method(name)
+            self._native_support_cache[name] = (
+                self.all_ranks_support(callable(operation))
+                if self.size > 1
+                else callable(operation)
+            )
+        return self._native_support_cache[name]
+
+    def _rust_collective(self, name, *args):
+        operation = self.native_method(name)
+        if self.supports_native(name) and callable(operation):
             return True, operation(self, *args)
         return False, None
 
@@ -157,15 +245,11 @@ class World:
         """Replicate variable-size metadata with O(total rows) storage, including empty ranks."""
         if self.size == 1:
             return rows
-        try:
-            from .errors import NativeUnavailable
-            from .rust_control import extension
-
-            gather = getattr(extension(), "run_cnot_native_gather_rows", None)
-        except NativeUnavailable:
-            gather = None
-        if callable(gather):
-            return gather(self, rows)
+        used, result = self._rust_collective(
+            "run_cnot_native_gather_rows", rows
+        )
+        if used:
+            return result
 
         # Compatibility path for older PyO3 modules without the gather ABI.
         counts = self.gather_fixed(self.longs([len(rows)])).flatten().tolist()

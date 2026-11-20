@@ -34,8 +34,9 @@ def _two_rank_world():
     world = World("cpu")
     world.rank = 0
     world.size = 2
+    world._control_group = object()
+    world._control_gather = lambda tensor: torch.stack((tensor, tensor.clone()))
     return world
-
 
 def test_control_collectives_use_the_selected_rust_transport():
     world = _two_rank_world()
@@ -194,52 +195,47 @@ def test_world_exchange_preserves_python_fallback_for_older_extensions(monkeypat
 def test_checked_stage_keeps_legacy_rust_abi_when_v2_is_not_universal(monkeypatch):
     world = _two_rank_world()
     calls = []
+    votes = iter((False, True))
     expected = object()
 
-    def rank_support(actual_world, supported):
-        calls.append(("support", actual_world, supported))
-        return False
+    def support(local):
+        calls.append(("support", world, local))
+        return next(votes)
 
     def run_native_checked(actual_world, stage, callback):
         calls.append(("legacy", actual_world, stage))
         return callback()
 
+    monkeypatch.setattr(world, "all_ranks_support", support)
     monkeypatch.setattr(
-        rust_control,
-        "extension",
-        lambda: SimpleNamespace(
-            run_cnot_native_checked=run_native_checked,
-            run_cnot_native_all_ranks_support=rank_support,
-        ),
+        rust_control, "extension",
+        lambda: SimpleNamespace(run_cnot_native_checked=run_native_checked),
     )
 
     assert world.checked("prepare CNOT stage", lambda: expected) is expected
     assert calls == [
         ("support", world, False),
+        ("support", world, True),
         ("legacy", world, "prepare CNOT stage"),
     ]
-
 
 def test_checked_stage_uses_v2_only_after_rank_support_vote(monkeypatch):
     world = _two_rank_world()
     calls = []
     expected = object()
 
-    def rank_support(actual_world, supported):
-        calls.append(("support", actual_world, supported))
-        return supported
+    def support(local):
+        calls.append(("support", world, local))
+        return local
 
     def run_native_checked_v2(actual_world, stage, callback):
         calls.append(("v2", actual_world, stage))
         return callback()
 
+    monkeypatch.setattr(world, "all_ranks_support", support)
     monkeypatch.setattr(
-        rust_control,
-        "extension",
-        lambda: SimpleNamespace(
-            run_cnot_native_checked_v2=run_native_checked_v2,
-            run_cnot_native_all_ranks_support=rank_support,
-        ),
+        rust_control, "extension",
+        lambda: SimpleNamespace(run_cnot_native_checked_v2=run_native_checked_v2),
     )
 
     assert world.checked("prepare CNOT stage", lambda: expected) is expected
@@ -250,7 +246,6 @@ def test_checked_stage_uses_v2_only_after_rank_support_vote(monkeypatch):
         ("v2", world, "prepare CNOT stage"),
         ("v2", world, "expand CNOT stage"),
     ]
-
 
 def test_checked_stage_keeps_python_fallback_for_older_extensions(monkeypatch):
     world = _two_rank_world()
@@ -267,8 +262,8 @@ def test_python_checked_stage_coordinates_keyboard_interrupt(monkeypatch):
     monkeypatch.setattr(world, "sum", lambda tensor: tensor)
     gathered = []
 
-    def all_gather_object(output, local_error, **kwargs):
-        gathered.append(local_error)
+    def all_gather_object(output, local_error, group=None, **kwargs):
+        gathered.append((local_error, group))
         output[0] = local_error
         output[1] = "rank 1: RuntimeError: peer completed the stage"
 
@@ -279,8 +274,9 @@ def test_python_checked_stage_coordinates_keyboard_interrupt(monkeypatch):
 
     with pytest.raises(RuntimeError, match="KeyboardInterrupt: cancel requested"):
         world.checked("CNOT checkpoint stage", interrupted_stage)
-    assert gathered == ["rank 0: KeyboardInterrupt: cancel requested"]
-
+    assert gathered == [
+        ("rank 0: KeyboardInterrupt: cancel requested", world._control_group)
+    ]
 
 def _configure_row_gather(world, local_rows, calls, remote_rows):
     world.rank = 0
@@ -405,43 +401,32 @@ def test_rust_world_native_stage_support_abi_is_exposed():
     assert callable(getattr(native, "run_cnot_native_all_ranks_support", None))
 
 
-def test_world_native_stage_support_delegates_to_rust_when_available(monkeypatch):
+def test_world_native_stage_support_uses_control_group_without_optional_rust_dispatch(monkeypatch):
     world = _two_rank_world()
     calls = []
 
-    def support(actual_world, local_support):
-        calls.append((actual_world, local_support))
-        return local_support
+    def control_gather(local):
+        calls.append(local.tolist())
+        return torch.tensor([[local.item()], [0]], dtype=local.dtype)
 
+    monkeypatch.setattr(world, "_control_gather", control_gather)
     monkeypatch.setattr(
-        rust_control,
-        "extension",
-        lambda: SimpleNamespace(run_cnot_native_all_ranks_support=support),
+        rust_control, "extension",
+        lambda: pytest.fail("capability voting must not enter an optional Rust collective"),
     )
 
-    assert world.all_ranks_support(True) is True
-    assert calls == [(world, True)]
+    assert world.all_ranks_support(True) is False
+    assert calls == [[1]]
 
-
-def test_world_native_stage_support_keeps_python_fallback_for_older_extensions(monkeypatch):
+def test_world_native_stage_support_uses_control_group_when_no_rank_supports_stage():
     world = _two_rank_world()
-    collectives = []
 
-    def longs(values):
-        collectives.append(("longs", list(values)))
-        return torch.tensor(values, dtype=torch.int64)
+    def fail_default_collective(_tensor):
+        pytest.fail("capability votes must not use the search transport")
 
-    def sum(tensor):
-        collectives.append(("sum", tensor.tolist()))
-        return torch.tensor([1], dtype=torch.int64)
-
-    monkeypatch.setattr(world, "longs", longs)
-    monkeypatch.setattr(world, "sum", sum)
-    monkeypatch.setattr(rust_control, "extension", lambda: SimpleNamespace())
+    world.sum = fail_default_collective
 
     assert world.all_ranks_support(False) is False
-    assert collectives == [("longs", [0]), ("sum", [0])]
-
 
 def test_rust_native_stage_support_requires_all_rank_votes(monkeypatch):
     native = rust_control.extension()
@@ -803,6 +788,148 @@ def test_rust_goal_failure_gathers_diagnostics_as_fixed_tensors(monkeypatch):
 
 
 
+def test_rank_support_vote_uses_the_gloo_control_group(monkeypatch):
+    world = World("cpu")
+    world.rank = 0
+    world.size = 2
+    control_group = object()
+    world._control_group = control_group
+    calls = []
+
+    def all_gather(output, local, group=None):
+        calls.append((local.device.type, group))
+        output[0].copy_(local)
+        output[1].zero_()
+
+    monkeypatch.setattr(dist, "all_gather", all_gather)
+    monkeypatch.setattr(
+        rust_control,
+        "extension",
+        lambda: SimpleNamespace(
+            run_cnot_native_all_ranks_support=lambda *_args: pytest.fail(
+                "capability voting must use the stable CPU control group"
+            )
+        ),
+    )
+
+    assert world.all_ranks_support(True) is False
+    assert calls == [("cpu", control_group)]
+
+
+def test_optional_rust_collective_falls_back_when_one_rank_lacks_its_abi(monkeypatch):
+    world = _two_rank_world()
+    calls = []
+
+    def native_operation(*_args):
+        calls.append("native")
+        return object()
+
+    monkeypatch.setattr(world, "all_ranks_support", lambda local: False)
+    monkeypatch.setattr(
+        rust_control, "extension",
+        lambda: SimpleNamespace(run_cnot_native_optional=native_operation),
+    )
+
+    assert world._rust_collective("run_cnot_native_optional") == (False, None)
+    assert calls == []
+
+
+def test_checked_stage_negotiates_legacy_abi_before_calling_it(monkeypatch):
+    world = _two_rank_world()
+    votes = iter((False, False))
+    legacy_calls = []
+    expected = object()
+
+    def legacy(actual_world, stage, callback):
+        legacy_calls.append((actual_world, stage))
+        return callback()
+
+    monkeypatch.setattr(world, "all_ranks_support", lambda _local: next(votes))
+    monkeypatch.setattr(world, "sum", lambda tensor: tensor)
+    monkeypatch.setattr(
+        rust_control, "extension",
+        lambda: SimpleNamespace(run_cnot_native_checked=legacy),
+    )
+
+    assert world.checked("prepare CNOT stage", lambda: expected) is expected
+    assert legacy_calls == []
+
+
+def test_search_controller_falls_back_when_native_runner_is_not_universal(monkeypatch):
+    from multigpubeamsearch import cnot
+
+    root = torch.zeros((1, 2, 1), dtype=torch.int64)
+    world = SimpleNamespace(
+        device=root.device,
+        rank=0,
+        size=2,
+        checked=lambda _stage, callback: callback(),
+        all_ranks_support=lambda _local: False,
+        native_method=lambda _name: lambda: None,
+        supports_native=lambda _name: False,
+    )
+
+    class WorldContext:
+        def __enter__(self):
+            return world
+
+        def __exit__(self, *_args):
+            return False
+
+    native_calls = []
+    compat_calls = []
+    expected = object()
+
+    def native_runner(*args):
+        native_calls.append(args)
+        raise AssertionError("one rank cannot enter the Rust controller alone")
+
+    def compat(actual_world, actual_root, scorer, width, shortlist, max_depth,
+               mode, audit, validation, engine):
+        compat_calls.append((actual_world, actual_root, width, shortlist,
+                             max_depth, mode, audit, validation, engine))
+        return expected
+
+    monkeypatch.setattr(cnot, "World", lambda _device: WorldContext())
+    monkeypatch.setattr(cnot, "_native_search_runner", lambda: native_runner)
+    monkeypatch.setattr(cnot, "_search_cnot_compat", compat)
+
+    result = cnot.search_cnot(
+        root, object(), width=8, shortlist=4, max_depth=3, engine="auto"
+    )
+
+    assert result is expected
+    assert native_calls == []
+    assert len(compat_calls) == 1
+
+
+def test_world_coordinates_device_preflight_error_over_control_group(monkeypatch):
+    world = World("cuda:0")
+    world.rank = 0
+    world.size = 2
+    control_group = object()
+    gathered = []
+
+    monkeypatch.setattr(dist, "get_backend", lambda: "nccl")
+    monkeypatch.setattr(
+        dist, "new_group",
+        lambda **kwargs: control_group if kwargs.get("backend") == "gloo" else None,
+    )
+    monkeypatch.setattr(torch.cuda, "current_device", lambda: 1)
+
+    def all_gather_object(output, local_error, group=None):
+        gathered.append((local_error, group))
+        output[0] = local_error
+        output[1] = "rank 1: ValueError: set the process's local CUDA device"
+    
+    monkeypatch.setattr(dist, "all_gather_object", all_gather_object)
+
+    with pytest.raises(RuntimeError, match="rank 1"):
+        world.__enter__()
+
+    assert gathered and gathered[0][1] is control_group
+
+
 def test_compat_search_forces_python_engine_when_auto_engine_is_not_universal(monkeypatch):
     from multigpubeamsearch import cnot
 
@@ -846,7 +973,6 @@ def test_compat_search_forces_python_engine_when_auto_engine_is_not_universal(mo
     assert support_calls == [True]
     assert engine_calls == ["python"]
     assert transport_calls == [False]
-
 
 def test_native_goal_uses_common_rank_capability_before_dispatch(monkeypatch):
     from multigpubeamsearch import cnot
