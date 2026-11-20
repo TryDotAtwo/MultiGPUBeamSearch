@@ -337,7 +337,6 @@ while not (directory/'stop').exists():
     fs::remove_dir_all(root).unwrap();
 }
 
-
 #[test]
 fn session_cancellation_reaps_all_resident_ranks() {
     let root = std::env::temp_dir().join(format!("beam-search-cancel-{}", std::process::id()));
@@ -416,11 +415,23 @@ while not (directory/'stop').exists():
         workers_dir.join("waiting-0").is_file() && workers_dir.join("waiting-1").is_file();
     cancellation.store(true, Ordering::Release);
     let (mut owner, result) = handle.join().unwrap();
-    assert!(both_ranks_waiting, "both resident ranks must receive the search request");
+    assert!(
+        both_ranks_waiting,
+        "both resident ranks must receive the search request"
+    );
     let error = result.unwrap_err().to_string();
-    assert!(error.contains("cancelled"), "unexpected cancellation result: {error}");
-    assert!(owner.pids().is_empty(), "cancellation must reap every resident rank");
-    assert!(workers_dir.join("stop").is_file(), "rank workers must receive stop marker");
+    assert!(
+        error.contains("cancelled"),
+        "unexpected cancellation result: {error}"
+    );
+    assert!(
+        owner.pids().is_empty(),
+        "cancellation must reap every resident rank"
+    );
+    assert!(
+        workers_dir.join("stop").is_file(),
+        "rank workers must receive stop marker"
+    );
     assert!(workers_dir.join("exited-0").is_file());
     assert!(workers_dir.join("exited-1").is_file());
     owner.close().unwrap();
