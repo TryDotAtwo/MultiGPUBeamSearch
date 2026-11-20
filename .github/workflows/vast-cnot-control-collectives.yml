@@ -37,6 +37,28 @@ jobs:
           python-version: "3.11"
       - name: Compile the permutation acceptance script
         run: python -m py_compile tools/verify_permutation_cuda.py
+      - name: Syntax-check the remote Bash payload without running it
+        shell: bash
+        run: |
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          import subprocess
+
+          source = Path(".github/workflows/vast-cnot-control-collectives.yml").read_text(encoding="utf-8")
+          marker = "cat > \"${RUNNER_TEMP}/run-cnot-control.sh\" <<'REMOTE'\n"
+          start = source.index(marker) + len(marker)
+          end = source.index("\n          REMOTE\n", start)
+          lines = source[start:end].splitlines()
+          for number, line in enumerate(lines, 1):
+              if line and not line.startswith("          "):
+                  raise SystemExit(f"unexpected indentation in remote payload line {number}")
+              if line:
+                  lines[number - 1] = line[10:]
+          payload = Path(os.environ["RUNNER_TEMP"]) / "vast-remote-payload.sh"
+          payload.write_text("\n".join(lines) + "\n", encoding="utf-8")
+          subprocess.run(["bash", "-n", str(payload)], check=True)
+          PY
 
   gpu-acceptance:
     if: github.event_name == 'workflow_dispatch'
