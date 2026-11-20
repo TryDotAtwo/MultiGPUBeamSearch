@@ -178,7 +178,8 @@ def test_rank_plan_validation_keeps_python_for_noninteger_legacy_values(monkeypa
             return True
 
     plans=_valid_rank_plans_for_native_validation()
-    plans[0]['WORLD_SIZE']=True
+    for row in plans:
+        row['WORLD_SIZE']=True
     monkeypatch.setattr(rust_control,'extension',lambda:NativeExtension())
     with pytest.raises(ValueError,match='missing rank admission'):
         pipeline_profiles.validate_rank_plans(plans)
