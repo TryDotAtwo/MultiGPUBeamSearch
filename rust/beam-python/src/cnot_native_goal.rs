@@ -2,10 +2,11 @@
 //!
 //! Torch owns every tensor. This module only retains handles during one
 //! coarse stage, and uses the same goal and error collectives as the reference.
+use crate::cnot_native_checked::gather_error_messages_v2;
 use pyo3::{
     exceptions::{PyException, PyOverflowError, PyRuntimeError, PyZeroDivisionError},
     prelude::*,
-    types::{PyDict, PyList},
+    types::PyDict,
 };
 
 fn local_goal<'py>(
@@ -135,16 +136,12 @@ pub(crate) fn goal<'py>(
         .collect::<PyResult<Vec<_>>>()?;
     if rows.iter().any(|(_, _, failed)| *failed != 0) {
         let size: usize = world.getattr("size")?.extract()?;
-        let errors = PyList::new(py, (0..size).map(|_| py.None()))?;
-        py.import("torch.distributed")?
-            .call_method1("all_gather_object", (&errors, error))?;
-        let messages: Vec<Option<String>> = errors.extract()?;
+        let messages = gather_error_messages_v2(world, size, error.as_deref())?;
         return Err(PyRuntimeError::new_err(format!(
             "find CNOT goal failed: {}",
             messages
                 .into_iter()
-                .flatten()
-                .filter(|s| !s.is_empty())
+                .filter(|message| !message.is_empty())
                 .collect::<Vec<_>>()
                 .join(" | ")
         )));

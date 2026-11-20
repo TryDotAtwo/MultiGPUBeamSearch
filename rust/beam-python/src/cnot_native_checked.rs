@@ -9,7 +9,7 @@ use pyo3::{
     types::PyList,
 };
 
-fn gather_error_messages_v2<'py>(
+pub(crate) fn gather_error_messages_v2<'py>(
     world: &Bound<'py, PyAny>,
     size: usize,
     error: Option<&str>,
