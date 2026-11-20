@@ -2632,6 +2632,7 @@ Main commit `148b2a826a369b7601e904ea409e0cc5301c75c9` also passed the 260-test 
   passed Rust checks, PyO3 build, 266 Python tests (2 skipped), and NCCL probe
   syntax. Artifact 14595053280, SHA-256
   `8057258b53a903863f37a50d27a157a064bcd14ab0f8507daca087d8a3bdddd9`.
+- Main GREEN: [Actions run 44661706426](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44661706426) at `080f98fd1968ca8af5fc1a18629efb7ab707b5db` passed Rust checks, PyO3 build, 266 Python tests (2 skipped), and NCCL probe syntax. Artifact 14595702908, SHA-256 `5132784e06da62aa6ee3faeeaff9ca014ddc9ed2865fe439c0fa929b656f1f2c`.
 - The test uses a two-rank CPU diagnostic fixture; it does not establish
   physical CUDA/NCCL multi-GPU execution. Evidence:
   `test_results/refactor_20261120/cnot-goal-tensor-errors/GITHUB_STATUS.md`.

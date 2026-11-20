@@ -19,3 +19,6 @@ object-gather compatibility behavior.
 
 The test exercises the two-rank diagnostic contract using CPU tensors. No
 physical GPU or multi-GPU goal-error run was executed.
+
+- Main GREEN: [run 44661706426](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44661706426) on `main` commit `080f98fd1968ca8af5fc1a18629efb7ab707b5db` passed Rust checks, PyO3 build, 266 Python tests (2 skipped), and NCCL probe syntax.
+- Main artifact: [14595702908](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44661706426/artifacts/14595702908), SHA-256 `5132784e06da62aa6ee3faeeaff9ca014ddc9ed2865fe439c0fa929b656f1f2c`.
