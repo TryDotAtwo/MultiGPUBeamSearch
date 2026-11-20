@@ -17,3 +17,6 @@ No search, quota, rank, collective, or CUDA behavior changes.
 - Actions artifact: [14594831023](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44658594054/artifacts/14594831023), SHA-256 `746312d931ec875bbceeb253b9ca5a316a47cbba788805109fda034eee8ccdd1`.
 
 These are hosted CPU/PyO3 and syntax checks. No physical GPU or multi-GPU runtime was executed; no Vast instance was started.
+
+- Main GREEN: [run 44659065473](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44659065473) on `main` commit `62feb392b66bed588d66e0f94b4049f82f523c3e` passed 265 Python tests (2 skipped), Rust checks, PyO3 build, and NCCL probe syntax.
+- Main artifact: [14594144027](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44659065473/artifacts/14594144027), SHA-256 `61f754fbc8f51c56ad3d1b4407d630a0350539198b443fc9cfa0b3dc06382e34`.
