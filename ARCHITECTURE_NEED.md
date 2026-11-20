@@ -53,6 +53,28 @@ policy are unchanged. CPU/Gloo and PyO3 checks do not establish physical
 CUDA/NCCL failure recovery.
 
 
+## CNOT selection and gathered-row preflight, 2026-11-20
+
+CNOT selection now coordinates local preparation failures over the existing
+CPU/Gloo control group before ranks enter the next search-data collective.
+Preflight covers count and histogram reduction setup, local radix-boundary
+updates before another selection pass, selected-record preparation before
+gather, and row-gather buffer allocation plus per-source slicing and copy
+preparation before broadcasts. Stream 5 fixed gathers allocate the input and
+output buffers, validate their shape/device/contiguity, and vote on readiness
+before entering the existing NCCL all-gather. The Python compatibility path
+uses the same control-stage ordering.
+
+The checks add control-group coordination; they preserve the search order,
+winner tie-breaks, scoring, numerical policy, candidate IDs, rank ownership,
+and existing NCCL payload and collective order. A rank-local preparation
+failure can be coordinated while the Gloo control group is usable. This does
+not recover process loss or a failed or indefinitely blocked NCCL communicator.
+CPU/Gloo and installed-wheel checks passed; physical CUDA/NCCL behavior remains
+unverified.
+Evidence: `test_results/refactor_20261120/cnot-collective-preflight/GITHUB_STATUS.md`.
+
+
 ## Rust session identity для beam_width="max", 2026-11-20
 
 Запрошенное значение ширины и разрешённая ширина — разные поля контракта.

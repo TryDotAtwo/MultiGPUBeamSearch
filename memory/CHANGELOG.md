@@ -2897,3 +2897,39 @@ Main commit `148b2a826a369b7601e904ea409e0cc5301c75c9` also passed the 260-test 
 - Physical CUDA/NCCL cancellation, the штатный checkpoint scorer on GPU, and
   physical 1-/2-GPU search remain unverified. Full test and workflow output is
   retained in the linked Actions artifacts.
+
+
+## 2026-11-20 - Preflight CNOT selection and gathered-row collectives
+
+- CNOT now coordinates rank-local selection preparation, selected-record
+  gathering, row-gather buffers and copies, and Stream 5 fixed-gather
+  preparation over the existing CPU/Gloo control group before ranks enter the
+  next data collective. The Python compatibility path follows the same stage
+  order.
+- Search order, tie-breaks, scorer calls, numerical policy, candidate IDs,
+  ownership, and NCCL payload/collective order are unchanged. This catches
+  local preparation failures only while the Gloo control group remains usable;
+  process loss or a failed/hung NCCL communicator is not recovered.
+- RED: [Actions run 44804192845](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44804192845)
+  reproduced a rank-local CNOT histogram preparation exception escaping the
+  stage before its peer could proceed safely.
+- GREEN: main commit `74f71ccef2895f96b716282e7ee29d9800c564dc`,
+  [CNOT CPU/Gloo run 44812797417](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44812797417),
+  passed 308 tests (2 skipped, 104 warnings). Artifact
+  [14667597426](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44812797417/artifacts/14667597426),
+  SHA-256 `057e12b7adc26b11fc4022acedffd17c0bbf786d0111222570398250ef3662be`.
+- [Installed wheel run 44812797344](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44812797344)
+  built a PEP 517 wheel and installed it outside the checkout; `pip check`,
+  public exports, and `resident-search-v1` passed. Artifact
+  [14667767054](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44812797344/artifacts/14667767054),
+  SHA-256 `cadfb46d6191211dbaf420ae3092ae7822ee16b5f4f42120f05dcd5288a7be4f`.
+- Rust/permutation-depth CPU contract run
+  [44812797266](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44812797266)
+  passed.
+- Read-only Vast run
+  [44812797614](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44812797614)
+  found instance 61080396 exited and skipped checkout, transfer, build and
+  GPU execution. It did not change resource state. Physical 1-/2-GPU runs and
+  the штатный checkpoint scorer remain unverified.
+- No local build/results were created and no paid execution was used.
+- Full receipts: `test_results/refactor_20261120/cnot-collective-preflight/GITHUB_STATUS.md`.
