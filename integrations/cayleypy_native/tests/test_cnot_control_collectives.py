@@ -261,6 +261,27 @@ def test_checked_stage_keeps_python_fallback_for_older_extensions(monkeypatch):
     assert world.checked("prepare CNOT stage", lambda: expected) is expected
 
 
+def test_python_checked_stage_coordinates_keyboard_interrupt(monkeypatch):
+    world = _two_rank_world()
+    monkeypatch.setattr(rust_control, "extension", lambda: SimpleNamespace())
+    monkeypatch.setattr(world, "sum", lambda tensor: tensor)
+    gathered = []
+
+    def all_gather_object(output, local_error, **kwargs):
+        gathered.append(local_error)
+        output[0] = local_error
+        output[1] = "rank 1: RuntimeError: peer completed the stage"
+
+    monkeypatch.setattr(dist, "all_gather_object", all_gather_object)
+
+    def interrupted_stage():
+        raise KeyboardInterrupt("cancel requested")
+
+    with pytest.raises(RuntimeError, match="KeyboardInterrupt: cancel requested"):
+        world.checked("CNOT checkpoint stage", interrupted_stage)
+    assert gathered == ["rank 0: KeyboardInterrupt: cancel requested"]
+
+
 def _configure_row_gather(world, local_rows, calls, remote_rows):
     world.rank = 0
     world.size = 2
@@ -703,6 +724,30 @@ def test_rust_checked_stage_gathers_error_messages_without_object_collective(mon
         "rank 1: RuntimeError: remote failure"
     )
     assert len(gathered) == 2
+
+def test_rust_checked_stage_coordinates_keyboard_interrupt(monkeypatch):
+    world = _two_rank_world()
+    monkeypatch.setattr(world, "all_ranks_support", lambda supported: supported)
+    monkeypatch.setattr(world, "longs", lambda values: torch.tensor(values, dtype=torch.int64))
+    monkeypatch.setattr(world, "sum", lambda tensor: torch.tensor([1], dtype=torch.int64))
+    gathered = []
+
+    def gather_fixed(tensor):
+        gathered.append(tensor)
+        if len(gathered) == 1:
+            return torch.tensor([[tensor.item()], [0]], dtype=torch.int64)
+        return torch.stack((tensor, torch.zeros_like(tensor)))
+
+    monkeypatch.setattr(world, "gather_fixed", gather_fixed)
+    checker = rust_control.extension().run_cnot_native_checked_v2
+
+    def interrupted_stage():
+        raise KeyboardInterrupt("cancel requested")
+
+    with pytest.raises(RuntimeError, match="KeyboardInterrupt: cancel requested"):
+        checker(world, "CNOT checkpoint stage", interrupted_stage)
+    assert len(gathered) == 2
+
 
 def test_rust_goal_failure_gathers_diagnostics_as_fixed_tensors(monkeypatch):
     from multigpubeamsearch import _beam_runtime

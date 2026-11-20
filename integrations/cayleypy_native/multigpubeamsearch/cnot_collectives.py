@@ -133,7 +133,7 @@ class World:
         result, error = None, None
         try:
             result = fn()
-        except Exception as exc:
+        except BaseException as exc:
             error = f"rank {self.rank}: {type(exc).__name__}: {exc}"
         if self.sum(self.longs([int(error is not None)])).item():
             errors = [None] * self.size

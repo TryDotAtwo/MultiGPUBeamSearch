@@ -117,6 +117,9 @@ rank processes after their ABI/layout and specialization checks.
   errors gather UTF-8 diagnostics as length and padded-byte tensors through the
   selected `World` transport; the older checked-stage compatibility ABI retains
   its existing object-gather fallback.
+  Multi-rank checked callbacks capture `BaseException` as a rank-local failure
+  before voting, so one rank's `KeyboardInterrupt` cannot leave peers waiting in
+  the stage. A one-rank call preserves the original exception.
   Its score validation and legacy CPU/older-CUDA expansion and distinct
   sequences are Rust-owned while using the same Torch and domain operators;
   mixed operator availability on ranks must remain valid.

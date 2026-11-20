@@ -4,7 +4,7 @@
 //! object gather for compatibility; the v2 path gathers UTF-8 diagnostics as
 //! fixed-size tensors over the existing world transport. Torch owns buffers.
 use pyo3::{
-    exceptions::{PyException, PyOverflowError, PyRuntimeError},
+    exceptions::{PyBaseException, PyOverflowError, PyRuntimeError},
     prelude::*,
     types::PyList,
 };
@@ -97,7 +97,7 @@ fn checked_impl<'py>(
     let (value, error) = match result {
         Ok(value) => (Some(value), None),
         Err(error) => {
-            if !error.is_instance_of::<PyException>(py) {
+            if !error.is_instance_of::<PyBaseException>(py) {
                 return Err(error);
             }
             let rank: usize = world.getattr("rank")?.extract()?;
