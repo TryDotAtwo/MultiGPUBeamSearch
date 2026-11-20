@@ -703,3 +703,56 @@ def test_rust_checked_stage_gathers_error_messages_without_object_collective(mon
         "rank 1: RuntimeError: remote failure"
     )
     assert len(gathered) == 2
+
+def test_rust_goal_failure_gathers_diagnostics_as_fixed_tensors(monkeypatch):
+    from multigpubeamsearch import _beam_runtime
+
+    world = _two_rank_world()
+    local_message = b"rank 0: ValueError: local failure"
+    remote_message = b"rank 1: RuntimeError: remote failure"
+    gathered = []
+    monkeypatch.setattr(
+        world, "longs", lambda values: torch.tensor(values, dtype=torch.int64)
+    )
+
+    def gather_fixed(tensor):
+        gathered.append(tensor)
+        if len(gathered) == 1:
+            return torch.tensor(
+                [[torch.iinfo(torch.int64).max, -1, 1],
+                 [torch.iinfo(torch.int64).max, -1, 0]],
+                dtype=torch.int64,
+            )
+        if len(gathered) == 2:
+            return torch.tensor(
+                [[len(local_message)], [len(remote_message)]], dtype=torch.int64
+            )
+        if len(gathered) == 3:
+            width = max(len(local_message), len(remote_message))
+            local = list(local_message) + [0] * (width - len(local_message))
+            remote = list(remote_message) + [0] * (width - len(remote_message))
+            return torch.tensor([local, remote], dtype=torch.int64)
+        raise AssertionError("unexpected fixed gather")
+
+    monkeypatch.setattr(world, "gather_fixed", gather_fixed)
+    monkeypatch.setattr(
+        dist,
+        "all_gather_object",
+        lambda *_args, **_kwargs: pytest.fail("goal error must not use object gather"),
+    )
+
+    class FailingParents:
+        def size(self, dimension):
+            raise ValueError("local failure")
+
+    with pytest.raises(RuntimeError) as exc_info:
+        _beam_runtime.run_cnot_native_goal(
+            world, FailingParents(), torch.empty(0, dtype=torch.int64), 0, object()
+        )
+
+    assert str(exc_info.value) == (
+        "find CNOT goal failed: rank 0: ValueError: local failure | "
+        "rank 1: RuntimeError: remote failure"
+    )
+    assert len(gathered) == 3
+
