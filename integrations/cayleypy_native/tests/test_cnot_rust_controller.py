@@ -788,7 +788,9 @@ def distributed_cnot_setup_failure(rank, rendezvous, failure_point):
             f"{expected_stages[failure_point]} failed: "
             f"rank 1: RuntimeError: {message}"
         )
-        assert str(error.value) == expected
+        assert str(error.value) == expected, (
+            f"{failure_point} returned {str(error.value)!r}; expected {expected!r}"
+        )
 
         # The coordinated preflight error must leave the caller's Gloo world usable.
         probe = torch.tensor([rank + 1], dtype=torch.int64)
