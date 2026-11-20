@@ -56,8 +56,18 @@ jobs:
               if line:
                   lines[number - 1] = line[10:]
           payload = Path(os.environ["RUNNER_TEMP"]) / "vast-remote-payload.sh"
-          payload.write_text("\n".join(lines) + "\n", encoding="utf-8")
+          payload_text = "\n".join(lines) + "\n"
+          payload.write_text(payload_text, encoding="utf-8")
           subprocess.run(["bash", "-n", str(payload)], check=True)
+          archive_command = 'tar -czf "$archive" CMakeLists.txt Cargo.toml Cargo.lock cmake cuda integrations/cayleypy_native integrations/cnot_scorer native rust src tools tests'
+          if archive_command not in source:
+              raise SystemExit("the remote source archive must include root CMake test sources")
+          for required in (
+              '"$wheel_python" -m pip install --force-reinstall --no-deps "$wheel"',
+              "if not module_path.is_relative_to(venv):",
+          ):
+              if required not in payload_text:
+                  raise SystemExit(f"missing installed-wheel provenance guard: {required}")
           lines = source.splitlines()
           heredoc_count = 0
           index = 0
@@ -191,7 +201,7 @@ jobs:
           set -euo pipefail
           [[ "$(git rev-parse HEAD)" == "$SOURCE_SHA" ]]
           archive="${RUNNER_TEMP}/beam-gpu-acceptance-${SOURCE_SHA}.tar.gz"
-          tar -czf "$archive" CMakeLists.txt Cargo.toml Cargo.lock cmake cuda integrations/cayleypy_native integrations/cnot_scorer native rust src tools
+          tar -czf "$archive" CMakeLists.txt Cargo.toml Cargo.lock cmake cuda integrations/cayleypy_native integrations/cnot_scorer native rust src tools tests
           echo "path=$archive" >> "$GITHUB_OUTPUT"
           echo "sha256=$(sha256sum "$archive" | awk '{print $1}')" >> "$GITHUB_OUTPUT"
       - name: Build the installed wheel and exercise both GPU search domains
@@ -302,7 +312,17 @@ jobs:
             wheel="$(find "$wheel_dir" -maxdepth 1 -type f -name 'multigpubeamsearch-*.whl' -print -quit)"
             test -n "$wheel"
             wheel_python="${venv}/bin/python"
-            "$wheel_python" -m pip install "$wheel"
+            "$wheel_python" -m pip install --force-reinstall --no-deps "$wheel"
+            "$wheel_python" - "$venv" <<'PY'
+          import sys
+          from pathlib import Path
+          import multigpubeamsearch
+          venv = Path(sys.argv[1]).resolve()
+          module_path = Path(multigpubeamsearch.__file__).resolve()
+          if not module_path.is_relative_to(venv):
+              raise SystemExit(f"wheel import escaped the acceptance venv: {module_path}")
+          print("INSTALLED_PACKAGE_PATH=" + str(module_path))
+          PY
             "$wheel_python" -m pip check
             cd "${run_root}/wheel-smoke"
             unset PYTHONPATH
