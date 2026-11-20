@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-11-20 - Move permutation search-input serialization into Rust
+
+- beam-runtime::search_inputs now writes the legacy permutation puzzle_info.json and test.csv from a Rust-validated PublicGraphContract, preserving byte formatting and generator order. PyO3 rebuilds and validates the normalized request; Python retains the writer for older extensions and legacy contract shapes.
+- The test-first RED run [44637299070](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44637299070) reached Rust compilation and failed on the expected missing beam_runtime::search_inputs module. The first compatibility run exposed seven test fixtures without Rust graph fields; the adapter now returns to the existing Python writer for those shapes.
+- GREEN CNOT CPU/PyO3 run [44640784456](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44640784456) passed Rust formatting/checks, PyO3 build, 240 Python tests (2 skipped), and NCCL probe syntax. Artifact [14586960403](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44640784456/artifacts/14586960403), SHA-256 81c2e270527d8e2180c8a49f8dfcc3ef627a9bd2b62cbe7fb71ee64fd61a211b. Companion permutation depth-control run [44640371591](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44640371591) passed.
+- This transfers task-file serialization only. Search semantics, multi-GPU rank protocol, inference kernels, and CNOT behavior are unchanged. The checks do not include physical CUDA/NCCL multi-GPU execution. Evidence: test_results/refactor_20261120/rust-search-input-serialization/GITHUB_STATUS.md.
+
 ## 2026-11-19 - Move CNOT deduplicate/score dispatch into Rust
 
 - For typed `PyCnotSearchInput`, the Rust compatibility adapter now owns distinct-state dispatch, score validation, rank-wide error coordination, and result assignment. It reuses the existing CUDA `distinct_candidates` operator and scorer; CPU and older operator libraries retain `cnot._distinct`.
