@@ -429,8 +429,14 @@ impl Backend for NativeStages<'_> {
             required(&self.values, "values")?,
             column(&required(&self.meta, "meta")?, 1)?,
             width,
-        )?
-        .into_bound(self.py);
+        )
+        .map(|result| result.into_bound(self.py));
+        let result = checked(
+            self.py,
+            &self.world,
+            "select CNOT frontier",
+            result,
+        )?;
         self.ranks = Some(result.get_item(0)?);
         self.local = Some(result.get_item(1)?);
         self.new_lex = Some(result.get_item(2)?);
