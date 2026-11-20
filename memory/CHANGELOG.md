@@ -2666,3 +2666,6 @@ Main commit `148b2a826a369b7601e904ea409e0cc5301c75c9` also passed the 260-test 
 - The test uses a two-rank CPU diagnostic fixture; it does not establish
   physical CUDA/NCCL multi-GPU execution. Evidence:
   `test_results/refactor_20261120/cnot-goal-tensor-errors/GITHUB_STATUS.md`.
+- MAIN GREEN: [Actions run 44699705418](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44699705418) at `db9577fcc61a3b57fae1ba0e1e2bc5c579e9b001` passed the same Rust/PyO3 CPU suite (269 passed, 2 skipped, 104 warnings). Artifact 14612416568, SHA-256 `51be4e713b50c58e70e9a7b95ec055ab2f039420715dfe275f4e5d9c8a8ddfa6`.
+- The automatically triggered existing-Vast workflow [44699705287](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44699705287) observed a stopped instance and skipped remote build/execution; it did not start the instance. Physical CUDA/NCCL validation remains unverified.
+
