@@ -801,3 +801,143 @@ def test_rust_goal_failure_gathers_diagnostics_as_fixed_tensors(monkeypatch):
     )
     assert len(gathered) == 3
 
+
+
+def test_rank_support_vote_uses_the_gloo_control_group(monkeypatch):
+    world = World("cpu")
+    world.rank = 0
+    world.size = 2
+    control_group = object()
+    world._control_group = control_group
+    calls = []
+
+    def all_gather(output, local, group=None):
+        calls.append((local.device.type, group))
+        output[0].copy_(local)
+        output[1].zero_()
+
+    monkeypatch.setattr(dist, "all_gather", all_gather)
+    monkeypatch.setattr(
+        rust_control,
+        "extension",
+        lambda: SimpleNamespace(
+            run_cnot_native_all_ranks_support=lambda *_args: pytest.fail(
+                "capability voting must use the stable CPU control group"
+            )
+        ),
+    )
+
+    assert world.all_ranks_support(True) is False
+    assert calls == [("cpu", control_group)]
+
+
+def test_optional_rust_collective_falls_back_when_one_rank_lacks_its_abi(monkeypatch):
+    world = _two_rank_world()
+    calls = []
+
+    def native_operation(*_args):
+        calls.append("native")
+        return object()
+
+    monkeypatch.setattr(world, "all_ranks_support", lambda local: False)
+    monkeypatch.setattr(
+        rust_control, "extension",
+        lambda: SimpleNamespace(run_cnot_native_optional=native_operation),
+    )
+
+    assert world._rust_collective("run_cnot_native_optional") == (False, None)
+    assert calls == []
+
+
+def test_checked_stage_negotiates_legacy_abi_before_calling_it(monkeypatch):
+    world = _two_rank_world()
+    votes = iter((False, False))
+    legacy_calls = []
+    expected = object()
+
+    def legacy(actual_world, stage, callback):
+        legacy_calls.append((actual_world, stage))
+        return callback()
+
+    monkeypatch.setattr(world, "all_ranks_support", lambda _local: next(votes))
+    monkeypatch.setattr(world, "sum", lambda tensor: tensor)
+    monkeypatch.setattr(
+        rust_control, "extension",
+        lambda: SimpleNamespace(run_cnot_native_checked=legacy),
+    )
+
+    assert world.checked("prepare CNOT stage", lambda: expected) is expected
+    assert legacy_calls == []
+
+
+def test_search_controller_falls_back_when_native_runner_is_not_universal(monkeypatch):
+    from multigpubeamsearch import cnot
+
+    root = torch.zeros((1, 2, 1), dtype=torch.int64)
+    world = SimpleNamespace(
+        device=root.device,
+        rank=0,
+        size=2,
+        checked=lambda _stage, callback: callback(),
+        all_ranks_support=lambda _local: False,
+    )
+
+    class WorldContext:
+        def __enter__(self):
+            return world
+
+        def __exit__(self, *_args):
+            return False
+
+    native_calls = []
+    compat_calls = []
+    expected = object()
+
+    def native_runner(*args):
+        native_calls.append(args)
+        raise AssertionError("one rank cannot enter the Rust controller alone")
+
+    def compat(actual_world, actual_root, scorer, width, shortlist, max_depth,
+               mode, audit, validation, engine):
+        compat_calls.append((actual_world, actual_root, width, shortlist,
+                             max_depth, mode, audit, validation, engine))
+        return expected
+
+    monkeypatch.setattr(cnot, "World", lambda _device: WorldContext())
+    monkeypatch.setattr(cnot, "_native_search_runner", lambda: native_runner)
+    monkeypatch.setattr(cnot, "_search_cnot_compat", compat)
+
+    result = cnot.search_cnot(
+        root, object(), width=8, shortlist=4, max_depth=3, engine="auto"
+    )
+
+    assert result is expected
+    assert native_calls == []
+    assert len(compat_calls) == 1
+
+
+def test_world_coordinates_device_preflight_error_over_control_group(monkeypatch):
+    world = World("cuda:0")
+    world.rank = 0
+    world.size = 2
+    control_group = object()
+    gathered = []
+
+    monkeypatch.setattr(dist, "get_backend", lambda: "nccl")
+    monkeypatch.setattr(
+        dist, "new_group",
+        lambda **kwargs: control_group if kwargs.get("backend") == "gloo" else None,
+    )
+    monkeypatch.setattr(torch.cuda, "current_device", lambda: 1)
+
+    def all_gather_object(output, local_error, group=None):
+        gathered.append((local_error, group))
+        output[0] = local_error
+        output[1] = "rank 1: ValueError: set the process's local CUDA device"
+    
+    monkeypatch.setattr(dist, "all_gather_object", all_gather_object)
+
+    with pytest.raises(RuntimeError, match="rank 1"):
+        world.__enter__()
+
+    assert gathered and gathered[0][1] is control_group
