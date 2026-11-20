@@ -2943,3 +2943,32 @@ Main commit `148b2a826a369b7601e904ea409e0cc5301c75c9` also passed the 260-test 
   the штатный checkpoint scorer remain unverified.
 - No local build/results were created and no paid execution was used.
 - Full receipts: `test_results/refactor_20261120/cnot-collective-preflight/GITHUB_STATUS.md`.
+
+## 2026-11-21 - Prepare installed-wheel GPU acceptance
+
+- Added an installed-wheel permutation acceptance script for CayleyPy LRX(4).
+  It searches a reachable state at exact distance 2–4, independently replays
+  the result, and repeats each one-GPU and two-GPU search inside a Rust-owned
+  session while checking worker-process reuse.
+- Converted the existing Vast CNOT control workflow to manual dispatch. It
+  requires a USD spend cap, checks the already-running 2x RTX 3060 instance,
+  derives a bounded test runtime, and never starts or stops the instance.
+- The physical workflow builds and installs the PEP 517 wheel on Vast, checks
+  the private trained scorer's pinned checkpoint, runs permutation and CNOT
+  searches on one and two GPUs, and keeps full output in the remote
+  test_results/ tree and Actions artifacts. Private checkpoint files are
+  referenced in place and are excluded from the source archive.
+- The source harness has not yet run on physical GPUs. A configured workflow
+  and CPU-side syntax validation do not establish CUDA, NCCL, checkpoint
+  scoring, or 1-/2-GPU acceptance. A user-supplied spend cap is still required
+  before dispatch; the target Vast instance was previously reported stopped.
+
+## 2026-11-21 - Repair GPU acceptance packaging checks
+
+- Included the repository-root `tests/` directory in the remote build archive because the full CMake project references those C++ test sources during configuration.
+- The acceptance environment now force-reinstalls the wheel built for the tested commit and verifies that `multigpubeamsearch` imports from that run's virtual environment.
+- Kept the authenticated SSH control-master connection open until remote `test_results/` retrieval, even though the one-time key is revoked by the remote exit trap. Hosted fake-SSH tests cover both successful runs and failed runs with partial-result collection.
+- The permutation fixture independently replays moves and checks the reported device layout against the count of distinct Rust rank-worker processes; recorded world size now reflects those observed workers.
+- Hosted source validation passed in [Actions run 44831036050](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44831036050); artifact [14675264978](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44831036050/artifacts/14675264978), SHA-256 `66fb835caa5cc9e1a897bb97777c18cccdffd9cb3092c3ec2e7908ae9181bfad`.
+- That push-triggered run validated Python/Bash syntax and packaging guards only. The physical GPU job was skipped; CUDA/NCCL search and checkpoint-scored CNOT remain unverified pending a supplied spend cap and an already-running instance.
+- Source-controlled evidence: `test_results/refactor_20261121/gpu-acceptance/GITHUB_STATUS.md`.

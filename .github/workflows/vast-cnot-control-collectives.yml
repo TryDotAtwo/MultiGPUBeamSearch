@@ -1,30 +1,21 @@
-name: CNOT Rust control collectives on existing Vast
+name: Installed-wheel permutation and CNOT GPU acceptance
 
 on:
   workflow_dispatch:
+    inputs:
+      spend_cap_usd:
+        description: "USD ceiling for this GPU acceptance run. Instance 61080396 must already be running. The workflow never starts or stops it, so a running instance remains billable after the job."
+        required: true
+        type: string
   push:
     branches:
-      - main
+      - "codex/beam-*"
     paths:
       - .github/workflows/vast-cnot-control-collectives.yml
-      - cuda/cnot_stream5_bridge.cu
-      - integrations/cayleypy_native/multigpubeamsearch/cnot_collectives.py
-      - integrations/cayleypy_native/multigpubeamsearch/cnot_stream5.py
-      - integrations/cayleypy_native/tests/cnot_stream5_control_nccl.py
-      - integrations/cayleypy_native/tests/cnot_device_unseen_distributed.py
-      - integrations/cayleypy_native/multigpubeamsearch/cnot_native.py
-      - CMakeLists.txt
-      - cmake/BeamStateSizing.cmake
-      - cuda/cnot_*
-      - native/cnot_owned_domain.*
-      - rust/beam-native-sys/src/cnot_*
-      - rust/beam-python/src/cnot_*
-      - rust/beam-native-sys/src/cnot_stream5.rs
-      - rust/beam-python/src/cnot_stream5.rs
-      - rust/beam-python/src/cnot_native_stages.rs
-      - Cargo.toml
-      - Cargo.lock
-
+      - tools/verify_permutation_cuda.py
+      - tools/vast_result_transport.sh
+      - tools/test_vast_result_transport.py
+      - memory/CHANGELOG.md
 permissions:
   contents: read
 
@@ -33,19 +24,132 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  control-collectives:
-    name: Build and exercise two-rank NCCL control collectives
+  validate-source:
+    name: Validate acceptance harness source
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Compile the acceptance scripts
+        id: compile_source
+        run: python -m py_compile tools/verify_permutation_cuda.py tools/test_vast_result_transport.py
+      - name: Test Vast result retrieval after remote key revocation
+        id: transport_test
+        run: python tools/test_vast_result_transport.py -v
+      - name: Syntax-check the remote Bash payload without running it
+        id: syntax_check
+        shell: bash
+        run: |
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          import subprocess
+
+          source = Path(".github/workflows/vast-cnot-control-collectives.yml").read_text(encoding="utf-8")
+          marker = "cat > \"${RUNNER_TEMP}/run-cnot-control.sh\" <<'REMOTE'\n"
+          start = source.index(marker) + len(marker)
+          end = source.index("\n          REMOTE\n", start)
+          lines = source[start:end].splitlines()
+          for number, line in enumerate(lines, 1):
+              if line and not line.startswith("          "):
+                  raise SystemExit(f"unexpected indentation in remote payload line {number}")
+              if line:
+                  lines[number - 1] = line[10:]
+          payload = Path(os.environ["RUNNER_TEMP"]) / "vast-remote-payload.sh"
+          payload_text = "\n".join(lines) + "\n"
+          payload.write_text(payload_text, encoding="utf-8")
+          subprocess.run(["bash", "-n", str(payload)], check=True)
+          archive_command = 'tar -czf "$archive" CMakeLists.txt Cargo.toml Cargo.lock cmake cuda integrations/cayleypy_native integrations/cnot_scorer native rust src tools tests'
+          if archive_command not in source:
+              raise SystemExit("the remote source archive must include root CMake test sources")
+          for required in (
+              '"$wheel_python" -m pip install --force-reinstall --no-deps "$wheel"',
+              "if not module_path.is_relative_to(venv):",
+          ):
+              if required not in payload_text:
+                  raise SystemExit(f"missing installed-wheel provenance guard: {required}")
+          if "bash tools/vast_result_transport.sh" not in source:
+              raise SystemExit("the remote GPU job must use the tested SSH result transport")
+          if "ControlMaster=yes -MNf" not in Path("tools/vast_result_transport.sh").read_text(encoding="utf-8"):
+              raise SystemExit("the SSH result transport must retain an authenticated control master")
+          artifact_section = source.split("      - name: Upload sanitized status and remote test log", 1)[1]
+          if "beam-gpu-acceptance-test-results.tar.gz" not in artifact_section:
+              raise SystemExit("the remote GPU test_results archive must be uploaded as an Actions artifact")
+          lines = source.splitlines()
+          heredoc_count = 0
+          index = 0
+          marker = "<" * 2 + "'" + "PY" + "'"
+          while index < len(lines):
+              if marker not in lines[index]:
+                  index += 1
+                  continue
+              index += 1
+              body = []
+              while index < len(lines) and lines[index].strip() != "PY":
+                  line = lines[index]
+                  if line and not line.startswith("          "):
+                      raise SystemExit(f"unexpected Python heredoc indentation at workflow line {index + 1}")
+                  body.append(line[10:] if line else "")
+                  index += 1
+              if index >= len(lines):
+                  raise SystemExit("unterminated Python heredoc")
+              compile("\n".join(body) + "\n", f"<workflow-python-heredoc-{heredoc_count}>", "exec")
+              heredoc_count += 1
+              index += 1
+          if heredoc_count < 4:
+              raise SystemExit(f"expected at least four Python heredocs, found {heredoc_count}")
+          PY
+      - name: Write source validation receipt
+        if: always()
+        env:
+          COMPILE_OUTCOME: ${{ steps.compile_source.outcome }}
+          TRANSPORT_OUTCOME: ${{ steps.transport_test.outcome }}
+          SYNTAX_OUTCOME: ${{ steps.syntax_check.outcome }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "${RUNNER_TEMP}/gpu-acceptance-source"
+          cat > "${RUNNER_TEMP}/gpu-acceptance-source/GITHUB_STATUS.md" <<EOF
+          # Hosted source validation
+
+          - Commit: ${GITHUB_SHA}
+          - Python source compile: ${COMPILE_OUTCOME}
+          - Fake SSH result retrieval after key revocation: ${TRANSPORT_OUTCOME}
+          - Remote Bash and embedded Python syntax: ${SYNTAX_OUTCOME}
+          - Physical GPU job: separate manual-dispatch job; this receipt does not claim CUDA/NCCL acceptance.
+          EOF
+      - name: Upload source validation receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gpu-acceptance-source-${{ github.run_id }}
+          path: ${{ runner.temp }}/gpu-acceptance-source/GITHUB_STATUS.md
+          if-no-files-found: error
+          retention-days: 30
+
+  gpu-acceptance:
+    if: github.event_name == 'workflow_dispatch'
+    needs: validate-source
+    name: Build installed wheel and validate permutation plus checkpoint CNOT on Vast
+    runs-on: ubuntu-latest
+    timeout-minutes: 105
     env:
       VAST_INSTANCE_ID: "61080396"
       SOURCE_SHA: ${{ github.sha }}
-      REMOTE_ROOT: /workspace/codex-cnot-control-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+      REMOTE_ROOT: /workspace/codex-beam-gpu-acceptance-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
-      - name: Check the existing Vast instance without changing its state
+      - name: Check existing instance status and the requested GPU spend cap
         id: status
         env:
           VAST_API_KEY: ${{ secrets.VAST_API_KEY }}
+          SPEND_CAP_USD: ${{ inputs.spend_cap_usd }}
         shell: bash
         run: |
           set -euo pipefail
@@ -59,9 +163,16 @@ jobs:
             -H "Authorization: Bearer ${VAST_API_KEY}" \
             -H "Accept: application/json" \
             "https://console.vast.ai/api/v0/instances/" > "$instances"
-          python3 - "$VAST_INSTANCE_ID" "$instances" "$status" "$GITHUB_OUTPUT" <<'PY'
+          python3 - "$VAST_INSTANCE_ID" "$instances" "$status" "$GITHUB_OUTPUT" "$SPEND_CAP_USD" <<'PY'
           import datetime, json, sys
+          from decimal import Decimal, InvalidOperation
           instance_id = int(sys.argv[1])
+          try:
+              spend_cap = Decimal(sys.argv[5])
+          except InvalidOperation:
+              raise SystemExit("spend_cap_usd must be a positive decimal USD amount")
+          if not spend_cap.is_finite() or spend_cap <= 0:
+              raise SystemExit("spend_cap_usd must be a positive decimal USD amount")
           with open(sys.argv[2], encoding="utf-8") as source:
               payload = json.load(source)
           rows = payload.get("instances", []) if isinstance(payload, dict) else payload
@@ -78,13 +189,31 @@ jobs:
                       return value
               return "unknown"
           actual = state("actual_status", "status", "cur_state")
+          gpu_name = str(row.get("gpu_name") or "unknown")
+          gpu_count = row.get("num_gpus")
+          hourly_rate = Decimal(str(row.get("dph_total") or "0"))
+          allowed_seconds = 0
+          if actual.lower() == "running":
+              if gpu_count != 2 or "3060" not in gpu_name:
+                  raise SystemExit(f"Expected the existing 2x RTX 3060 instance; found {gpu_count} x {gpu_name}")
+              if not hourly_rate.is_finite() or hourly_rate <= 0:
+                  raise SystemExit("Vast did not provide a valid hourly instance rate")
+              # Reserve 20% of the supplied cap for status checks, transfer, and
+              # final artifact upload; the remote workload has its own timeout.
+              allowed_seconds = int(spend_cap / hourly_rate * Decimal(3600) * Decimal("0.80"))
+              allowed_seconds = min(allowed_seconds, 5400)
+              if allowed_seconds < 1200:
+                  raise SystemExit("The supplied cap permits less than 20 minutes of GPU work")
           report = {
               "instance_id": instance_id,
               "checked_at_utc": datetime.datetime.now(datetime.timezone.utc).isoformat(),
               "actual_status": actual,
               "intended_status": state("intended_status"),
-              "gpu_name": row.get("gpu_name"),
-              "gpu_count": row.get("num_gpus"),
+              "gpu_name": gpu_name,
+              "gpu_count": gpu_count,
+              "hourly_rate_usd": str(hourly_rate),
+              "spend_cap_usd": str(spend_cap),
+              "allowed_runtime_seconds": allowed_seconds,
               "gpu_test": "not_started" if actual.lower() == "running" else "skipped_instance_not_running",
           }
           with open(sys.argv[3], "w", encoding="utf-8") as output:
@@ -92,7 +221,8 @@ jobs:
               output.write("\n")
           with open(sys.argv[4], "a", encoding="utf-8") as output:
               output.write(f"instance_running={'true' if actual.lower() == 'running' else 'false'}\n")
-          print(f"Instance {instance_id}: {actual}; GPU test: {report['gpu_test']}")
+              output.write(f"allowed_runtime_seconds={allowed_seconds}\n")
+          print(f"Instance {instance_id}: {actual}; GPU test: {report['gpu_test']}; allowed GPU runtime: {allowed_seconds}s")
           PY
           if [[ "$(jq -r .gpu_test "$status")" == "skipped_instance_not_running" ]]; then
             echo "No instance state change was attempted." >> "$GITHUB_STEP_SUMMARY"
@@ -104,30 +234,31 @@ jobs:
           ref: ${{ env.SOURCE_SHA }}
           fetch-depth: 1
           persist-credentials: false
-      - name: Create code-only source archive
+      - name: Create code-only source archive, excluding private model inputs
         id: archive
         if: steps.status.outputs.instance_running == 'true'
         shell: bash
         run: |
           set -euo pipefail
           [[ "$(git rev-parse HEAD)" == "$SOURCE_SHA" ]]
-          archive="${RUNNER_TEMP}/beam-cnot-${SOURCE_SHA}.tar.gz"
-          tar -czf "$archive" CMakeLists.txt Cargo.toml Cargo.lock cmake cuda integrations/cayleypy_native native rust src tools
+          archive="${RUNNER_TEMP}/beam-gpu-acceptance-${SOURCE_SHA}.tar.gz"
+          tar -czf "$archive" CMakeLists.txt Cargo.toml Cargo.lock cmake cuda integrations/cayleypy_native integrations/cnot_scorer native rust src tools tests
           echo "path=$archive" >> "$GITHUB_OUTPUT"
           echo "sha256=$(sha256sum "$archive" | awk '{print $1}')" >> "$GITHUB_OUTPUT"
-      - name: Transfer, build, and run on the already-running instance
+      - name: Build the installed wheel and exercise both GPU search domains
         id: remote
         if: steps.status.outputs.instance_running == 'true'
         env:
           VAST_API_KEY: ${{ secrets.VAST_API_KEY }}
           ARCHIVE_PATH: ${{ steps.archive.outputs.path }}
           ARCHIVE_SHA: ${{ steps.archive.outputs.sha256 }}
+          ALLOWED_RUNTIME_SECONDS: ${{ steps.status.outputs.allowed_runtime_seconds }}
         shell: bash
         run: |
           set -euo pipefail
           key_file="${RUNNER_TEMP}/vast_cnot_ed25519"
           known_hosts="${RUNNER_TEMP}/vast_cnot_known_hosts"
-          remote_log="${RUNNER_TEMP}/cnot-control-nccl.log"
+          remote_log="${RUNNER_TEMP}/beam-gpu-acceptance.log"
           trap 'rm -f "$key_file" "$key_file.pub" "$known_hosts"' EXIT
           ssh-keygen -q -t ed25519 -N "" -C "codex-cnot-${VAST_INSTANCE_ID}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" -f "$key_file"
           public_key="$(cat "$key_file.pub")"
@@ -183,53 +314,160 @@ jobs:
             python_bin="$(command -v python3)"
             command -v cargo >/dev/null
             command -v cmake >/dev/null
-            cd "$source_dir"
+            command -v git >/dev/null
+            [[ -x /usr/local/cuda/bin/nvcc ]]
+            upstream="/private/TheQuantumProject"
+            manifest="/private/gl4/search-qhat.json"
+            [[ -d "$upstream/.git" ]] || { echo "The pinned private scorer checkout is missing on Vast." >&2; exit 1; }
+            [[ -f "$manifest" ]] || { echo "The private GL4 checkpoint manifest is missing on Vast." >&2; exit 1; }
+            [[ "$(git -C "$upstream" cat-file -t c5b3e3f93b45aa7e533fd2c06209c28ce516ffeb)" == "commit" ]]
+
             "$python_bin" - <<'PY'
           import torch
           if not torch.cuda.is_available() or torch.cuda.device_count() < 2:
               raise SystemExit("two CUDA devices are required on the existing instance")
+          names = [torch.cuda.get_device_name(i) for i in range(2)]
+          if any("3060" not in name for name in names):
+              raise SystemExit("the physical acceptance target must be two RTX 3060 GPUs")
           print("CUDA_DEVICE_COUNT=" + str(torch.cuda.device_count()))
+          print("CUDA_GPU_NAMES=" + repr(names))
+          print("TORCH_VERSION=" + str(torch.__version__))
+          print("TORCH_CUDA_VERSION=" + str(torch.version.cuda))
+          if torch.version.cuda is None:
+              raise SystemExit("CUDA-enabled PyTorch is required")
           PY
+
             export CARGO_TARGET_DIR="${run_root}/cargo-target"
             export PYO3_PYTHON="$python_bin"
-            cargo build --locked --release -p beam-python
-            extension="${CARGO_TARGET_DIR}/release/lib_beam_runtime.so"
-            test -s "$extension"
-            cp "$extension" "$source_dir/integrations/cayleypy_native/multigpubeamsearch/_beam_runtime.so"
+            export CUDA_PATH="/usr/local/cuda"
+            export CUDACXX="${CUDA_PATH}/bin/nvcc"
+            export CNOT103_CUDA_ARCHITECTURES=86
+            export LIBTORCH_USE_PYTORCH=1
+
+            wheel_dir="${run_root}/wheel-dist"
+            venv="${run_root}/venv"
+            mkdir -p "$wheel_dir" "${run_root}/wheel-smoke"
+            cd "$source_dir/integrations/cayleypy_native"
+            "$python_bin" -m pip wheel --verbose --no-deps --wheel-dir "$wheel_dir" .
+            "$python_bin" -m venv --system-site-packages "$venv"
+            wheel="$(find "$wheel_dir" -maxdepth 1 -type f -name 'multigpubeamsearch-*.whl' -print -quit)"
+            test -n "$wheel"
+            wheel_python="${venv}/bin/python"
+            "$wheel_python" -m pip install --force-reinstall --no-deps "$wheel"
+            "$wheel_python" - "$venv" <<'PY'
+          import sys
+          from pathlib import Path
+          import multigpubeamsearch
+          venv = Path(sys.argv[1]).resolve()
+          module_path = Path(multigpubeamsearch.__file__).resolve()
+          if not module_path.is_relative_to(venv):
+              raise SystemExit(f"wheel import escaped the acceptance venv: {module_path}")
+          print("INSTALLED_PACKAGE_PATH=" + str(module_path))
+          PY
+            "$wheel_python" -m pip check
+            cd "${run_root}/wheel-smoke"
+            unset PYTHONPATH
+            GITHUB_WORKSPACE="$source_dir" "$wheel_python" \
+              "$source_dir/integrations/cayleypy_native/tests/installed_wheel_smoke.py"
+
+            scorer_build="${run_root}/private-cnot-scorer"
+            "$python_bin" "$source_dir/integrations/cnot_scorer/build.py" \
+              --source "$upstream" --build-dir "$scorer_build"
+            scorer_library="${scorer_build}/target/release/libcnot103_native.so"
+            test -s "$scorer_library"
+
             domain_build="${run_root}/cnot-owned-domain-build"
             cmake -S "$source_dir" -B "$domain_build" -DCMAKE_BUILD_TYPE=Release \
               -DBEAM_CNOT_OWNED_DOMAIN_ONLY=ON -DBEAM_CUDA_ARCHITECTURES=86
             cmake --build "$domain_build" --target beam_cnot_owned_domain --parallel 2
             domain_library="${domain_build}/libbeam_cnot_owned_domain.so"
             test -s "$domain_library"
+
             export BEAM_CNOT_OWNED_LIBRARY="$domain_library"
-            export CNOT_RUST_EVIDENCE="${run_root}/test_results/refactor_20261120/cnot-device-error/ranks"
-            mkdir -p "$CNOT_RUST_EVIDENCE"
-            export PYTHONPATH="$source_dir/integrations/cayleypy_native"
+            export MGBS_TQP_LIBRARY="$scorer_library"
+            export MGBS_TQP_MANIFEST="$manifest"
+            export CNOT_RUST_EVIDENCE="${run_root}/test_results/refactor_20261121/gpu-acceptance/ranks"
             export TORCH_EXTENSIONS_DIR="${run_root}/torch-extensions"
             export RUST_BACKTRACE=1
-            "$python_bin" -m torch.distributed.run --standalone --nproc_per_node=2 \
-              integrations/cayleypy_native/tests/cnot_stream5_control_nccl.py
-            "$python_bin" -m torch.distributed.run --standalone --nproc_per_node=2 \
-              integrations/cayleypy_native/tests/cnot_device_unseen_distributed.py
+            mkdir -p "$CNOT_RUST_EVIDENCE"
+
+            result_dir="${run_root}/test_results/refactor_20261121/gpu-acceptance"
+            mkdir -p "$result_dir"
+            MGBS_TQP_LIBRARY="$scorer_library" MGBS_TQP_MANIFEST="$manifest" \
+              "$wheel_python" -m unittest discover \
+              -s "$source_dir/integrations/cayleypy_native/tests" -p test_cnot_scorer.py -v
+
+            "$wheel_python" "$source_dir/tools/verify_permutation_cuda.py" \
+              --source-dir "$source_dir" --cache-dir "${run_root}/permutation-cache" \
+              --output "${result_dir}/permutation-1-and-2-gpu.json"
+
+            CUDA_VISIBLE_DEVICES=0 "$wheel_python" -m torch.distributed.run --standalone --nproc_per_node=1 \
+              "$source_dir/tools/verify_cnot.py" --case trained --backend nccl --mode qhat \
+              --engine rust --require-rust-scorer --library "$scorer_library" --manifest "$manifest" \
+              --output "${result_dir}/cnot-trained-1-gpu.json"
+
+            CUDA_VISIBLE_DEVICES=0,1 "$wheel_python" -m torch.distributed.run --standalone --nproc_per_node=2 \
+              "$source_dir/tools/verify_cnot.py" --case trained-deep --backend nccl --mode proposal \
+              --engine rust --require-rust-scorer --library "$scorer_library" --manifest "$manifest" \
+              --output "${result_dir}/cnot-trained-2-gpu.json"
+
+            "$wheel_python" -m torch.distributed.run --standalone --nproc_per_node=2 \
+              "$source_dir/integrations/cayleypy_native/tests/cnot_stream5_control_nccl.py"
+            "$wheel_python" -m torch.distributed.run --standalone --nproc_per_node=2 \
+              "$source_dir/integrations/cayleypy_native/tests/cnot_device_unseen_distributed.py"
+
+            "$wheel_python" - "${result_dir}" <<'PY'
+          import json, pathlib, sys
+          root = pathlib.Path(sys.argv[1])
+          expected = "92f3ec8e6a6ef831916a9d3ba9bbdae9307c9850d61334916a2b3e690c0020c4"
+          for name in ("cnot-trained-1-gpu.json", "cnot-trained-2-gpu.json"):
+              report = json.loads((root / name).read_text(encoding="utf-8"))
+              actual = report.get("model", {}).get("checkpoint_sha256")
+              if actual != expected:
+                  raise SystemExit(f"{name}: unexpected checkpoint SHA-256 {actual!r}")
+              if report.get("engine") != "rust" or not report.get("bitwise_replay"):
+                  raise SystemExit(f"{name}: Rust controller or replay evidence missing")
+          permutation = json.loads((root / "permutation-1-and-2-gpu.json").read_text(encoding="utf-8"))
+          if [row.get("world_size") for row in permutation.get("runs", [])] != [1, 2]:
+              raise SystemExit("permutation one- and two-GPU results are missing")
+          print(json.dumps({
+              "checkpoint_sha256": expected,
+              "permutation_world_sizes": [1, 2],
+              "cnot_world_sizes": [1, 2],
+              "rust_controller": True,
+              "installed_wheel": True,
+          }, separators=(",", ":")))
+          PY
           }
-          log_dir="${run_root}/test_results/refactor_20261118/cnot-control-collectives"
+
+          log_dir="${run_root}/test_results/refactor_20261121/gpu-acceptance"
           mkdir -p "$log_dir"
           run_test 2>&1 | tee "${log_dir}/cuda-nccl.log"
           control_marker_count="$(grep -c 'CNOT_CONTROL_COLLECTIVES_OK' "${log_dir}/cuda-nccl.log")"
           descriptor_marker_count="$(grep -c 'CNOT_DEVICE_UNSEEN_OK' "${log_dir}/cuda-nccl.log")"
+          checkpoint_report_count="$(grep -c 'checkpoint_sha256.*92f3ec8e6a6ef831916a9d3ba9bbdae9307c9850d61334916a2b3e690c0020c4' "${log_dir}/cuda-nccl.log")"
           [[ "$control_marker_count" == 2 ]]
           [[ "$descriptor_marker_count" == 2 ]]
-          printf '{"source_sha":"%s","gpu_test":"passed","control_rank_markers":%s,"descriptor_rank_markers":%s}\n' \
-            "$source_sha" "$control_marker_count" "$descriptor_marker_count" > "${log_dir}/receipt.json"
+          [[ "$checkpoint_report_count" -ge 2 ]]
+          printf '{"source_sha":"%s","gpu_test":"passed","control_rank_markers":%s,"descriptor_rank_markers":%s,"checkpoint_sha256":"%s"}\n' \
+            "$source_sha" "$control_marker_count" "$descriptor_marker_count" "92f3ec8e6a6ef831916a9d3ba9bbdae9307c9850d61334916a2b3e690c0020c4" > "${log_dir}/receipt.json"
           cat "${log_dir}/receipt.json"
           REMOTE
-          if ! ssh "${ssh_opts[@]}" "root@${host}" \
-            "bash -s -- '${REMOTE_ROOT}/source' '${REMOTE_ROOT}' '${key_blob}' '${remote_archive}' '${ARCHIVE_SHA}' '${SOURCE_SHA}'" \
-            < "${RUNNER_TEMP}/run-cnot-control.sh" > "$remote_log" 2>&1; then
-            tail -n 100 "$remote_log"
-            exit 1
-          fi
+          result_archive="${RUNNER_TEMP}/beam-gpu-acceptance-test-results.tar.gz"
+          VAST_SSH_PRIVATE_KEY="$key_file" \
+          VAST_SSH_KNOWN_HOSTS="$known_hosts" \
+          VAST_SSH_HOST="$host" \
+          VAST_SSH_PORT="$port" \
+          VAST_SSH_LOG="$remote_log" \
+          VAST_SSH_RESULTS="$result_archive" \
+          VAST_SSH_SCRIPT="${RUNNER_TEMP}/run-cnot-control.sh" \
+          VAST_REMOTE_ROOT="$REMOTE_ROOT" \
+          VAST_REMOTE_RUNTIME_SECONDS="$ALLOWED_RUNTIME_SECONDS" \
+          VAST_REMOTE_KEY_BLOB="$key_blob" \
+          VAST_REMOTE_ARCHIVE="$remote_archive" \
+          VAST_REMOTE_ARCHIVE_SHA="$ARCHIVE_SHA" \
+          VAST_SOURCE_SHA="$SOURCE_SHA" \
+            bash tools/vast_result_transport.sh
           cat "$remote_log"
           control_marker_count="$(grep -c 'CNOT_CONTROL_COLLECTIVES_OK' "$remote_log")"
           descriptor_marker_count="$(grep -c 'CNOT_DEVICE_UNSEEN_OK' "$remote_log")"
@@ -243,14 +481,15 @@ jobs:
         if: steps.status.outputs.instance_running != 'true'
         shell: bash
         run: |
-          echo "Two-rank CNOT NCCL and descriptor-recovery checks skipped: instance 61080396 is not running. No start, stop, or rent request was made." >> "$GITHUB_STEP_SUMMARY"
+          echo "GPU acceptance skipped: instance 61080396 is not already running. No start, stop, or rent request was made." >> "$GITHUB_STEP_SUMMARY"
       - name: Upload sanitized status and remote test log
         if: always() && steps.status.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
-          name: vast-cnot-control-collectives-${{ github.run_id }}
+          name: vast-beam-gpu-acceptance-${{ github.run_id }}
           path: |
             ${{ runner.temp }}/vast-status.json
-            ${{ runner.temp }}/cnot-control-nccl.log
+            ${{ runner.temp }}/beam-gpu-acceptance.log
+            ${{ runner.temp }}/beam-gpu-acceptance-test-results.tar.gz
           if-no-files-found: warn
           retention-days: 7
