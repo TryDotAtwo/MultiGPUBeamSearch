@@ -2575,7 +2575,13 @@ Preserved 26 checkouts and their source/index overlays; verified restoration of 
   passed 250 Python tests (2 skipped), Rust checks, PyO3 build, and NCCL
   probe syntax. Artifact 14590465891, SHA256
   9aff948e3aec5b88173fcb2121cae0789680e1625f037afb1c6185093f24de6b.
-- These CPU/PyO3 checks do not establish physical CUDA/NCCL multi-GPU
+- Main run [44650117639](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44650117639)
+  at commit `16e7f53c059b6cab7391cfb5aeeb6f167ddd05ce` passed the same
+  250-test CPU/PyO3 suite (2 skipped), with artifact 14591345545 and SHA256
+  `3a4d15ff588e32941510851fae041bcc304593ad89cd849d5ff57719f4950adb`.
+  Companion permutation depth-control run
+  [44650117646](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44650117646)
+  passed. These CPU/PyO3 checks do not establish physical CUDA/NCCL multi-GPU
   execution. Evidence:
   `test_results/refactor_20261120/rust-pipeline-cache-receipt/GITHUB_STATUS.md`.
 
