@@ -37,29 +37,31 @@ def _worker(rank, rendezvous):
     try:
         exchange = exchange_fn()
         world = World("cpu")
-        cases = [
-            (([[10, 11], [20, 21], [22, 23]], [1, 0, 1]),
-             ([[30, 31]], [0])),
-            (([], []), ([[40, 41]], [0])),
-            (([], []), ([], [])),
-            (([[50, 51]], [0]), ([[60, 61]], [1])),
-        ]
-        expected_rows = [
-            ([[20, 21], [30, 31]], [[10, 11], [22, 23]]),
-            ([[40, 41]], []), ([], []), ([[50, 51]], [[60, 61]]),
-        ]
-        for index, case in enumerate(cases):
-            values, destinations = case[rank]
-            rows = torch.tensor(values, dtype=torch.int64).reshape(-1, 2)
-            targets = torch.tensor(destinations, dtype=torch.int64)
-            reference = world.exchange(rows, targets, native_packet=True)
-            result = exchange(world, rows, targets)
-            assert torch.equal(result, reference)
-            assert result.tolist() == expected_rows[index][rank]
-        # The same process group is still usable after the all-empty exchange.
-        value = torch.tensor([rank], dtype=torch.int64)
-        dist.all_reduce(value)
-        assert value.item() == 1
+        with world:
+            cases = [
+                (([[10, 11], [20, 21], [22, 23]], [1, 0, 1]),
+                 ([[30, 31]], [0])),
+                (([], []), ([[40, 41]], [0])),
+                (([], []), ([], [])),
+                (([[50, 51]], [0]), ([[60, 61]], [1])),
+            ]
+            expected_rows = [
+                ([[20, 21], [30, 31]], [[10, 11], [22, 23]]),
+                ([[40, 41]], []), ([], []), ([[50, 51]], [[60, 61]]),
+            ]
+            for index, case in enumerate(cases):
+                values, destinations = case[rank]
+                rows = torch.tensor(values, dtype=torch.int64).reshape(-1, 2)
+                targets = torch.tensor(destinations, dtype=torch.int64)
+                reference = world.exchange(rows, targets, native_packet=True)
+                result = exchange(world, rows, targets)
+                assert torch.equal(result, reference)
+                assert result.tolist() == expected_rows[index][rank]
+            # The same process group is still usable after the all-empty exchange.
+            value = torch.tensor([rank], dtype=torch.int64)
+            dist.all_reduce(value)
+            assert value.item() == 1
+
     finally:
         dist.destroy_process_group()
 

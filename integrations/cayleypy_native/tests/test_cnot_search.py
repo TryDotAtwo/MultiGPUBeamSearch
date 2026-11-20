@@ -181,7 +181,7 @@ def test_compatibility_cnot_stage_goal_delegates_to_rust(monkeypatch):
 
     from types import SimpleNamespace
 
-    world, parents, lex, identity = object(), SimpleNamespace(is_cuda=False), object(), object()
+    world, parents, lex, identity = World("cpu"), SimpleNamespace(is_cuda=False), object(), object()
     expected = (19, 2)
     calls = []
 
@@ -231,7 +231,7 @@ def test_compatibility_cnot_stage_goal_keeps_old_extension_fallback(monkeypatch)
     from types import SimpleNamespace
     from multigpubeamsearch import cnot_rust_stages, rust_control
 
-    world = SimpleNamespace(device=torch.device("cpu"))
+    world = World("cpu")
     parents = pack_rows((1, 2))
     lex = torch.tensor([0], dtype=torch.int64)
     identity = pack_rows((1, 2))

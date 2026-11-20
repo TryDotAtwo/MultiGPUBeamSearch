@@ -125,58 +125,59 @@ def wide_case():
 
 
 def validate_case(rows, scorer, mode, width, k, depth, device, require_cross_rank=False):
-    world = World(device)
     result = search_cnot(pack_rows(rows, device=device), scorer, width=width, shortlist=k,
                          max_depth=depth, mode=mode, audit=True)
-    def inspect():
-        if world.rank:
-            return None
-        layers = verify_layers(rows, scorer, mode, width, k, result.layers, device)
-        require(result.status == "solved", f"expected a solution, got {result.status}")
-        pairs = gate_pairs(len(rows))
-        replay = tuple(1 << i for i in range(len(rows)))
-        for action in result.gates:
-            replay = apply(replay, pairs[action])
-        require(replay == rows, "independent construction does not match the input")
-        if require_cross_rank and world.size > 1:
-            require(any(edge["move"] > 255 and len({edge["source"], edge["hash_owner"], edge["target"]}) > 1
-                        for edge in result.path_routes), "large physical move never crossed a rank")
-        require(any(layer["distinct"] > width and layer["retained"] == width and
-                    (world.size == 1 or sum(rank[3] > 0 for rank in layer["by_rank"]) >= 2)
-                    for layer in layers), "missing a saturated layer with participating owners")
-        report = dict(n=len(rows), width=width, shortlist=k, mode=mode, world=world.size,
-                      scorer=type(scorer).__name__, model=getattr(scorer, "metadata", None),
-                      layers=layers, physical_ids=list(result.gates), directed_gates=[pairs[i] for i in result.gates],
-                      length=result.length, bitwise_replay=True, routes=result.path_routes)
-        if len(rows) == 4 and result.length <= 3:
-            report["exact_distance_bfs"] = small_exact_distance(rows, pairs, result.length)
-        return report
-    return world.checked("independent validation", inspect)
+    with World(device) as world:
+        def inspect():
+            if world.rank:
+                return None
+            layers = verify_layers(rows, scorer, mode, width, k, result.layers, device)
+            require(result.status == "solved", f"expected a solution, got {result.status}")
+            pairs = gate_pairs(len(rows))
+            replay = tuple(1 << i for i in range(len(rows)))
+            for action in result.gates:
+                replay = apply(replay, pairs[action])
+            require(replay == rows, "independent construction does not match the input")
+            if require_cross_rank and world.size > 1:
+                require(any(edge["move"] > 255 and len({edge["source"], edge["hash_owner"], edge["target"]}) > 1
+                            for edge in result.path_routes), "large physical move never crossed a rank")
+            require(any(layer["distinct"] > width and layer["retained"] == width and
+                        (world.size == 1 or sum(rank[3] > 0 for rank in layer["by_rank"]) >= 2)
+                        for layer in layers), "missing a saturated layer with participating owners")
+            report = dict(n=len(rows), width=width, shortlist=k, mode=mode, world=world.size,
+                          scorer=type(scorer).__name__, model=getattr(scorer, "metadata", None),
+                          layers=layers, physical_ids=list(result.gates), directed_gates=[pairs[i] for i in result.gates],
+                          length=result.length, bitwise_replay=True, routes=result.path_routes)
+            if len(rows) == 4 and result.length <= 3:
+                report["exact_distance_bfs"] = small_exact_distance(rows, pairs, result.length)
+            return report
+        return world.checked("independent validation", inspect)
 
 
 def validate_distribution(device):
     """Exercise every rank as a parent source, value owner and frontier recipient."""
-    world = World(device)
+    world_size = dist.get_world_size() if dist.is_initialized() else 1
     n = 6
     rows = tuple(1 << i for i in reversed(range(n)))
     width, k = 17, 25
-    if world.size > width:
+    if world_size > width:
         raise ValueError("this small all-rank fixture covers up to 17 workers")
     scorer = WireFixture(29)
     result = search_cnot(pack_rows(rows, device=device), scorer, width=width, shortlist=k,
                          max_depth=3, audit=True)
-    def inspect():
-        if world.rank:
-            return None
-        layers = verify_layers(rows, scorer, "qhat", width, k, result.layers, device)
-        require(len(layers) == 2, "expected two complete expansions before the depth bound")
-        per_rank = layers[1]["by_rank"]
-        require(all(row[0] and row[3] and row[4] for row in per_rank),
-                "a rank did not expand parents, score distinct candidates or retain winners")
-        require(layers[1]["retained"] == width and layers[1]["distinct"] > width, "unsaturated frontier")
-        return dict(n=n, width=width, shortlist=k, mode="qhat", world=world.size,
-                    scorer=type(scorer).__name__, status=result.status, layers=layers)
-    return world.checked("all-rank validation", inspect)
+    with World(device) as world:
+        def inspect():
+            if world.rank:
+                return None
+            layers = verify_layers(rows, scorer, "qhat", width, k, result.layers, device)
+            require(len(layers) == 2, "expected two complete expansions before the depth bound")
+            per_rank = layers[1]["by_rank"]
+            require(all(row[0] and row[3] and row[4] for row in per_rank),
+                    "a rank did not expand parents, score distinct candidates or retain winners")
+            require(layers[1]["retained"] == width and layers[1]["distinct"] > width, "unsaturated frontier")
+            return dict(n=n, width=width, shortlist=k, mode="qhat", world=world.size,
+                        scorer=type(scorer).__name__, status=result.status, layers=layers)
+        return world.checked("all-rank validation", inspect)
 
 
 def main():
