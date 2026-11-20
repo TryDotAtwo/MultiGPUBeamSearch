@@ -647,12 +647,11 @@ pub(crate) fn run_cnot_native_all_ranks_support(
     world: Bound<'_, PyAny>,
     local_support: bool,
 ) -> PyResult<bool> {
-    let local = world.call_method1("longs", (vec![if local_support { 1_i64 } else { 0_i64 }],))?;
-    let total: usize = world
-        .call_method1("sum", (local,))?
-        .call_method0("item")?
-        .extract()?;
-    Ok(total == world.getattr("size")?.extract::<usize>()?)
+    // Capability negotiation is control traffic, so it uses World’s stable
+    // CPU/Gloo group rather than the search transport.
+    world
+        .call_method1("all_ranks_support", (local_support,))?
+        .extract()
 }
 
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {

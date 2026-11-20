@@ -1,3 +1,30 @@
+## 2026-11-20 - CNOT setup failures use the Gloo control group
+
+- The Rust top-level CNOT controller now coordinates failures from identity
+  construction, native stage runner loading, and compatibility stage
+  construction with the existing checked CNOT protocol before peers continue.
+  Native-stage capability negotiation uses `World.all_ranks_support` over
+  CPU/Gloo rather than the search payload transport.
+- Added two-rank Gloo failure injection for all three setup operations. Each
+  case checks the same rank-wide diagnostic and confirms the process group
+  remains usable. Updated capability-vote tests to require the Gloo control
+  method.
+- Search order, scoring, precision, owner mapping, and NCCL payload exchange
+  were not changed.
+- RED: Actions run
+  [44750014338](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44750014338)
+  failed the new assertions on the pre-fix behavior (4 failed, 296 passed,
+  2 skipped). Follow-up
+  [44751261363](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44751261363)
+  passed Rust checks and PyO3 build but exposed three outdated test expectations.
+- GREEN: Actions run
+  [44751923980](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44751923980)
+  passed Rust CNOT checks, PyO3 build, 300 Python tests (2 skipped), and NCCL
+  probe syntax. Artifact [14636575322](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44751923980/artifacts/14636575322),
+  SHA-256 `d69aa55acf31b468732a5ce30dfb0318ddab15d9bb07eda06e21922e70fc3f19`.
+- Physical CUDA/NCCL and 1-/2-GPU execution remain unverified. Full receipt:
+  `test_results/refactor_20261120/cnot-setup-gloo/GITHUB_STATUS.md`.
+
 ## 2026-11-20 - Align Rust CNOT stages with the Gloo checked-control ABI
 
 - The Rust compatibility dispatcher now recognizes the new checked-control capability, so typed CNOT initialize, expand, and deduplicate/score stages no longer fall back because they still looked for the old v2 marker. The top-level two-rank controller test now asserts a Gloo failure vote rather than the former payload-world vote.

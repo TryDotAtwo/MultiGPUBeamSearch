@@ -432,28 +432,19 @@ def test_rust_native_stage_support_requires_all_rank_votes(monkeypatch):
     assert callable(support)
 
     world = _two_rank_world()
-    votes = []
-    totals = iter((1, 2, 0))
+    votes = iter((False, True, False))
+    calls = []
 
-    def longs(values):
-        votes.append(("longs", list(values)))
-        return torch.tensor(values, dtype=torch.int64)
+    def all_ranks_support(local_support):
+        calls.append(bool(local_support))
+        return next(votes)
 
-    def sum(tensor):
-        votes.append(("sum", tensor.tolist()))
-        return torch.tensor([next(totals)], dtype=torch.int64)
-
-    monkeypatch.setattr(world, "longs", longs)
-    monkeypatch.setattr(world, "sum", sum)
+    monkeypatch.setattr(world, "all_ranks_support", all_ranks_support)
 
     assert support(world, False) is False
     assert support(world, True) is True
     assert support(world, True) is False
-    assert votes == [
-        ("longs", [0]), ("sum", [0]),
-        ("longs", [1]), ("sum", [1]),
-        ("longs", [1]), ("sum", [1]),
-    ]
+    assert calls == [False, True, True]
 
 
 def test_rust_cnot_identity_consensus_abi_is_exposed():

@@ -1,5 +1,19 @@
 # Конфиг
 
+## CNOT setup failures are coordinated before search, 2026-11-20
+
+The Rust top-level controller runs CNOT identity construction, native-stage
+runner loading, and compatibility-stage construction through the existing
+checked stage protocol. For multi-rank jobs, every rank votes and shares
+diagnostics over the stable CPU/Gloo control group before continuing. Native
+stage capability is also agreed through `World.all_ranks_support` on that
+control group, not by reducing a vote over the search transport.
+
+This prevents a rank-local setup error from leaving peers to enter a later
+collective or search stage alone. Search order, candidate selection, scoring,
+precision, owner mapping, and NCCL payload exchange are unchanged. Hosted
+CPU/Gloo tests do not establish physical CUDA/NCCL failure recovery.
+
 ## CNOT checked errors use the Gloo control group, 2026-11-20
 
 For multi-rank CNOT, the new optional PyO3 capability

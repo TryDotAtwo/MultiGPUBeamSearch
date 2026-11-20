@@ -159,6 +159,7 @@ jobs:
             integrations/cayleypy_native/tests/test_cnot_rust_controller.py::test_rust_compatibility_backend_bypasses_cnot_python_distinct \
             integrations/cayleypy_native/tests/test_cnot_rust_controller.py::test_rust_compatibility_backend_bypasses_cnot_native_route_helper \
             integrations/cayleypy_native/tests/test_cnot_rust_controller.py::test_rust_top_level_controller_preserves_compatibility_stage_fallback \
+            integrations/cayleypy_native/tests/test_cnot_rust_controller.py::test_two_gloo_ranks_coordinate_cnot_setup_failures_and_keep_the_world \
             2>&1 | tee test_results/refactor_20261120/cnot-rust-domain-fallback/cnot-search-cpu.log
       - name: Check the two-rank NCCL probe syntax
         run: |

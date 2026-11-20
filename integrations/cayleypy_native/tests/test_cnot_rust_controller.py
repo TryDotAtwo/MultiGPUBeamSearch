@@ -80,6 +80,10 @@ def test_rust_top_level_controller_owns_cnot_admission_and_stage_dispatch():
             events.append(("sum", tensor.tolist()))
             return tensor.sum()
 
+        def all_ranks_support(self, local_support):
+            events.append(("all-ranks-support", bool(local_support)))
+            return bool(local_support)
+
         _stream5_library = None
 
     world = World()
@@ -121,8 +125,7 @@ def test_rust_top_level_controller_owns_cnot_admission_and_stage_dispatch():
         ("gather-fixed", digest_values),
         ("identity", 3, "cpu"),
         ("native-runner",),
-        ("longs", [1]),
-        ("sum", [1]),
+        ("all-ranks-support", True),
         ("native-stages", world, admitted_root, identity, input_matrix, scorer,
          "qhat", True, 5, 6, 6, 4),
     ]
@@ -318,6 +321,10 @@ def test_rust_top_level_controller_preserves_compatibility_stage_fallback():
             events.append(("gloo-any-rank-failed", bool(local_failed)))
             return bool(local_failed)
 
+        def all_ranks_support(self, local_support):
+            events.append(("all-ranks-support", bool(local_support)))
+            return False
+
         _stream5_library = None
 
     world = World()
@@ -368,11 +375,13 @@ def test_rust_top_level_controller_preserves_compatibility_stage_fallback():
         ("longs", digest_values),
         ("gather-fixed", digest_values),
         ("identity", 4, "cpu"),
+        ("gloo-any-rank-failed", False),
         ("native-runner",),
-        ("longs", [1]),
-        ("sum", [1]),
+        ("gloo-any-rank-failed", False),
+        ("all-ranks-support", True),
         ("make-stages", world, admitted_root, identity, input_matrix, scorer,
          "proposal", False),
+        ("gloo-any-rank-failed", False),
         ("root-is-goal",),
     ]
 
@@ -728,6 +737,90 @@ def distributed(rank, rendezvous):
 def test_two_gloo_ranks_exact_results_failure_and_recovery(tmp_path):
     require_controller()
     mp.spawn(distributed, args=((tmp_path / "cnot-rust-gloo").resolve().as_uri(),), nprocs=2)
+
+def distributed_cnot_setup_failure(rank, rendezvous, failure_point):
+    torch.set_num_threads(1)
+    dist.init_process_group(
+        "gloo",
+        init_method=rendezvous,
+        rank=rank,
+        world_size=2,
+        timeout=timedelta(seconds=15),
+    )
+    old_runner = cnot._native_stages_runner
+    old_identity = cnot.native.cnot_identity
+    old_compat = cnot._make_compat_stages
+    message = f"fixture {failure_point} failed on rank one"
+    expected_stages = {
+        "identity": "build CNOT identity",
+        "native_runner": "load CNOT native stage runner",
+        "compatibility_stages": "build CNOT compatibility stages",
+    }
+    try:
+        require_controller()
+        if failure_point == "identity":
+            def build_identity(*args, **kwargs):
+                if rank == 1:
+                    raise RuntimeError(message)
+                return old_identity(*args, **kwargs)
+            cnot.native.cnot_identity = build_identity
+        elif failure_point == "native_runner":
+            def build_runner():
+                if rank == 1:
+                    raise RuntimeError(message)
+                return old_runner()
+            cnot._native_stages_runner = build_runner
+        elif failure_point == "compatibility_stages":
+            cnot._native_stages_runner = lambda: None
+            def build_compatibility_stages(*args, **kwargs):
+                if rank == 1:
+                    raise RuntimeError(message)
+                return old_compat(*args, **kwargs)
+            cnot._make_compat_stages = build_compatibility_stages
+        else:
+            raise AssertionError(f"unknown failure point: {failure_point}")
+
+        with pytest.raises(RuntimeError) as error:
+            cnot.search_cnot(
+                cnot.pack_rows((8, 4, 2, 1)),
+                WireFixture(9),
+                width=5,
+                shortlist=9,
+                max_depth=4,
+                mode="qhat",
+                engine="rust",
+            )
+        expected = (
+            f"{expected_stages[failure_point]} failed: "
+            f"rank 1: RuntimeError: {message}"
+        )
+        assert str(error.value) == expected, (
+            f"{failure_point} returned {str(error.value)!r}; expected {expected!r}"
+        )
+
+        # The coordinated preflight error must leave the caller's Gloo world usable.
+        probe = torch.tensor([rank + 1], dtype=torch.int64)
+        dist.all_reduce(probe)
+        assert probe.item() == 3
+    finally:
+        cnot._native_stages_runner = old_runner
+        cnot.native.cnot_identity = old_identity
+        cnot._make_compat_stages = old_compat
+        dist.destroy_process_group()
+
+
+@pytest.mark.skipif(not dist.is_gloo_available(), reason="two CPU ranks require Gloo")
+@pytest.mark.parametrize("failure_point", ["identity", "native_runner", "compatibility_stages"])
+def test_two_gloo_ranks_coordinate_cnot_setup_failures_and_keep_the_world(
+        tmp_path, failure_point):
+    require_controller()
+    rendezvous = (tmp_path / f"cnot-setup-{failure_point}").resolve().as_uri()
+    mp.spawn(
+        distributed_cnot_setup_failure,
+        args=(rendezvous, failure_point),
+        nprocs=2,
+    )
+
 
 @pytest.mark.parametrize("mode", ["qhat", "proposal"])
 def test_rust_compatibility_backend_owns_cnot_expand_dispatch(monkeypatch, mode):

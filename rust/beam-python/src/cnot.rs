@@ -753,11 +753,19 @@ fn run_cnot_native_search<'py>(
     let wires: u32 = input_matrix.getattr("n")?.extract()?;
     let identity_args = PyDict::new(py);
     identity_args.set_item("device", world.getattr("device")?)?;
-    let identity = identity_builder.call((wires,), Some(&identity_args))?;
+    let identity_result = identity_builder.call((wires,), Some(&identity_args));
+    let identity =
+        crate::cnot_native_checked::checked_v2(py, &world, "build CNOT identity", identity_result)?;
     let alphabet = wires * (wires - 1);
 
     if use_rust {
-        let native_stages = native_stages_builder.call0()?;
+        let native_stages_result = native_stages_builder.call0();
+        let native_stages = crate::cnot_native_checked::checked_v2(
+            py,
+            &world,
+            "load CNOT native stage runner",
+            native_stages_result,
+        )?;
         let supports_native = crate::cnot_native_stages::run_cnot_native_all_ranks_support(
             world.clone(),
             !native_stages.is_none(),
@@ -788,15 +796,21 @@ fn run_cnot_native_search<'py>(
             ));
         }
 
-        let stages = compatibility_stages_builder.call1((
-            world,
+        let compatibility_stages = compatibility_stages_builder.call1((
+            world.clone(),
             input_matrix.getattr("root")?,
             identity,
             input_matrix,
             scorer,
             mode,
             audit,
-        ))?;
+        ));
+        let stages = crate::cnot_native_checked::checked_v2(
+            py,
+            &world,
+            "build CNOT compatibility stages",
+            compatibility_stages,
+        )?;
         return Ok(run_cnot(
             py,
             stages,
