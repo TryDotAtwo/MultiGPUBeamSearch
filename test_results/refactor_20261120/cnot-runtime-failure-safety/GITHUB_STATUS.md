@@ -12,7 +12,7 @@ Tested source: `d1ed3e163e1d8a0e3d7e9da214fc6889be35df18` on `main`.
 
 - Two-rank Gloo engine-agreement run [44736922496](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44736922496): 284 passed, 2 skipped. It verifies mixed `auto`/`python` requests fail collectively before search. Artifact [14629311464](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44736922496/artifacts/14629311464), SHA-256 `47a2d00a8de967c8c95460afc3b3acd7afbc9dbd8189a1891e6aef2c083766e4`.
 - Final CNOT CPU run [44738874159](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44738874159): 294 passed, 2 skipped, 104 warnings; Rust `cnot_exchange` passed 6 tests, including local and peer receive-allocation failure before payload. Artifact [14628794155](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44738874159/artifacts/14628794155), SHA-256 `a16b41766901ffd35e1a32c9d2ca565ed6db5d7fe544244402707837cb3dd9c1`.
-- Final installed wheel run [44738874151](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44738874151): passed. Artifact [14629797227](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44738874151/artifacts/80f6cc4467937e301bf42ad1ebcd51fa38ee7bc535217d8cb3b09e779df4cc36).
+- Final installed wheel run [44738874151](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44738874151): passed. Artifact [14629797227](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44738874151/artifacts/14629797227).
 
 ## Physical GPU status
 
