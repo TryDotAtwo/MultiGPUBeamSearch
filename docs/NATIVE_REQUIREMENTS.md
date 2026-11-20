@@ -72,11 +72,14 @@ rank processes after their ABI/layout and specialization checks.
 - Before this Rust bridge calls the borrowed expansion ABI, it checks parent
   indices and physical move IDs on the device, then reads one boolean result
   from each descriptor tensor on the host. The low-level C ABI still requires
-  valid descriptors. These scalar reads turn invalid values into ordinary
-  rank-local errors before a device assertion can poison the CUDA context; the
-  existing rank-wide stage vote must propagate that error. The two-rank
-  injected-error and post-error reuse check is not yet accepted; see
-  `test_results/refactor_20261117/cnot-device-error/GITHUB_STATUS.md`.
+  valid descriptors. These checks turn invalid values into ordinary rank-local
+  errors before a device assertion can poison the CUDA context; the existing
+  rank-wide stage vote must propagate that error. The two-rank injected-error
+  and same-process-group recovery test is wired into
+  `.github/workflows/vast-cnot-control-collectives.yml`, but remains unaccepted:
+  the latest run observed a stopped Vast instance and skipped source build and GPU
+  execution. See
+  `test_results/refactor_20261120/cnot-device-error-workflow/GITHUB_STATUS.md`.
 - A logical Hash128 uses every bit, ordered by high half then low half. CandidateMeta
   remains 32 bytes and aligned to 32. Stream3 retains original candidate IDs.
 - Persistent permutation padding stays zero. CNOT packed matrices retain their
