@@ -478,3 +478,24 @@ def test_backend_native_outcome_file_uses_rust_owner_when_available(tmp_path, mo
             "effective_beam_width": 64,
             "metadata": {"owner": "rust"},
         }
+
+
+
+def test_native_session_cancel_reaches_only_active_rust_owner():
+    from multigpubeamsearch.rust_resident import RustResidentWorkers
+
+    calls = []
+    owner = SimpleNamespace(cancel=lambda: calls.append("cancel"), close=lambda: calls.append("close"))
+    workers = RustResidentWorkers.__new__(RustResidentWorkers)
+    workers._owner = owner
+    session = NativeSession(engine="rust")
+    try:
+        assert session.cancel() is False
+        session._workers = workers
+        session._run_owner = 12345
+        assert session.cancel() is True
+        assert calls == ["cancel"]
+        session._run_owner = None
+    finally:
+        session.close()
+    assert calls == ["cancel", "close"]
