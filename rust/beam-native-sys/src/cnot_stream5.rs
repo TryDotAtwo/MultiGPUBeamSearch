@@ -660,7 +660,6 @@ mod torch {
             Ok(output.clone())
         }
 
-
         pub fn broadcast_i64(&self, tensor: &Bound<'_, PyAny>, source: u32) -> PyResult<()> {
             let (collectives, ptr, device) = self.collective_bindings()?;
             if source >= self.world {
