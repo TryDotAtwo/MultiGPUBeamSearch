@@ -186,4 +186,3 @@ fn rejects_receive_allocation_failure_before_payload_exchange() {
         ]
     );
 }
-
