@@ -322,14 +322,13 @@ impl Backend for NativeStages<'_> {
     type Records = Py<PyAny>;
 
     fn root_is_goal(&mut self) -> PyResult<bool> {
-        let goal = (|| -> PyResult<bool> {
+        let goal = (|| -> PyResult<Bound<'_, PyAny>> {
             if let Some(is_identity) = crate::cnot::search_input_is_identity(&self.input)? {
-                return Ok(is_identity);
+                return self.py.import("builtins")?.getattr("bool")?.call1((is_identity,));
             }
             self.py
                 .import("torch")?
-                .call_method1("equal", (&self.root, &self.identity))?
-                .extract()
+                .call_method1("equal", (&self.root, &self.identity))
         })();
         checked(self.py, &self.world, "check CNOT root goal", goal)?.extract()
     }
