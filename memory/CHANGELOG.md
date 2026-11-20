@@ -2616,3 +2616,22 @@ Main commit `148b2a826a369b7601e904ea409e0cc5301c75c9` also passed the 260-test 
 - Main GREEN: [Actions run 44659065473](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44659065473) at `62feb392b66bed588d66e0f94b4049f82f523c3e` passed 265 Python tests (2 skipped), Rust checks, PyO3 build, and NCCL probe syntax. Artifact 14594144027, SHA-256 `61f754fbc8f51c56ad3d1b4407d630a0350539198b443fc9cfa0b3dc06382e34`.
 - Physical CUDA/NCCL multi-GPU execution remains unverified. Evidence:
   `test_results/refactor_20261120/rust-rank-plan-validation/GITHUB_STATUS.md`.
+
+## 2026-11-20 - CNOT goal errors use fixed tensor diagnostics
+
+- Reused the Rust checked-stage UTF-8 diagnostic gather for the CNOT goal error
+  path. After the existing goal vote, ranks gather lengths and padded bytes via
+  `World.gather_fixed`; successful goal selection and its collective sequence
+  remain unchanged.
+- The older checked-stage ABI retains its object-gather compatibility path.
+  No goal, winner, matrix, scorer, search-depth, or rank semantics changed.
+- RED: [Actions run 44660740001](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44660740001)
+  passed 265 Python tests (2 skipped); the new goal test failed on the existing
+  `all_gather_object` call.
+- Branch GREEN: [Actions run 44661053113](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44661053113)
+  passed Rust checks, PyO3 build, 266 Python tests (2 skipped), and NCCL probe
+  syntax. Artifact 14595053280, SHA-256
+  `8057258b53a903863f37a50d27a157a064bcd14ab0f8507daca087d8a3bdddd9`.
+- The test uses a two-rank CPU diagnostic fixture; it does not establish
+  physical CUDA/NCCL multi-GPU execution. Evidence:
+  `test_results/refactor_20261120/cnot-goal-tensor-errors/GITHUB_STATUS.md`.

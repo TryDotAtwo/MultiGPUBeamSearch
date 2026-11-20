@@ -110,7 +110,10 @@ rank processes after their ABI/layout and specialization checks.
   errors using the same rank exchange; PyTorch continues to own all tensor
   storage. The older Python stage adapter retains its previous behavior.
   The Rust backend also coordinates initialization, expansion and distinct
-  stage errors with the existing vote and failure-only message gather.
+  stage errors with the existing vote. CNOT goal failures and checked v2 stage
+  errors gather UTF-8 diagnostics as length and padded-byte tensors through the
+  selected `World` transport; the older checked-stage compatibility ABI retains
+  its existing object-gather fallback.
   Its score validation and legacy CPU/older-CUDA expansion and distinct
   sequences are Rust-owned while using the same Torch and domain operators;
   mixed operator availability on ranks must remain valid.

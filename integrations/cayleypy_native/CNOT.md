@@ -91,10 +91,11 @@ Stream 5 communicator carries CNOT `sum`, fixed `all_gather`, and history-row
 selection is collective: if any rank lacks either ABI, all ranks retain the
 previous Torch collective path. Tensor storage remains PyTorch-owned; the FFI
 borrows its device addresses on the current CUDA stream and records that stream
-before NCCL reads or writes the buffers. NCCL unique-ID bootstrap and the
-failure-only `all_gather_object` diagnostic remain on the caller's default
-process group. This transfers collective dispatch, not the full CNOT search or
-checkpoint scorer.
+before NCCL reads or writes the buffers. NCCL unique-ID bootstrap and the diagnostic fallback for older checked
+stage APIs remain on the caller's default process group. Rust CNOT goal failures
+and the checked v2 stage path gather UTF-8 lengths and padded byte tensors via
+the current `World` transport. This transfers diagnostic dispatch only, not
+the full CNOT search or checkpoint scorer.
 
 With the matching PyO3 extension, public `TQPScorer` uses a Rust-owned
 scorer-library/context handle. Rust performs the existing `inference_batch`

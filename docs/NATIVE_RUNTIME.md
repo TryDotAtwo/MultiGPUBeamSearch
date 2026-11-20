@@ -101,10 +101,10 @@ remain coordinated through the existing rank exchange. The Rust stage backend
 owns local-goal orchestration and rank-wide winner/error coordination, using the
 existing ATen operator or the same Torch tensor operations when it is missing.
 The older Python stage adapter retains its original goal implementation.
-The Rust stage backend also owns the existing error vote. Its v2
-failure path gathers UTF-8 diagnostics by first gathering byte lengths, then
-zero-padded bytes with fixed-shape tensor collectives in rank order. The Rust
-CNOT controller uses that path directly. Public `World.checked` performs one
+The Rust stage backend also owns the existing error vote. Rust CNOT goal
+failures and its v2 checked-stage failure path gather UTF-8 diagnostics by first
+gathering byte lengths, then zero-padded bytes with fixed-shape tensor
+collectives in rank order. Public `World.checked` performs one
 cached all-rank support vote before selecting the optional v2 ABI; if any rank
 has an older PyO3 extension, all ranks retain the legacy checker or Python
 object-gather fallback. Admission now runs under the Rust rank controller and

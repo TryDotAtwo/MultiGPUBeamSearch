@@ -3217,3 +3217,16 @@ selection, collectives, search output, or CUDA execution. Hosted CPU/PyO3
 evidence is recorded in
 `test_results/refactor_20261120/rust-rank-plan-validation/GITHUB_STATUS.md`.
 Physical CUDA/NCCL multi-GPU execution remains unverified.
+
+## CNOT goal failure diagnostics use fixed tensors (2026-11-20)
+
+After the existing rank-wide goal vote reports an error, the Rust goal stage
+now gathers diagnostic byte lengths and padded UTF-8 bytes through
+`World.gather_fixed`. The existing successful-goal collective and winning
+candidate selection are unchanged. The older checked-stage ABI retains its
+object-gather fallback; this goal path uses fixed tensors even when
+`World.gather_fixed` falls back to the caller's Torch process group.
+
+RED/GREEN CPU/PyO3 evidence is recorded in
+`test_results/refactor_20261120/cnot-goal-tensor-errors/GITHUB_STATUS.md`.
+No physical CUDA/NCCL multi-GPU goal-error run has been accepted.
