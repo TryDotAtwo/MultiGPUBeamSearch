@@ -1,3 +1,10 @@
+## 2026-11-20 - Coordinate CNOT BaseException failures across ranks
+
+- Multi-rank checked CNOT stages now capture Python `BaseException` values, including `KeyboardInterrupt`, into the existing rank-wide error vote. The Rust checked ABI follows the same rule; single-rank calls preserve the original exception.
+- CNOT CPU Actions run [44708561397](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44708561397) passed Rust formatting/checks, Rust CNOT tests, PyO3 build, and 271 Python compatibility tests (2 skipped). Artifact [14615563947](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44708561397/artifacts/14615563947), SHA-256 `5294dd904cc054b5bcff621de6f291f84b77bff1d875aaf50c9e3b145a5f7e17`.
+- The existing-Vast workflow [44708561389](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44708561389) authenticated its redacted Actions secret but found instance 61080396 exited and skipped build/transfer/GPU execution. Status artifact [14616430543](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44708561389/artifacts/14616430543), SHA-256 `727c95f07cb1c931629e0cb748aff1e839570dc71993d9efad11e47d63996ac8`.
+- CPU ABI and mocked two-rank error tests do not establish physical NCCL or CUDA recovery. Evidence: `test_results/refactor_20261120/cnot-checked-baseexception/GITHUB_STATUS.md`.
+
 ## 2026-11-20 - Preserve max beam width across resident sessions
 
 - Resident identity now keeps the requested form of beam width, including `"max"`, while retaining the accepted logical width separately. Repeated resident requests validate against that accepted width.
