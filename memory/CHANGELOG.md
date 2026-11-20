@@ -2717,3 +2717,11 @@ Main commit `148b2a826a369b7601e904ea409e0cc5301c75c9` also passed the 260-test 
   Evidence: `test_results/refactor_20261120/rust-session-cancel/GITHUB_STATUS.md`.
 - This validates host-side process cancellation only; physical CUDA/NCCL and
   1-/2-GPU runs remain unverified.
+- MAIN GREEN: run
+  [44722196693](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44722196693)
+  at `014a2ffeaab5493dd0e0363c93a034fe09413381` passed again on main:
+  Rust/CNOT CPU checks, PyO3 build, and 280 Python tests (2 skipped). Artifact
+  14621863125, SHA-256
+  `c33942672d0c4a24c3845feb5e733236fb6512b731f6fc8ff79fd3729f706840`.
+  The companion public-owner workflow [44722196881](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44722196881)
+  also passed. Physical CUDA/NCCL and 1-/2-GPU validation remain unverified.
