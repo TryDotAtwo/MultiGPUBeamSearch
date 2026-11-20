@@ -104,6 +104,46 @@ impl SessionIdentity {
         Ok(())
     }
 }
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RequestedBeam {
+    Exact(u64),
+    AutoMax,
+}
+
+impl Serialize for RequestedBeam {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            Self::Exact(width) => serializer.serialize_u64(*width),
+            Self::AutoMax => serializer.serialize_str("max"),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for RequestedBeam {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        #[serde(untagged)]
+        enum WireValue {
+            Exact(u64),
+            Token(String),
+        }
+
+        match WireValue::deserialize(deserializer)? {
+            WireValue::Exact(width) => Ok(Self::Exact(width)),
+            WireValue::Token(token) if token == "max" => Ok(Self::AutoMax),
+            WireValue::Token(token) => Err(<D::Error as serde::de::Error>::custom(format!(
+                "unsupported requested beam width {token:?}"
+            ))),
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct PreparationIdentity {
@@ -116,7 +156,8 @@ pub struct PreparationIdentity {
     pub model_backend: String,
     pub devices: Vec<u32>,
     pub binding_scope: bool,
-    pub beam_width: u64,
+    #[serde(rename = "beam_width")]
+    pub requested_beam: RequestedBeam,
     pub max_steps: u32,
     pub options_repr: String,
     pub cuda_visible_devices: Option<String>,
@@ -135,7 +176,7 @@ impl PreparationIdentity {
         model_backend: String,
         devices: Vec<u32>,
         binding_scope: bool,
-        beam_width: u64,
+        requested_beam: RequestedBeam,
         max_steps: u32,
         options_repr: String,
         cuda_visible_devices: Option<String>,
@@ -152,7 +193,7 @@ impl PreparationIdentity {
             model_backend,
             devices,
             binding_scope,
-            beam_width,
+            requested_beam,
             max_steps,
             options_repr,
             cuda_visible_devices,

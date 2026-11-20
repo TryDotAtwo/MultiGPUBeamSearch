@@ -349,26 +349,33 @@ class NativeSession:
                 model.backend,device_order,binding_scope,
                 beam_width,max_steps,options_repr,visible_devices,cuda_device_order,
                 runtime_build_key)
+            rust_preparation_identity_supported = True
             identity_key = None
             if self._engine == 'rust':
-                from .rust_control import build_preparation_identity
-                identity_key = build_preparation_identity(
-                    graph_hash=contract.graph_hash,
-                    geometry=geometry,
-                    center=center,
-                    generators=generators,
-                    model_artifact_hash=model.artifact_hash,
-                    artifact_sizes=artifact_sizes,
-                    model_backend=model.backend,
-                    devices=device_order,
-                    binding_scope=binding_scope,
-                    beam_width=beam_width,
-                    max_steps=max_steps,
-                    options_repr=options_repr,
-                    cuda_visible_devices=visible_devices,
-                    cuda_device_order=cuda_device_order,
-                    runtime_build=runtime_build,
+                from .rust_control import (
+                    build_preparation_identity,
+                    supports_auto_max_preparation_identity,
                 )
+                if type(beam_width) is str and beam_width == 'max':
+                    rust_preparation_identity_supported = supports_auto_max_preparation_identity()
+                if rust_preparation_identity_supported:
+                    identity_key = build_preparation_identity(
+                        graph_hash=contract.graph_hash,
+                        geometry=geometry,
+                        center=center,
+                        generators=generators,
+                        model_artifact_hash=model.artifact_hash,
+                        artifact_sizes=artifact_sizes,
+                        model_backend=model.backend,
+                        devices=device_order,
+                        binding_scope=binding_scope,
+                        beam_width=beam_width,
+                        max_steps=max_steps,
+                        options_repr=options_repr,
+                        cuda_visible_devices=visible_devices,
+                        cuda_device_order=cuda_device_order,
+                        runtime_build=runtime_build,
+                    )
             if identity_key is None:
                 preparation_identity = {
                     'graph_hash': contract.graph_hash,
@@ -394,7 +401,8 @@ class NativeSession:
                     or not self.model_snapshot_cache.verify_for_launch(model, contract)):
                 verify_prepared_model(model,contract)
             rust_identity_match = None
-            if self._engine == 'rust' and self._workers is not None:
+            if (rust_preparation_identity_supported and self._engine == 'rust'
+                    and self._workers is not None):
                 preparer = getattr(self._workers, 'begin_preparation', None)
                 if callable(preparer):
                     rust_identity_match = preparer(identity_key)
@@ -486,13 +494,15 @@ class NativeSession:
                 outcome.metadata['persistent_session'] = persistent_metadata
             if remember_preparation and self._workers is not None:
                 result_recorder = getattr(self._workers, 'remember_preparation_result', None)
-                rust_owns_metadata = (self._engine == 'rust'
+                rust_owns_metadata = (rust_preparation_identity_supported
+                    and self._engine == 'rust'
                     and callable(result_recorder)
                     and result_recorder(identity_key, outcome.metadata))
                 self._rust_metadata_owned = rust_owns_metadata
                 recorder = getattr(self._workers, 'remember_preparation', None)
                 rust_owns_identity = rust_owns_metadata or (
-                    self._engine == 'rust' and callable(recorder)
+                    rust_preparation_identity_supported
+                    and self._engine == 'rust' and callable(recorder)
                     and recorder(identity_key))
                 self._identity = None if rust_owns_identity else identity
                 self._metadata = (None if rust_owns_metadata

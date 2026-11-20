@@ -1,5 +1,5 @@
 use beam_core::search::PermutationGraph;
-use beam_runtime::search_session::{PreparationIdentity, SessionIdentity};
+use beam_runtime::search_session::{PreparationIdentity, RequestedBeam, SessionIdentity};
 use pyo3::{
     exceptions::{PyRuntimeError, PyValueError},
     prelude::*,
@@ -60,13 +60,24 @@ fn build_preparation_identity(
     model_backend: String,
     devices: Vec<u32>,
     binding_scope: bool,
-    beam_width: u64,
+    beam_width: &Bound<'_, PyAny>,
     max_steps: u32,
     options_repr: String,
     cuda_visible_devices: Option<String>,
     cuda_device_order: Option<String>,
     runtime_build: Option<String>,
 ) -> PyResult<String> {
+    let requested_beam = match beam_width.extract::<u64>() {
+        Ok(width) => RequestedBeam::Exact(width),
+        Err(_) => match beam_width.extract::<String>() {
+            Ok(token) if token == "max" => RequestedBeam::AutoMax,
+            _ => {
+                return Err(PyValueError::new_err(
+                    "preparation beam_width must be a nonnegative integer or 'max'",
+                ))
+            }
+        },
+    };
     let geometry: [Option<u64>; 3] = geometry.try_into().map_err(|_| {
         PyValueError::new_err("preparation geometry must contain exactly three values")
     })?;
@@ -84,7 +95,7 @@ fn build_preparation_identity(
         model_backend,
         devices,
         binding_scope,
-        beam_width,
+        requested_beam,
         max_steps,
         options_repr,
         cuda_visible_devices,
@@ -208,6 +219,7 @@ fn parse_terminal(
 }
 pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add("SEARCH_TERMINAL_RESULT_VERSION", 1)?;
+    module.add("PREPARATION_IDENTITY_AUTO_MAX_VERSION", 1)?;
     module.add_function(wrap_pyfunction!(build_preparation_identity, module)?)?;
     module.add_function(wrap_pyfunction!(build_session_identity, module)?)?;
     module.add_class::<SearchSession>()?;

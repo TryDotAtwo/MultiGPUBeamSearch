@@ -1,5 +1,7 @@
 use beam_core::search::PermutationGraph;
-use beam_runtime::search_session::{Launch, PreparationIdentity, SearchSession, SessionIdentity};
+use beam_runtime::search_session::{
+    Launch, PreparationIdentity, RequestedBeam, SearchSession, SessionIdentity,
+};
 use serde_json::json;
 use std::{fs, sync::atomic::Ordering, time::Duration};
 #[test]
@@ -103,7 +105,7 @@ while not (directory/'stop').exists():
         model_backend: identity.model_backend.clone(),
         devices: identity.devices.clone(),
         binding_scope: false,
-        beam_width: identity.beam_width,
+        requested_beam: RequestedBeam::Exact(identity.beam_width),
         max_steps: identity.max_steps,
         options_repr: "NativeOptions()".into(),
         cuda_visible_devices: None,
@@ -203,7 +205,7 @@ while not (directory/'stop').exists():
         model_backend: identity.model_backend.clone(),
         devices: identity.devices.clone(),
         binding_scope: false,
-        beam_width: identity.beam_width,
+        requested_beam: RequestedBeam::Exact(identity.beam_width),
         max_steps: identity.max_steps,
         options_repr: "NativeOptions()".into(),
         cuda_visible_devices: None,

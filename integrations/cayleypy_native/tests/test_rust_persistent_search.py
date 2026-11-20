@@ -508,3 +508,125 @@ def test_rust_resident_cancel_handles_missing_extension_method():
     workers = RustResidentWorkers.__new__(RustResidentWorkers)
     workers._owner = SimpleNamespace()
     assert workers.cancel() is False
+
+
+def test_compiled_rust_preparation_identity_builder_accepts_auto_max():
+    from multigpubeamsearch import rust_control
+
+    runtime = rust_control.extension()
+    assert runtime.PREPARATION_IDENTITY_AUTO_MAX_VERSION == 1
+    identity = rust_control.build_preparation_identity(
+        graph_hash="a" * 64,
+        geometry=(2, 2, 1),
+        center=(0, 1),
+        generators=((1, 0),),
+        model_artifact_hash="b" * 64,
+        artifact_sizes=(17,),
+        model_backend="mlp",
+        devices=(0, 1),
+        binding_scope=False,
+        beam_width="max",
+        max_steps=4,
+        options_repr="NativeOptions()",
+        cuda_visible_devices="0,1",
+        cuda_device_order="PCI_BUS_ID",
+        runtime_build={"binary_sha256": "c" * 64, "inference_backend": "cutlass"},
+    )
+    assert isinstance(identity, str)
+    assert json.loads(identity)["beam_width"] == "max"
+
+    owner = runtime.SearchSession()
+    try:
+        assert owner.begin_preparation(identity) is False
+        owner.remember_preparation(identity)
+        assert owner.preparation_matches(identity) is True
+    finally:
+        owner.close()
+
+
+def test_auto_max_identity_builder_requires_explicit_extension_capability(monkeypatch):
+    from multigpubeamsearch import rust_control
+
+    builder_calls = []
+    legacy_runtime = SimpleNamespace(
+        build_preparation_identity=lambda *args: builder_calls.append(args)
+    )
+    monkeypatch.setattr(rust_control, "extension", lambda: legacy_runtime)
+
+    assert rust_control.supports_auto_max_preparation_identity() is False
+    result = rust_control.build_preparation_identity(
+        graph_hash="a" * 64,
+        geometry=(2, 2, 1),
+        center=(0, 1),
+        generators=((1, 0),),
+        model_artifact_hash="b" * 64,
+        artifact_sizes=(17,),
+        model_backend="mlp",
+        devices=(0,),
+        binding_scope=False,
+        beam_width="max",
+        max_steps=4,
+        options_repr="NativeOptions()",
+        cuda_visible_devices=None,
+        cuda_device_order=None,
+        runtime_build=None,
+    )
+    assert result is None
+    assert builder_calls == []
+
+
+def test_old_rust_owner_never_receives_auto_max_preparation_json(tmp_path, monkeypatch):
+    from multigpubeamsearch import models, persistent, rust_control
+
+    monkeypatch.setattr(rust_control, "supports_auto_max_preparation_identity", lambda: False)
+    monkeypatch.setattr(
+        rust_control,
+        "build_preparation_identity",
+        lambda **kwargs: pytest.fail("old extension must not build an auto-max key"),
+    )
+    monkeypatch.setattr(persistent, "requires_mlp_host_binding", lambda *args, **kwargs: False)
+    monkeypatch.setattr(models, "verify_prepared_model", lambda *args, **kwargs: None)
+
+    class NumericOnlyOwner:
+        pids = [101]
+        sequence = 1
+        _last_reused = False
+
+        def configure(self, *args, **kwargs):
+            raise AssertionError("the retained owner should not be reconfigured")
+
+        def _reject_typed_preparation(self, identity):
+            raise AssertionError("old numeric-only owner received an auto-max key")
+
+        begin_preparation = _reject_typed_preparation
+        preparation_matches = _reject_typed_preparation
+        remember_preparation = _reject_typed_preparation
+        remember_preparation_result = _reject_typed_preparation
+
+        def close(self):
+            return None
+
+    contract = SimpleNamespace(
+        graph_hash="graph-hash", state_len=1, num_classes=1, move_count=1,
+        center=(0,), generators=((0,),), start=(1,),
+    )
+    model = SimpleNamespace(artifact_hash="model-hash", artifact_sizes=(), backend="mlp")
+    options = NativeOptions(cache_dir=tmp_path)
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    session = NativeSession(engine="rust")
+    session._workers = NumericOnlyOwner()
+
+    def execute(*args, **kwargs):
+        session._pending["launch_started"] = True
+        return NativeOutcome(None, 0.01, 64, run_dir, {"terminal_records": 1})
+
+    try:
+        outcome = session.run(
+            execute, contract, model, options, "max", 4, run_dir, (0,),
+            runtime=SimpleNamespace(build_metadata={}),
+        )
+        assert outcome.effective_beam_width == 64
+        assert outcome.metadata["persistent_session"]["worker_pids"] == [101]
+    finally:
+        session.close()

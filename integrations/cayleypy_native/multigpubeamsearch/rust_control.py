@@ -51,6 +51,16 @@ def options_descriptor(options):
             for name, value in values.items()}
 
 
+def supports_auto_max_preparation_identity():
+    """Whether this extension can decode the auto-max preparation request token."""
+    try:
+        native = extension()
+    except (NativeUnavailable, ImportError):
+        return False
+    version = getattr(native, 'PREPARATION_IDENTITY_AUTO_MAX_VERSION', 0)
+    return type(version) is int and version >= 1
+
+
 def build_preparation_identity(*, graph_hash, geometry, center, generators,
                                model_artifact_hash, artifact_sizes, model_backend,
                                devices, binding_scope, beam_width, max_steps,
@@ -67,6 +77,14 @@ def build_preparation_identity(*, graph_hash, geometry, center, generators,
     runtime_build_json = (None if runtime_build is None
                           else json.dumps(runtime_build, sort_keys=True))
     try:
+        if type(beam_width) is str and beam_width == 'max':
+            if type(getattr(native, 'PREPARATION_IDENTITY_AUTO_MAX_VERSION', 0)) is not int:
+                return None
+            if native.PREPARATION_IDENTITY_AUTO_MAX_VERSION < 1:
+                return None
+            native_beam_width = beam_width
+        else:
+            native_beam_width = int(beam_width)
         result = builder(
             graph_hash,
             [None if value is None else int(value) for value in geometry],
@@ -78,7 +96,7 @@ def build_preparation_identity(*, graph_hash, geometry, center, generators,
             model_backend,
             [int(device) for device in devices],
             bool(binding_scope),
-            int(beam_width),
+            native_beam_width,
             int(max_steps),
             options_repr,
             cuda_visible_devices,
