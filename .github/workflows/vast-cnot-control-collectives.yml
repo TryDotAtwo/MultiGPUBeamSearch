@@ -13,6 +13,8 @@ on:
     paths:
       - .github/workflows/vast-cnot-control-collectives.yml
       - tools/verify_permutation_cuda.py
+      - tools/vast_result_transport.sh
+      - tools/test_vast_result_transport.py
       - memory/CHANGELOG.md
 permissions:
   contents: read
@@ -35,9 +37,11 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - name: Compile the permutation acceptance script
+      - name: Compile the acceptance scripts
         id: compile_source
-        run: python -m py_compile tools/verify_permutation_cuda.py
+        run: python -m py_compile tools/verify_permutation_cuda.py tools/test_vast_result_transport.py
+      - name: Test Vast result retrieval after remote key revocation
+        run: python tools/test_vast_result_transport.py -v
       - name: Syntax-check the remote Bash payload without running it
         id: syntax_check
         shell: bash
@@ -70,10 +74,10 @@ jobs:
           ):
               if required not in payload_text:
                   raise SystemExit(f"missing installed-wheel provenance guard: {required}")
-          if "tar -C '${REMOTE_ROOT}' -czf - test_results/refactor_20261121/gpu-acceptance" not in source:
-              raise SystemExit("remote GPU test_results must be collected even when the test command fails")
-          if 'result_archive="${RUNNER_TEMP}/beam-gpu-acceptance-test-results.tar.gz"' not in source:
-              raise SystemExit("the remote test_results archive must be retrieved by the runner")
+          if "bash tools/vast_result_transport.sh" not in source:
+              raise SystemExit("the remote GPU job must use the tested SSH result transport")
+          if "ControlMaster=yes -MNf" not in Path("tools/vast_result_transport.sh").read_text(encoding="utf-8"):
+              raise SystemExit("the SSH result transport must retain an authenticated control master")
           artifact_section = source.split("      - name: Upload sanitized status and remote test log", 1)[1]
           if "beam-gpu-acceptance-test-results.tar.gz" not in artifact_section:
               raise SystemExit("the remote GPU test_results archive must be uploaded as an Actions artifact")
@@ -446,28 +450,21 @@ jobs:
             "$source_sha" "$control_marker_count" "$descriptor_marker_count" "92f3ec8e6a6ef831916a9d3ba9bbdae9307c9850d61334916a2b3e690c0020c4" > "${log_dir}/receipt.json"
           cat "${log_dir}/receipt.json"
           REMOTE
-          remote_exit=0
-          if ssh "${ssh_opts[@]}" "root@${host}" \
-            "timeout --signal=TERM --kill-after=60s '${ALLOWED_RUNTIME_SECONDS}s' bash -s -- '${REMOTE_ROOT}/source' '${REMOTE_ROOT}' '${key_blob}' '${remote_archive}' '${ARCHIVE_SHA}' '${SOURCE_SHA}'" \
-            < "${RUNNER_TEMP}/run-cnot-control.sh" > "$remote_log" 2>&1; then
-            remote_exit=0
-          else
-            remote_exit=$?
-          fi
           result_archive="${RUNNER_TEMP}/beam-gpu-acceptance-test-results.tar.gz"
-          if ssh "${ssh_opts[@]}" "root@${host}" \
-            "tar -C '${REMOTE_ROOT}' -czf - test_results/refactor_20261121/gpu-acceptance" \
-            > "$result_archive"; then
-            echo "Retrieved remote GPU test_results for the Actions artifact."
-          else
-            rm -f "$result_archive"
-            echo "Remote test_results could not be retrieved; the remote console log remains available." >&2
-          fi
-          if [[ "$remote_exit" != 0 ]]; then
-            tail -n 100 "$remote_log"
-            exit "$remote_exit"
-          fi
-          test -s "$result_archive"
+          VAST_SSH_PRIVATE_KEY="$key_file" \
+          VAST_SSH_KNOWN_HOSTS="$known_hosts" \
+          VAST_SSH_HOST="$host" \
+          VAST_SSH_PORT="$port" \
+          VAST_SSH_LOG="$remote_log" \
+          VAST_SSH_RESULTS="$result_archive" \
+          VAST_SSH_SCRIPT="${RUNNER_TEMP}/run-cnot-control.sh" \
+          VAST_REMOTE_ROOT="$REMOTE_ROOT" \
+          VAST_REMOTE_RUNTIME_SECONDS="$ALLOWED_RUNTIME_SECONDS" \
+          VAST_REMOTE_KEY_BLOB="$key_blob" \
+          VAST_REMOTE_ARCHIVE="$remote_archive" \
+          VAST_REMOTE_ARCHIVE_SHA="$ARCHIVE_SHA" \
+          VAST_SOURCE_SHA="$SOURCE_SHA" \
+            bash tools/vast_result_transport.sh
           cat "$remote_log"
           control_marker_count="$(grep -c 'CNOT_CONTROL_COLLECTIVES_OK' "$remote_log")"
           descriptor_marker_count="$(grep -c 'CNOT_DEVICE_UNSEEN_OK' "$remote_log")"
