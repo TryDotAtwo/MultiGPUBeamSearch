@@ -1102,3 +1102,63 @@ def test_two_rank_gloo_rejects_mixed_cnot_engine_requests(tmp_path):
                 process.terminate()
             process.join(timeout=2)
 
+def _rank_local_failure_vote_worker(rank, init_method, output_dir):
+    from datetime import timedelta
+    import torch.distributed as distributed
+
+    distributed.init_process_group(
+        backend="gloo",
+        init_method=init_method,
+        rank=rank,
+        world_size=2,
+        timeout=timedelta(seconds=8),
+    )
+    try:
+        from multigpubeamsearch.cnot_collectives import World
+
+        with World("cpu") as world:
+            any_failed = world.any_rank_failed(rank == 1)
+        Path(output_dir, f"rank-{rank}.json").write_text(
+            json.dumps({"any_failed": any_failed}), encoding="utf-8"
+        )
+    finally:
+        if distributed.is_initialized():
+            distributed.destroy_process_group()
+
+
+def test_two_rank_gloo_reports_rank_local_receive_allocation_failure(tmp_path):
+    rendezvous = tmp_path / "gloo-allocation-store"
+    output_dir = tmp_path / "gloo-allocation-results"
+    output_dir.mkdir()
+    context = mp.get_context("spawn")
+    processes = [
+        context.Process(
+            target=_rank_local_failure_vote_worker,
+            args=(rank, f"file://{rendezvous}", str(output_dir)),
+        )
+        for rank in range(2)
+    ]
+    for process in processes:
+        process.start()
+
+    deadline = time.monotonic() + 20
+    try:
+        for process in processes:
+            process.join(timeout=max(0, deadline - time.monotonic()))
+        alive = [process for process in processes if process.is_alive()]
+        if alive:
+            for process in alive:
+                process.terminate()
+                process.join(timeout=2)
+            pytest.fail("two-rank Gloo allocation vote exceeded 20 seconds")
+        assert [process.exitcode for process in processes] == [0, 0]
+        results = [
+            json.loads((output_dir / f"rank-{rank}.json").read_text(encoding="utf-8"))
+            for rank in range(2)
+        ]
+        assert results == [{"any_failed": True}, {"any_failed": True}]
+    finally:
+        for process in processes:
+            if process.is_alive():
+                process.terminate()
+            process.join(timeout=2)
