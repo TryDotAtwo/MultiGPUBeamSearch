@@ -2809,3 +2809,28 @@ Main commit `148b2a826a369b7601e904ea409e0cc5301c75c9` also passed the 260-test 
   search. Full logs and the smoke summary are in
   `test_results/refactor_20261120/installed-wheel/GITHUB_STATUS.md` and the
   linked Actions artifact.
+
+## 2026-11-20 - Coordinate CNOT selection completion errors
+
+- Added a two-rank Gloo regression that injects a rank-one exception during
+  local result ordering after the global selection collectives. Before the
+  fix, rank zero entered the next redistribution collective and received a
+  peer-closed Gloo error instead of the original diagnosis.
+- The Rust CNOT stage now checks the completed selection result through the
+  existing Gloo control group before starting redistribution. Both ranks
+  receive the same stage error, and the test confirms that a subsequent Gloo
+  all-reduce still works.
+- Main run [44796514366](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44796514366)
+  passed 302 tests with 2 skipped. Artifact [14659601192](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44796514366/artifacts/14659601192),
+  SHA-256 `87ae53a9f6ab336e160eff33ec3d7a1c6b282e5043614ffe03398d5b302e686f`.
+- Installed PEP 517 wheel run [44796514465](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44796514465)
+  passed installation outside the checkout, `pip check`, public import/export
+  checks, and the `resident-search-v1` worker protocol. Artifact
+  [14658528465](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44796514465/artifacts/14658528465),
+  SHA-256 `8b7d94b169c9f3bf82b95b94a91a7ec94bcbe037fc7ed83b99cee165a55b924e`.
+- The read-only existing-Vast job [44796514430](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44796514430)
+  found instance 61080396 exited and skipped GPU execution; no instance
+  state change was attempted.
+- CPU/Gloo and wheel checks do not establish CUDA, NCCL, or physical 1-/2-GPU
+  acceptance. Errors inside selection before an internal collective are not
+  covered by this completion vote.

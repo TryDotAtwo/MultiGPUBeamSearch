@@ -3324,3 +3324,19 @@ object-gather fallback; this goal path uses fixed tensors even when
 RED/GREEN CPU/PyO3 evidence is recorded in
 `test_results/refactor_20261120/cnot-goal-tensor-errors/GITHUB_STATUS.md`.
 No physical CUDA/NCCL multi-GPU goal-error run has been accepted.
+
+## CNOT selection completion errors are coordinated before redistribution (2026-11-20)
+
+After the distributed selection cutoff has finished its own collectives, the Rust
+stage now votes on the returned result through the existing Gloo control group
+before allowing search to enter candidate redistribution. This reports a
+rank-local error in post-selection work to every rank and keeps the next stage
+from starting with a missing participant. The check does not cover failures
+that occur inside selection before one of its collectives; those still require
+separate boundary-level handling.
+
+The change adds a control-group vote at the selection boundary. Candidate
+ranking, cutoff width, score ordering, and lexical tie-breaking are unchanged.
+The two-rank Gloo regression and installed-wheel evidence are recorded in
+`test_results/refactor_20261120/cnot-selection-gloo/GITHUB_STATUS.md`.
+Physical CUDA/NCCL multi-GPU execution remains unverified.
