@@ -199,6 +199,9 @@ rank processes after their ABI/layout and specialization checks.
 
 beam-runtime must materialize legacy permutation runner input files from the validated Rust graph contract before worker launch. Preserve puzzle_info.json schema and spacing, m0..mN insertion order, trailing newline, and the one-row test.csv format exactly. PyO3 must rebuild and validate the normalized graph request before writing. Older extensions and legacy Python contract objects retain the previous Python writer. This boundary change must not alter search stages, multi-GPU rank/collective behavior, inference arithmetic, or CNOT semantics.
 
+## Pipeline profile receipt validation
+
+The component-calibrated public pipeline-cache receipt validator may run in beam-runtime through an optional PyO3 method. It must preserve the existing receipt schema and Python acceptance behavior for standard JSON records: identity and phase, environment allowlist and numeric bounds, exactly one selected profile, rank-plan consistency, exact requested beam, one valid measurement row per rank, positive finite timings, and transport item counts. A missing/older extension or unsupported input keeps the Python validator. Full-frontier receipts remain on the Python statistical selector until its bootstrap policy is reproduced exactly. After a cache receipt passes, every reuse still requires fresh all-rank native memory admission and unchanged execution geometry. This migration must not change profile choice, search width, rank membership, collectives, or GPU execution.
 ## Performance and switching
 
 Downstream component timings only nominate profiles. Keep raw all-rank receipts,

@@ -136,3 +136,32 @@ def test_adaptive_cache_binds_search_trace_and_measured_subset(tmp_path,policy):
         assert not valid_receipt(bad,identity)
     path=tmp_path/'adaptive.json';write_profile(path,identity,data)
     assert read_profile(path,identity,lambda env:plans)['cache_hit']
+
+
+def test_rust_component_receipt_validator_matches_python_and_defers_full_grid():
+    from multigpubeamsearch import _beam_runtime
+
+    validator = _beam_runtime.validate_pipeline_profile_receipt
+    identity, data, _ = receipt()
+    assert validator(json.dumps(data), json.dumps(identity)) is True
+
+    corrupt = copy.deepcopy(data)
+    corrupt['tested'][0]['rank_measurements'][0]['union_seconds'] = [0.0] * 5
+    assert validator(json.dumps(corrupt), json.dumps(identity)) is False
+
+    full_identity, full_data, _ = full_receipt()
+    assert validator(json.dumps(full_data), json.dumps(full_identity)) is None
+
+def test_component_receipt_keeps_python_fallback_for_older_extension(monkeypatch):
+    from multigpubeamsearch import pipeline_cache, rust_control
+
+    class LegacyExtension:
+        pass
+
+    monkeypatch.setattr(rust_control, 'extension', lambda: LegacyExtension())
+    identity, data, _ = receipt()
+    assert pipeline_cache.valid_receipt(data, identity)
+
+    corrupt = copy.deepcopy(data)
+    corrupt['environment']['LD_PRELOAD'] = '/unexpected'
+    assert not pipeline_cache.valid_receipt(corrupt, identity)

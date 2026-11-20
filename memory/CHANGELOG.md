@@ -2551,3 +2551,31 @@ Preserved 26 checkouts and their source/index overlays; verified restoration of 
   ea6be9a385dc4d5abb74d2de589adbb4318b39d6bdc8937997b73085465aacba.
 - Физическая CUDA/NCCL multi-GPU проверка не выполнялась. Полная запись:
   test_results/refactor_20261120/cnot-rust-route-dispatch/GITHUB_STATUS.md.
+
+## 2026-11-20 - Rust component pipeline-cache receipt validation
+
+- `beam-runtime::pipeline_cache` now validates the public
+  `component_calibrated` receipt shape; optional PyO3 dispatch in
+  `pipeline_cache.py` keeps Python fallback for missing/older extensions and
+  all full-frontier receipts.
+- Preserved receipt schema, environment allowlist, plan admission checks,
+  complete per-rank measurements, requested beam width, and positive finite
+  component/transport timings. Fresh native all-rank memory admission after
+  cache validation stays mandatory. No search, profile-selection, rank,
+  collective, inference, or GPU behavior changed.
+- RED: Actions run
+  [44648572656](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44648572656)
+  failed because the PyO3 validator was not implemented yet; 248 tests passed
+  and 2 skipped. Rust checks and the extension build passed.
+- GREEN: Actions run
+  [44649100197](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44649100197)
+  passed Rust checks, PyO3 build, 249 Python tests (2 skipped), and NCCL probe
+  syntax. The follow-up legacy-extension fallback run
+  [44649561313](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44649561313)
+  passed 250 Python tests (2 skipped), Rust checks, PyO3 build, and NCCL
+  probe syntax. Artifact 14590465891, SHA256
+  9aff948e3aec5b88173fcb2121cae0789680e1625f037afb1c6185093f24de6b.
+- These CPU/PyO3 checks do not establish physical CUDA/NCCL multi-GPU
+  execution. Evidence:
+  `test_results/refactor_20261120/rust-pipeline-cache-receipt/GITHUB_STATUS.md`.
+

@@ -511,6 +511,11 @@ The per-GPU capacity-cache predicate now runs in `beam-core` through optional Py
 
 This moves the decision only; memory sampling, cache loading, calibration work, and GPU behavior are unchanged. Hosted run [44550275840](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44550275840) passed 211 Python tests (2 skipped), scoped Rust/PyO3 checks, and NCCL probe syntax. Physical CUDA/NCCL was not run. Evidence: `test_results/refactor_20261119/rust-inference-cache/GITHUB_STATUS.md`.
 
+## Rust component pipeline-receipt validation
+
+For component-calibrated pipeline profiles, `beam-runtime::pipeline_cache` now validates receipt identity, phase, environment allowlist, rank-plan agreement, complete rank cohort, requested beam, and positive timing samples. The optional PyO3 validator returns an unsupported result for full-frontier receipts; their Python statistical validator remains authoritative because its bootstrap selection policy is not interchangeable with the Rust selector. Python retains its validator when the extension is absent or predates this method.
+
+Cache reads still perform fresh all-rank native memory admission and geometry comparison after receipt validation. Cache schema, selected profile, rank membership, search execution, and GPU behavior are unchanged. Hosted run [44649100197](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44649100197) passed Rust checks, the PyO3 build, 249 Python tests (2 skipped), and NCCL probe syntax. The follow-up run [44649561313](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44649561313) passed 250 Python tests (2 skipped), with artifact 14590465891 and SHA-256 9aff948e3aec5b88173fcb2121cae0789680e1625f037afb1c6185093f24de6b. These checks do not establish physical CUDA/NCCL multi-GPU runtime acceptance.
 ## Rust-owned permutation search inputs
 
 For capable extensions, backend.py asks rust_control.write_search_inputs to pass the normalized graph fields through PyO3. The extension rebuilds and validates PublicGraphContract; beam-runtime::search_inputs then writes the same puzzle_info.json and test.csv bytes as the previous Python path. Generator keys remain m0, m1, … in source order, including multi-digit IDs. If an extension lacks this optional method or receives a legacy contract shape, the backend retains the existing Python writer.

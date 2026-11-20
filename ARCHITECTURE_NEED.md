@@ -3171,3 +3171,21 @@ unverified. Evidence:
 beam-runtime::search_inputs now writes the legacy puzzle_info.json and test.csv from a Rust-validated PublicGraphContract. The PyO3 boundary rebuilds the contract from normalized input before writing. It preserves Python's existing JSON spacing, synthetic m0 through mN move names in generator order, trailing newline, and quoted single-row CSV format. The Python backend keeps its prior writer for older extensions and legacy contract objects without the Rust fields.
 
 This moves pre-launch task-file serialization only. Search expansion, frontier selection, inference arithmetic, rank setup, collectives, candidate ownership, CUDA kernels, and CNOT are unchanged. Hosted run [44640784456](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44640784456) passed the CNOT CPU/PyO3 checks, 240 Python tests (2 skipped), and NCCL probe syntax. Companion depth-control run [44640371591](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44640371591) passed. These do not establish physical CUDA/NCCL multi-GPU runtime acceptance. Evidence: test_results/refactor_20261120/rust-search-input-serialization/GITHUB_STATUS.md.
+
+## Rust component pipeline-cache receipt validation (2026-11-20)
+
+The public `component_calibrated` pipeline receipt is now validated by
+`beam-runtime::pipeline_cache` through an optional PyO3 API. It checks cache
+identity and phase, environment admission, rank-plan coherence, exact beam
+width, the complete per-rank timing cohort, and positive finite transfer and
+stage measurements. Missing or older extensions retain the Python validator;
+full-frontier receipts remain in Python because their bootstrap selector must
+remain policy-compatible.
+
+Fresh all-rank native admission and geometry comparison in `read_profile`
+remain mandatory after receipt validation. No receipt schema, selected profile,
+search control flow, rank ordering, collective, inference arithmetic, or CUDA
+kernel changed. Hosted checks and run evidence are recorded in
+`test_results/refactor_20261120/rust-pipeline-cache-receipt/GITHUB_STATUS.md`.
+Physical CUDA/NCCL multi-GPU execution remains unverified.
+

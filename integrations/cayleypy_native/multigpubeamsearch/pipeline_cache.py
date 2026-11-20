@@ -32,7 +32,34 @@ def cache_path(root,identity):
     return Path(root)/'pipeline-profiles'/f'{key}.json'
 
 
+def _native_component_receipt(data, identity):
+    if identity.get('full_frontier', False):
+        return None
+    try:
+        from .errors import NativeUnavailable
+        from .rust_control import extension
+        native = extension()
+    except (ImportError, NativeUnavailable):
+        return None
+    validator = getattr(native, 'validate_pipeline_profile_receipt', None)
+    if not callable(validator):
+        return None
+    try:
+        result = validator(json.dumps(data), json.dumps(identity))
+    except (TypeError, ValueError, OverflowError):
+        return None
+    return result if result is None or type(result) is bool else None
+
+
 def valid_receipt(data,identity):
+    """Use Rust for component receipts; retain Python as the compatibility path."""
+    native = _native_component_receipt(data, identity)
+    if native is not None:
+        return native
+    return _valid_receipt_python(data, identity)
+
+
+def _valid_receipt_python(data,identity):
     """Reject incomplete cohorts and arbitrary environment injection."""
     try:
         if data['cache_identity']!=identity:return False
