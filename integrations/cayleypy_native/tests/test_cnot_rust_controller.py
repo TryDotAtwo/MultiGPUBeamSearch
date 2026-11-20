@@ -750,11 +750,14 @@ def distributed_cnot_setup_failure(rank, rendezvous, failure_point):
     old_runner = cnot._native_stages_runner
     old_identity = cnot.native.cnot_identity
     old_compat = cnot._make_compat_stages
+    old_input = cnot._input
+    old_equal = torch.equal
     message = f"fixture {failure_point} failed on rank one"
     expected_stages = {
         "identity": "build CNOT identity",
         "native_runner": "load CNOT native stage runner",
         "compatibility_stages": "build CNOT compatibility stages",
+        "root_goal": "check CNOT root goal",
     }
     try:
         require_controller()
@@ -777,6 +780,17 @@ def distributed_cnot_setup_failure(rank, rendezvous, failure_point):
                     raise RuntimeError(message)
                 return old_compat(*args, **kwargs)
             cnot._make_compat_stages = build_compatibility_stages
+        elif failure_point == "root_goal":
+            def build_untyped_input(root, *_args, **_kwargs):
+                return cnot._InputMatrix(root.shape[1], b"root-goal-fixture", root)
+            cnot._input = build_untyped_input
+
+            def fail_on_rank_one(left, right):
+                if rank == 1:
+                    raise RuntimeError(message)
+                return old_equal(left, right)
+
+            torch.equal = fail_on_rank_one
         else:
             raise AssertionError(f"unknown failure point: {failure_point}")
 
@@ -806,11 +820,15 @@ def distributed_cnot_setup_failure(rank, rendezvous, failure_point):
         cnot._native_stages_runner = old_runner
         cnot.native.cnot_identity = old_identity
         cnot._make_compat_stages = old_compat
+        cnot._input = old_input
+        torch.equal = old_equal
         dist.destroy_process_group()
 
 
 @pytest.mark.skipif(not dist.is_gloo_available(), reason="two CPU ranks require Gloo")
-@pytest.mark.parametrize("failure_point", ["identity", "native_runner", "compatibility_stages"])
+@pytest.mark.parametrize("failure_point", [
+    "identity", "native_runner", "compatibility_stages", "root_goal",
+])
 def test_two_gloo_ranks_coordinate_cnot_setup_failures_and_keep_the_world(
         tmp_path, failure_point):
     require_controller()
