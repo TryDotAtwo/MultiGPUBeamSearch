@@ -905,3 +905,20 @@ def test_rust_cpu_search_applies_children_without_python_tensor_helper(monkeypat
     result = cnot.search_cnot(cnot.pack_rows(rows), scorer, engine="rust", **options)
 
     assert asdict(result) == asdict(reference)
+
+
+def test_rust_cpu_search_deduplicates_without_python_tensor_helper(monkeypatch):
+    require_controller()
+    from multigpubeamsearch import cnot_native
+
+    rows, scorer = (8, 4, 2, 1), WireFixture(9)
+    options = dict(width=5, shortlist=9, max_depth=4, mode="qhat", audit=True)
+    reference = cnot.search_cnot(cnot.pack_rows(rows), scorer, engine="python", **options)
+
+    def forbidden(*_args, **_kwargs):
+        pytest.fail("Rust CNOT deduplication called the Python tensor helper")
+
+    monkeypatch.setattr(cnot_native, "cnot_first_unseen", forbidden)
+    result = cnot.search_cnot(cnot.pack_rows(rows), scorer, engine="rust", **options)
+
+    assert asdict(result) == asdict(reference)

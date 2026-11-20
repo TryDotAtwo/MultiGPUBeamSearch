@@ -138,6 +138,7 @@ jobs:
             integrations/cayleypy_native/tests/test_cnot_rust_controller.py::test_rust_search_owns_stages_without_python_stage_object \
             integrations/cayleypy_native/tests/test_cnot_rust_controller.py::test_rust_search_owns_batch_stages_without_python_helpers \
             integrations/cayleypy_native/tests/test_cnot_rust_controller.py::test_rust_cpu_search_applies_children_without_python_tensor_helper \
+            integrations/cayleypy_native/tests/test_cnot_rust_controller.py::test_rust_cpu_search_deduplicates_without_python_tensor_helper \
             integrations/cayleypy_native/tests/test_cnot_rust_controller.py::test_rust_top_level_controller_owns_cnot_admission_and_stage_dispatch \
             integrations/cayleypy_native/tests/test_cnot_rust_controller.py::test_rust_controller_prepares_typed_input_without_python_builder \
             integrations/cayleypy_native/tests/test_cnot_rust_controller.py::test_rust_native_root_goal_uses_typed_matrix_without_torch_equal\
