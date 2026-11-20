@@ -13,7 +13,8 @@ This prevents a rank-local setup error from leaving peers to enter a later
 collective or search stage alone. Search order, candidate selection, scoring,
 precision, owner mapping, and NCCL payload exchange are unchanged. Hosted
 CPU/Gloo tests do not establish physical CUDA/NCCL failure recovery.
-Hosted CPU/Gloo and installed-wheel receipts: `test_results/refactor_20261120/cnot-setup-gloo/GITHUB_STATUS.md`.
+Hosted CPU/Gloo and installed-wheel receipts:
+`test_results/refactor_20261120/cnot-setup-gloo/GITHUB_STATUS.md`.
 
 ## CNOT checked errors use the Gloo control group, 2026-11-20
 

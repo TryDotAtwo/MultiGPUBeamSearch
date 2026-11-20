@@ -22,7 +22,8 @@
   passed Rust CNOT checks, PyO3 build, 300 Python tests (2 skipped), and NCCL
   probe syntax. Artifact [14636575322](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44751923980/artifacts/14636575322),
   SHA-256 `d69aa55acf31b468732a5ce30dfb0318ddab15d9bb07eda06e21922e70fc3f19`.
-- Physical CUDA/NCCL and 1-/2-GPU execution remain unverified. - Main commit `7f48cea985fad82176411d1731eb7d4d741bced7` passed again:
+- Physical CUDA/NCCL and 1-/2-GPU execution remain unverified.
+- Main commit `7f48cea985fad82176411d1731eb7d4d741bced7` passed again:
   [CNOT CPU run 44753288626](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44753288626)
   passed Rust checks, PyO3 build, 300 Python tests (2 skipped), and NCCL probe
   syntax. Artifact [14635354179](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44753288626/artifacts/14635354179),
