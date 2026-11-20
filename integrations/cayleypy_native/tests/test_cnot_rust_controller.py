@@ -1112,3 +1112,60 @@ def test_two_gloo_ranks_coordinate_cnot_selection_failure_after_gather_and_keep_
         args=(rendezvous,),
         nprocs=2,
     )
+
+
+def distributed_cnot_exchange_prepare_failure(rank, rendezvous):
+    torch.set_num_threads(1)
+    dist.init_process_group(
+        "gloo",
+        init_method=rendezvous,
+        rank=rank,
+        world_size=2,
+        timeout=timedelta(seconds=15),
+    )
+    original_bincount = torch.bincount
+    message = "fixture CNOT exchange packet failed on rank one"
+    try:
+        require_controller()
+        if rank == 1:
+            def fail_bincount(tensor, *args, **kwargs):
+                raise RuntimeError(message)
+            torch.bincount = fail_bincount
+
+        with pytest.raises(RuntimeError) as error:
+            cnot.search_cnot(
+                cnot.pack_rows((8, 4, 2, 1)),
+                WireFixture(9),
+                width=5,
+                shortlist=9,
+                max_depth=4,
+                mode="qhat",
+                engine="rust",
+            )
+        expected = (
+            "prepare CNOT record exchange failed: "
+            f"rank 1: RuntimeError: {message}"
+        )
+        assert str(error.value) == expected, (
+            f"exchange preparation returned {str(error.value)!r}; "
+            f"expected {expected!r}"
+        )
+
+        probe = torch.tensor([rank + 1], dtype=torch.int64)
+        dist.all_reduce(probe)
+        assert probe.item() == 3
+    finally:
+        torch.bincount = original_bincount
+        dist.destroy_process_group()
+
+
+@pytest.mark.skipif(not dist.is_gloo_available(), reason="two CPU ranks require Gloo")
+def test_two_gloo_ranks_coordinate_cnot_exchange_preparation_failure_and_keep_world(
+        tmp_path):
+    require_controller()
+    rendezvous = (tmp_path / "cnot-exchange-prepare").resolve().as_uri()
+    mp.spawn(
+        distributed_cnot_exchange_prepare_failure,
+        args=(rendezvous,),
+        nprocs=2,
+    )
