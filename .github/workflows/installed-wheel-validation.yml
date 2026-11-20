@@ -1,0 +1,68 @@
+name: Installed Python wheel validation
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - "codex/beam-*"
+    paths:
+      - .github/workflows/installed-wheel-validation.yml
+      - integrations/cayleypy_native/tests/installed_wheel_smoke.py
+      - integrations/cayleypy_native/pyproject.toml
+      - integrations/cayleypy_native/build_backend.py
+      - integrations/cayleypy_native/multigpubeamsearch/**
+      - integrations/cayleypy_native/cayleypy_native/**
+      - Cargo.toml
+      - Cargo.lock
+      - rust/beam-**
+
+permissions:
+  contents: read
+
+jobs:
+  installed-wheel:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      CARGO_TERM_COLOR: always
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install Rust toolchain
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+      - name: Install CPU runtime dependencies
+        run: |
+          set -o pipefail
+          mkdir -p test_results/refactor_20261120/installed-wheel
+          python -m pip install --upgrade pip 2>&1 | tee test_results/refactor_20261120/installed-wheel/dependencies.log
+          python -m pip install numpy cayleypy==0.1.0 cmake ninja 2>&1 | tee -a test_results/refactor_20261120/installed-wheel/dependencies.log
+          python -m pip install torch==2.9.0 --index-url https://download.pytorch.org/whl/cpu 2>&1 | tee -a test_results/refactor_20261120/installed-wheel/dependencies.log
+      - name: Build the PEP 517 wheel
+        working-directory: integrations/cayleypy_native
+        run: |
+          set -o pipefail
+          mkdir -p "$RUNNER_TEMP/mgbs-wheel-dist"
+          python -m pip wheel --verbose --no-deps --wheel-dir "$RUNNER_TEMP/mgbs-wheel-dist" . 2>&1 | tee "$GITHUB_WORKSPACE/test_results/refactor_20261120/installed-wheel/build.log"
+      - name: Install wheel and validate from outside the checkout
+        run: |
+          set -o pipefail
+          wheel="$(find "$RUNNER_TEMP/mgbs-wheel-dist" -maxdepth 1 -type f -name 'multigpubeamsearch-*.whl' -print -quit)"
+          test -n "$wheel"
+          python -m pip install "$wheel" 2>&1 | tee test_results/refactor_20261120/installed-wheel/install.log
+          python -m pip check 2>&1 | tee test_results/refactor_20261120/installed-wheel/pip-check.log
+          mkdir -p "$RUNNER_TEMP/mgbs-wheel-smoke"
+          cd "$RUNNER_TEMP/mgbs-wheel-smoke"
+          env -u PYTHONPATH python "$GITHUB_WORKSPACE/integrations/cayleypy_native/tests/installed_wheel_smoke.py" 2>&1 | tee "$GITHUB_WORKSPACE/test_results/refactor_20261120/installed-wheel/smoke.log"
+      - name: Upload wheel validation logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: installed-python-wheel-validation
+          path: test_results/refactor_20261120/installed-wheel
+          if-no-files-found: error
+          retention-days: 30
