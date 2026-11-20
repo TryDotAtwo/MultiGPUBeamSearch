@@ -161,4 +161,34 @@ def test_rust_rank_plan_validator_checks_protocol_and_memory():
     plans[-1]['SHARD_COUNT']=8
     with pytest.raises(ValueError):
         _beam_runtime.validate_rank_plans_json(json.dumps(plans))
+    plans=_valid_rank_plans_for_native_validation()
+    plans[0]['estimated_required_device_bytes']=21
+    with pytest.raises(ValueError):
+        _beam_runtime.validate_rank_plans_json(json.dumps(plans))
 
+
+
+def test_rank_plan_validation_keeps_python_for_noninteger_legacy_values(monkeypatch):
+    from multigpubeamsearch import pipeline_profiles, rust_control
+
+    calls=[]
+    class NativeExtension:
+        def validate_rank_plans_json(self, payload):
+            calls.append(payload)
+            return True
+
+    plans=_valid_rank_plans_for_native_validation()
+    plans[0]['WORLD_SIZE']=True
+    monkeypatch.setattr(rust_control,'extension',lambda:NativeExtension())
+    with pytest.raises(ValueError,match='missing rank admission'):
+        pipeline_profiles.validate_rank_plans(plans)
+    assert calls==[]
+
+
+def test_rank_plan_validation_preserves_legacy_zero_alignment_acceptance():
+    from multigpubeamsearch import pipeline_profiles
+
+    plans=_valid_rank_plans_for_native_validation()
+    for row in plans:
+        row['BEAM_WIDTH_ALIGNMENT']=0
+    assert pipeline_profiles.validate_rank_plans(plans) is True
