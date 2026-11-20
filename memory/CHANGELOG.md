@@ -1,3 +1,9 @@
+## 2026-11-20 - Add CNOT descriptor recovery to Vast validation
+
+- The existing-instance workflow now builds the standalone CNOT owned-domain ABI and runs the two-rank Stream 5 control and corrected descriptor-error recovery checks. It does not start, stop, or rent the Vast instance.
+- Actions run [44705007455](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44705007455) completed successfully. The secret-backed read-only Vast status query worked, but the configured instance was stopped, so checkout, build, and GPU execution were skipped. Sanitized artifact [14614466680](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44705007455/artifacts/14614466680), SHA-256 `84ec4991f053a6914ae815526ab09af29c07f15723cec5135cf7db3e0131d512`.
+- This validates workflow parsing and the stopped-instance gate only. CMake, CUDA, NCCL, descriptor-error propagation, and same-process-group recovery remain physically unverified. Evidence: `test_results/refactor_20261120/cnot-device-error-workflow/GITHUB_STATUS.md`.
+
 ## 2026-11-20 - Move typed CPU CNOT owner assignment into Rust
 
 - For typed CPU CNOT compatibility searches, owner assignment now uses `beam_core::cnot::owner_ranks` through the PyO3 adapter. The existing CUDA owner operator and Python-only fallback remain in place. Hashes continue to select shards only; state equality and full packed-word comparison are unchanged.
