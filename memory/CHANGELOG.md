@@ -1,3 +1,12 @@
+## 2026-11-20 - Coordinate Rust session identity and CNOT exchange failures
+
+- AutoMax remains a distinct requested preparation value while resolved session identity stores the numeric width. Older PyO3 extensions keep the Python-owned preparation cache.
+- CNOT compatibility ranks agree on the requested engine over the Gloo control group before engine-dependent branching. Rust and Python Stream 5 paths now vote on receive-buffer readiness before sending payload; any local allocation failure prevents every rank from entering the payload exchange.
+- CPU/Gloo verification: final CNOT workflow at [run 44738874159](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44738874159) passed 294 tests, skipped 2, and reported 104 warnings. The focused Rust `cnot_exchange` integration suite passed 6 tests. Artifact [14628794155](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44738874159/artifacts/14628794155), SHA-256 `a16b41766901ffd35e1a32c9d2ca565ed6db5d7fe544244402707837cb3dd9c1`.
+- Installed wheel verification passed at [run 44738874151](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44738874151). Artifact [14629797227](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44738874151/artifacts/14629797227), SHA-256 `80f6cc4467937e301bf42ad1ebcd51fa38ee7bc535217d8cb3b09e779df4cc36`.
+- [Vast status run 44738618500](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44738618500) found instance 61080396 exited and skipped the physical check. It made no start, stop, or rent request. CUDA/NCCL runtime acceptance remains open.
+- Detailed run and artifact references: `test_results/refactor_20261120/cnot-runtime-failure-safety/GITHUB_STATUS.md`.
+
 ## 2026-11-20 - Enter World for CNOT validation collectives
 
 - CNOT validation helpers and the direct rank-exchange fixture now enter `World` before rank-coordinated checks. Capability tests use the actual `World` negotiation interface. Search and exchange algorithms are unchanged.

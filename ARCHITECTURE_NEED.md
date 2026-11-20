@@ -1,5 +1,39 @@
 # Конфиг
 
+## Rust session identity для beam_width="max", 2026-11-20
+
+Запрошенное значение ширины и разрешённая ширина — разные поля контракта.
+Preparation wire сохраняет legacy-ключ `beam_width`, но принимает
+`RequestedBeam::AutoMax` как строковый токен `"max"`; числовые запросы
+продолжают сериализоваться как раньше. После разрешения `SessionIdentity`
+содержит фактическую ширину типа `u64`.
+
+PyO3 публикует `PREPARATION_IDENTITY_AUTO_MAX_VERSION = 1`. Python передаёт
+AutoMax в typed Rust preparation identity только при наличии этой capability.
+Старые расширения сохраняют прежний Python-owned cache identity и не пытаются
+десериализовать строку в `u64`. Алгоритм выбора beam и precision не менялись.
+
+## Межранговый выбор CNOT engine и подготовка Stream 5, 2026-11-20
+
+В compatibility пути CNOT запросы `auto`, `python` и `rust` согласуются на
+CPU Gloo control group до engine-зависимой ветки. Если ранги запросили разные
+режимы, каждый завершает setup ошибкой до поискового конвейера. Общий запрос
+`auto` выбирает Rust только при общей поддержке; иначе все ранги переходят
+на существующий Python compatibility путь.
+
+Stream 5 обменивает счётчики, проверяет ограничения и заранее выделяет
+receive backing и пустой send placeholder. Затем все ранги выполняют OR-vote
+готовности через Gloo CPU control group. Ошибка выделения на одном ранге
+останавливает payload обмен на всех рангах. Существующий NCCL payload,
+форматы записей, выбор кандидатов и оценки не изменены. Python fallback
+использует тот же порядок проверок и readiness vote.
+
+Hosted evidence находится в
+`test_results/refactor_20261120/cnot-runtime-failure-safety/GITHUB_STATUS.md`.
+CPU/Gloo и wheel проверки прошли. Физический CUDA/NCCL запуск не подтверждён:
+проверка Vast увидела остановленный instance и не меняла его состояние.
+
+
 ## Rust-владелец CPU CNOT first-unseen, 2026-11-20
 
 Для typed Rust compatibility path CPU-дедупликацию CNOT теперь выполняет
