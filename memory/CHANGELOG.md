@@ -1,6 +1,7 @@
 # Changelog
 
 ## 2026-11-20 - Move typed CPU CNOT first-unseen into Rust
+- MAIN GREEN: [Actions run 44672860884](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44672860884) at commit `7a2e679f66d903b6bd309e00006078f1f2617c1c` passed Rust CNOT checks, PyO3 extension build, 268 Python CPU compatibility tests (2 skipped, 98 warnings), and NCCL probe syntax. Artifact [14599974834](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44672860884/artifacts/14599974834), SHA-256 `a7eb4010f90efde25bdc3e057e76f73ca3447fa9f345b5688c4330d4191610ca`.
 
 - The test-first RED run [44671005907](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44671005907) reached the typed CPU search and failed exactly because it called the Python cnot_first_unseen tensor helper (267 passed, 1 failed, 2 skipped). Artifact [14600765521](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44671005907/artifacts/14600765521), SHA-256 09684db96085d6ee9bef6b6e3b7802c023c5c061ebfc54090f04387f8b939409.
 - beam-core now returns the first original child index for each state absent from closed and earlier children. It masks non-logical tail bits and confirms hash-bucket matches by comparing every packed word. Typed CPU PyO3 dispatch calls this core function; CUDA and Python-only paths remain unchanged.
