@@ -227,7 +227,7 @@ def _requested_engine_digest(engine):
     if type(engine) is not str or engine not in ("auto", "python", "rust"):
         raise ValueError("CNOT engine must be auto, python, or rust")
     return hashlib.sha256(
-        b"cnot-requested-engine-v1\\0" + engine.encode("utf-8")
+        b"cnot-requested-engine-v1:" + engine.encode("utf-8")
     ).digest()
 
 
@@ -300,7 +300,7 @@ def _search_cnot_compat(world, root, scorer, width, shortlist, max_depth,
         "validate CNOT search engine",
         lambda: _requested_engine_digest(engine),
     )
-    world.require_consensus(engine_digest)
+    world.require_engine_consensus(engine_digest)
     if engine == "auto":
         local_rust = world.checked(
             "select CNOT search engine",

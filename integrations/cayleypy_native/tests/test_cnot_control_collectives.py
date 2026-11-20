@@ -1092,7 +1092,7 @@ def test_two_rank_gloo_rejects_mixed_cnot_engine_requests(tmp_path):
         ]
         assert all(result["type"] == "ValueError" for result in results), results
         assert all(
-            "CNOT root, search settings or scorer fingerprints differ between ranks"
+            "CNOT search engine settings differ between ranks"
             in result["message"]
             for result in results
         ), results

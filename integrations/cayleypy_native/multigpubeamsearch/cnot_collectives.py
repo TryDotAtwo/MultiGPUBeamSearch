@@ -114,6 +114,16 @@ class World:
         if not (identities == identities[0]).all().item():
             raise ValueError("CNOT root, search settings or scorer fingerprints differ between ranks")
 
+    def require_engine_consensus(self, digest):
+        """Compare requested CNOT engine settings on the CPU Gloo control group."""
+        if self.size == 1:
+            return
+        identities = self._control_gather(
+            torch.tensor(list(digest), dtype=torch.int64)
+        )
+        if not (identities == identities[0]).all().item():
+            raise ValueError("CNOT search engine settings differ between ranks")
+
     def __exit__(self, kind, value, traceback):
         try:
             if self.transport is not None:
