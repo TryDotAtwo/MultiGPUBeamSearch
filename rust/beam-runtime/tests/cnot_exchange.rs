@@ -86,7 +86,18 @@ fn fixture() -> Fixture {
 fn exchanges_counts_before_rows_and_votes_before_each() {
     let mut b = fixture();
     assert_eq!(cnot_exchange::exchange(&mut b), Ok(vec![3]));
-    assert_eq!(b.events, ["send_count", "vote", "counts", "vote", "prepare", "ready_vote", "rows"]);
+    assert_eq!(
+        b.events,
+        [
+            "send_count",
+            "vote",
+            "counts",
+            "vote",
+            "prepare",
+            "ready_vote",
+            "rows"
+        ]
+    );
 }
 
 #[test]
@@ -123,7 +134,18 @@ fn allows_empty_exchange() {
     b.sends = 0;
     b.receive = vec![0, 0];
     assert_eq!(cnot_exchange::exchange(&mut b), Ok(vec![0]));
-    assert_eq!(b.events, ["send_count", "vote", "counts", "vote", "prepare", "ready_vote", "rows"]);
+    assert_eq!(
+        b.events,
+        [
+            "send_count",
+            "vote",
+            "counts",
+            "vote",
+            "prepare",
+            "ready_vote",
+            "rows"
+        ]
+    );
 }
 
 #[test]
@@ -136,7 +158,14 @@ fn rejects_receive_allocation_failure_before_payload_exchange() {
     );
     assert_eq!(
         local.events,
-        ["send_count", "vote", "counts", "vote", "prepare", "ready_vote"]
+        [
+            "send_count",
+            "vote",
+            "counts",
+            "vote",
+            "prepare",
+            "ready_vote"
+        ]
     );
 
     let mut peer = fixture();
@@ -147,7 +176,14 @@ fn rejects_receive_allocation_failure_before_payload_exchange() {
     );
     assert_eq!(
         peer.events,
-        ["send_count", "vote", "counts", "vote", "prepare", "ready_vote"]
+        [
+            "send_count",
+            "vote",
+            "counts",
+            "vote",
+            "prepare",
+            "ready_vote"
+        ]
     );
 }
 

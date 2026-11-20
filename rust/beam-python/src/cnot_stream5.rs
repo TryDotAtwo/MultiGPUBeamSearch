@@ -2,7 +2,7 @@
 use beam_native_sys::cnot_stream5::{Stream5Communicator, Stream5Library};
 use beam_runtime::cnot_exchange::{self, Backend, Counts};
 use pyo3::{
-    exceptions::{PyOverflowError, PyValueError},
+    exceptions::{PyOverflowError, PyRuntimeError, PyValueError},
     prelude::*,
     types::PyBytes,
 };
