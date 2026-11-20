@@ -19,6 +19,7 @@ on:
       - integrations/cayleypy_native/multigpubeamsearch/cnot_stream5.py
       - integrations/cayleypy_native/multigpubeamsearch/cnot_rust_stages.py
       - rust/beam-python/src/cnot_native_redistribute.rs
+      - rust/beam-python/src/cnot_native_selection.rs
       - integrations/cayleypy_native/multigpubeamsearch/cnot_scorer.py
       - integrations/cayleypy_native/multigpubeamsearch/backend.py
       - integrations/cayleypy_native/multigpubeamsearch/dispatch.py
