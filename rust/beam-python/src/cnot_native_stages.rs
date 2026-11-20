@@ -324,7 +324,11 @@ impl Backend for NativeStages<'_> {
     fn root_is_goal(&mut self) -> PyResult<bool> {
         let goal = (|| -> PyResult<Bound<'_, PyAny>> {
             if let Some(is_identity) = crate::cnot::search_input_is_identity(&self.input)? {
-                return self.py.import("builtins")?.getattr("bool")?.call1((is_identity,));
+                return self
+                    .py
+                    .import("builtins")?
+                    .getattr("bool")?
+                    .call1((is_identity,));
             }
             self.py
                 .import("torch")?
