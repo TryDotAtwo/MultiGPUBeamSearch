@@ -80,6 +80,10 @@ def test_rust_top_level_controller_owns_cnot_admission_and_stage_dispatch():
             events.append(("sum", tensor.tolist()))
             return tensor.sum()
 
+        def all_ranks_support(self, local_support):
+            events.append(("all-ranks-support", bool(local_support)))
+            return bool(local_support)
+
         _stream5_library = None
 
     world = World()
@@ -121,8 +125,7 @@ def test_rust_top_level_controller_owns_cnot_admission_and_stage_dispatch():
         ("gather-fixed", digest_values),
         ("identity", 3, "cpu"),
         ("native-runner",),
-        ("longs", [1]),
-        ("sum", [1]),
+        ("all-ranks-support", True),
         ("native-stages", world, admitted_root, identity, input_matrix, scorer,
          "qhat", True, 5, 6, 6, 4),
     ]
@@ -372,10 +375,13 @@ def test_rust_top_level_controller_preserves_compatibility_stage_fallback():
         ("longs", digest_values),
         ("gather-fixed", digest_values),
         ("identity", 4, "cpu"),
+        ("gloo-any-rank-failed", False),
         ("native-runner",),
+        ("gloo-any-rank-failed", False),
         ("all-ranks-support", True),
         ("make-stages", world, admitted_root, identity, input_matrix, scorer,
          "proposal", False),
+        ("gloo-any-rank-failed", False),
         ("root-is-goal",),
     ]
 
