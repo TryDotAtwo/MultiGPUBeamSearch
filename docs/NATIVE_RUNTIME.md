@@ -521,3 +521,17 @@ Cache reads still perform fresh all-rank native memory admission and geometry co
 For capable extensions, backend.py asks rust_control.write_search_inputs to pass the normalized graph fields through PyO3. The extension rebuilds and validates PublicGraphContract; beam-runtime::search_inputs then writes the same puzzle_info.json and test.csv bytes as the previous Python path. Generator keys remain m0, m1, … in source order, including multi-digit IDs. If an extension lacks this optional method or receives a legacy contract shape, the backend retains the existing Python writer.
 
 Hosted run [44640784456](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44640784456) passed Rust formatting/checks, PyO3 build, 240 Python tests (2 skipped), and NCCL probe syntax. Run [44640371591](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44640371591) passed companion permutation depth-control checks. No GPU kernel, search loop, rank protocol, or CNOT path changed; physical CUDA/NCCL multi-GPU execution remains unverified.
+
+## Rust rank-frontier quota adapter
+
+The calibration-side `rank_frontier_counts` helper now calls the existing
+`beam-core::planning::rank_frontier_counts` through optional PyO3. The Rust
+contract validates the exact admitted rank plans and returns the same logical
+per-rank quotas as the native final exchange, excluding spare capacity. Python
+keeps the existing formula when the extension is unavailable/older or the plan
+shape is outside the Rust contract.
+
+This changes only the owner of the quota calculation used by calibration
+fixtures and probes. It does not change beam width, rank order, rank ownership,
+collectives, or any CUDA execution. Hosted run [44652345373](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44652345373) passed Rust formatting/planning checks, the PyO3 build, 260 Python tests (2 skipped), and NCCL probe syntax. Physical CUDA/NCCL multi-GPU execution remains unverified.
+

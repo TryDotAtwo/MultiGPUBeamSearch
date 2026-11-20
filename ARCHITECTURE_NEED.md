@@ -3189,3 +3189,16 @@ kernel changed. Hosted checks and run evidence are recorded in
 `test_results/refactor_20261120/rust-pipeline-cache-receipt/GITHUB_STATUS.md`.
 Physical CUDA/NCCL multi-GPU execution remains unverified.
 
+## Rust rank-frontier quotas for calibration (2026-11-20)
+
+The Python calibration helper now delegates logical rank quota calculation to
+the existing `beam_core::planning::rank_frontier_counts` through optional
+PyO3. Rust validates the admitted rank-plan protocol and computes the same
+ceiling-difference quotas used by native final exchange; Python retains the
+formula for older extensions and non-typed legacy plan shapes.
+
+This changes no beam width, rank membership/order, spare-slot policy,
+collective, frontier payload, or CUDA execution. Evidence:
+`test_results/refactor_20261120/rust-rank-frontier-quotas/GITHUB_STATUS.md`.
+Physical multi-GPU runtime remains unverified.
+

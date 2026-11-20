@@ -1,0 +1,7 @@
+# Rust rank-frontier quota adapter
+
+- Hosted RED: [GitHub Actions run 44651491013](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44651491013) confirmed the new PyO3 method was missing. The run also caught a missing import in the test (258 passed, 2 skipped, 2 failed); the import was corrected.
+- Intermediate run [44651869713](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44651869713) stopped at rustfmt before compilation. Run [44652047968](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44652047968) passed Rust/PyO3 checks but exposed an incorrect single-rank fallback fixture (259 passed, 2 skipped, 1 failed). Both issues were corrected.
+- Hosted GREEN: [GitHub Actions run 44652345373](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44652345373) passed rustfmt, the Rust planning contract test, the selected Rust checks, the PyO3 build, 260 Python tests (2 skipped), and NCCL probe syntax. Artifact [14590718645](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44652345373/artifacts/14590718645), SHA-256 `53f863655ff5a1c428a8b1abc4b840065a3708b619c2c42615db7fcec89e72d0`.
+- The Rust adapter delegates to the existing exact ceiling-difference quota implementation. Python keeps its formula when the extension is old or inputs do not fit the typed rank-plan contract. Beam width, rank order, ownership, collective order, and frontier contents are unchanged.
+- Hosted CPU/PyO3 checks and NCCL syntax do not establish physical CUDA/NCCL multi-GPU runtime acceptance.

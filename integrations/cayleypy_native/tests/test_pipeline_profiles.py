@@ -1,5 +1,6 @@
+import json
 import pytest
-from multigpubeamsearch.pipeline_profiles import pipeline_candidates,validate_rank_plans
+from multigpubeamsearch.pipeline_profiles import pipeline_candidates,validate_rank_plans,rank_frontier_counts
 from multigpubeamsearch.pipeline_profiles import tune_pipeline
 from multigpubeamsearch.calibration_stats import Measurement
 import time
@@ -92,3 +93,29 @@ def test_negative_memory_estimate_is_not_admission():
          'SHARD_COUNT':4,'B_MICRO':32,'WORLD_SIZE':1,'STREAM4_BATCH_ALIGNMENT':1024,
          'estimated_required_device_bytes':-1,'gpu_budget_bytes':11}
     with pytest.raises(ValueError,match='values'):validate_rank_plans([row])
+
+
+def test_rust_rank_frontier_counts_preserves_exact_uneven_quotas():
+    from multigpubeamsearch import _beam_runtime
+
+    plans = [
+        dict(GLOBAL_BEAM_WIDTH_EFFECTIVE=5, BEAM_WIDTH_ALIGNMENT=1,
+             SHARD_COUNT=4, B_MICRO=32, WORLD_SIZE=3,
+             STREAM4_BATCH_ALIGNMENT=1, LOCAL_RANK=rank,
+             estimated_required_device_bytes=10, gpu_budget_bytes=20)
+        for rank in range(3)
+    ]
+    expected = [2, 2, 1]
+    assert _beam_runtime.rank_frontier_counts(json.dumps(plans)) == expected
+    assert rank_frontier_counts(plans) == expected
+
+
+def test_rank_frontier_counts_keeps_python_fallback_for_legacy_extension(monkeypatch):
+    from multigpubeamsearch import rust_control
+
+    class LegacyExtension:
+        pass
+
+    monkeypatch.setattr(rust_control, 'extension', lambda: LegacyExtension())
+    plans = [{'GLOBAL_BEAM_WIDTH_EFFECTIVE': 5, 'WORLD_SIZE': 3} for _ in range(3)]
+    assert rank_frontier_counts(plans) == [2, 2, 1]

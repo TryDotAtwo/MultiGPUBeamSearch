@@ -2585,3 +2585,16 @@ Preserved 26 checkouts and their source/index overlays; verified restoration of 
   execution. Evidence:
   `test_results/refactor_20261120/rust-pipeline-cache-receipt/GITHUB_STATUS.md`.
 
+## 2026-11-20 - Rust rank-frontier quotas for calibration
+
+The Python calibration helper now uses the existing typed
+`beam_core::planning::rank_frontier_counts` through optional PyO3. It preserves
+the exact ceiling-difference distribution used by native final exchange,
+including uneven widths and zero spare-slot contribution. Older extensions
+and unsupported legacy shapes retain the Python formula. No beam width, rank
+order, collective, search output, or CUDA operation changed. Hosted RED/GREEN
+RED run [44651491013](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44651491013) found the missing PyO3 method; its test import omission was corrected. An intermediate fallback-fixture failure was fixed. GREEN run [44652345373](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44652345373) passed the Rust planning contract, PyO3 build, 260 Python tests (2 skipped), and NCCL probe syntax. Artifact 14590718645, SHA256 `53f863655ff5a1c428a8b1abc4b840065a3708b619c2c42615db7fcec89e72d0`. Evidence:
+`test_results/refactor_20261120/rust-rank-frontier-quotas/GITHUB_STATUS.md`.
+Physical multi-GPU runtime remains unverified.
+
+

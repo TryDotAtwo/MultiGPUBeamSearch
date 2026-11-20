@@ -6,10 +6,13 @@ on:
     branches:
       - main
       - codex/cnot-*
+      - codex/beam-*
     paths:
       - .github/workflows/cnot-cpu-validation.yml
       - integrations/cayleypy_native/multigpubeamsearch/cnot.py
       - integrations/cayleypy_native/multigpubeamsearch/pipeline_cache.py
+      - integrations/cayleypy_native/multigpubeamsearch/pipeline_profiles.py
+      - integrations/cayleypy_native/tests/test_pipeline_profiles.py
       - integrations/cayleypy_native/tests/test_pipeline_cache.py
       - integrations/cayleypy_native/multigpubeamsearch/cnot_cli.py
       - integrations/cayleypy_native/multigpubeamsearch/cnot_collectives.py
@@ -94,7 +97,9 @@ jobs:
               rust/beam-runtime/tests/session_preparation_identity.rs\
               rust/beam-runtime/tests/search_inputs.rs
             rustfmt --check --edition 2021 rust/beam-core/src/inference.rs rust/beam-core/src/cnot.rs rust/beam-core/tests/cnot.rs
+            rustfmt --check --edition 2021 rust/beam-python/src/planning.rs
             cargo test --locked -p beam-core --test cnot
+            cargo test --locked -p beam-core --test planning
             cargo test --locked -p beam-core --test search
             cargo test --locked -p beam-runtime cnot_search
             cargo test --locked -p beam-runtime --test search_session
@@ -116,6 +121,7 @@ jobs:
           python -m pytest -q \
             integrations/cayleypy_native/tests/test_backend.py \
             integrations/cayleypy_native/tests/test_pipeline_cache.py \
+            integrations/cayleypy_native/tests/test_pipeline_profiles.py \
             integrations/cayleypy_native/tests/test_rust_graph_contract.py \
             integrations/cayleypy_native/tests/test_search_controls.py \
             integrations/cayleypy_native/tests/test_rust_control.py \

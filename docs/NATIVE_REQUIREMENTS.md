@@ -236,3 +236,8 @@ and unstable measurements cannot produce an accepted default.
 The authorized total is USD 50 including associated costs. This task may operate
 only its own leases. Preserve billing/lease records and stop owned paid resources
 when their work ends; do not infer authorization over another project's instances.
+
+## Logical frontier quota ownership
+
+Calibration fixture and probe code should obtain per-rank logical frontier counts from the existing Rust planning contract through an optional PyO3 adapter. Preserve the exact ceiling-difference partition used by final exchange, including uneven widths, and exclude spare capacity. If the extension is missing/older or the plan is outside the typed contract, retain the Python compatibility formula. Do not change beam width, rank ordering, ownership, collective order, or frontier contents.
+

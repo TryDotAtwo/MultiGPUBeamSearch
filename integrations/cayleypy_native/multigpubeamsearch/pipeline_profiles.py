@@ -1,6 +1,8 @@
 """Search downstream parameters while freezing the measured model microbatch."""
 from __future__ import annotations
 
+import json
+
 
 TUNABLE_KEYS=frozenset({'BEAM_B_MICRO','BEAM_STREAM3_RING_SLOTS','BEAM_SHARD_COUNT',
     'BEAM_STREAM4_BATCH_CANDIDATES','BEAM_STREAM4_ACTIVE_SORT_SLOTS'})
@@ -29,8 +31,33 @@ def pipeline_candidates(inference_micro, baseline, *, max_outer=65536, tune_oute
     return result
 
 
+def _native_rank_frontier_counts(plans):
+    try:
+        from .errors import NativeUnavailable
+        from .rust_control import extension
+        native = extension()
+    except (ImportError, NativeUnavailable):
+        return None
+    builder = getattr(native, 'rank_frontier_counts', None)
+    if not callable(builder):
+        return None
+    try:
+        result = builder(json.dumps(plans))
+        width = plans[0]['GLOBAL_BEAM_WIDTH_EFFECTIVE']
+    except (IndexError, KeyError, TypeError, ValueError, OverflowError):
+        return None
+    if (type(result) is not list or len(result) != len(plans)
+            or any(type(value) is not int or value < 0 for value in result)
+            or sum(result) != width):
+        return None
+    return result
+
+
 def rank_frontier_counts(plans):
-    """Logical rank quotas match native final exchange, excluding spare slots."""
+    """Return logical rank quotas, using the existing Rust contract when available."""
+    native = _native_rank_frontier_counts(plans)
+    if native is not None:
+        return native
     width=plans[0]['GLOBAL_BEAM_WIDTH_EFFECTIVE'];world=len(plans)
     return [((rank+1)*width+world-1)//world-(rank*width+world-1)//world
             for rank in range(world)]
