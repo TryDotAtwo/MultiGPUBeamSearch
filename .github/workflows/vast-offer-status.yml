@@ -45,19 +45,28 @@ jobs:
 
           base = "https://console.vast.ai/api/v0"
 
-          def api_get(path, query=None):
-              url = base + path
-              if query is not None:
-                  url += "?" + urllib.parse.urlencode({
-                      "q": json.dumps(query, separators=(",", ":"))
-                  })
+          def api_get(path):
               request = urllib.request.Request(
-                  url,
+                  base + path,
                   headers={
                       "Authorization": "Bearer " + api_key,
                       "Accept": "application/json",
                   },
                   method="GET",
+              )
+              with urllib.request.urlopen(request, timeout=30) as response:
+                  return json.load(response)
+
+          def api_post(path, payload):
+              request = urllib.request.Request(
+                  base + path,
+                  data=json.dumps(payload).encode("utf-8"),
+                  headers={
+                      "Authorization": "Bearer " + api_key,
+                      "Accept": "application/json",
+                      "Content-Type": "application/json",
+                  },
+                  method="POST",
               )
               with urllib.request.urlopen(request, timeout=30) as response:
                   return json.load(response)
@@ -111,47 +120,48 @@ jobs:
               "storage_cost": number(row, "storage_cost"),
           }
 
+          offer_query = {
+              "gpu_name": {"in": ["RTX_3060", "RTX 3060"]},
+              "num_gpus": {"in": [1, 2]},
+              "verified": {"eq": True},
+              "rentable": {"eq": True},
+              "rented": {"eq": False},
+              "type": "ondemand",
+              "limit": 100,
+          }
+          payload = api_post("/bundles/", offer_query)
           offers = []
           seen_ids = set()
-          for gpu_query_name in ("RTX_3060", "RTX 3060"):
-              try:
-                  payload = api_get("/bundles/", {"gpu_name": gpu_query_name})
-              except urllib.error.HTTPError as exc:
-                  if exc.code in (400, 422) and gpu_query_name == "RTX 3060":
-                      continue
-                  raise
-              for offer in rows_from(payload, "offers"):
-                  if not isinstance(offer, dict):
-                      continue
-                  offer_id = offer.get("id")
-                  if offer_id is None or str(offer_id) in seen_ids:
-                      continue
-                  name = offer.get("gpu_name")
-                  if not isinstance(name, str) or name.replace("_", " ").replace("-", " ").lower() != "rtx 3060":
-                      continue
-                  count = offer.get("num_gpus")
-                  price = number(offer, "dph_total")
-                  if count not in (1, 2) or price is None or price <= 0:
-                      continue
-                  if offer.get("rentable") is not True or offer.get("verified") is not True:
-                      continue
-                  if offer.get("external") is True:
-                      continue
-                  seen_ids.add(str(offer_id))
-                  offers.append({
-                      "offer_id": offer_id,
-                      "gpu_name": name[:80],
-                      "gpu_count": count,
-                      "dph_total": price,
-                      "gpu_ram": number(offer, "gpu_ram"),
-                      "cpu_cores": number(offer, "cpu_cores"),
-                      "cpu_ram": number(offer, "cpu_ram"),
-                      "disk_space": number(offer, "disk_space"),
-                      "cuda_max_good": number(offer, "cuda_max_good"),
-                      "reliability": number(offer, "reliability"),
-                      "verified": True,
-                      "rentable": True,
-                  })
+          for offer in rows_from(payload, "offers"):
+              if not isinstance(offer, dict):
+                  continue
+              offer_id = offer.get("id")
+              if offer_id is None or str(offer_id) in seen_ids:
+                  continue
+              name = offer.get("gpu_name")
+              if not isinstance(name, str) or name.replace("_", " ").replace("-", " ").lower() != "rtx 3060":
+                  continue
+              count = offer.get("num_gpus")
+              price = number(offer, "dph_total")
+              if count not in (1, 2) or price is None or price <= 0:
+                  continue
+              if offer.get("rentable") is not True or offer.get("verified") is not True:
+                  continue
+              seen_ids.add(str(offer_id))
+              offers.append({
+                  "offer_id": offer_id,
+                  "gpu_name": name[:80],
+                  "gpu_count": count,
+                  "dph_total": price,
+                  "gpu_ram": number(offer, "gpu_ram"),
+                  "cpu_cores": number(offer, "cpu_cores"),
+                  "cpu_ram": number(offer, "cpu_ram"),
+                  "disk_space": number(offer, "disk_space"),
+                  "cuda_max_good": number(offer, "cuda_max_good"),
+                  "reliability": number(offer, "reliability"),
+                  "verified": True,
+                  "rentable": True,
+              })
 
           offers.sort(key=lambda item: (item["gpu_count"], item["dph_total"], str(item["offer_id"])))
           report = {
