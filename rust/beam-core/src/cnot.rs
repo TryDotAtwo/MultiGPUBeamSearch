@@ -111,7 +111,6 @@ pub fn apply_gate_words(wires: u32, words: &mut [u64], id: u32) -> Result<()> {
     Ok(())
 }
 
-
 /// Hash a packed state only to select a candidate bucket. Equality is always
 /// decided by comparing every logical word after masking row-tail padding.
 fn cnot_state_hash(state: &[u64], stride: usize, tail_mask: u64) -> u64 {
@@ -162,11 +161,7 @@ fn cnot_state_at<'a>(
 /// Return original child indices that are the first full-matrix occurrence
 /// after closed states and earlier children. Hash collisions never establish
 /// equality; every word is compared, with non-logical row-tail bits ignored.
-pub fn first_unseen_indices(
-    wires: u32,
-    closed: &[u64],
-    children: &[u64],
-) -> Result<Vec<usize>> {
+pub fn first_unseen_indices(wires: u32, closed: &[u64], children: &[u64]) -> Result<Vec<usize>> {
     if !(1..=256).contains(&wires) {
         return Err(ContractError::Invalid("CNOT wires"));
     }
