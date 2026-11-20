@@ -1169,3 +1169,63 @@ def test_two_gloo_ranks_coordinate_cnot_exchange_preparation_failure_and_keep_wo
         args=(rendezvous,),
         nprocs=2,
     )
+
+
+def distributed_cnot_exchange_payload_allocation_failure(rank, rendezvous):
+    torch.set_num_threads(1)
+    dist.init_process_group(
+        "gloo",
+        init_method=rendezvous,
+        rank=rank,
+        world_size=2,
+        timeout=timedelta(seconds=15),
+    )
+    original_new_empty = torch.Tensor.new_empty
+    message = "fixture CNOT exchange payload allocation failed on rank one"
+    try:
+        require_controller()
+        if rank == 1:
+            def fail_receive_allocation(tensor, size, *args, **kwargs):
+                shape = tuple(size)
+                if tensor.ndim == 2 and tensor.shape[0] == 0 and len(shape) == 2 and shape[0] > 0:
+                    raise RuntimeError(message)
+                return original_new_empty(tensor, size, *args, **kwargs)
+            torch.Tensor.new_empty = fail_receive_allocation
+
+        with pytest.raises(RuntimeError) as error:
+            cnot.search_cnot(
+                cnot.pack_rows((8, 4, 2, 1)),
+                WireFixture(9),
+                width=5,
+                shortlist=9,
+                max_depth=4,
+                mode="qhat",
+                engine="rust",
+            )
+        expected = (
+            "prepare CNOT record exchange payload failed: "
+            f"rank 1: RuntimeError: {message}"
+        )
+        assert str(error.value) == expected, (
+            f"exchange payload preparation returned {str(error.value)!r}; "
+            f"expected {expected!r}"
+        )
+
+        probe = torch.tensor([rank + 1], dtype=torch.int64)
+        dist.all_reduce(probe)
+        assert probe.item() == 3
+    finally:
+        torch.Tensor.new_empty = original_new_empty
+        dist.destroy_process_group()
+
+
+@pytest.mark.skipif(not dist.is_gloo_available(), reason="two CPU ranks require Gloo")
+def test_two_gloo_ranks_coordinate_cnot_exchange_payload_failure_and_keep_world(
+        tmp_path):
+    require_controller()
+    rendezvous = (tmp_path / "cnot-exchange-payload").resolve().as_uri()
+    mp.spawn(
+        distributed_cnot_exchange_payload_allocation_failure,
+        args=(rendezvous,),
+        nprocs=2,
+    )
