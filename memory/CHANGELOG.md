@@ -2725,3 +2725,23 @@ Main commit `148b2a826a369b7601e904ea409e0cc5301c75c9` also passed the 260-test 
   `c33942672d0c4a24c3845feb5e733236fb6512b731f6fc8ff79fd3729f706840`.
   The companion public-owner workflow [44722196881](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44722196881)
   also passed. Physical CUDA/NCCL and 1-/2-GPU validation remain unverified.
+
+## 2026-11-20 - Installed Python wheel validation
+
+- Added a GitHub Actions acceptance job that builds the package through its
+  PEP 517 backend, installs the produced wheel, checks dependencies, and runs
+  the smoke check from outside the source checkout with `PYTHONPATH` unset.
+- The check confirmed both `multigpubeamsearch` and the compatibility
+  namespace `cayleypy_native`, the public search/model/session exports, Rust
+  ABI v1, `TQPScorer`, `InferenceCalibration`, the packaged executable
+  `beam-runner`, and its `resident-search-v1` protocol.
+- Branch run [44724395099](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44724395099)
+  and main run [44727232048](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44727232048)
+  passed at commit `e8a819fa6a46845bdffad95857007aa5b374ba04` using hosted
+  Ubuntu, Python 3.11, and CPU PyTorch 2.9.0. Main artifact 14623599422,
+  SHA-256 `0fd444baec3ae693e891a5fe74fe49b6bbe7d4a7a2ed752f32fcbd740d1739a0`.
+- This is installed-wheel and host-side worker-protocol evidence. It does not
+  validate CUDA execution, checkpoint scoring, NCCL, or physical 1-/2-GPU
+  search. Full logs and the smoke summary are in
+  `test_results/refactor_20261120/installed-wheel/GITHUB_STATUS.md` and the
+  linked Actions artifact.
