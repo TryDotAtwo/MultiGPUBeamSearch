@@ -3165,3 +3165,9 @@ sequences, rank ownership, search semantics and scorer behavior are unchanged.
 Hosted CPU/PyO3 checks passed. Physical CUDA/NCCL multi-GPU execution remains
 unverified. Evidence:
 `test_results/refactor_20261119/cnot-rust-verify/GITHUB_STATUS.md`.
+
+## Rust-owned permutation search task files (2026-11-20)
+
+beam-runtime::search_inputs now writes the legacy puzzle_info.json and test.csv from a Rust-validated PublicGraphContract. The PyO3 boundary rebuilds the contract from normalized input before writing. It preserves Python's existing JSON spacing, synthetic m0 through mN move names in generator order, trailing newline, and quoted single-row CSV format. The Python backend keeps its prior writer for older extensions and legacy contract objects without the Rust fields.
+
+This moves pre-launch task-file serialization only. Search expansion, frontier selection, inference arithmetic, rank setup, collectives, candidate ownership, CUDA kernels, and CNOT are unchanged. Hosted run [44640784456](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44640784456) passed the CNOT CPU/PyO3 checks, 240 Python tests (2 skipped), and NCCL probe syntax. Companion depth-control run [44640371591](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44640371591) passed. These do not establish physical CUDA/NCCL multi-GPU runtime acceptance. Evidence: test_results/refactor_20261120/rust-search-input-serialization/GITHUB_STATUS.md.
