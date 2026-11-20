@@ -81,6 +81,7 @@ class NativeSession:
         self._identity = None
         self._metadata = None
         self._rust_metadata_owned = False
+        self._resolved_beam_width = None
         self._token = None
         self._lock = threading.Lock()
         self._operation_lock = threading.Lock()
@@ -183,6 +184,7 @@ class NativeSession:
         self._identity = None
         self._metadata = None
         self._rust_metadata_owned = False
+        self._resolved_beam_width = None
 
     def close(self):
         self._check_owner()
@@ -349,7 +351,7 @@ class NativeSession:
                     'model_backend': model.backend,
                     'devices': [int(device) for device in device_order],
                     'binding_scope': bool(binding_scope),
-                    'beam_width': int(beam_width),
+                    'beam_width': beam_width if type(beam_width) is str and beam_width == 'max' else int(beam_width),
                     'max_steps': int(max_steps),
                     'options_repr': options_repr,
                     'cuda_visible_devices': visible_devices,
@@ -421,11 +423,12 @@ class NativeSession:
                     result = take_outcome(directory)
                     outcome = NativeOutcome(result['path'], result['elapsed_seconds'],
                         result['effective_beam_width'], directory, result['metadata'])
-                    if outcome.effective_beam_width != beam_width:
+                    if (self._resolved_beam_width is None
+                            or outcome.effective_beam_width != self._resolved_beam_width):
                         raise NativeBackendError('resident effective beam changed')
                 else:
                     path,effective,terminal=self.terminal_result(directory/'native.log',contract,max_steps=max_steps)
-                    if effective != self._metadata['requested_beam_width']:
+                    if self._resolved_beam_width is None or effective != self._resolved_beam_width:
                         raise NativeBackendError('resident effective beam changed')
                     metadata=deepcopy(self._metadata)
                     from .rust_resident import TERMINAL_FIELDS
@@ -462,6 +465,7 @@ class NativeSession:
                 self._identity = None if rust_owns_identity else identity
                 self._metadata = (None if rust_owns_metadata
                                   else deepcopy(outcome.metadata))
+                self._resolved_beam_width = outcome.effective_beam_width
                 rust_outcome_owned = rust_owns_metadata
             if rust_outcome_owned:
                 owner_metadata = outcome.metadata.get('persistent_session')

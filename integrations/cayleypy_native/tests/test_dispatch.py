@@ -125,6 +125,42 @@ def test_native_result_replays_and_is_upstream_compatible(tmp_path, monkeypatch)
     assert calls[0][1:] == (123, 4, (0,))
 
 
+def test_auto_max_beam_width_is_preserved_by_public_dispatch(tmp_path, monkeypatch):
+    calls = fake_native(monkeypatch, tmp_path)
+    dispatch.enable_native(NativeOptions(cache_dir=tmp_path))
+    result = graph().beam_search(start_state=[1, 0, 2, 3, 4], beam_width="max",
+                                 max_steps=4, return_path=True)
+    assert result.path == [2]
+    assert calls[0][1] == "max"
+    assert result.native_metadata["requested_beam_width"] == "max"
+
+
+def test_rust_session_identity_fallback_accepts_auto_max(tmp_path, monkeypatch):
+    from multigpubeamsearch import NativeSession, models, rust_control, persistent
+
+    monkeypatch.setattr(rust_control, "build_preparation_identity", lambda **kwargs: None)
+    monkeypatch.setattr(persistent, "requires_mlp_host_binding", lambda *args, **kwargs: False)
+    monkeypatch.setattr(models, "verify_prepared_model", lambda *args, **kwargs: None)
+    contract = SimpleNamespace(graph_hash="graph-hash", state_len=1, num_classes=1, move_count=1,
+                               center=(0,), generators=((0,),), start=(1,))
+    model = SimpleNamespace(artifact_hash="model-hash", artifact_sizes=(), backend="mlp")
+    options = NativeOptions(cache_dir=tmp_path)
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    observed = []
+
+    def execute(contract, model, options, beam_width, max_steps, run_dir, devices, *, runtime=None):
+        observed.append(beam_width)
+        return NativeOutcome(None, 0.01, 64, run_dir,
+                             {"requested_beam_width": beam_width, "effective_beam_width": 64})
+
+    with NativeSession(engine="rust") as session:
+        outcome = session.run(execute, contract, model, options, "max", 4, run_dir, (0,),
+                              runtime=SimpleNamespace(build_metadata={}))
+    assert observed == ["max"]
+    assert outcome.effective_beam_width == 64
+
+
 def test_dispatch_clamps_touch_bfs_to_the_requested_step_budget(tmp_path, monkeypatch):
     fake_native(monkeypatch, tmp_path)
     observed = []
@@ -205,7 +241,8 @@ def test_session_cannot_close_while_nccl_preparation_is_active(tmp_path, monkeyp
     assert session.closed
 
 
-def test_prepared_session_reuses_worker_then_rejects_changed_nccl(tmp_path, monkeypatch):
+@pytest.mark.parametrize(("beam_width", "resolved_width"), [(64, 64), ("max", 64)])
+def test_prepared_session_reuses_worker_then_rejects_changed_nccl(tmp_path, monkeypatch, beam_width, resolved_width):
     import subprocess
     from multigpubeamsearch import NativeSession, backend, build, models, resident_transport
     from multigpubeamsearch.contracts import GraphContract
@@ -259,17 +296,23 @@ def test_prepared_session_reuses_worker_then_rejects_changed_nccl(tmp_path, monk
         session = current_session()
         elapsed = session.launch([str(runner)], contract=contract, run_dir=run_dir, env={},
                                  world=len(devices), timeout=5, runtime=runtime)
-        return NativeOutcome((2,), elapsed, beam_width, run_dir,
-                             {"requested_beam_width": beam_width, "profile": {}, "terminal_records": 1})
+        resolved = 64 if beam_width == "max" else beam_width
+        return NativeOutcome((2,), elapsed, resolved, run_dir,
+                             {"requested_beam_width": beam_width, "effective_beam_width": resolved,
+                              "profile": {}, "terminal_records": 1})
 
     monkeypatch.setattr(backend, "_run_native_once", execute)
     options = NativeOptions(cache_dir=tmp_path / "cache", runner_path=runner, inference_backend="cutlass")
     args = dict(backend="native", native_options=options, start_state=start,
-                beam_width=64, max_steps=4, return_path=True)
-    with NativeSession(experimental_parallel_nccl_identity=True):
+                beam_width=beam_width, max_steps=4, return_path=True)
+    with NativeSession(engine="python", experimental_parallel_nccl_identity=True):
         first = dispatch.beam_search(g, **args)
         second = dispatch.beam_search(g, **args)
         assert first.path == second.path == [2]
+        assert first.native_metadata["requested_beam_width"] == beam_width
+        assert second.native_metadata["requested_beam_width"] == beam_width
+        assert first.native_metadata["effective_beam_width"] == resolved_width
+        assert second.native_metadata["effective_beam_width"] == resolved_width
         assert len(workers) == 1 and workers[0].sequence == 2
         assert second.native_metadata["persistent_session"]["reused"]
         library.write_bytes(b"modified nccl")

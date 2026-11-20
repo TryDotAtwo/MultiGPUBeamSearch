@@ -194,6 +194,10 @@ rank processes after their ABI/layout and specialization checks.
 - Public options have a strict Rust representation, including integer/duration
   bounds and incompatible option combinations. Python only serializes descriptors
   at the new coarse adapter. Model export and its semantic checks stay in PyTorch.
+- Beam width requests preserve the distinction between an exact positive width and
+  `"max"`. Session identity stores the requested form; a reused worker must keep
+  the previously accepted logical width, which remains separately recorded in
+  result metadata.
 - A cached inference profile requires complete source/device-bound receipts and
   recomputed timing statistics. Changed model/helper bytes invalidate the request;
   released memory pressure invalidates a capacity-limited cached profile.
