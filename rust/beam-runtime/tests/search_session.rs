@@ -1,7 +1,7 @@
 use beam_core::search::PermutationGraph;
 use beam_runtime::search_session::{Launch, PreparationIdentity, SearchSession, SessionIdentity};
 use serde_json::json;
-use std::{fs, time::Duration};
+use std::{fs, sync::atomic::Ordering, time::Duration};
 #[test]
 fn session_reuses_compatible_jobs_and_releases_before_model_or_geometry_change() {
     let root = std::env::temp_dir().join(format!("beam-search-owner-{}", std::process::id()));
