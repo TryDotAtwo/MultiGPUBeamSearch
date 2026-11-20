@@ -535,3 +535,17 @@ This changes only the owner of the quota calculation used by calibration
 fixtures and probes. It does not change beam width, rank order, rank ownership,
 collectives, or any CUDA execution. Hosted run [44652345373](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44652345373) passed Rust formatting/planning checks, the PyO3 build, 260 Python tests (2 skipped), and NCCL probe syntax. Main run [44652813652](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44652813652) at commit `148b2a826a369b7601e904ea409e0cc5301c75c9` also passed 260 Python tests (2 skipped), Rust planning checks, PyO3 build and NCCL syntax; artifact 14592080300, SHA-256 `3f519592bd4f5a38140257a025b3fb20d7701064f250b5228c4f4af6308555f7`. Physical CUDA/NCCL multi-GPU execution remains unverified.
 
+## Rust rank-plan validation
+
+Calibration now calls the optional PyO3 `validate_rank_plans_json` method for
+ordinary typed rank-plan dictionaries. It uses the existing
+`beam_core::planning::validate_rank_plans` contract. Unknown fields are
+excluded from the JSON payload. Missing/older extensions, non-integer values,
+unsupported record shapes, and native validation errors continue through the
+existing Python validator, preserving its acceptance policy and messages.
+
+The rank plan returned to the caller, logical quotas, profile choice, memory
+admission, rank order, collective schedule, and CUDA stages are unchanged.
+Hosted CPU/PyO3 results are recorded at
+`test_results/refactor_20261120/rust-rank-plan-validation/GITHUB_STATUS.md`.
+This check does not establish physical CUDA/NCCL multi-GPU execution.

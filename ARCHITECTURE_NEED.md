@@ -3202,3 +3202,18 @@ collective, frontier payload, or CUDA execution. Evidence:
 `test_results/refactor_20261120/rust-rank-frontier-quotas/GITHUB_STATUS.md`.
 Physical multi-GPU runtime remains unverified.
 
+## Rust validation for calibration rank plans (2026-11-20)
+
+The calibration-side `validate_rank_plans` delegates ordinary typed rank records
+to `beam-core::planning::validate_rank_plans` through an optional PyO3 method.
+Only exact Python lists of dictionaries with integer values for the recognized
+rank-plan fields cross this adapter; unknown fields are omitted. Missing or old
+extensions, unsupported Python values, and Rust rejections retain the existing
+Python validator and its public errors. This preserves legacy acceptance where
+the current Rust contract is stricter, including zero-valued geometry.
+
+The change does not alter beam width, rank ordering, capacity, calibration
+selection, collectives, search output, or CUDA execution. Hosted CPU/PyO3
+evidence is recorded in
+`test_results/refactor_20261120/rust-rank-plan-validation/GITHUB_STATUS.md`.
+Physical CUDA/NCCL multi-GPU execution remains unverified.

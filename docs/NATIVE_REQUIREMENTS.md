@@ -241,3 +241,14 @@ when their work ends; do not infer authorization over another project's instance
 
 Calibration fixture and probe code should obtain per-rank logical frontier counts from the existing Rust planning contract through an optional PyO3 adapter. Preserve the exact ceiling-difference partition used by final exchange, including uneven widths, and exclude spare capacity. If the extension is missing/older or the plan is outside the typed contract, retain the Python compatibility formula. Do not change beam width, rank ordering, ownership, collective order, or frontier contents.
 
+## Calibration rank-plan validation
+
+The optional Rust/PyO3 `validate_rank_plans_json` adapter may handle only
+ordinary list/dict records whose recognized rank-plan values are exact Python
+integers. Send only fields used by the Rust `RankPlan`; unrelated extension
+fields must not be serialized or passed across the boundary. Keep the Python
+validator for older extensions, unsupported values or record shapes, and every
+Rust rejection. This preserves existing error messages and Python acceptance,
+including values accepted by Python but rejected by the currently stricter Rust
+geometry contract. Do not change quota, beam-width, capacity, rank-order,
+collective, or search policy as part of this migration.

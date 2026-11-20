@@ -2597,4 +2597,21 @@ RED run [44651491013](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/r
 `test_results/refactor_20261120/rust-rank-frontier-quotas/GITHUB_STATUS.md`.
 Main commit `148b2a826a369b7601e904ea409e0cc5301c75c9` also passed the 260-test CPU/PyO3 suite (2 skipped) in Actions run [44652813652](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44652813652); artifact 14592080300, SHA256 `3f519592bd4f5a38140257a025b3fb20d7701064f250b5228c4f4af6308555f7`. Physical multi-GPU runtime remains unverified.
 
+## 2026-11-20 - Rust validation of calibration rank plans
 
+- Added optional `beam-core::planning::validate_rank_plans` dispatch through
+  PyO3 and routed ordinary typed calibration plan dictionaries to Rust.
+- Kept unknown fields outside the payload. Unsupported Python values, missing
+  or older extensions, and Rust rejections retain the existing Python
+  validator and error messages, including legacy zero-geometry acceptance.
+- No calibration choice, beam width, rank ordering, memory policy, collective,
+  search output, or CUDA operation changed.
+- RED: [Actions run 44656721403](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44656721403)
+  passed the existing CPU/PyO3 suite (261 passed, 2 skipped) and failed the two
+  new assertions for the missing Rust dispatch and PyO3 method.
+- Branch GREEN: [Actions run 44658594054](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44658594054)
+  passed 265 Python tests (2 skipped), Rust checks, PyO3 build, and NCCL probe
+  syntax. Artifact 14594831023, SHA-256
+  `746312d931ec875bbceeb253b9ca5a316a47cbba788805109fda034eee8ccdd1`.
+- Physical CUDA/NCCL multi-GPU execution remains unverified. Evidence:
+  `test_results/refactor_20261120/rust-rank-plan-validation/GITHUB_STATUS.md`.
