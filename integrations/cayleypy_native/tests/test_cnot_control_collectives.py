@@ -801,3 +801,48 @@ def test_rust_goal_failure_gathers_diagnostics_as_fixed_tensors(monkeypatch):
     )
     assert len(gathered) == 3
 
+
+
+def test_compat_search_forces_python_engine_when_auto_engine_is_not_universal(monkeypatch):
+    from multigpubeamsearch import cnot
+
+    world = _two_rank_world()
+    root = torch.zeros((1, 2, 1), dtype=torch.int64)
+    input_matrix = SimpleNamespace(root=root, n=2, raw=b"input")
+    engine_calls = []
+    support_calls = []
+    transport_calls = []
+    expected = object()
+
+    monkeypatch.setattr(world, "checked", lambda _stage, callback: callback())
+    monkeypatch.setattr(
+        world, "all_ranks_support",
+        lambda local: support_calls.append(local) or False,
+    )
+    monkeypatch.setattr(world, "require_consensus", lambda _digest: None)
+    monkeypatch.setattr(
+        world, "start_transport",
+        lambda *, prefer_rust: transport_calls.append(prefer_rust),
+    )
+    monkeypatch.setattr(cnot, "_search_engine", lambda *_args: ("rust", object()))
+
+    def admit(_root, _scorer, _width, _shortlist, _depth, _mode, _audit, _validation, engine):
+        engine_calls.append(engine)
+        return input_matrix, b"digest", None
+
+    monkeypatch.setattr(cnot, "_admit", admit)
+    monkeypatch.setattr(
+        cnot.native, "cnot_identity",
+        lambda _n, device: torch.ones((1, 2, 1), dtype=torch.int64, device=device),
+    )
+    monkeypatch.setattr(cnot, "_search", lambda *_args: expected)
+
+    result = cnot._search_cnot_compat(
+        world, root, object(), width=8, shortlist=4, max_depth=3,
+        mode="qhat", audit=False, validation="auto", engine="auto",
+    )
+
+    assert result is expected
+    assert support_calls == [True]
+    assert engine_calls == ["python"]
+    assert transport_calls == [False]
