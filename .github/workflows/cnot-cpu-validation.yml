@@ -95,12 +95,14 @@ jobs:
               rust/beam-python/src/cnot_stream5.rs \
               rust/beam-runtime/tests/search_session.rs \
               rust/beam-runtime/tests/session_preparation_identity.rs\
-              rust/beam-runtime/tests/search_inputs.rs
+              rust/beam-runtime/tests/search_inputs.rs \
+              rust/beam-runtime/tests/cnot_exchange.rs
             rustfmt --check --edition 2021 rust/beam-core/src/inference.rs rust/beam-core/src/cnot.rs rust/beam-core/tests/cnot.rs
             rustfmt --check --edition 2021 rust/beam-python/src/planning.rs
             cargo test --locked -p beam-core --test cnot
             cargo test --locked -p beam-core --test planning
             cargo test --locked -p beam-core --test search
+            cargo test --locked -p beam-runtime --test cnot_exchange
             cargo test --locked -p beam-runtime cnot_search
             cargo test --locked -p beam-runtime --test search_session
             cargo test --locked -p beam-runtime --test session_preparation_identity
@@ -132,6 +134,7 @@ jobs:
             integrations/cayleypy_native/tests/test_cnot_search.py \
             integrations/cayleypy_native/tests/test_cnot_control_collectives.py \
             integrations/cayleypy_native/tests/test_cnot_rust_exchange.py \
+            integrations/cayleypy_native/tests/test_cnot_stream5_rust.py \
             integrations/cayleypy_native/tests/test_cnot_scorer_runtime_dispatch.py \
             integrations/cayleypy_native/tests/test_cnot_scorer_batch_api.py \
             integrations/cayleypy_native/tests/test_rust_persistent_search.py \

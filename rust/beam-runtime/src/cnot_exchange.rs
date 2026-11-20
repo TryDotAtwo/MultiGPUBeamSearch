@@ -18,6 +18,9 @@ pub trait Backend {
     fn send_count(&mut self) -> Result<u64, Self::Error>;
     fn any_overflow(&mut self, local: bool) -> Result<bool, Self::Error>;
     fn exchange_counts(&mut self) -> Result<Counts, Self::Error>;
+    fn prepare_rows(&mut self, size: u32) -> Result<(), Self::Error>;
+    fn any_prepare_failure(&mut self, local: bool) -> Result<bool, Self::Error>;
+    fn peer_prepare_failure(&mut self) -> Self::Error;
     fn exchange_rows(
         &mut self,
         send: &[u32],
@@ -46,5 +49,13 @@ pub fn exchange<B: Backend>(backend: &mut B) -> Result<B::Output, B::Error> {
             backend.receive_overflow()
         });
     }
+    let prepared = backend.prepare_rows(receive_size as u32);
+    if backend.any_prepare_failure(prepared.is_err())? {
+        return Err(match prepared {
+            Err(error) => error,
+            Ok(()) => backend.peer_prepare_failure(),
+        });
+    }
+    prepared?;
     backend.exchange_rows(&counts.send, &counts.receive, receive_size as u32)
 }

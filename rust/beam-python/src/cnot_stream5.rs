@@ -106,6 +106,8 @@ impl PyStream5Communicator {
             send,
             counts,
             world,
+            backing: None,
+            source: None,
         };
         cnot_exchange::exchange(&mut stages)
     }
@@ -116,6 +118,8 @@ struct TensorExchange<'a, 'py> {
     send: Bound<'py, PyAny>,
     counts: Bound<'py, PyAny>,
     world: Bound<'py, PyAny>,
+    backing: Option<Bound<'py, PyAny>>,
+    source: Option<Bound<'py, PyAny>>,
 }
 
 impl<'py> Backend for TensorExchange<'_, 'py> {
@@ -127,11 +131,36 @@ impl<'py> Backend for TensorExchange<'_, 'py> {
     }
 
     fn any_overflow(&mut self, local: bool) -> PyResult<bool> {
-        let flag = self
-            .world
-            .call_method1("longs", (vec![if local { 1_i64 } else { 0_i64 }],))?;
-        let total = self.world.call_method1("sum", (flag,))?;
-        Ok(total.call_method0("item")?.extract::<u64>()? != 0)
+        self.world
+            .call_method1("any_rank_failed", (local,))?
+            .extract()
+    }
+
+    fn prepare_rows(&mut self, size: u32) -> PyResult<()> {
+        let width: u64 = self.send.call_method1("size", (1,))?.extract()?;
+        let backing = self
+            .send
+            .call_method1("new_empty", ((u64::from(size).max(1), width),))?;
+        let source = if self.send_count()? == 0 {
+            self.send.call_method1("new_empty", ((1_u64, width),))?
+        } else {
+            self.send.clone()
+        };
+        self.backing = Some(backing);
+        self.source = Some(source);
+        Ok(())
+    }
+
+    fn any_prepare_failure(&mut self, local: bool) -> PyResult<bool> {
+        self.world
+            .call_method1("any_rank_failed", (local,))?
+            .extract()
+    }
+
+    fn peer_prepare_failure(&mut self) -> PyErr {
+        PyRuntimeError::new_err(
+            "CNOT receive buffer allocation failed on another rank before payload exchange",
+        )
     }
 
     fn exchange_counts(&mut self) -> PyResult<Counts> {
@@ -168,17 +197,14 @@ impl<'py> Backend for TensorExchange<'_, 'py> {
         receive: &[u32],
         size: u32,
     ) -> PyResult<Self::Output> {
-        let width: u64 = self.send.call_method1("size", (1,))?.extract()?;
-        let backing = self
-            .send
-            .call_method1("new_empty", ((u64::from(size).max(1), width),))?;
-        let source = if self.send_count()? == 0 {
-            self.send.call_method1("new_empty", ((1_u64, width),))?
-        } else {
-            self.send.clone()
-        };
+        let backing = self.backing.as_ref().ok_or_else(|| {
+            PyRuntimeError::new_err("CNOT receive buffer was not prepared before payload exchange")
+        })?;
+        let source = self.source.as_ref().ok_or_else(|| {
+            PyRuntimeError::new_err("CNOT send buffer was not prepared before payload exchange")
+        })?;
         self.comm
-            .exchange_row_tensors(&source, &backing, send, receive)?;
+            .exchange_row_tensors(source, backing, send, receive)?;
         backing.call_method1("narrow", (0, 0, size))
     }
 

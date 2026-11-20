@@ -103,6 +103,13 @@ class World:
         gathered = self._control_gather(vote)
         return gathered.sum().item() == self.size
 
+    def any_rank_failed(self, local_failed):
+        """OR rank-local failure flags over the CPU Gloo control group."""
+        if self.size == 1:
+            return bool(local_failed)
+        vote = torch.tensor([int(bool(local_failed))], dtype=torch.int64)
+        return bool(self._control_gather(vote).sum().item())
+
     def require_consensus(self, digest):
         """Reject CNOT setup when the ranks received different search inputs."""
         used, result = self._rust_collective(

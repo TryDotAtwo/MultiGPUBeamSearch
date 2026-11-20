@@ -135,7 +135,7 @@ class Stream5:
         world = self.world
         limit = 0xffffffff
         # Offsets, including the final offset, are uint32 in the existing wire protocol.
-        if world.sum(world.longs([int(len(send) > limit)])).item():
+        if world.any_rank_failed(len(send) > limit):
             raise OverflowError("per-rank CNOT send exceeds Stream 5 uint32 offsets")
         send_counts = counts.to(torch.int32)
         recv_counts = torch.empty_like(send_counts)
@@ -145,11 +145,21 @@ class Stream5:
         send_split = counts.tolist()
         recv_split = [count & limit for count in recv_counts.tolist()]
         size = sum(recv_split)
-        if world.sum(world.longs([int(size > limit)])).item():
+        if world.any_rank_failed(size > limit):
             raise OverflowError("per-rank CNOT receive exceeds Stream 5 uint32 offsets")
-        # A valid address also permits zero-count NCCL operations on an empty rank.
-        backing = send.new_empty((max(1, size), send.size(1)))
-        source = send if len(send) else send.new_empty((1, send.size(1)))
+        # Reserve both device buffers before any rank enters the payload collective.
+        backing = None
+        source = None
+        allocation_error = None
+        try:
+            backing = send.new_empty((max(1, size), send.size(1)))
+            source = send if len(send) else send.new_empty((1, send.size(1)))
+        except Exception as error:
+            allocation_error = error
+        if world.any_rank_failed(allocation_error is not None):
+            if allocation_error is not None:
+                raise allocation_error
+            raise RuntimeError("CNOT Stream 5 receive buffer allocation failed on another rank")
         host_counts = C.c_uint32 * world.size
         self.check(self.lib.cnot_s5_rows(*args, source.data_ptr(), backing.data_ptr(),
                                          host_counts(*send_split), host_counts(*recv_split), send.size(1)))
