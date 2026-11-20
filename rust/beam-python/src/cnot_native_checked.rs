@@ -1,15 +1,24 @@
 //! Rank-wide error coordination for fallible CNOT stages.
 //!
-//! The operation still runs on the calling thread. The v1 ABI retains its
-//! object gather for compatibility; the v2 path gathers UTF-8 diagnostics as
-//! fixed-size tensors over the existing world transport. Torch owns buffers.
+//! The operation still runs on the calling thread. Checked-stage votes and
+//! diagnostics use the existing CPU/Gloo control group so a CUDA allocation or
+//! NCCL failure does not require another GPU collective.
 use pyo3::{
     exceptions::{PyBaseException, PyOverflowError, PyRuntimeError},
     prelude::*,
-    types::PyList,
+    types::{PyDict, PyList},
 };
 
+fn cpu_i64_tensor<'py>(py: Python<'py>, values: Vec<i64>) -> PyResult<Bound<'py, PyAny>> {
+    let torch = py.import("torch")?;
+    let kwargs = PyDict::new(py);
+    kwargs.set_item("dtype", torch.getattr("int64")?)?;
+    kwargs.set_item("device", "cpu")?;
+    torch.call_method("tensor", (values,), Some(&kwargs))
+}
+
 pub(crate) fn gather_error_messages_v2<'py>(
+    py: Python<'py>,
     world: &Bound<'py, PyAny>,
     size: usize,
     error: Option<&str>,
@@ -17,9 +26,9 @@ pub(crate) fn gather_error_messages_v2<'py>(
     let local_len = error.map_or(0, str::len);
     let local_len = i64::try_from(local_len)
         .map_err(|_| PyOverflowError::new_err("CNOT error message exceeds int64 length"))?;
-    let length_tensor = world.call_method1("longs", (vec![local_len],))?;
+    let length_tensor = cpu_i64_tensor(py, vec![local_len])?;
     let gathered_lengths = world
-        .call_method1("gather_fixed", (length_tensor,))?
+        .call_method1("_control_gather", (length_tensor,))?
         .call_method0("flatten")?
         .call_method0("tolist")?;
     let raw_lengths: Vec<i64> = gathered_lengths.extract()?;
@@ -50,9 +59,9 @@ pub(crate) fn gather_error_messages_v2<'py>(
         ));
     }
     local_bytes.resize(max_len, 0);
-    let payload_tensor = world.call_method1("longs", (local_bytes,))?;
+    let payload_tensor = cpu_i64_tensor(py, local_bytes)?;
     let gathered_payload = world
-        .call_method1("gather_fixed", (payload_tensor,))?
+        .call_method1("_control_gather", (payload_tensor,))?
         .call_method0("tolist")?;
     let rows: Vec<Vec<i64>> = gathered_payload.extract()?;
     if rows.len() != size {
@@ -106,18 +115,21 @@ fn checked_impl<'py>(
             (None, Some(format!("rank {rank}: {name}: {message}")))
         }
     };
-    let vote = world.call_method1("longs", (vec![i64::from(error.is_some())],))?;
-    if world
-        .call_method1("sum", (vote,))?
-        .call_method0("item")?
-        .is_truthy()?
-    {
+    let any_failed: bool = world
+        .call_method1("any_rank_failed", (error.is_some(),))?
+        .extract()?;
+    if any_failed {
         let messages = if byte_gather {
-            gather_error_messages_v2(world, size, error.as_deref())?
+            gather_error_messages_v2(py, world, size, error.as_deref())?
         } else {
             let errors = PyList::new(py, (0..size).map(|_| py.None()))?;
-            py.import("torch.distributed")?
-                .call_method1("all_gather_object", (&errors, error))?;
+            let kwargs = PyDict::new(py);
+            kwargs.set_item("group", world.getattr("_control_group")?)?;
+            py.import("torch.distributed")?.call_method(
+                "all_gather_object",
+                (&errors, error),
+                Some(&kwargs),
+            )?;
             let gathered: Vec<Option<String>> = errors.extract()?;
             gathered.into_iter().flatten().collect()
         };
@@ -151,8 +163,7 @@ pub(crate) fn checked_v2<'py>(
     checked_impl(py, world, stage, result, true)
 }
 
-/// Preserve the rank-wide checker negotiation used by Python `World.checked`,
-/// then coordinate an operation result without calling a Python stage callback.
+/// Coordinate Rust-owned CNOT stages through the existing Gloo control group.
 pub(crate) fn checked_compat<'py>(
     py: Python<'py>,
     world: &Bound<'py, PyAny>,
@@ -163,38 +174,7 @@ pub(crate) fn checked_compat<'py>(
     if size == 1 {
         return result;
     }
-
-    let mut use_v2 = false;
-    let selected = world.getattr("_checked_error_gather_v2")?;
-    if selected.is_none() {
-        let extension = py
-            .import("multigpubeamsearch.rust_control")?
-            .call_method0("extension")?;
-        let builtins = py.import("builtins")?;
-        let checker = builtins.getattr("getattr")?.call1((
-            extension,
-            "run_cnot_native_checked_v2",
-            py.None(),
-        ))?;
-        let callable = builtins.getattr("callable")?.call1((&checker,))?;
-        let supported: bool = world
-            .call_method1("all_ranks_support", (&callable,))?
-            .extract()?;
-        if supported {
-            world.setattr("_checked_error_gather_v2", &checker)?;
-            use_v2 = true;
-        } else {
-            world.setattr("_checked_error_gather_v2", false)?;
-        }
-    } else {
-        use_v2 = selected.is_callable();
-    }
-
-    if use_v2 {
-        checked_v2(py, world, stage, result)
-    } else {
-        checked(py, world, stage, result)
-    }
+    checked_v2(py, world, stage, result)
 }
 
 #[pyfunction]
@@ -217,7 +197,18 @@ fn run_cnot_native_checked_v2<'py>(
     checked_v2(py, &world, stage, callback.call0())
 }
 
+#[pyfunction]
+fn run_cnot_native_checked_control<'py>(
+    py: Python<'py>,
+    world: Bound<'py, PyAny>,
+    stage: &str,
+    callback: Bound<'py, PyAny>,
+) -> PyResult<Bound<'py, PyAny>> {
+    checked_v2(py, &world, stage, callback.call0())
+}
+
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(run_cnot_native_checked, module)?)?;
-    module.add_function(wrap_pyfunction!(run_cnot_native_checked_v2, module)?)
+    module.add_function(wrap_pyfunction!(run_cnot_native_checked_v2, module)?)?;
+    module.add_function(wrap_pyfunction!(run_cnot_native_checked_control, module)?)
 }
