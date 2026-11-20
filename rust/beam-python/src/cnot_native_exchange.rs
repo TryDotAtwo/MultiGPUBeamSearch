@@ -186,12 +186,7 @@ pub(crate) fn exchange<'py>(
         };
         Ok(PyTuple::new(py, [send, counts, recv_counts])?.into_any())
     })();
-    let prepared = checked(
-        py,
-        world,
-        "prepare CNOT record exchange",
-        prepared,
-    )?;
+    let prepared = checked(py, world, "prepare CNOT record exchange", prepared)?;
     let send = prepared.get_item(0)?;
     let counts = prepared.get_item(1)?;
     let recv_counts = prepared.get_item(2)?;
@@ -209,19 +204,12 @@ pub(crate) fn exchange<'py>(
     let payload = (|| -> PyResult<Bound<'py, PyAny>> {
         let send_split = counts.call_method0("tolist")?;
         let recv_split = recv_counts.call_method0("tolist")?;
-        let received_size = py
-            .import("builtins")?
-            .call_method1("sum", (&recv_split,))?;
+        let received_size = py.import("builtins")?.call_method1("sum", (&recv_split,))?;
         let columns = rows.getattr("shape")?.get_item(1)?;
         let received = rows.call_method1("new_empty", ((received_size, columns),))?;
         Ok(PyTuple::new(py, [received, send_split, recv_split])?.into_any())
     })();
-    let payload = checked(
-        py,
-        world,
-        "prepare CNOT record exchange payload",
-        payload,
-    )?;
+    let payload = checked(py, world, "prepare CNOT record exchange payload", payload)?;
     let received = payload.get_item(0)?;
     let send_split = payload.get_item(1)?;
     let recv_split = payload.get_item(2)?;
