@@ -58,6 +58,28 @@ jobs:
           payload = Path(os.environ["RUNNER_TEMP"]) / "vast-remote-payload.sh"
           payload.write_text("\n".join(lines) + "\n", encoding="utf-8")
           subprocess.run(["bash", "-n", str(payload)], check=True)
+          lines = source.splitlines()
+          heredoc_count = 0
+          index = 0
+          while index < len(lines):
+              if "<<'PY'" not in lines[index]:
+                  index += 1
+                  continue
+              index += 1
+              body = []
+              while index < len(lines) and lines[index].strip() != "PY":
+                  line = lines[index]
+                  if line and not line.startswith("          "):
+                      raise SystemExit(f"unexpected Python heredoc indentation at workflow line {index + 1}")
+                  body.append(line[10:] if line else "")
+                  index += 1
+              if index >= len(lines):
+                  raise SystemExit("unterminated Python heredoc")
+              compile("\n".join(body) + "\n", f"<workflow-python-heredoc-{heredoc_count}>", "exec")
+              heredoc_count += 1
+              index += 1
+          if heredoc_count < 4:
+              raise SystemExit(f"expected at least four Python heredocs, found {heredoc_count}")
           PY
 
   gpu-acceptance:
