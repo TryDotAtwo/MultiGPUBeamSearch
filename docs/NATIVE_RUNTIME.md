@@ -18,6 +18,16 @@ matches by comparing every packed word. Existing CUDA kernels and Python-only
 fallbacks remain unchanged. Hosted CPU/PyO3 evidence is in
 test_results/refactor_20261120/cnot-rust-first-unseen/GITHUB_STATUS.md.
 
+## Rust-owned CPU CNOT owner assignment
+
+For typed Rust CPU search, root and child owner ranks now come from
+beam-core::cnot::owner_ranks. It preserves the existing position-dependent
+128-bit hash, row-tail masking, wire-count salt, and rank modulus. Python-only
+CPU/reference calls retain the Torch/NumPy implementation; CUDA dispatch keeps
+the existing owner kernel. Hosted CPU/PyO3 evidence is in
+test_results/refactor_20261120/cnot-rust-owners/GITHUB_STATUS.md. It does not
+establish physical CUDA/NCCL multi-GPU execution.
+
 ## Compatibility-preserving inference selection
 
 `autotune.select_inference` can use `beam-core::inference::select_inference_compatible` through the optional PyO3 function `inference_select_compatible`. For ordinary `Measurement` rows it keeps the existing rejection rules, median/MAD estimates, CPython-seeded bootstrap interval, baseline recovery and tie ordering. Python retains the previous implementation as a fallback for older extensions and values outside the Rust adapter's supported shape.
