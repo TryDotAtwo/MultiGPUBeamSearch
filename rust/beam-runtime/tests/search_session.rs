@@ -404,7 +404,7 @@ while not (directory/'stop').exists():
         );
         (owner, result)
     });
-    let workers_dir = root.join("resident-session");
+    let workers_dir = run_dir.join("resident-session");
     let deadline = std::time::Instant::now() + Duration::from_secs(5);
     while std::time::Instant::now() < deadline
         && !(workers_dir.join("waiting-0").is_file() && workers_dir.join("waiting-1").is_file())
