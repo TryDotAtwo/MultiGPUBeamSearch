@@ -1,3 +1,12 @@
+## 2026-11-21 - Make CNOT runtime acceptance select Rust explicitly
+
+- `tools/verify_cnot.py` accepts `--engine`, reports the selected engine and scorer runtime type, and `--require-rust-scorer` requires both the Rust controller and the PyO3 Rust-owned TQP scorer for trained checkpoint cases. The search algorithm and scorer numerics are unchanged.
+- Added an end-to-end CPU/Gloo run of the public CNOT verifier to CNOT compatibility tests and the installed-wheel workflow. The wheel run imports the package from site-packages outside the checkout and uses `engine=rust`; it solved the n=144 fixture in two gates and passed independent bitwise replay.
+- RED: [Actions run 44819995307](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44819995307) caught both missing CLI contracts (2 failed, 308 passed, 2 skipped).
+- GREEN: [CNOT CPU run 44820597906](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44820597906) passed Rust checks, PyO3 build, 310 Python tests (2 skipped, 104 warnings), and NCCL probe syntax. Artifact [14672625098](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44820597906/artifacts/14672625098), SHA-256 `1e520abb300f25bb14e80384832dda91f79582e1530030ec5941d1625e40425b`.
+- [Installed-wheel run 44820639095](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44820639095) built and installed the PEP 517 wheel outside the checkout, passed `pip check`, then ran the Rust CNOT controller through that installed wheel with CPU/Gloo. The n=144, B=1, K=3 case returned length 2 and bitwise replay passed. Artifact [14671043639](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44820639095/artifacts/14671043639), SHA-256 `f0335a4828b4d416234b5d32ba36cbf4b1b2517bbd48f2f65b85a27c45a9f4b1`.
+- These runs do not load the private checkpoint and do not verify CUDA/NCCL or physical 1-/2-GPU execution. Full receipt: `test_results/refactor_20261121/cnot-native-verifier/GITHUB_STATUS.md`.
+
 ## 2026-11-20 - CNOT setup failures use the Gloo control group
 
 - The Rust top-level CNOT controller now coordinates failures from identity
