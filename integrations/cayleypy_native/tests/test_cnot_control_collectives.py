@@ -1101,4 +1101,4 @@ def test_two_rank_gloo_rejects_mixed_cnot_engine_requests(tmp_path):
             if process.is_alive():
                 process.terminate()
             process.join(timeout=2)
-\n
+
