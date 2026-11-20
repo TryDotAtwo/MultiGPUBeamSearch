@@ -1229,3 +1229,63 @@ def test_two_gloo_ranks_coordinate_cnot_exchange_payload_failure_and_keep_world(
         args=(rendezvous,),
         nprocs=2,
     )
+
+
+def distributed_cnot_keyboard_interrupt(rank, rendezvous):
+    import signal
+
+    torch.set_num_threads(1)
+    dist.init_process_group(
+        "gloo",
+        init_method=rendezvous,
+        rank=rank,
+        world_size=2,
+        timeout=timedelta(seconds=15),
+    )
+    old_input = cnot._input
+    old_equal = torch.equal
+    try:
+        require_controller()
+        if rank == 1:
+            def build_untyped_input(root, *_args, **_kwargs):
+                return cnot._InputMatrix(root.shape[1], b"interrupt-fixture", root)
+            cnot._input = build_untyped_input
+
+            def interrupt_during_root_goal(left, right):
+                signal.raise_signal(signal.SIGINT)
+                return old_equal(left, right)
+
+            torch.equal = interrupt_during_root_goal
+
+        with pytest.raises(KeyboardInterrupt) as error:
+            cnot.search_cnot(
+                cnot.pack_rows((8, 4, 2, 1)),
+                WireFixture(9),
+                width=5,
+                shortlist=9,
+                max_depth=4,
+                mode="qhat",
+                validation="python",
+                engine="rust",
+            )
+        assert "check CNOT root goal" in str(error.value)
+        assert "rank 1: KeyboardInterrupt" in str(error.value)
+
+        probe = torch.tensor([rank + 1], dtype=torch.int64)
+        dist.all_reduce(probe)
+        assert probe.item() == 3
+    finally:
+        cnot._input = old_input
+        torch.equal = old_equal
+        dist.destroy_process_group()
+
+
+@pytest.mark.skipif(not dist.is_gloo_available(), reason="two CPU ranks require Gloo")
+def test_two_gloo_ranks_propagate_sigint_as_keyboard_interrupt_and_keep_world(tmp_path):
+    require_controller()
+    rendezvous = (tmp_path / "cnot-sigint").resolve().as_uri()
+    mp.spawn(
+        distributed_cnot_keyboard_interrupt,
+        args=(rendezvous,),
+        nprocs=2,
+    )
