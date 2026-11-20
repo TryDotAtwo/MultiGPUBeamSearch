@@ -1,4 +1,5 @@
 """Rust owns the versioned Stream 5 communicator and its library lifetime."""
+from datetime import timedelta
 import gc
 import os
 from pathlib import Path
@@ -7,7 +8,11 @@ import subprocess
 
 import pytest
 import torch
+import torch.distributed as dist
+import torch.multiprocessing as mp
 
+from multigpubeamsearch.cnot_collectives import World
+from multigpubeamsearch.cnot_stream5 import RustStream5
 from multigpubeamsearch.rust_control import extension
 
 
@@ -178,3 +183,63 @@ def test_rust_reports_native_errors_without_double_close(mock_library, monkeypat
     del comm
     gc.collect()
     assert log.read_text().splitlines().count("close 0 0") == 1
+
+
+def _fixed_gather_preflight_worker(rank, rendezvous):
+    torch.set_num_threads(1)
+    dist.init_process_group(
+        "gloo",
+        init_method=rendezvous,
+        rank=rank,
+        world_size=2,
+        timeout=timedelta(seconds=30),
+    )
+    original_new_empty = torch.Tensor.new_empty
+    message = "fixture Stream 5 output allocation failed on rank one"
+    calls = []
+    try:
+        with World("cpu") as world:
+            class Communicator:
+                def validate_all_gather_i64_into(self, tensor, work, output):
+                    calls.append("validate")
+
+                def all_gather_i64_into(self, tensor, work, output):
+                    calls.append("all_gather")
+                    return output
+
+            transport = RustStream5.__new__(RustStream5)
+            transport.world = world
+            transport.comm = Communicator()
+            tensor = torch.tensor([rank + 1], dtype=torch.int64)
+
+            if rank == 1:
+                def fail_output_allocation(self, size, *args, **kwargs):
+                    if tuple(size) == (2, 1):
+                        raise RuntimeError(message)
+                    return original_new_empty(self, size, *args, **kwargs)
+                torch.Tensor.new_empty = fail_output_allocation
+
+            with pytest.raises(RuntimeError) as error:
+                transport.gather_fixed(tensor)
+            expected = (
+                "prepare Rust Stream 5 fixed gather failed: "
+                f"rank 1: RuntimeError: {message}"
+            )
+            assert str(error.value) == expected
+            assert calls == [], "a rank entered validation/NCCL after a peer allocation failure"
+
+            probe = torch.tensor([rank + 1], dtype=torch.int64)
+            dist.all_reduce(probe)
+            assert probe.item() == 3
+    finally:
+        torch.Tensor.new_empty = original_new_empty
+        dist.destroy_process_group()
+
+
+@pytest.mark.skipif(not dist.is_gloo_available(), reason="two CPU ranks require Gloo")
+def test_two_gloo_ranks_preflight_stream5_gather_allocation_and_keep_world(tmp_path):
+    mp.spawn(
+        _fixed_gather_preflight_worker,
+        args=((tmp_path / "stream5-gather-preflight").resolve().as_uri(),),
+        nprocs=2,
+    )

@@ -32,6 +32,7 @@ on:
       - integrations/cayleypy_native/tests/test_cnot_rust_controller.py
       - integrations/cayleypy_native/tests/test_cnot_control_collectives.py
       - integrations/cayleypy_native/tests/test_cnot_rust_exchange.py
+      - integrations/cayleypy_native/tests/test_cnot_stream5_rust.py
       - integrations/cayleypy_native/tests/test_cnot_scorer_runtime_dispatch.py
       - integrations/cayleypy_native/tests/test_cnot_scorer_batch_api.py
       - integrations/cayleypy_native/multigpubeamsearch/rust_control.py

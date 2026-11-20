@@ -90,6 +90,25 @@ impl PyStream5Communicator {
         self.inner.all_gather_i64(tensor)
     }
 
+    fn validate_all_gather_i64_into(
+        &self,
+        tensor: &Bound<'_, PyAny>,
+        work: &Bound<'_, PyAny>,
+        output: &Bound<'_, PyAny>,
+    ) -> PyResult<()> {
+        self.inner
+            .validate_all_gather_i64_into(tensor, work, output)
+    }
+
+    fn all_gather_i64_into<'py>(
+        &self,
+        tensor: &Bound<'py, PyAny>,
+        work: &Bound<'py, PyAny>,
+        output: &Bound<'py, PyAny>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        self.inner.all_gather_i64_into(tensor, work, output)
+    }
+
     fn broadcast_i64(&self, tensor: &Bound<'_, PyAny>, source: u32) -> PyResult<()> {
         self.inner.broadcast_i64(tensor, source)
     }

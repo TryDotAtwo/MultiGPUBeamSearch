@@ -559,38 +559,90 @@ mod torch {
             &self,
             tensor: &Bound<'py, PyAny>,
         ) -> PyResult<Bound<'py, PyAny>> {
-            let (collectives, ptr, device) = self.collective_bindings()?;
+            let (_, _, device) = self.collective_bindings()?;
             let (count, contiguous) = Self::control_tensor(tensor, device)?;
-            let received = count
+            count
                 .checked_mul(u64::from(self.world))
                 .ok_or_else(|| invalid("Stream 5 fixed gather size overflow"))?;
             let mut output_shape = vec![u64::from(self.world)];
             output_shape.extend(tensor.getattr("shape")?.extract::<Vec<u64>>()?);
             let output = tensor.call_method1("new_empty", (output_shape,))?;
-            if count == 0 {
-                return Ok(output);
-            }
             let work = if contiguous {
                 tensor.clone()
             } else {
                 tensor.call_method0("contiguous")?
             };
-            let stream = current_stream(tensor.py(), device)?;
-            if !contiguous {
-                tensor.call_method1("record_stream", (&stream,))?;
+            self.all_gather_i64_into(tensor, &work, &output)
+        }
+
+        /// Validate every rank-local fixed-gather buffer before entering NCCL.
+        pub fn validate_all_gather_i64_into(
+            &self,
+            tensor: &Bound<'_, PyAny>,
+            work: &Bound<'_, PyAny>,
+            output: &Bound<'_, PyAny>,
+        ) -> PyResult<()> {
+            let (_, _, device) = self.collective_bindings()?;
+            let (count, _) = Self::control_tensor(tensor, device)?;
+            let (work_count, work_contiguous) = Self::control_tensor(work, device)?;
+            let (output_count, output_contiguous) = Self::control_tensor(output, device)?;
+            if !work_contiguous || work_count != count {
+                return Err(invalid("Stream 5 fixed gather input buffer is invalid"));
             }
-            let send = address(&work, &stream)?;
-            let receive = address(&output, &stream)?;
-            if send == receive {
-                return Err(invalid("Stream 5 fixed gather buffers overlap"));
+            if !output_contiguous {
+                return Err(invalid("Stream 5 fixed gather output must be contiguous"));
             }
-            let (output_count, _) = Self::control_tensor(&output, device)?;
+
+            let input_shape: Vec<u64> = tensor.getattr("shape")?.extract()?;
+            let work_shape: Vec<u64> = work.getattr("shape")?.extract()?;
+            if work_shape != input_shape {
+                return Err(invalid("Stream 5 fixed gather input shape changed"));
+            }
+            let mut expected_shape = vec![u64::from(self.world)];
+            expected_shape.extend(input_shape);
+            let output_shape: Vec<u64> = output.getattr("shape")?.extract()?;
+            if output_shape != expected_shape {
+                return Err(invalid("Stream 5 fixed gather output shape is invalid"));
+            }
+            let received = count
+                .checked_mul(u64::from(self.world))
+                .ok_or_else(|| invalid("Stream 5 fixed gather size overflow"))?;
             if output_count != received {
                 return Err(invalid("Stream 5 fixed gather output size is invalid"));
             }
+            if count == 0 {
+                return Ok(());
+            }
+
+            let stream = current_stream(tensor.py(), device)?;
+            let send = address(work, &stream)?;
+            let receive = address(output, &stream)?;
+            if send == receive {
+                return Err(invalid("Stream 5 fixed gather buffers overlap"));
+            }
+            let _: usize = stream.getattr("cuda_stream")?.extract()?;
+            Ok(())
+        }
+
+        pub fn all_gather_i64_into<'py>(
+            &self,
+            tensor: &Bound<'py, PyAny>,
+            work: &Bound<'py, PyAny>,
+            output: &Bound<'py, PyAny>,
+        ) -> PyResult<Bound<'py, PyAny>> {
+            self.validate_all_gather_i64_into(tensor, work, output)?;
+            let (collectives, ptr, device) = self.collective_bindings()?;
+            let (count, _) = Self::control_tensor(tensor, device)?;
+            if count == 0 {
+                return Ok(output.clone());
+            }
+
+            let stream = current_stream(tensor.py(), device)?;
+            let send = address(work, &stream)?;
+            let receive = address(output, &stream)?;
             let raw_stream: usize = stream.getattr("cuda_stream")?.extract()?;
-            // SAFETY: both buffers are checked, contiguous, stream-recorded
-            // tensors with the output sized for world * count int64 elements.
+            // SAFETY: both buffers are validated, contiguous, stream-recorded
+            // tensors with output storage sized for world * count int64 elements.
             let code = unsafe {
                 (collectives.all_gather_i64)(
                     ptr.as_ptr(),
@@ -605,8 +657,9 @@ mod torch {
                     self.bindings.error("all-gather int64", code).to_string(),
                 ));
             }
-            Ok(output)
+            Ok(output.clone())
         }
+
 
         pub fn broadcast_i64(&self, tensor: &Bound<'_, PyAny>, source: u32) -> PyResult<()> {
             let (collectives, ptr, device) = self.collective_bindings()?;

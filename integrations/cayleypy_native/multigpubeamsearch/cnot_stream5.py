@@ -98,7 +98,27 @@ class RustStream5:
         return tensor
 
     def gather_fixed(self, tensor):
-        return self.comm.all_gather_i64(tensor)
+        if not all(hasattr(self.comm, name) for name in
+                   ("validate_all_gather_i64_into", "all_gather_i64_into")):
+            return self.comm.all_gather_i64(tensor)
+
+        def prepare():
+            work = tensor.contiguous()
+            output_shape = (self.world.size, *tuple(tensor.shape))
+            return work, tensor.new_empty(output_shape)
+
+        work, output = self.world.checked(
+            "prepare Rust Stream 5 fixed gather",
+            prepare,
+        )
+        self.world.checked(
+            "validate Rust Stream 5 fixed gather",
+            lambda: self.comm.validate_all_gather_i64_into(tensor, work, output),
+        )
+        return self.world.checked(
+            "gather Rust Stream 5 fixed values",
+            lambda: self.comm.all_gather_i64_into(tensor, work, output),
+        )
 
     def broadcast(self, tensor, source):
         self.comm.broadcast_i64(tensor, source)
