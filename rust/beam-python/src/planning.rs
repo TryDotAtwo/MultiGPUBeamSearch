@@ -211,7 +211,6 @@ fn rank_frontier_counts(plans: &str) -> PyResult<Vec<u64>> {
         .map_err(|error| PyValueError::new_err(error.to_string()))
 }
 
-
 #[pyfunction]
 fn validate_rank_plans_json(plans: &str) -> PyResult<bool> {
     let rows: Vec<beam_core::planning::RankPlan> =
