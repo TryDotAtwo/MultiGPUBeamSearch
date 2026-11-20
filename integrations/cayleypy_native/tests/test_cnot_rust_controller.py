@@ -1246,11 +1246,12 @@ def distributed_cnot_keyboard_interrupt(rank, rendezvous):
     old_equal = torch.equal
     try:
         require_controller()
-        if rank == 1:
-            def build_untyped_input(root, *_args, **_kwargs):
-                return cnot._InputMatrix(root.shape[1], b"interrupt-fixture", root)
-            cnot._input = build_untyped_input
 
+        def build_untyped_input(root, *_args, **_kwargs):
+            return cnot._InputMatrix(root.shape[1], b"interrupt-fixture", root)
+        cnot._input = build_untyped_input
+
+        if rank == 1:
             def interrupt_during_root_goal(left, right):
                 signal.raise_signal(signal.SIGINT)
                 return old_equal(left, right)
