@@ -2695,3 +2695,25 @@ Main commit `148b2a826a369b7601e904ea409e0cc5301c75c9` also passed the 260-test 
 - MAIN GREEN: [Actions run 44699705418](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44699705418) at `db9577fcc61a3b57fae1ba0e1e2bc5c579e9b001` passed the same Rust/PyO3 CPU suite (269 passed, 2 skipped, 104 warnings). Artifact 14612416568, SHA-256 `51be4e713b50c58e70e9a7b95ec055ab2f039420715dfe275f4e5d9c8a8ddfa6`.
 - The automatically triggered existing-Vast workflow [44699705287](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44699705287) observed a stopped instance and skipped remote build/execution; it did not start the instance. Physical CUDA/NCCL validation remains unverified.
 
+## 2026-11-20 - Public cancellation for Rust resident searches
+
+- Added `NativeSession.cancel()` for an active Rust-engine search. It signals
+  the Rust resident owner, handles a request arriving during preparation, and
+  closes the session after cancellation. Idle sessions and the Python engine
+  return `False`; old Rust extensions without cancellation support keep the
+  compatibility behavior.
+- Added a two-rank CPU integration test that waits for both resident workers,
+  requests cancellation, and verifies the stop marker, both worker exits, and
+  empty PID ownership afterward. Search algorithm, scoring, precision, rank
+  topology, and GPU code are unchanged.
+- RED: Actions run
+  [44719860829](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44719860829)
+  exposed the missing public method (86 passed, 3 skipped, one expected failure).
+- GREEN: Actions run
+  [44721590584](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44721590584)
+  passed the Rust/CNOT CPU workflow, including 3/3 resident session tests,
+  Rust checks, PyO3 build, and 280 Python tests (2 skipped). Artifact 14620999670,
+  SHA-256 `3930714e9560a28ec895af213bfafc190a5feed85423371b08f412211cfc8122`.
+  Evidence: `test_results/refactor_20261120/rust-session-cancel/GITHUB_STATUS.md`.
+- This validates host-side process cancellation only; physical CUDA/NCCL and
+  1-/2-GPU runs remain unverified.
