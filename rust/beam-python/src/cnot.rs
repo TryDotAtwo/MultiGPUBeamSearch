@@ -337,11 +337,17 @@ impl Backend for PyStages<'_> {
                     let lex = world.call_method1("longs", (initial,))?;
                     self.stages.setattr("lex", lex)?;
                     let owner_result = (|| {
-                        let native = self.py.import("multigpubeamsearch.cnot_native")?;
                         let size = world.getattr("size")?;
-                        native
-                            .call_method1("cnot_owners", (&root, size))?
-                            .call_method0("item")
+                        if root.getattr("is_cuda")?.is_truthy()? {
+                            let native = self.py.import("multigpubeamsearch.cnot_native")?;
+                            native
+                                .call_method1("cnot_owners", (&root, &size))?
+                                .call_method0("item")
+                        } else {
+                            let size: u32 = size.extract()?;
+                            crate::cnot_native_batch::cpu_owners(self.py, &root, size)?
+                                .call_method0("item")
+                        }
                     })();
                     let owns_root = crate::cnot_native_checked::checked_compat(
                         self.py,

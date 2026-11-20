@@ -1,3 +1,11 @@
+## 2026-11-20 - Move typed CPU CNOT owner assignment into Rust
+
+- For typed CPU CNOT compatibility searches, owner assignment now uses `beam_core::cnot::owner_ranks` through the PyO3 adapter. The existing CUDA owner operator and Python-only fallback remain in place. Hashes continue to select shards only; state equality and full packed-word comparison are unchanged.
+- RED: hosted run [44674560289](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44674560289) failed at the expected Python owner-helper callback check (268 passed, 1 failed, 2 skipped). Artifact 14602160860, SHA-256 `76726ff8bb49e3d56cf7acbf19476c4b6759d6ad552df3b24e3efc9b9a203508`.
+- An intermediate hosted run [44698622193](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44698622193) stopped at rustfmt before compilation; formatting was corrected.
+- GREEN: [Actions run 44699020897](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44699020897) passed Rust CNOT checks, the PyO3 build, 269 CPU/PyO3 tests (2 skipped), and the NCCL probe syntax check. Artifact 14612107333, SHA-256 `f367eb4217389be60ddaff4e8812565a0a26ecde879962e3ba8bb0e159d92ceb`.
+- This is hosted CPU/PyO3 validation only. No physical CUDA/NCCL multi-GPU run or paid compute was used. Evidence: `test_results/refactor_20261120/cnot-rust-owners/GITHUB_STATUS.md`.
+
 # Changelog
 
 ## 2026-11-20 - Move typed CPU CNOT first-unseen into Rust

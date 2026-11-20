@@ -284,13 +284,68 @@ pub(crate) fn expand<'py>(
     )?;
     let rows = children.call_method1("reshape", (-1, n * words))?;
     let candidates = torch.call_method1("cat", (PyTuple::new(py, [meta, rows])?, 1))?;
-    let owners = match device_domain.as_deref_mut() {
-        Some(domain) => domain.owners(py, &children)?,
-        None => native.call_method1("cnot_owners", (&children, world.getattr("size")?))?,
+    let owners = if let Some(domain) = device_domain.as_deref_mut() {
+        domain.owners(py, &children)?
+    } else if children.getattr("is_cuda")?.is_truthy()? {
+        native.call_method1("cnot_owners", (&children, world.getattr("size")?))?
+    } else {
+        let world_size: u32 = world.getattr("size")?.extract()?;
+        cpu_owners(py, &children, world_size)?
     };
     Ok(PyTuple::new(py, [candidates, owners])?.into_any())
 }
 
+pub(crate) fn cpu_owners<'py>(
+    py: Python<'py>,
+    packed: &Bound<'py, PyAny>,
+    world_size: u32,
+) -> PyResult<Bound<'py, PyAny>> {
+    if !(1..=65_536).contains(&world_size) {
+        return Err(PyValueError::new_err(
+            "CNOT world size must be in [1, 65536]",
+        ));
+    }
+
+    let torch = py.import("torch")?;
+    let int64 = torch.getattr("int64")?;
+    if !packed
+        .getattr("dtype")?
+        .call_method1("__eq__", (&int64,))?
+        .is_truthy()?
+        || packed.getattr("ndim")?.extract::<usize>()? != 3
+    {
+        return Err(PyValueError::new_err(
+            "packed CNOT matrices require int64 [batch,n,ceil(n/64)]",
+        ));
+    }
+    let shape: Vec<i64> = packed.getattr("shape")?.extract()?;
+    let wires = shape[1];
+    let words = shape[2];
+    if !(1..=256).contains(&wires) || words != (wires + 63) / 64 {
+        return Err(PyValueError::new_err(
+            "packed CNOT matrices require 1..256 qubits and ceil(n/64) words per row",
+        ));
+    }
+    let device_type: String = packed.getattr("device")?.getattr("type")?.extract()?;
+    if device_type != "cpu" {
+        return Err(PyValueError::new_err(
+            "CPU CNOT owner assignment requires a CPU tensor",
+        ));
+    }
+
+    let flat: Vec<i64> = packed
+        .call_method0("contiguous")?
+        .call_method1("reshape", (-1,))?
+        .call_method0("tolist")?
+        .extract()?;
+    let packed_words: Vec<u64> = flat.into_iter().map(|word| word as u64).collect();
+    let owners = beam_core::cnot::owner_ranks(wires as u32, &packed_words, world_size)
+        .map_err(|_| PyValueError::new_err("invalid packed CNOT owner batch"))?;
+    let values = PyList::new(py, owners.iter().map(|&owner| owner as i64))?;
+    let kwargs = PyDict::new(py);
+    kwargs.set_item("dtype", int64)?;
+    torch.call_method("tensor", (values,), Some(&kwargs))
+}
 fn cpu_first_unseen<'py>(
     py: Python<'py>,
     closed: &Bound<'py, PyAny>,

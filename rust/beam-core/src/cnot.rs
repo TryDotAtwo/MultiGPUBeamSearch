@@ -111,6 +111,67 @@ pub fn apply_gate_words(wires: u32, words: &mut [u64], id: u32) -> Result<()> {
     Ok(())
 }
 
+/// The same SplitMix-derived mixer used by the CUDA CNOT owner hash.
+fn cnot_owner_mix64(mut value: u64) -> u64 {
+    value ^= value >> 30;
+    value = value.wrapping_mul(0xbf58_476d_1ce4_e5b9);
+    value ^= value >> 27;
+    value = value.wrapping_mul(0x94d0_49bb_1331_11eb);
+    value ^ (value >> 31)
+}
+
+/// Assign each packed CNOT matrix to the rank selected by the existing
+/// position-dependent 128-bit owner hash. Hashes select rank placement only;
+/// this function does not compare matrices or decide whether they are equal.
+pub fn owner_ranks(wires: u32, packed: &[u64], world_size: u32) -> Result<Vec<u32>> {
+    if !(1..=256).contains(&wires) {
+        return Err(ContractError::Invalid("CNOT wires"));
+    }
+    if !(1..=65_536).contains(&world_size) {
+        return Err(ContractError::Invalid("CNOT world size"));
+    }
+
+    let rows = wires as usize;
+    let stride = rows.div_ceil(64);
+    let matrix_words = rows
+        .checked_mul(stride)
+        .ok_or(ContractError::Overflow("CNOT packed matrix"))?;
+    if packed.len() % matrix_words != 0 {
+        return Err(ContractError::Invalid("CNOT packed state batch length"));
+    }
+
+    let tail_bits = wires % 64;
+    let tail_mask = if tail_bits == 0 {
+        u64::MAX
+    } else {
+        (1u64 << tail_bits) - 1
+    };
+    let mut owners = Vec::with_capacity(packed.len() / matrix_words);
+
+    for state in packed.chunks_exact(matrix_words) {
+        let mut lo = 0u64;
+        let mut hi = 0u64;
+        for (index, &word) in state.iter().enumerate() {
+            let value = if index % stride == stride - 1 {
+                word & tail_mask
+            } else {
+                word
+            };
+            let position = (index as u64).wrapping_add(1);
+            lo ^= cnot_owner_mix64(value ^ position.wrapping_mul(0x9e37_79b9_7f4a_7c15));
+            hi ^=
+                cnot_owner_mix64(value.wrapping_add(position.wrapping_mul(0xd6e8_feb8_6659_fd93)));
+        }
+
+        lo ^= u64::from(wires);
+        hi ^= u64::from(wires) << 32;
+        let mut key = lo ^ hi.rotate_left(32) ^ 0x243f_6a88_85a3_08d3;
+        key ^= cnot_owner_mix64(hi.wrapping_add(0x9e37_79b9_7f4a_7c15));
+        owners.push((cnot_owner_mix64(key) % u64::from(world_size)) as u32);
+    }
+
+    Ok(owners)
+}
 /// Hash a packed state only to select a candidate bucket. Equality is always
 /// decided by comparing every logical word after masking row-tail padding.
 fn cnot_state_hash(state: &[u64], stride: usize, tail_mask: u64) -> u64 {

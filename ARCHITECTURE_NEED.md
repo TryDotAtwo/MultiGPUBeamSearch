@@ -35,8 +35,10 @@ cnot_children путь. CPU first-unseen в typed Rust compatibility path теп
 beam-core::cnot::first_unseen_indices: он маскирует tail padding, хранит
 первый индекс в порядке генерации и подтверждает совпадение сравнением всех
 packed words. CUDA dispatch и Python-only engine сохраняют прежний
-cnot_first_unseen путь. cnot_owners пока сохраняет прежние CUDA/C++ kernels
-и CPU/reference Torch реализацию. pack_cnot_route больше не вызывается из
+cnot_first_unseen путь. Typed CPU owner assignment теперь вычисляет прежний
+position-dependent hash в beam-core и возвращает те же owner ranks. Python-only
+CPU/reference fallback остаётся доступен, а CUDA dispatch сохраняет прежний
+C++/CUDA owner kernel. pack_cnot_route больше не вызывается из
 typed Rust compatibility path: Rust проверяет source rank, dtype и диапазон
 move ID, затем собирает тот же int64 route lane.
 

@@ -195,3 +195,35 @@ fn identity_check_covers_the_complete_packed_matrix() {
     let changed = CnotMatrix::from_le_bytes(129, &packed).unwrap();
     assert!(!changed.is_identity());
 }
+
+#[test]
+fn owner_ranks_match_position_hash_and_ignore_row_padding() {
+    let states = [0, 0, 0, 1, 0, 0, 1, 2, 4, 7, 0, 1, 1, 2, 4];
+    assert_eq!(
+        beam_core::cnot::owner_ranks(3, &states, 251).unwrap(),
+        vec![31, 180, 140, 61, 140]
+    );
+
+    let wires = 65u32;
+    let matrix_words = wires as usize * 2;
+    let zeros = vec![0u64; matrix_words];
+    let mut padding_only = zeros.clone();
+    for row in 0..wires as usize {
+        padding_only[row * 2 + 1] = !1u64;
+    }
+    assert_eq!(
+        beam_core::cnot::owner_ranks(wires, &zeros, 251).unwrap(),
+        beam_core::cnot::owner_ranks(wires, &padding_only, 251).unwrap()
+    );
+    assert_eq!(
+        beam_core::cnot::owner_ranks(1, &[0, 1, 3], 65_536)
+            .unwrap()
+            .len(),
+        3
+    );
+    assert!(beam_core::cnot::owner_ranks(0, &[], 1).is_err());
+    assert!(beam_core::cnot::owner_ranks(257, &[], 1).is_err());
+    assert!(beam_core::cnot::owner_ranks(3, &[0], 1).is_err());
+    assert!(beam_core::cnot::owner_ranks(3, &[], 0).is_err());
+    assert!(beam_core::cnot::owner_ranks(3, &[], 65_537).is_err());
+}

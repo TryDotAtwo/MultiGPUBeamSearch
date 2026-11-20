@@ -348,9 +348,12 @@ impl Backend for NativeStages<'_> {
                     .as_mut()
                     .ok_or_else(|| PyRuntimeError::new_err("CNOT device domain is unavailable"))?;
                 domain.owners(self.py, &root)?.call_method0("item")
-            } else {
+            } else if root.getattr("is_cuda")?.is_truthy()? {
                 self.native()?
                     .call_method1("cnot_owners", (&root, self.size))?
+                    .call_method0("item")
+            } else {
+                crate::cnot_native_batch::cpu_owners(self.py, &root, self.size)?
                     .call_method0("item")
             }
         })();
