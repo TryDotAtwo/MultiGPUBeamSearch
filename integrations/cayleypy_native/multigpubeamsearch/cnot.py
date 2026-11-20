@@ -223,6 +223,14 @@ def _reconstruct(world, history, final, input_matrix):
     return gates, routes[::-1]
 
 
+def _requested_engine_digest(engine):
+    if type(engine) is not str or engine not in ("auto", "python", "rust"):
+        raise ValueError("CNOT engine must be auto, python, or rust")
+    return hashlib.sha256(
+        b"cnot-requested-engine-v1\\0" + engine.encode("utf-8")
+    ).digest()
+
+
 def _search_engine(engine, max_depth):
     if engine not in ("auto", "python", "rust"):
         raise ValueError("CNOT engine must be auto, python, or rust")
@@ -288,6 +296,11 @@ def _make_compat_stages(world, root, identity, input_matrix, scorer, mode, audit
 def _search_cnot_compat(world, root, scorer, width, shortlist, max_depth,
                         mode, audit, validation, engine):
     """Compatibility orchestration for older PyO3 extensions."""
+    engine_digest = world.checked(
+        "validate CNOT search engine",
+        lambda: _requested_engine_digest(engine),
+    )
+    world.require_consensus(engine_digest)
     if engine == "auto":
         local_rust = world.checked(
             "select CNOT search engine",

@@ -1,4 +1,7 @@
+import json
+import multiprocessing as mp
 from pathlib import Path
+import time
 from types import SimpleNamespace
 
 import pytest
@@ -1002,3 +1005,100 @@ def test_native_goal_uses_common_rank_capability_before_dispatch(monkeypatch):
     assert stages.goal(3) == expected
     assert support_votes == [True]
     assert native_calls == []
+
+
+def _mixed_engine_gloo_worker(rank, init_method, output_dir):
+    import torch.distributed as distributed
+    from datetime import timedelta
+
+    distributed.init_process_group(
+        backend="gloo",
+        init_method=init_method,
+        rank=rank,
+        world_size=2,
+        timeout=timedelta(seconds=8),
+    )
+    observed = None
+    try:
+        from multigpubeamsearch import cnot, rust_control
+        from multigpubeamsearch.cnot_collectives import World
+        from multigpubeamsearch.errors import NativeUnavailable
+
+        def missing_extension():
+            raise NativeUnavailable("test forces the Python collective compatibility path")
+
+        def unexpected_admission(*_args, **_kwargs):
+            raise AssertionError("mixed engine requests reached CNOT admission")
+
+        rust_control.extension = missing_extension
+        cnot._admit = unexpected_admission
+        with World("cpu") as world:
+            try:
+                cnot._search_cnot_compat(
+                    world,
+                    torch.zeros((1, 2, 1), dtype=torch.int64),
+                    object(),
+                    width=8,
+                    shortlist=4,
+                    max_depth=3,
+                    mode="qhat",
+                    audit=False,
+                    validation="auto",
+                    engine="auto" if rank == 0 else "python",
+                )
+            except Exception as error:
+                observed = {"type": type(error).__name__, "message": str(error)}
+            else:
+                observed = {"type": "returned", "message": ""}
+    except Exception as error:
+        observed = {"type": type(error).__name__, "message": str(error)}
+    finally:
+        if distributed.is_initialized():
+            distributed.destroy_process_group()
+    Path(output_dir, f"rank-{rank}.json").write_text(
+        json.dumps(observed), encoding="utf-8"
+    )
+
+
+def test_two_rank_gloo_rejects_mixed_cnot_engine_requests(tmp_path):
+    rendezvous = tmp_path / "gloo-store"
+    output_dir = tmp_path / "gloo-results"
+    output_dir.mkdir()
+    context = mp.get_context("spawn")
+    processes = [
+        context.Process(
+            target=_mixed_engine_gloo_worker,
+            args=(rank, f"file://{rendezvous}", str(output_dir)),
+        )
+        for rank in range(2)
+    ]
+    for process in processes:
+        process.start()
+
+    deadline = time.monotonic() + 20
+    try:
+        for process in processes:
+            process.join(timeout=max(0, deadline - time.monotonic()))
+        alive = [process for process in processes if process.is_alive()]
+        if alive:
+            for process in alive:
+                process.terminate()
+                process.join(timeout=2)
+            pytest.fail("two-rank Gloo CNOT engine agreement exceeded 20 seconds")
+        assert [process.exitcode for process in processes] == [0, 0]
+        results = [
+            json.loads((output_dir / f"rank-{rank}.json").read_text(encoding="utf-8"))
+            for rank in range(2)
+        ]
+        assert all(result["type"] == "ValueError" for result in results), results
+        assert all(
+            "CNOT root, search settings or scorer fingerprints differ between ranks"
+            in result["message"]
+            for result in results
+        ), results
+    finally:
+        for process in processes:
+            if process.is_alive():
+                process.terminate()
+            process.join(timeout=2)
+\n
