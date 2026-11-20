@@ -2967,6 +2967,6 @@ Main commit `148b2a826a369b7601e904ea409e0cc5301c75c9` also passed the 260-test 
 
 - Included the repository-root `tests/` directory in the remote build archive because the full CMake project references those C++ test sources during configuration.
 - The acceptance environment now force-reinstalls the wheel built for the tested commit and verifies that `multigpubeamsearch` imports from that run's virtual environment.
-- Hosted source validation passed in [Actions run 44828781264](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44828781264); artifact [14675486620](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44828781264/artifacts/14675486620), SHA-256 `5e0653276e4cda72e9f7c5d98f01b711d56935572a690dce1f64ba63ab78c653`.
+- Hosted source validation passed in [Actions run 44829728978](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44829728978); artifact [14674899394](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44829728978/artifacts/14674899394), SHA-256 `06f2ae40ae37b6224378dce805c1e527bab3d65533fca4f6f3efc09d73249b1a`.
 - That push-triggered run validated Python/Bash syntax and packaging guards only. The physical GPU job was skipped; CUDA/NCCL search and checkpoint-scored CNOT remain unverified pending a supplied spend cap and an already-running instance.
 - Source-controlled evidence: `test_results/refactor_20261121/gpu-acceptance/GITHUB_STATUS.md`.
