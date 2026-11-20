@@ -41,6 +41,7 @@ jobs:
         id: compile_source
         run: python -m py_compile tools/verify_permutation_cuda.py tools/test_vast_result_transport.py
       - name: Test Vast result retrieval after remote key revocation
+        id: transport_test
         run: python tools/test_vast_result_transport.py -v
       - name: Syntax-check the remote Bash payload without running it
         id: syntax_check
@@ -109,6 +110,7 @@ jobs:
         if: always()
         env:
           COMPILE_OUTCOME: ${{ steps.compile_source.outcome }}
+          TRANSPORT_OUTCOME: ${{ steps.transport_test.outcome }}
           SYNTAX_OUTCOME: ${{ steps.syntax_check.outcome }}
         shell: bash
         run: |
@@ -119,6 +121,7 @@ jobs:
 
           - Commit: ${GITHUB_SHA}
           - Python source compile: ${COMPILE_OUTCOME}
+          - Fake SSH result retrieval after key revocation: ${TRANSPORT_OUTCOME}
           - Remote Bash and embedded Python syntax: ${SYNTAX_OUTCOME}
           - Physical GPU job: separate manual-dispatch job; this receipt does not claim CUDA/NCCL acceptance.
           EOF
