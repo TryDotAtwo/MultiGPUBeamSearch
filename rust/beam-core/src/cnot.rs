@@ -4,6 +4,7 @@
 //! CNOT XORs the complete control row into the target row. Hashes are never
 //! used to decide whether two matrices are equal here.
 use crate::ContractError;
+use std::collections::HashMap;
 
 type Result<T> = std::result::Result<T, ContractError>;
 
@@ -108,6 +109,110 @@ pub fn apply_gate_words(wires: u32, words: &mut [u64], id: u32) -> Result<()> {
         }
     }
     Ok(())
+}
+
+
+/// Hash a packed state only to select a candidate bucket. Equality is always
+/// decided by comparing every logical word after masking row-tail padding.
+fn cnot_state_hash(state: &[u64], stride: usize, tail_mask: u64) -> u64 {
+    let mut hash = 0xcbf2_9ce4_8422_2325u64;
+    for (index, &word) in state.iter().enumerate() {
+        let value = if index % stride == stride - 1 {
+            word & tail_mask
+        } else {
+            word
+        };
+        hash ^= value;
+        hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
+    }
+    hash ^= hash >> 33;
+    hash = hash.wrapping_mul(0xff51_afd7_ed55_8ccd);
+    hash ^= hash >> 33;
+    hash = hash.wrapping_mul(0xc4ce_b9fe_1a85_ec53);
+    hash ^ (hash >> 33)
+}
+
+fn cnot_states_equal(left: &[u64], right: &[u64], stride: usize, tail_mask: u64) -> bool {
+    left.iter().zip(right).enumerate().all(|(index, (&a, &b))| {
+        if index % stride == stride - 1 {
+            (a & tail_mask) == (b & tail_mask)
+        } else {
+            a == b
+        }
+    })
+}
+
+fn cnot_state_at<'a>(
+    closed: &'a [u64],
+    children: &'a [u64],
+    closed_count: usize,
+    matrix_words: usize,
+    global_index: usize,
+) -> &'a [u64] {
+    if global_index < closed_count {
+        let start = global_index * matrix_words;
+        &closed[start..start + matrix_words]
+    } else {
+        let child_index = global_index - closed_count;
+        let start = child_index * matrix_words;
+        &children[start..start + matrix_words]
+    }
+}
+
+/// Return original child indices that are the first full-matrix occurrence
+/// after closed states and earlier children. Hash collisions never establish
+/// equality; every word is compared, with non-logical row-tail bits ignored.
+pub fn first_unseen_indices(
+    wires: u32,
+    closed: &[u64],
+    children: &[u64],
+) -> Result<Vec<usize>> {
+    if !(1..=256).contains(&wires) {
+        return Err(ContractError::Invalid("CNOT wires"));
+    }
+    let rows = wires as usize;
+    let stride = rows.div_ceil(64);
+    let matrix_words = rows
+        .checked_mul(stride)
+        .ok_or(ContractError::Overflow("CNOT packed matrix"))?;
+    if closed.len() % matrix_words != 0 || children.len() % matrix_words != 0 {
+        return Err(ContractError::Invalid("CNOT packed state batch length"));
+    }
+    let closed_count = closed.len() / matrix_words;
+    let child_count = children.len() / matrix_words;
+    let total_count = closed_count
+        .checked_add(child_count)
+        .ok_or(ContractError::Overflow("CNOT state count"))?;
+    let tail_bits = wires % 64;
+    let tail_mask = if tail_bits == 0 {
+        u64::MAX
+    } else {
+        (1u64 << tail_bits) - 1
+    };
+
+    let mut buckets = HashMap::<u64, Vec<usize>>::new();
+    let mut first_children = Vec::new();
+    for global_index in 0..total_count {
+        let state = cnot_state_at(closed, children, closed_count, matrix_words, global_index);
+        let hash = cnot_state_hash(state, stride, tail_mask);
+        let bucket = buckets.entry(hash).or_default();
+        let mut already_seen = false;
+        for &previous_index in bucket.iter() {
+            let previous =
+                cnot_state_at(closed, children, closed_count, matrix_words, previous_index);
+            if cnot_states_equal(previous, state, stride, tail_mask) {
+                already_seen = true;
+                break;
+            }
+        }
+        if !already_seen {
+            bucket.push(global_index);
+            if global_index >= closed_count {
+                first_children.push(global_index - closed_count);
+            }
+        }
+    }
+    Ok(first_children)
 }
 
 /// An owned, validated input. Its words are never borrowed across the Python

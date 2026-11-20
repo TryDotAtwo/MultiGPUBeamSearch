@@ -1,5 +1,14 @@
 # Конфиг
 
+## Rust-владелец CPU CNOT first-unseen, 2026-11-20
+
+Для typed Rust compatibility path CPU-дедупликацию CNOT теперь выполняет
+beam-core::cnot::first_unseen_indices. Результат сохраняет первый child index
+в generation order; все logical words сравниваются после маскирования только
+неиспользуемых tail bits. Совпадение хеша используется лишь для выбора bucket
+и подтверждается полным сравнением матриц. CUDA kernels и Python-only engine
+не меняются. Hosted CPU/PyO3 evidence: test_results/refactor_20261120/cnot-rust-first-unseen/GITHUB_STATUS.md.
+
 ## Rust-владелец CPU CNOT child application, 2026-11-20
 
 Для typed CNOT compatibility path пакетное применение физических ходов к
@@ -22,10 +31,14 @@ generation-order deduplication, score validation и формы выходных 
 упакованные операции через beam_core::cnot::apply_gate_words; физический
 алфавит ходов, XOR контрольной строки и очистка tail padding сохранены.
 CUDA dispatch и Python-only engine продолжают использовать прежний
-cnot_children путь. cnot_first_unseen и cnot_owners сохраняют прежние
-CUDA/C++ kernels и CPU/reference Torch реализации. pack_cnot_route больше не
-вызывается из typed Rust compatibility path: Rust проверяет source rank,
-dtype и диапазон move ID, затем собирает тот же int64 route lane.
+cnot_children путь. CPU first-unseen в typed Rust compatibility path теперь использует
+beam-core::cnot::first_unseen_indices: он маскирует tail padding, хранит
+первый индекс в порядке генерации и подтверждает совпадение сравнением всех
+packed words. CUDA dispatch и Python-only engine сохраняют прежний
+cnot_first_unseen путь. cnot_owners пока сохраняет прежние CUDA/C++ kernels
+и CPU/reference Torch реализацию. pack_cnot_route больше не вызывается из
+typed Rust compatibility path: Rust проверяет source rank, dtype и диапазон
+move ID, затем собирает тот же int64 route lane.
 
 Python-only engine и старые stage providers сохраняют fallback. Алгоритм
 поиска, scoring, precision, state layout и transport не менялись.

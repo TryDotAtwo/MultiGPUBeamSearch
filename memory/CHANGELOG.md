@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-11-20 - Move typed CPU CNOT first-unseen into Rust
+
+- The test-first RED run [44671005907](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44671005907) reached the typed CPU search and failed exactly because it called the Python cnot_first_unseen tensor helper (267 passed, 1 failed, 2 skipped). Artifact [14600765521](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44671005907/artifacts/14600765521), SHA-256 09684db96085d6ee9bef6b6e3b7802c023c5c061ebfc54090f04387f8b939409.
+- beam-core now returns the first original child index for each state absent from closed and earlier children. It masks non-logical tail bits and confirms hash-bucket matches by comparing every packed word. Typed CPU PyO3 dispatch calls this core function; CUDA and Python-only paths remain unchanged.
+- Hosted GREEN validation is pending. Physical CUDA/NCCL multi-GPU execution has not run; paid compute was not used.
+- Evidence: test_results/refactor_20261120/cnot-rust-first-unseen/GITHUB_STATUS.md.
+
 ## 2026-11-20 - Move typed CPU CNOT child application into Rust
 
 - Added beam_core::cnot::apply_gate_words for in-place application of one physical CNOT to packed row-major state, retaining control-major move IDs and clearing per-row tail padding. The typed CPU compatibility adapter applies selected children through this Rust primitive and returns the existing int64 tensor layout.

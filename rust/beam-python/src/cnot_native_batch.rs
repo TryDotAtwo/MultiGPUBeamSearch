@@ -291,6 +291,87 @@ pub(crate) fn expand<'py>(
     Ok(PyTuple::new(py, [candidates, owners])?.into_any())
 }
 
+fn cpu_first_unseen<'py>(
+    py: Python<'py>,
+    closed: &Bound<'py, PyAny>,
+    children: &Bound<'py, PyAny>,
+    n: i64,
+    words: i64,
+) -> PyResult<Bound<'py, PyAny>> {
+    if !(1..=256).contains(&n)
+        || words != (n + 63) / 64
+        || closed.getattr("is_cuda")?.is_truthy()?
+        || children.getattr("is_cuda")?.is_truthy()?
+    {
+        return Err(PyValueError::new_err("invalid CPU CNOT state tensors"));
+    }
+    let closed_shape: Vec<i64> = closed.getattr("shape")?.extract()?;
+    let children_shape: Vec<i64> = children.getattr("shape")?.extract()?;
+    if closed_shape.len() != 3
+        || children_shape.len() != 3
+        || closed_shape[1] != n
+        || children_shape[1] != n
+        || closed_shape[2] != words
+        || children_shape[2] != words
+    {
+        return Err(PyValueError::new_err("invalid packed CNOT matrix shape"));
+    }
+
+    let torch = py.import("torch")?;
+    let int64 = torch.getattr("int64")?;
+    for tensor in [closed, children] {
+        if !tensor
+            .getattr("dtype")?
+            .call_method1("__eq__", (&int64,))?
+            .is_truthy()?
+            || tensor
+                .getattr("device")?
+                .getattr("type")?
+                .extract::<String>()?
+                != "cpu"
+        {
+            return Err(PyValueError::new_err(
+                "CNOT matrices require int64 CPU tensors for Rust reference deduplication",
+            ));
+        }
+    }
+    let closed_device = closed.getattr("device")?;
+    let children_device = children.getattr("device")?;
+    if closed_device
+        .call_method1("__ne__", (&children_device,))?
+        .is_truthy()?
+    {
+        return Err(PyValueError::new_err(
+            "closed and child CNOT matrices must share n and device",
+        ));
+    }
+
+    let closed_flat: Vec<i64> = closed
+        .call_method0("contiguous")?
+        .call_method1("reshape", (-1,))?
+        .call_method0("tolist")?
+        .extract()?;
+    let children_flat: Vec<i64> = children
+        .call_method0("contiguous")?
+        .call_method1("reshape", (-1,))?
+        .call_method0("tolist")?
+        .extract()?;
+    let closed_words: Vec<u64> = closed_flat.into_iter().map(|word| word as u64).collect();
+    let child_words: Vec<u64> = children_flat.into_iter().map(|word| word as u64).collect();
+    let selected = beam_core::cnot::first_unseen_indices(
+        n as u32,
+        &closed_words,
+        &child_words,
+    )
+    .map_err(|_| PyValueError::new_err("invalid packed CNOT state batch"))?;
+
+    let indices = PyList::new(py, selected.iter().map(|&index| index as i64))?;
+    let kwargs = PyDict::new(py);
+    kwargs.set_item("dtype", int64)?;
+    kwargs.set_item("device", children_device)?;
+    torch.call_method("tensor", (indices,), Some(&kwargs))
+}
+
 pub(crate) fn distinct<'py>(
     py: Python<'py>,
     world: &Bound<'py, PyAny>,
@@ -312,9 +393,12 @@ pub(crate) fn distinct<'py>(
         .get_item((slice(py, None, None)?, slice(py, Some(4), None)?))?
         .call_method1("reshape", (-1, n, words))?
         .call_method0("contiguous")?;
-    let first = match device_domain {
-        Some(domain) => domain.first_unseen(py, closed, &children)?,
-        None => native.call_method1("cnot_first_unseen", (closed, &children))?,
+    let first = if let Some(domain) = device_domain {
+        domain.first_unseen(py, closed, &children)?
+    } else if children.getattr("is_cuda")?.is_truthy()? {
+        native.call_method1("cnot_first_unseen", (closed, &children))?
+    } else {
+        cpu_first_unseen(py, closed, &children, n, words)?
     };
     let children = children.get_item(&first)?;
     let meta = incoming.get_item((&first, slice(py, None, Some(4))?))?;

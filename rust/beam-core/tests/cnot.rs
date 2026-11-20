@@ -145,6 +145,34 @@ fn apply_gate_words_matches_cnot_replay_and_clears_tail_padding() {
 }
 
 #[test]
+fn first_unseen_preserves_order_compares_all_words_and_masks_padding() {
+    let wires = 65u32;
+    let matrix_words = 130usize;
+    let mut closed = vec![0u64; matrix_words * 2];
+    // The second closed state differs from zero in the final logical row word.
+    closed[matrix_words + matrix_words - 1] = 1;
+
+    let mut children = vec![0u64; matrix_words * 5];
+    // Child 0 is already closed.
+    children[matrix_words + 77] = 1; // New state in a non-leading packed word.
+    children[2 * matrix_words + 77] = 1; // Duplicate of child 1.
+    children[3 * matrix_words + matrix_words - 1] = 1 | (1u64 << 63); // Closed after tail mask.
+    children[4 * matrix_words + 42] = 1; // Another distinct state.
+    assert_eq!(
+        beam_core::cnot::first_unseen_indices(wires, &closed, &children).unwrap(),
+        vec![1, 4]
+    );
+
+    // n=1 is accepted by the Python packed-state contract; its high bits are padding.
+    assert_eq!(
+        beam_core::cnot::first_unseen_indices(1, &[], &[0, 1, 3]).unwrap(),
+        vec![0, 1]
+    );
+    assert!(beam_core::cnot::first_unseen_indices(0, &[], &[]).is_err());
+    assert!(beam_core::cnot::first_unseen_indices(3, &[0], &[]).is_err());
+}
+
+#[test]
 fn identity_check_covers_the_complete_packed_matrix() {
     for n in [2, 63, 64, 65, 127, 128, 129, 256] {
         let mut packed = identity(n as usize);
