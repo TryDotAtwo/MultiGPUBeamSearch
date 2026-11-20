@@ -124,9 +124,9 @@ def wide_case():
     return replay_cnot(n, (first, second)), WireFixture(second)
 
 
-def validate_case(rows, scorer, mode, width, k, depth, device, require_cross_rank=False):
+def validate_case(rows, scorer, mode, width, k, depth, device, require_cross_rank=False, engine="auto"):
     result = search_cnot(pack_rows(rows, device=device), scorer, width=width, shortlist=k,
-                         max_depth=depth, mode=mode, audit=True)
+                         max_depth=depth, mode=mode, audit=True, engine=engine)
     with World(device) as world:
         def inspect():
             if world.rank:
@@ -145,7 +145,9 @@ def validate_case(rows, scorer, mode, width, k, depth, device, require_cross_ran
                         (world.size == 1 or sum(rank[3] > 0 for rank in layer["by_rank"]) >= 2)
                         for layer in layers), "missing a saturated layer with participating owners")
             report = dict(n=len(rows), width=width, shortlist=k, mode=mode, world=world.size,
-                          scorer=type(scorer).__name__, model=getattr(scorer, "metadata", None),
+                          scorer=type(scorer).__name__,
+                          scorer_runtime=f"{type(scorer).__module__}.{type(scorer).__qualname__}",
+                          engine=engine, model=getattr(scorer, "metadata", None),
                           layers=layers, physical_ids=list(result.gates), directed_gates=[pairs[i] for i in result.gates],
                           length=result.length, bitwise_replay=True, routes=result.path_routes)
             if len(rows) == 4 and result.length <= 3:
@@ -154,7 +156,7 @@ def validate_case(rows, scorer, mode, width, k, depth, device, require_cross_ran
         return world.checked("independent validation", inspect)
 
 
-def validate_distribution(device):
+def validate_distribution(device, engine="auto"):
     """Exercise every rank as a parent source, value owner and frontier recipient."""
     world_size = dist.get_world_size() if dist.is_initialized() else 1
     n = 6
@@ -164,7 +166,7 @@ def validate_distribution(device):
         raise ValueError("this small all-rank fixture covers up to 17 workers")
     scorer = WireFixture(29)
     result = search_cnot(pack_rows(rows, device=device), scorer, width=width, shortlist=k,
-                         max_depth=3, audit=True)
+                         max_depth=3, audit=True, engine=engine)
     with World(device) as world:
         def inspect():
             if world.rank:
@@ -176,7 +178,7 @@ def validate_distribution(device):
                     "a rank did not expand parents, score distinct candidates or retain winners")
             require(layers[1]["retained"] == width and layers[1]["distinct"] > width, "unsaturated frontier")
             return dict(n=n, width=width, shortlist=k, mode="qhat", world=world.size,
-                        scorer=type(scorer).__name__, status=result.status, layers=layers)
+                        scorer=type(scorer).__name__, engine=engine, status=result.status, layers=layers)
         return world.checked("all-rank validation", inspect)
 
 
@@ -188,8 +190,18 @@ def main():
     parser.add_argument("--width", type=int)
     parser.add_argument("--library")
     parser.add_argument("--manifest")
+    parser.add_argument("--engine", choices=("auto", "python", "rust"), default="auto",
+                        help="select the search controller; rust fails closed when unavailable")
+    parser.add_argument("--require-rust-scorer", action="store_true",
+                        help="require the Rust-owned checkpoint scorer and Rust controller")
     parser.add_argument("--output", required=True, type=Path)
     args = parser.parse_args()
+    if args.require_rust_scorer:
+        if args.case not in ("trained", "trained-deep"):
+            parser.error("--require-rust-scorer requires a trained checkpoint case")
+        if args.engine == "python":
+            parser.error("--require-rust-scorer cannot be combined with --engine python")
+        args.engine = "rust"
     device = initialize_world(args.backend)
     world = World(device)
     try:
@@ -204,8 +216,16 @@ def main():
         else:
             context = nullcontext()
         with context as scorer:
-            output = (validate_distribution(device) if args.case == "topology" else
-                      validate_case(rows, scorer, args.mode, width, k, 3, device, args.case == "wide"))
+            if args.require_rust_scorer:
+                def require_native_scorer():
+                    from multigpubeamsearch.cnot_scorer import _rust_tqp_scorer
+                    native_type = _rust_tqp_scorer()
+                    require(native_type is not None and type(scorer) is native_type,
+                            "Rust-owned checkpoint scorer is required")
+                world.checked("verify Rust-owned checkpoint scorer", require_native_scorer)
+            output = (validate_distribution(device, args.engine) if args.case == "topology" else
+                      validate_case(rows, scorer, args.mode, width, k, 3, device,
+                                    args.case == "wide", engine=args.engine))
             if args.case == "trained-deep" and world.size == 2:
                 def check_participation():
                     if world.rank == 0:
