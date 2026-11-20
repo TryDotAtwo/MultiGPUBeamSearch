@@ -5,7 +5,7 @@
 - Repository: `TryDotAtwo/MultiGPUBeamSearch`
 - Branch commit: `59f52f7b9686e9d8bfc53e820f5fad3bf95058fb`
 - Main commit before integration: `dbafbd62480aa044f025e764e04967682d3e25c9`
-- Final main commit will be recorded after its hosted rerun.
+- Main commit: `7f48cea985fad82176411d1731eb7d4d741bced7`.
 
 ## Change
 
@@ -37,3 +37,21 @@ remain unchanged.
 This is hosted CPU/Gloo and build evidence. Physical CUDA/NCCL behavior,
 checkpoint inference, and physical 1-/2-GPU search were not run. No Vast
 instance was started or rented for this change.
+
+
+## Main commit verification
+
+- [CNOT CPU run 44753288626](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44753288626)
+  passed Rust CNOT checks, PyO3 build, 300 Python tests (2 skipped), and NCCL
+  probe syntax. Artifact [14635354179](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44753288626/artifacts/14635354179),
+  SHA-256 `ad6f1a99d901646fb5e1be98c52bfdaedbdd223ee6b7b24e9b8364d1fdb05844`.
+- [Installed wheel run 44753288676](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44753288676)
+  built/installed the PEP 517 wheel, passed `pip check`, and verified public
+  package exports and the `resident-search-v1` worker protocol. Artifact
+  [14636965521](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44753288676/artifacts/14636965521),
+  SHA-256 `ce53ecc010af096c80fdde650488d602eb729de792f050c0d36e7698b46ecdc9`.
+- [Read-only Vast check 44753288462](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44753288462)
+  found instance 61080396 exited and skipped GPU work. No start, stop, or rent
+  request was made. Artifact [14635019938](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44753288462/artifacts/14635019938),
+  SHA-256 `148f76a3806e2bd0943e825ea9c6a740f4c87ffbcd2a26d5476d553e442fde68`.
+- Physical CUDA/NCCL and 1-/2-GPU execution remain unverified.

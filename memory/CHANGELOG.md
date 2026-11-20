@@ -22,7 +22,24 @@
   passed Rust CNOT checks, PyO3 build, 300 Python tests (2 skipped), and NCCL
   probe syntax. Artifact [14636575322](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44751923980/artifacts/14636575322),
   SHA-256 `d69aa55acf31b468732a5ce30dfb0318ddab15d9bb07eda06e21922e70fc3f19`.
-- Physical CUDA/NCCL and 1-/2-GPU execution remain unverified. Full receipt:
+- Physical CUDA/NCCL and 1-/2-GPU execution remain unverified. - Main commit `7f48cea985fad82176411d1731eb7d4d741bced7` passed again:
+  [CNOT CPU run 44753288626](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44753288626)
+  passed Rust checks, PyO3 build, 300 Python tests (2 skipped), and NCCL probe
+  syntax. Artifact [14635354179](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44753288626/artifacts/14635354179),
+  SHA-256 `ad6f1a99d901646fb5e1be98c52bfdaedbdd223ee6b7b24e9b8364d1fdb05844`.
+- The same main commit passed the installed PEP 517 wheel check:
+  [run 44753288676](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44753288676)
+  built and installed the wheel outside the source tree, passed `pip check`,
+  and verified public exports plus `resident-search-v1`. Artifact
+  [14636965521](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44753288676/artifacts/14636965521),
+  SHA-256 `ce53ecc010af096c80fdde650488d602eb729de792f050c0d36e7698b46ecdc9`.
+- Existing-Vast status run
+  [44753288462](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44753288462)
+  confirmed instance 61080396 is exited and skipped CUDA/NCCL execution; it made
+  no start, stop, or rent request. Artifact
+  [14635019938](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44753288462/artifacts/14635019938),
+  SHA-256 `148f76a3806e2bd0943e825ea9c6a740f4c87ffbcd2a26d5476d553e442fde68`.
+- Full receipt:
   `test_results/refactor_20261120/cnot-setup-gloo/GITHUB_STATUS.md`.
 
 ## 2026-11-20 - Align Rust CNOT stages with the Gloo checked-control ABI
