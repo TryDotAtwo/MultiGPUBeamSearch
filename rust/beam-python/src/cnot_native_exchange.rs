@@ -24,7 +24,6 @@ fn checked_local<'py, T>(
     result
 }
 
-
 #[pyfunction]
 fn run_cnot_native_sum<'py>(
     py: Python<'py>,
@@ -182,7 +181,6 @@ fn run_cnot_native_gather_rows<'py>(
     }
     Ok(result)
 }
-
 
 pub(crate) fn exchange<'py>(
     py: Python<'py>,

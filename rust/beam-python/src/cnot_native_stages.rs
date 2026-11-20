@@ -466,7 +466,6 @@ impl Backend for NativeStages<'_> {
         Ok(())
     }
 
-
     fn redistribute(&mut self, depth: u64) -> PyResult<Round<Self::Layer, Self::Records>> {
         let ranks = required(&self.ranks, "ranks")?;
         let local = required(&self.local, "local")?;

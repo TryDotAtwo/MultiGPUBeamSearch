@@ -96,18 +96,17 @@ impl Backend for NativeSelection<'_> {
         let local = self.checked(
             "prepare CNOT selection count",
             (|| -> PyResult<Bound<'py, PyAny>> {
-                let local = i64::try_from(self.values.len()?)
-                    .map_err(|_| PyValueError::new_err("CNOT selection local count exceeds int64"))?;
+                let local = i64::try_from(self.values.len()?).map_err(|_| {
+                    PyValueError::new_err("CNOT selection local count exceeds int64")
+                })?;
                 self.world.call_method1("longs", (vec![local],))
             })(),
         )?;
         let global = self.world.call_method1("sum", (local,));
         let global = self.checked("sum CNOT selection counts", global)?;
         let count_value = self.checked("read CNOT selection count", global.call_method0("item"))?;
-        let count = self.checked_local(
-            "decode CNOT selection count",
-            count_value.extract::<u64>(),
-        )?;
+        let count =
+            self.checked_local("decode CNOT selection count", count_value.extract::<u64>())?;
 
         let prepared = (|| -> PyResult<()> {
             self.selection_ops = None;
@@ -152,7 +151,8 @@ impl Backend for NativeSelection<'_> {
                 let negative = bits.call_method1("__lt__", (0,))?;
                 let complement = bits.call_method0("__invert__")?;
                 let flipped = bits.call_method1("__xor__", (i64::MIN,))?;
-                self.score_keys = Some(torch.call_method1("where", (negative, complement, flipped))?);
+                self.score_keys =
+                    Some(torch.call_method1("where", (negative, complement, flipped))?);
                 self.boundary = Some(boundary);
             }
             self.bits = Some(bits);
@@ -209,9 +209,9 @@ impl Backend for NativeSelection<'_> {
 
         let updated = (|| -> PyResult<(u64, u64)> {
             if native {
-                let ops = ops
-                    .as_ref()
-                    .ok_or_else(|| PyRuntimeError::new_err("CNOT selection operators unavailable"))?;
+                let ops = ops.as_ref().ok_or_else(|| {
+                    PyRuntimeError::new_err("CNOT selection operators unavailable")
+                })?;
                 return ops
                     .call_method1(
                         "radix_update",
@@ -247,7 +247,6 @@ impl Backend for NativeSelection<'_> {
         self.checked_local("update CNOT selection boundary", updated)
     }
 
-
     fn accept_boundary(&mut self) -> PyResult<()> {
         let accepted = (|| -> PyResult<()> {
             required(&self.selected, "selected mask")?
@@ -256,7 +255,6 @@ impl Backend for NativeSelection<'_> {
         })();
         self.checked_local("accept CNOT selection boundary", accepted)
     }
-
 
     fn finish(&mut self, count: u64, width: u64) -> PyResult<Self::Output> {
         let records = (|| -> PyResult<Bound<'py, PyAny>> {
@@ -334,7 +332,6 @@ impl Backend for NativeSelection<'_> {
         let output = self.checked("select CNOT frontier", output)?;
         Ok(output.unbind())
     }
-
 
     fn invalid(&self, message: &'static str) -> PyErr {
         PyRuntimeError::new_err(message)
