@@ -195,6 +195,10 @@ rank processes after their ABI/layout and specialization checks.
   KeyboardInterrupt is propagated. Normal probe cleanup must not cancel its parent
   before the verified result can be published.
 
+## Permutation runner input files
+
+beam-runtime must materialize legacy permutation runner input files from the validated Rust graph contract before worker launch. Preserve puzzle_info.json schema and spacing, m0..mN insertion order, trailing newline, and the one-row test.csv format exactly. PyO3 must rebuild and validate the normalized graph request before writing. Older extensions and legacy Python contract objects retain the previous Python writer. This boundary change must not alter search stages, multi-GPU rank/collective behavior, inference arithmetic, or CNOT semantics.
+
 ## Performance and switching
 
 Downstream component timings only nominate profiles. Keep raw all-rank receipts,
