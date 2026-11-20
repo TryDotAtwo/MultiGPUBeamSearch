@@ -195,34 +195,28 @@ def test_world_exchange_preserves_python_fallback_for_older_extensions(monkeypat
     assert transport.calls[0][2].tolist() == [1, 2]
 
 
-def test_checked_stage_keeps_legacy_rust_abi_when_v2_is_not_universal(monkeypatch):
+def test_checked_stage_uses_gloo_fallback_when_only_legacy_abis_exist(monkeypatch):
     world = _two_rank_world()
-    calls = []
-    votes = iter((False, True))
     expected = object()
+    calls = []
 
-    def support(local):
-        calls.append(("support", world, local))
-        return next(votes)
+    def legacy_checker(*_args):
+        calls.append("legacy")
+        pytest.fail("old checked ABIs may use the search transport")
 
-    def run_native_checked(actual_world, stage, callback):
-        calls.append(("legacy", actual_world, stage))
-        return callback()
-
-    monkeypatch.setattr(world, "all_ranks_support", support)
     monkeypatch.setattr(
-        rust_control, "extension",
-        lambda: SimpleNamespace(run_cnot_native_checked=run_native_checked),
+        rust_control,
+        "extension",
+        lambda: SimpleNamespace(
+            run_cnot_native_checked=legacy_checker,
+            run_cnot_native_checked_v2=legacy_checker,
+        ),
     )
 
     assert world.checked("prepare CNOT stage", lambda: expected) is expected
-    assert calls == [
-        ("support", world, False),
-        ("support", world, True),
-        ("legacy", world, "prepare CNOT stage"),
-    ]
+    assert calls == []
 
-def test_checked_stage_uses_v2_only_after_rank_support_vote(monkeypatch):
+def test_checked_stage_uses_control_abi_only_after_rank_support_vote(monkeypatch):
     world = _two_rank_world()
     calls = []
     expected = object()
@@ -231,14 +225,15 @@ def test_checked_stage_uses_v2_only_after_rank_support_vote(monkeypatch):
         calls.append(("support", world, local))
         return local
 
-    def run_native_checked_v2(actual_world, stage, callback):
-        calls.append(("v2", actual_world, stage))
+    def run_native_control(actual_world, stage, callback):
+        calls.append(("control", actual_world, stage))
         return callback()
 
     monkeypatch.setattr(world, "all_ranks_support", support)
     monkeypatch.setattr(
-        rust_control, "extension",
-        lambda: SimpleNamespace(run_cnot_native_checked_v2=run_native_checked_v2),
+        rust_control,
+        "extension",
+        lambda: SimpleNamespace(run_cnot_native_checked_control=run_native_control),
     )
 
     assert world.checked("prepare CNOT stage", lambda: expected) is expected
@@ -246,8 +241,8 @@ def test_checked_stage_uses_v2_only_after_rank_support_vote(monkeypatch):
     assert world.checked("expand CNOT stage", lambda: second) is second
     assert calls == [
         ("support", world, True),
-        ("v2", world, "prepare CNOT stage"),
-        ("v2", world, "expand CNOT stage"),
+        ("control", world, "prepare CNOT stage"),
+        ("control", world, "expand CNOT stage"),
     ]
 
 def test_checked_stage_keeps_python_fallback_for_older_extensions(monkeypatch):
@@ -668,33 +663,32 @@ def test_rust_checked_stage_gathers_error_messages_without_object_collective(mon
     remote_message = b"rank 1: RuntimeError: remote failure"
     gathered = []
 
-    monkeypatch.setattr(
-        world,
-        "all_ranks_support",
-        lambda supported: supported,
-    )
-    monkeypatch.setattr(
-        world,
-        "longs",
-        lambda values: torch.tensor(values, dtype=torch.int64),
-    )
-    monkeypatch.setattr(world, "sum", lambda tensor: torch.tensor([1], dtype=torch.int64))
+    monkeypatch.setattr(world, "all_ranks_support", lambda supported: supported)
 
-    def gather_fixed(tensor):
+    def control_gather(tensor):
+        assert tensor.device.type == "cpu"
         gathered.append(tensor)
         if len(gathered) == 1:
+            return torch.tensor([[1], [0]], dtype=torch.int64)
+        if len(gathered) == 2:
             return torch.tensor(
                 [[len(local_message)], [len(remote_message)]],
                 dtype=torch.int64,
             )
-        if len(gathered) == 2:
+        if len(gathered) == 3:
             assert tensor.numel() == max(len(local_message), len(remote_message))
             local = tensor.tolist()
             remote = list(remote_message) + [0] * (tensor.numel() - len(remote_message))
             return torch.tensor([local, remote], dtype=torch.int64)
-        raise AssertionError("unexpected fixed gather")
+        raise AssertionError("unexpected control gather")
 
-    monkeypatch.setattr(world, "gather_fixed", gather_fixed)
+    def fail_data_plane(*_args, **_kwargs):
+        pytest.fail("checked error handling must not use the search transport")
+
+    monkeypatch.setattr(world, "_control_gather", control_gather)
+    monkeypatch.setattr(world, "longs", fail_data_plane)
+    monkeypatch.setattr(world, "sum", fail_data_plane)
+    monkeypatch.setattr(world, "gather_fixed", fail_data_plane)
     monkeypatch.setattr(
         dist,
         "all_gather_object",
@@ -711,22 +705,38 @@ def test_rust_checked_stage_gathers_error_messages_without_object_collective(mon
         "build CNOT stage failed: rank 0: ValueError: local failure | "
         "rank 1: RuntimeError: remote failure"
     )
-    assert len(gathered) == 2
+    assert len(gathered) == 3
 
 def test_rust_checked_stage_coordinates_keyboard_interrupt(monkeypatch):
     world = _two_rank_world()
-    monkeypatch.setattr(world, "all_ranks_support", lambda supported: supported)
-    monkeypatch.setattr(world, "longs", lambda values: torch.tensor(values, dtype=torch.int64))
-    monkeypatch.setattr(world, "sum", lambda tensor: torch.tensor([1], dtype=torch.int64))
-    gathered = []
+    local_message = b"rank 0: KeyboardInterrupt: cancel requested"
+    gathers = []
 
-    def gather_fixed(tensor):
-        gathered.append(tensor)
-        if len(gathered) == 1:
-            return torch.tensor([[tensor.item()], [0]], dtype=torch.int64)
-        return torch.stack((tensor, torch.zeros_like(tensor)))
+    def control_gather(tensor):
+        assert tensor.device.type == "cpu"
+        gathers.append(tensor)
+        if len(gathers) == 1:
+            return torch.tensor([[1], [0]], dtype=torch.int64)
+        if len(gathers) == 2:
+            return torch.tensor([[len(local_message)], [0]], dtype=torch.int64)
+        if len(gathers) == 3:
+            local = list(local_message)
+            return torch.tensor([local, [0] * len(local)], dtype=torch.int64)
+        raise AssertionError("unexpected control gather")
 
-    monkeypatch.setattr(world, "gather_fixed", gather_fixed)
+    monkeypatch.setattr(world, "_control_gather", control_gather)
+    monkeypatch.setattr(
+        world, "longs",
+        lambda *_args: pytest.fail("checked errors must not use device tensors"),
+    )
+    monkeypatch.setattr(
+        world, "sum",
+        lambda *_args: pytest.fail("checked errors must not use the search transport"),
+    )
+    monkeypatch.setattr(
+        world, "gather_fixed",
+        lambda *_args: pytest.fail("checked errors must not use the search transport"),
+    )
     checker = rust_control.extension().run_cnot_native_checked_v2
 
     def interrupted_stage():
@@ -734,8 +744,7 @@ def test_rust_checked_stage_coordinates_keyboard_interrupt(monkeypatch):
 
     with pytest.raises(RuntimeError, match="KeyboardInterrupt: cancel requested"):
         checker(world, "CNOT checkpoint stage", interrupted_stage)
-    assert len(gathered) == 2
-
+    assert len(gathers) == 3
 
 def test_rust_goal_failure_gathers_diagnostics_as_fixed_tensors(monkeypatch):
     from multigpubeamsearch import _beam_runtime
@@ -1162,3 +1171,129 @@ def test_two_rank_gloo_reports_rank_local_receive_allocation_failure(tmp_path):
             if process.is_alive():
                 process.terminate()
             process.join(timeout=2)
+
+
+def test_world_checked_python_fallback_uses_gloo_for_failure_vote(monkeypatch):
+    world = _two_rank_world()
+    control_group = world._control_group
+    def legacy_checker(*_args):
+        pytest.fail("old checked ABIs may use the search transport")
+
+    world._native_extension = SimpleNamespace(
+        run_cnot_native_checked=legacy_checker,
+        run_cnot_native_checked_v2=legacy_checker,
+    )
+    remote_error = "rank 1: RuntimeError: remote failure"
+
+    def fail_data_plane(*_args, **_kwargs):
+        pytest.fail("checked error handling must not use the search transport")
+
+    monkeypatch.setattr(world, "longs", fail_data_plane)
+    monkeypatch.setattr(world, "sum", fail_data_plane)
+    object_calls = []
+
+    def gather_objects(output, local_error, group=None):
+        object_calls.append((local_error, group))
+        output[:] = [local_error, remote_error]
+
+    monkeypatch.setattr(dist, "all_gather_object", gather_objects)
+
+    def fail_local_stage():
+        raise ValueError("local failure")
+
+    with pytest.raises(RuntimeError) as exc_info:
+        world.checked("prepare CNOT stage", fail_local_stage)
+
+    assert str(exc_info.value) == (
+        "prepare CNOT stage failed: rank 0: ValueError: local failure | "
+        "rank 1: RuntimeError: remote failure"
+    )
+    assert object_calls == [
+        ("rank 0: ValueError: local failure", control_group)
+    ]
+
+
+def test_rust_checked_v2_uses_gloo_for_error_vote_and_diagnostics(monkeypatch):
+    world = _two_rank_world()
+    local_message = b"rank 0: ValueError: local failure"
+    remote_message = b"rank 1: RuntimeError: remote failure"
+    gathers = []
+
+    def control_gather(tensor):
+        assert tensor.device.type == "cpu"
+        gathers.append(tensor.clone())
+        if len(gathers) == 1:
+            return torch.tensor([[1], [0]], dtype=torch.int64)
+        if len(gathers) == 2:
+            return torch.tensor(
+                [[len(local_message)], [len(remote_message)]], dtype=torch.int64
+            )
+        if len(gathers) == 3:
+            width = max(len(local_message), len(remote_message))
+            local = list(local_message) + [0] * (width - len(local_message))
+            remote = list(remote_message) + [0] * (width - len(remote_message))
+            return torch.tensor([local, remote], dtype=torch.int64)
+        raise AssertionError("unexpected control gather")
+
+    def fail_data_plane(*_args, **_kwargs):
+        pytest.fail("checked error handling must not use the search transport")
+
+    monkeypatch.setattr(world, "_control_gather", control_gather)
+    monkeypatch.setattr(world, "control_longs", lambda values: torch.tensor(
+        values, dtype=torch.int64, device="cpu"
+    ), raising=False)
+    monkeypatch.setattr(world, "longs", fail_data_plane)
+    monkeypatch.setattr(world, "sum", fail_data_plane)
+    monkeypatch.setattr(world, "gather_fixed", fail_data_plane)
+
+    def fail_local_stage():
+        raise ValueError("local failure")
+
+    with pytest.raises(RuntimeError) as exc_info:
+        rust_control.extension().run_cnot_native_checked_control(
+            world, "build CNOT stage", fail_local_stage
+        )
+
+    assert str(exc_info.value) == (
+        "build CNOT stage failed: rank 0: ValueError: local failure | "
+        "rank 1: RuntimeError: remote failure"
+    )
+    assert len(gathers) == 3
+
+
+def test_rust_checked_v1_gathers_compatibility_diagnostics_on_gloo(monkeypatch):
+    world = _two_rank_world()
+    control_group = world._control_group
+    remote_error = "rank 1: RuntimeError: remote failure"
+    calls = []
+
+    def control_gather(tensor):
+        assert tensor.device.type == "cpu"
+        calls.append("vote")
+        return torch.tensor([[1], [0]], dtype=torch.int64)
+
+    def gather_objects(output, local_error, group=None):
+        calls.append((local_error, group))
+        output[:] = [local_error, remote_error]
+
+    def fail_data_plane(*_args, **_kwargs):
+        pytest.fail("checked error handling must not use the search transport")
+
+    monkeypatch.setattr(world, "_control_gather", control_gather)
+    monkeypatch.setattr(world, "longs", fail_data_plane)
+    monkeypatch.setattr(world, "sum", fail_data_plane)
+    monkeypatch.setattr(world, "gather_fixed", fail_data_plane)
+    monkeypatch.setattr(dist, "all_gather_object", gather_objects)
+
+    def fail_local_stage():
+        raise ValueError("local failure")
+
+    with pytest.raises(RuntimeError, match="rank 1: RuntimeError: remote failure"):
+        rust_control.extension().run_cnot_native_checked(
+            world, "legacy CNOT stage", fail_local_stage
+        )
+
+    assert calls == [
+        "vote",
+        ("rank 0: ValueError: local failure", control_group),
+    ]

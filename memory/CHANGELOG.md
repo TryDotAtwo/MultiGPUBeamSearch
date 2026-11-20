@@ -1,3 +1,10 @@
+## 2026-11-20 - Align Rust CNOT stages with the Gloo checked-control ABI
+
+- The Rust compatibility dispatcher now recognizes the new checked-control capability, so typed CNOT initialize, expand, and deduplicate/score stages no longer fall back because they still looked for the old v2 marker. The top-level two-rank controller test now asserts a Gloo failure vote rather than the former payload-world vote.
+- RED: [Actions run 44744338479](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44744338479) exposed 12 compatibility failures. [Run 44745437675](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44745437675) reduced these to one stale event-order expectation.
+- GREEN: [Actions run 44746148112](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44746148112) passed Rust CNOT checks, the PyO3 build, the CNOT CPU compatibility suite (297 passed, 2 skipped, 104 warnings), and NCCL probe syntax. Artifact [14632339297](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44746148112/artifacts/14632339297), SHA-256 `db25f1da847170b2bf06d64736966023bbb2fff28a3e39bce14e60ae8ee11f26`.
+- This is hosted CPU/Gloo and build evidence only. Physical CUDA/NCCL execution and rank-wide runtime recovery remain unverified. Details: `test_results/refactor_20261120/cnot-checked-gloo-control/GITHUB_STATUS.md`.
+
 ## 2026-11-20 - Coordinate Rust session identity and CNOT exchange failures
 
 - AutoMax remains a distinct requested preparation value while resolved session identity stores the numeric width. Older PyO3 extensions keep the Python-owned preparation cache.

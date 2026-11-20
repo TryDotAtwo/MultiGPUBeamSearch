@@ -317,7 +317,7 @@ impl Backend for PyStages<'_> {
                 && self.stages.hasattr("root")?
             {
                 let world = self.stages.getattr("world")?;
-                if world.hasattr("_checked_error_gather_v2")?
+                if world.hasattr("_checked_error_gather_control")?
                     && world.hasattr("all_ranks_support")?
                 {
                     let rank: u32 = world.getattr("rank")?.extract()?;
@@ -409,7 +409,7 @@ impl Backend for PyStages<'_> {
                 && self.stages.hasattr("mode")?
             {
                 let world = self.stages.getattr("world")?;
-                if world.hasattr("_checked_error_gather_v2")?
+                if world.hasattr("_checked_error_gather_control")?
                     && world.hasattr("all_ranks_support")?
                 {
                     let expansion = crate::cnot_native_checked::checked_compat(
@@ -470,7 +470,7 @@ impl Backend for PyStages<'_> {
                 && self.stages.hasattr("words")?
             {
                 let world = self.stages.getattr("world")?;
-                if world.hasattr("_checked_error_gather_v2")?
+                if world.hasattr("_checked_error_gather_control")?
                     && world.hasattr("all_ranks_support")?
                 {
                     let result = crate::cnot_native_checked::checked_compat(

@@ -354,7 +354,7 @@ def search_cnot(root, scorer, *, width, shortlist, max_depth, mode="qhat", audit
             "resolve CNOT search controller", _native_search_runner
         )
         common_search = world.supports_native("run_cnot_native_search")
-        common_checker = world.supports_native("run_cnot_native_checked_v2")
+        common_checker = world.supports_native("run_cnot_native_checked_control")
         if callable(native_runner) and common_search and common_checker:
             options = (width, shortlist, max_depth, mode, audit, validation, engine)
             callbacks = (_input, native.cnot_identity, _native_stages_runner,

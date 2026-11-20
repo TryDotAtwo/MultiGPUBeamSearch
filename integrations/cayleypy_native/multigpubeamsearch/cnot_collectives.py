@@ -22,8 +22,7 @@ class World:
         self._owns_control_group = False
         self._native_extension = _UNSET
         self._native_support_cache = {}
-        self._checked_error_gather_v2 = None
-        self._checked_error_gather_v1 = None
+        self._checked_error_gather_control = None
         if self.size > 65536:
             raise ValueError("CNOT physical routes support at most 65536 world ranks")
 
@@ -99,7 +98,7 @@ class World:
 
     def all_ranks_support(self, local_support):
         """Vote over the stable CPU control group, independent of optional Rust ABIs."""
-        vote = torch.tensor([int(bool(local_support))], dtype=torch.int64)
+        vote = self.control_longs([int(bool(local_support))])
         gathered = self._control_gather(vote)
         return gathered.sum().item() == self.size
 
@@ -107,7 +106,7 @@ class World:
         """OR rank-local failure flags over the CPU Gloo control group."""
         if self.size == 1:
             return bool(local_failed)
-        vote = torch.tensor([int(bool(local_failed))], dtype=torch.int64)
+        vote = self.control_longs([int(bool(local_failed))])
         return bool(self._control_gather(vote).sum().item())
 
     def require_consensus(self, digest):
@@ -125,9 +124,7 @@ class World:
         """Compare requested CNOT engine settings on the CPU Gloo control group."""
         if self.size == 1:
             return
-        identities = self._control_gather(
-            torch.tensor(list(digest), dtype=torch.int64)
-        )
+        identities = self._control_gather(self.control_longs(list(digest)))
         if not (identities == identities[0]).all().item():
             raise ValueError("CNOT search engine settings differ between ranks")
 
@@ -149,6 +146,10 @@ class World:
 
     def longs(self, items):
         return torch.as_tensor(items, dtype=torch.int64, device=self.device)
+
+    def control_longs(self, items):
+        """Build int64 control metadata explicitly on host memory."""
+        return torch.as_tensor(items, dtype=torch.int64, device="cpu")
 
     def _control_gather(self, tensor):
         if self.size == 1:
@@ -195,33 +196,25 @@ class World:
         return tensor
 
     def checked(self, stage, fn):
-        """Coordinate local failures and negotiate the same checked-stage ABI."""
+        """Coordinate failures through the Gloo control ABI or the Python fallback."""
         if self.size == 1:
             return fn()
 
         native = self._extension()
-        checker_v2 = getattr(native, "run_cnot_native_checked_v2", None)
-        legacy_checker = getattr(native, "run_cnot_native_checked", None)
+        checker = getattr(native, "run_cnot_native_checked_control", None)
+        if self._checked_error_gather_control is None:
+            supported = self.supports_native("run_cnot_native_checked_control")
+            self._checked_error_gather_control = checker if supported else False
+        if callable(self._checked_error_gather_control):
+            return self._checked_error_gather_control(self, stage, fn)
 
-        if self._checked_error_gather_v2 is None:
-            supported = self.supports_native("run_cnot_native_checked_v2")
-            self._checked_error_gather_v2 = checker_v2 if supported else False
-        if callable(self._checked_error_gather_v2):
-            return self._checked_error_gather_v2(self, stage, fn)
-
-        if self._checked_error_gather_v1 is None:
-            supported = self.supports_native("run_cnot_native_checked")
-            self._checked_error_gather_v1 = legacy_checker if supported else False
-        if callable(self._checked_error_gather_v1):
-            return self._checked_error_gather_v1(self, stage, fn)
-
-        # Compatibility path for older PyO3 modules without either checked ABI.
+        # Do not invoke older checked ABIs: they may vote on the active GPU transport.
         result, error = None, None
         try:
             result = fn()
         except BaseException as exc:
             error = f"rank {self.rank}: {type(exc).__name__}: {exc}"
-        if self.sum(self.longs([int(error is not None)])).item():
+        if self.any_rank_failed(error is not None):
             errors = [None] * self.size
             dist.all_gather_object(errors, error, group=self._control_group)
             raise RuntimeError(f"{stage} failed: " + " | ".join(e for e in errors if e))

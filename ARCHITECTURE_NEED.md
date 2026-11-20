@@ -1,5 +1,23 @@
 # Конфиг
 
+## CNOT checked errors use the Gloo control group, 2026-11-20
+
+For multi-rank CNOT, the new optional PyO3 capability
+run_cnot_native_checked_control coordinates failure votes and diagnostics
+over the CPU Gloo control group. The capability is agreed by every rank before
+use. Older extensions without it use the Python checked fallback, which follows
+the same Gloo protocol; their legacy checked callbacks are not called for error
+coordination.
+
+The Rust v1 compatibility checker gathers diagnostic objects on the Gloo
+group. The v2 and control ABIs gather fixed-size UTF-8 byte tensors on Gloo.
+All control tensors are explicitly CPU-resident. Rank order and error text stay
+unchanged. The one-rank path still raises the original exception. Search stages,
+NCCL payload exchange, owner mapping, scorer calls, search order, and numerical
+policy are unchanged. CPU/Gloo and PyO3 checks do not establish physical
+CUDA/NCCL failure recovery.
+
+
 ## Rust session identity для beam_width="max", 2026-11-20
 
 Запрошенное значение ширины и разрешённая ширина — разные поля контракта.

@@ -314,6 +314,10 @@ def test_rust_top_level_controller_preserves_compatibility_stage_fallback():
             events.append(("sum", tensor.tolist()))
             return tensor.sum()
 
+        def any_rank_failed(self, local_failed):
+            events.append(("gloo-any-rank-failed", bool(local_failed)))
+            return bool(local_failed)
+
         _stream5_library = None
 
     world = World()
@@ -360,8 +364,7 @@ def test_rust_top_level_controller_preserves_compatibility_stage_fallback():
     digest_values = list(expected_digest.digest())
     assert events == [
         ("prepare-input", caller_root, 7, 12, 8, "proposal", "python"),
-        ("longs", [0]),
-        ("sum", [0]),
+        ("gloo-any-rank-failed", False),
         ("longs", digest_values),
         ("gather-fixed", digest_values),
         ("identity", 4, "cpu"),
