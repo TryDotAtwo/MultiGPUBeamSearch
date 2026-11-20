@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+import tempfile
 
 import cayleypy_native as compatibility
 import multigpubeamsearch as package
