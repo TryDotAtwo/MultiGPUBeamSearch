@@ -512,8 +512,14 @@ def test_rust_resident_cancel_handles_missing_extension_method():
 
 def test_compiled_rust_preparation_identity_builder_accepts_auto_max():
     from multigpubeamsearch import rust_control
+    from multigpubeamsearch.errors import NativeUnavailable
 
-    runtime = rust_control.extension()
+    try:
+        runtime = rust_control.extension()
+    except NativeUnavailable as error:
+        if "not installed" in str(error):
+            pytest.skip("Rust extension is not built in this CPU-only job")
+        raise
     assert runtime.PREPARATION_IDENTITY_AUTO_MAX_VERSION == 1
     identity = rust_control.build_preparation_identity(
         graph_hash="a" * 64,

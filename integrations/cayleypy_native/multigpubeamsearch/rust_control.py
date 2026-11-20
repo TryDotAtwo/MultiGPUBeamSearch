@@ -78,9 +78,8 @@ def build_preparation_identity(*, graph_hash, geometry, center, generators,
                           else json.dumps(runtime_build, sort_keys=True))
     try:
         if type(beam_width) is str and beam_width == 'max':
-            if type(getattr(native, 'PREPARATION_IDENTITY_AUTO_MAX_VERSION', 0)) is not int:
-                return None
-            if native.PREPARATION_IDENTITY_AUTO_MAX_VERSION < 1:
+            version = getattr(native, 'PREPARATION_IDENTITY_AUTO_MAX_VERSION', 0)
+            if type(version) is not int or version < 1:
                 return None
             native_beam_width = beam_width
         else:
