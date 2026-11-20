@@ -102,16 +102,27 @@ def run_layout(graph, contract, model, source_dir, cache_dir, devices, exact_dis
             if result.path_found is not True:
                 raise AssertionError(f"Rust permutation search did not solve on devices {devices}")
             path = resolve_move_path(graph, result.path)
-            if not contract.replay(path):
+            replayed = tuple(contract.start)
+            for move_index in path:
+                replayed = move(replayed, contract.generators[move_index])
+            if replayed != tuple(contract.center):
                 raise AssertionError("public result path failed independent permutation replay")
             if len(path) != exact_distance:
                 raise AssertionError(
                     f"expected exact distance {exact_distance}, received {len(path)}"
                 )
+            metadata_devices = tuple(result.native_metadata.get("devices", ()))
+            if metadata_devices != tuple(devices):
+                raise AssertionError(
+                    f"result reports devices {metadata_devices}, requested {tuple(devices)}"
+                )
             workers = getattr(session, "_workers", None)
             pids = tuple(workers.pids) if workers is not None else ()
-            if not pids:
-                raise AssertionError("Rust session did not retain rank worker processes")
+            if len(pids) != len(devices) or len(set(pids)) != len(pids):
+                raise AssertionError(
+                    f"expected one distinct Rust rank worker per device: "
+                    f"devices={tuple(devices)}, pids={pids}"
+                )
             if worker_pids is None:
                 worker_pids = pids
             elif worker_pids != pids:
@@ -124,11 +135,13 @@ def run_layout(graph, contract, model, source_dir, cache_dir, devices, exact_dis
                     "replay_valid": True,
                     "backend": result.native_metadata.get("backend"),
                     "inference_backend": result.native_metadata.get("inference_backend"),
+                    "devices": list(metadata_devices),
                     "elapsed_seconds": result.native_metadata.get("elapsed_seconds"),
                 }
             )
         return {
-            "world_size": len(devices),
+            "world_size": len(worker_pids),
+            "requested_devices": list(devices),
             "devices": list(devices),
             "gpu_names": [torch.cuda.get_device_name(device) for device in devices],
             "engine": "rust",
