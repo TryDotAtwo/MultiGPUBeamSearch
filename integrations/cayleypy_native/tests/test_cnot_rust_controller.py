@@ -1056,6 +1056,62 @@ def test_rust_cpu_search_assigns_owners_without_python_tensor_helper(monkeypatch
     assert asdict(result) == asdict(reference)
 
 
+def distributed_cnot_selection_histogram_failure(rank, rendezvous):
+    torch.set_num_threads(1)
+    dist.init_process_group(
+        "gloo",
+        init_method=rendezvous,
+        rank=rank,
+        world_size=2,
+        timeout=timedelta(seconds=15),
+    )
+    original_bincount = torch.bincount
+    message = "fixture CNOT selection histogram failed on rank one"
+    try:
+        require_controller()
+        from multigpubeamsearch.cnot_collectives import World
+
+        selection = rust_control.extension().run_cnot_native_selection
+        values = torch.tensor([float(rank), float(rank + 2)], dtype=torch.float32)
+        word_keys = torch.tensor([rank * 2, rank * 2 + 1], dtype=torch.int64)
+        with World("cpu") as world:
+            if rank == 1:
+                def fail_selection_histogram(tensor, *args, **kwargs):
+                    if kwargs.get("minlength") == 256:
+                        raise RuntimeError(message)
+                    return original_bincount(tensor, *args, **kwargs)
+                torch.bincount = fail_selection_histogram
+
+            with pytest.raises(RuntimeError) as error:
+                selection(world, values, word_keys, 1)
+            expected = (
+                "prepare CNOT selection histogram failed: "
+                f"rank 1: RuntimeError: {message}"
+            )
+            assert str(error.value) == expected, (
+                f"selection failure returned {str(error.value)!r}; expected {expected!r}"
+            )
+
+            probe = torch.tensor([rank + 1], dtype=torch.int64)
+            dist.all_reduce(probe)
+            assert probe.item() == 3
+    finally:
+        torch.bincount = original_bincount
+        dist.destroy_process_group()
+
+
+@pytest.mark.skipif(not dist.is_gloo_available(), reason="two CPU ranks require Gloo")
+def test_two_gloo_ranks_coordinate_cnot_selection_histogram_failure_and_keep_world(
+        tmp_path):
+    require_controller()
+    rendezvous = (tmp_path / "cnot-selection-histogram").resolve().as_uri()
+    mp.spawn(
+        distributed_cnot_selection_histogram_failure,
+        args=(rendezvous,),
+        nprocs=2,
+    )
+
+
 def distributed_cnot_selection_failure_after_gather(rank, rendezvous):
     torch.set_num_threads(1)
     dist.init_process_group(
