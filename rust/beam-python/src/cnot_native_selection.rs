@@ -88,7 +88,7 @@ impl<'py> NativeSelection<'py> {
     }
 }
 
-impl Backend for NativeSelection<'_> {
+impl<'py> Backend for NativeSelection<'py> {
     type Error = PyErr;
     type Output = Py<PyAny>;
 
