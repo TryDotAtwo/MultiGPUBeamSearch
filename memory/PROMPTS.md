@@ -70,3 +70,5 @@ Keep an active goal until the migration and required verification are complete.
 2026-11-19: Иван попросил продолжать полный перенос beam search на Rust + CUDA/C++, включая CNOT, с сохранением multi-GPU и публичной Python-совместимости; пока переносим существующее поведение без оптимизаций.
 
 2026-11-19: Иван подтвердил запись уже имеющегося Vast API key в зашифрованный GitHub Actions secret `VAST_API_KEY`. Секрет передан через stdin; его значение не добавлялось в исходники и логи. Это разрешение не запускает оплачиваемые GPU-инстансы.
+
+2026-11-20: Иван ответил «Я разрешаю» на запрос об использовании существующего Vast API key в зашифрованном GitHub Actions secret VAST_API_KEY; значение не раскрывать.
