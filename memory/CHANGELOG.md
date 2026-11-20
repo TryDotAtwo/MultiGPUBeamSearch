@@ -2967,6 +2967,8 @@ Main commit `148b2a826a369b7601e904ea409e0cc5301c75c9` also passed the 260-test 
 
 - Included the repository-root `tests/` directory in the remote build archive because the full CMake project references those C++ test sources during configuration.
 - The acceptance environment now force-reinstalls the wheel built for the tested commit and verifies that `multigpubeamsearch` imports from that run's virtual environment.
-- Hosted source validation passed in [Actions run 44829728978](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44829728978); artifact [14674899394](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44829728978/artifacts/14674899394), SHA-256 `06f2ae40ae37b6224378dce805c1e527bab3d65533fca4f6f3efc09d73249b1a`.
+- Kept the authenticated SSH control-master connection open until remote `test_results/` retrieval, even though the one-time key is revoked by the remote exit trap. Hosted fake-SSH tests cover both successful runs and failed runs with partial-result collection.
+- The permutation fixture independently replays moves and checks the reported device layout against the count of distinct Rust rank-worker processes; recorded world size now reflects those observed workers.
+- Hosted source validation passed in [Actions run 44831036050](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44831036050); artifact [14675264978](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44831036050/artifacts/14675264978), SHA-256 `66fb835caa5cc9e1a897bb97777c18cccdffd9cb3092c3ec2e7908ae9181bfad`.
 - That push-triggered run validated Python/Bash syntax and packaging guards only. The physical GPU job was skipped; CUDA/NCCL search and checkpoint-scored CNOT remain unverified pending a supplied spend cap and an already-running instance.
 - Source-controlled evidence: `test_results/refactor_20261121/gpu-acceptance/GITHUB_STATUS.md`.
