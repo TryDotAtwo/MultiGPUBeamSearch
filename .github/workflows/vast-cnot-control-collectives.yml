@@ -36,8 +36,10 @@ jobs:
         with:
           python-version: "3.11"
       - name: Compile the permutation acceptance script
+        id: compile_source
         run: python -m py_compile tools/verify_permutation_cuda.py
       - name: Syntax-check the remote Bash payload without running it
+        id: syntax_check
         shell: bash
         run: |
           python - <<'PY'
@@ -92,6 +94,31 @@ jobs:
           if heredoc_count < 4:
               raise SystemExit(f"expected at least four Python heredocs, found {heredoc_count}")
           PY
+      - name: Write source validation receipt
+        if: always()
+        env:
+          COMPILE_OUTCOME: ${{ steps.compile_source.outcome }}
+          SYNTAX_OUTCOME: ${{ steps.syntax_check.outcome }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "${RUNNER_TEMP}/gpu-acceptance-source"
+          cat > "${RUNNER_TEMP}/gpu-acceptance-source/GITHUB_STATUS.md" <<EOF
+          # Hosted source validation
+
+          - Commit: ${GITHUB_SHA}
+          - Python source compile: ${COMPILE_OUTCOME}
+          - Remote Bash and embedded Python syntax: ${SYNTAX_OUTCOME}
+          - Physical GPU job: separate manual-dispatch job; this receipt does not claim CUDA/NCCL acceptance.
+          EOF
+      - name: Upload source validation receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gpu-acceptance-source-${{ github.run_id }}
+          path: ${{ runner.temp }}/gpu-acceptance-source/GITHUB_STATUS.md
+          if-no-files-found: error
+          retention-days: 30
 
   gpu-acceptance:
     if: github.event_name == 'workflow_dispatch'
