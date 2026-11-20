@@ -74,8 +74,18 @@ def _native_validate_rank_plans(plans):
     validator = getattr(native, 'validate_rank_plans_json', None)
     if not callable(validator):
         return None
+    if type(plans) is not list or not plans or any(type(row) is not dict for row in plans):
+        return None
+    keys=('GLOBAL_BEAM_WIDTH_EFFECTIVE','BEAM_WIDTH_ALIGNMENT','SHARD_COUNT',
+          'B_MICRO','WORLD_SIZE','STREAM4_BATCH_ALIGNMENT','LOCAL_RANK',
+          'estimated_required_device_bytes','gpu_budget_bytes')
+    payload=[]
+    for row in plans:
+        if any(key in row and type(row[key]) is not int for key in keys):
+            return None
+        payload.append({key:row[key] for key in keys if key in row})
     try:
-        result = validator(json.dumps(plans))
+        result = validator(json.dumps(payload))
     except (TypeError, ValueError, OverflowError):
         # Run the established validator for unsupported values and to preserve
         # its public error messages when Rust rejects the same input.
