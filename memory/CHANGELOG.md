@@ -2943,3 +2943,22 @@ Main commit `148b2a826a369b7601e904ea409e0cc5301c75c9` also passed the 260-test 
   the штатный checkpoint scorer remain unverified.
 - No local build/results were created and no paid execution was used.
 - Full receipts: `test_results/refactor_20261120/cnot-collective-preflight/GITHUB_STATUS.md`.
+
+## 2026-11-21 - Prepare installed-wheel GPU acceptance
+
+- Added an installed-wheel permutation acceptance script for CayleyPy LRX(4).
+  It searches a reachable state at exact distance 2–4, independently replays
+  the result, and repeats each one-GPU and two-GPU search inside a Rust-owned
+  session while checking worker-process reuse.
+- Converted the existing Vast CNOT control workflow to manual dispatch. It
+  requires a USD spend cap, checks the already-running 2x RTX 3060 instance,
+  derives a bounded test runtime, and never starts or stops the instance.
+- The physical workflow builds and installs the PEP 517 wheel on Vast, checks
+  the private trained scorer's pinned checkpoint, runs permutation and CNOT
+  searches on one and two GPUs, and keeps full output in the remote
+  test_results/ tree and Actions artifacts. Private checkpoint files are
+  referenced in place and are excluded from the source archive.
+- The source harness has not yet run on physical GPUs. A configured workflow
+  and CPU-side syntax validation do not establish CUDA, NCCL, checkpoint
+  scoring, or 1-/2-GPU acceptance. A user-supplied spend cap is still required
+  before dispatch; the target Vast instance was previously reported stopped.
