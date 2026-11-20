@@ -179,10 +179,19 @@ class World:
         if used:
             return result
         if self.transport is not None and hasattr(self.transport, "gather_fixed"):
-            return self.transport.gather_fixed(tensor)
-        parts = [torch.empty_like(tensor) for _ in range(self.size)]
-        dist.all_gather(parts, tensor.contiguous())
-        return torch.stack(parts)
+            return self.checked("gather CNOT fixed values", lambda: self.transport.gather_fixed(tensor))
+
+        def prepare():
+            parts = [torch.empty_like(tensor) for _ in range(self.size)]
+            return parts, tensor.contiguous()
+
+        parts, contiguous = self.checked("prepare CNOT fixed gather", prepare)
+        self.checked(
+            "gather CNOT fixed values",
+            lambda: dist.all_gather(parts, contiguous),
+        )
+        return self.checked("assemble CNOT fixed gather", lambda: torch.stack(parts))
+
 
     def broadcast(self, tensor, source):
         if self.size > 1:
@@ -265,18 +274,43 @@ class World:
         if used:
             return result
 
-        # Compatibility path for older PyO3 modules without the gather ABI.
-        counts = self.gather_fixed(self.longs([len(rows)])).flatten().tolist()
-        result = rows.new_empty((sum(counts), rows.size(1)))
-        begin = 0
-        for src, count in enumerate(counts):
-            if count:
+        local = self.checked(
+            "prepare CNOT gathered-row count",
+            lambda: self.longs([len(rows)]),
+        )
+        gathered_counts = self.gather_fixed(local)
+
+        def prepare():
+            counts = [int(count) for count in gathered_counts.flatten().tolist()]
+            if len(counts) != self.size or any(count < 0 for count in counts):
+                raise RuntimeError("CNOT gathered row counts are invalid")
+            result = rows.new_empty((sum(counts), rows.size(1)))
+            sources = []
+            begin = 0
+            for source, count in enumerate(counts):
+                if count:
+                    sources.append((source, begin, count))
+                begin += count
+            return result, sources
+
+        result, sources = self.checked("prepare CNOT gathered-row buffer", prepare)
+        for source, begin, count in sources:
+            def prepare_part():
                 part = result.narrow(0, begin, count)
-                if src == self.rank:
+                if source == self.rank:
                     part.copy_(rows)
-                self.broadcast(part, src)
-            begin += count
+                return part
+
+            part = self.checked(
+                f"prepare CNOT row broadcast from rank {source}",
+                prepare_part,
+            )
+            self.checked(
+                f"broadcast CNOT rows from rank {source}",
+                lambda: self.broadcast(part, source),
+            )
         return result
+
 
     def exchange(self, rows, targets, *, native_packet=False):
         """Send variable-width int64 records to world ranks, including self and empty splits."""

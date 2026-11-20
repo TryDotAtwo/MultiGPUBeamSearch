@@ -423,20 +423,49 @@ impl Backend for NativeStages<'_> {
     }
 
     fn select(&mut self, width: u64) -> PyResult<()> {
+        let inputs = checked(
+            self.py,
+            &self.world,
+            "prepare CNOT selection inputs",
+            (|| -> PyResult<Bound<'_, PyAny>> {
+                let values = required(&self.values, "values")?;
+                let word_keys = column(&required(&self.meta, "meta")?, 1)?;
+                Ok(PyTuple::new(self.py, [values, word_keys])?.into_any())
+            })(),
+        )?;
+        let values = inputs.get_item(0)?;
+        let word_keys = inputs.get_item(1)?;
+
         let result = crate::cnot_native_selection::select(
             self.py,
             self.world.clone(),
-            required(&self.values, "values")?,
-            column(&required(&self.meta, "meta")?, 1)?,
+            values,
+            word_keys,
             width,
-        )
-        .map(|result| result.into_bound(self.py));
-        let result = checked(self.py, &self.world, "select CNOT frontier", result)?;
-        self.ranks = Some(result.get_item(0)?);
-        self.local = Some(result.get_item(1)?);
-        self.new_lex = Some(result.get_item(2)?);
+        )?
+        .into_bound(self.py);
+        let output = checked(
+            self.py,
+            &self.world,
+            "prepare CNOT selected frontier",
+            (|| -> PyResult<Bound<'_, PyAny>> {
+                Ok(PyTuple::new(
+                    self.py,
+                    [
+                        result.get_item(0)?,
+                        result.get_item(1)?,
+                        result.get_item(2)?,
+                    ],
+                )?
+                .into_any())
+            })(),
+        )?;
+        self.ranks = Some(output.get_item(0)?);
+        self.local = Some(output.get_item(1)?);
+        self.new_lex = Some(output.get_item(2)?);
         Ok(())
     }
+
 
     fn redistribute(&mut self, depth: u64) -> PyResult<Round<Self::Layer, Self::Records>> {
         let ranks = required(&self.ranks, "ranks")?;

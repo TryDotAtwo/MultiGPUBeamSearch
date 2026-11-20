@@ -70,3 +70,54 @@ def _worker(rank, rendezvous):
 def test_two_gloo_ranks_stable_records_empty_splits_and_reuse(tmp_path):
     exchange_fn()
     mp.spawn(_worker, args=((tmp_path / "exchange").resolve().as_uri(),), nprocs=2)
+
+
+def _gather_rows_allocation_failure_worker(rank, rendezvous):
+    torch.set_num_threads(1)
+    dist.init_process_group(
+        "gloo",
+        init_method=rendezvous,
+        rank=rank,
+        world_size=2,
+        timeout=timedelta(seconds=30),
+    )
+    original_new_empty = torch.Tensor.new_empty
+    message = "fixture CNOT gathered-row allocation failed on rank one"
+    try:
+        with World("cpu") as world:
+            rows = torch.tensor([[10, 11]], dtype=torch.int64) if rank == 0 else torch.empty(
+                (0, 2), dtype=torch.int64
+            )
+            if rank == 1:
+                def fail_gathered_rows(self, size, *args, **kwargs):
+                    shape = tuple(size)
+                    if self.ndim == 2 and self.shape[0] == 0 and shape[0] > 0:
+                        raise RuntimeError(message)
+                    return original_new_empty(self, size, *args, **kwargs)
+                torch.Tensor.new_empty = fail_gathered_rows
+
+            with pytest.raises(RuntimeError) as error:
+                world.gather_rows(rows)
+            expected = (
+                "prepare CNOT gathered-row buffer failed: "
+                f"rank 1: RuntimeError: {message}"
+            )
+            assert str(error.value) == expected, (
+                f"gather_rows returned {str(error.value)!r}; expected {expected!r}"
+            )
+
+            probe = torch.tensor([rank + 1], dtype=torch.int64)
+            dist.all_reduce(probe)
+            assert probe.item() == 3
+    finally:
+        torch.Tensor.new_empty = original_new_empty
+        dist.destroy_process_group()
+
+
+@pytest.mark.skipif(not dist.is_gloo_available(), reason="two CPU ranks require Gloo")
+def test_two_gloo_ranks_coordinate_gathered_rows_allocation_failure_and_keep_world(tmp_path):
+    mp.spawn(
+        _gather_rows_allocation_failure_worker,
+        args=((tmp_path / "gather-rows-allocation").resolve().as_uri(),),
+        nprocs=2,
+    )

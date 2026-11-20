@@ -86,6 +86,7 @@ jobs:
               rust/beam-python/src/cnot_native_batch.rs \
               rust/beam-python/src/cnot_native_dedup_score.rs \
               rust/beam-python/src/cnot_native_exchange.rs \
+              rust/beam-python/src/cnot_native_selection.rs \
               rust/beam-python/src/cnot_native_expand.rs \
               rust/beam-python/src/cnot_native_stages.rs \
               rust/beam-python/src/cnot_scorer_dispatch.rs \

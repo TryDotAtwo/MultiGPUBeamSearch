@@ -10,6 +10,21 @@ use pyo3::{
     types::{PyDict, PyList, PyTuple},
 };
 
+fn checked_local<'py, T>(
+    py: Python<'py>,
+    world: &Bound<'py, PyAny>,
+    stage: &str,
+    result: PyResult<T>,
+) -> PyResult<T> {
+    let marker = match &result {
+        Ok(_) => Ok(py.None().into_bound(py)),
+        Err(error) => Err(error.clone_ref(py)),
+    };
+    checked(py, world, stage, marker)?;
+    result
+}
+
+
 #[pyfunction]
 fn run_cnot_native_sum<'py>(
     py: Python<'py>,
@@ -42,19 +57,31 @@ fn run_cnot_native_gather_fixed<'py>(
 
     let transport = world.getattr("transport")?;
     if !transport.is_none() && transport.hasattr("gather_fixed")? {
-        return transport.call_method1("gather_fixed", (&tensor,));
+        let gathered = transport.call_method1("gather_fixed", (&tensor,));
+        return checked(py, &world, "gather CNOT fixed values", gathered);
     }
 
-    let torch = py.import("torch")?;
-    let mut parts = Vec::with_capacity(size);
-    for _ in 0..size {
-        parts.push(torch.call_method1("empty_like", (&tensor,))?);
-    }
-    let parts = PyList::new(py, parts)?;
-    let contiguous = tensor.call_method0("contiguous")?;
-    py.import("torch.distributed")?
-        .call_method1("all_gather", (&parts, contiguous))?;
-    torch.call_method1("stack", (&parts,))
+    let prepared = (|| -> PyResult<(Bound<'py, PyAny>, Bound<'py, PyAny>)> {
+        let torch = py.import("torch")?;
+        let mut parts = Vec::with_capacity(size);
+        for _ in 0..size {
+            parts.push(torch.call_method1("empty_like", (&tensor,))?);
+        }
+        let parts = PyList::new(py, parts)?.into_any();
+        let contiguous = tensor.call_method0("contiguous")?;
+        Ok((parts, contiguous))
+    })();
+    let prepared = checked_local(py, &world, "prepare CNOT fixed gather", prepared)?;
+    let parts = prepared.0;
+    let contiguous = prepared.1;
+
+    let gathered = py
+        .import("torch.distributed")?
+        .call_method1("all_gather", (&parts, contiguous));
+    checked_local(py, &world, "gather CNOT fixed values", gathered)?;
+
+    let stacked = py.import("torch")?.call_method1("stack", (parts,));
+    checked(py, &world, "assemble CNOT fixed gather", stacked)
 }
 
 #[pyfunction]
@@ -93,36 +120,69 @@ fn run_cnot_native_gather_rows<'py>(
         return Ok(rows);
     }
 
-    let local_count = i64::try_from(rows.len()?)
-        .map_err(|_| PyOverflowError::new_err("CNOT local row count exceeds int64"))?;
-    let local = world.call_method1("longs", (vec![local_count],))?;
-    let counts: Vec<usize> = world
-        .call_method1("gather_fixed", (local,))?
-        .call_method0("flatten")?
-        .call_method0("tolist")?
-        .extract()?;
-    let total = py
-        .import("builtins")?
-        .call_method1("sum", (counts.clone(),))?;
-    let columns = rows.call_method1("size", (1,))?;
-    let result = rows.call_method1("new_empty", ((total, columns),))?;
-    let rank: usize = world.getattr("rank")?.extract()?;
-    let mut begin = 0usize;
+    let local = checked(
+        py,
+        &world,
+        "prepare CNOT gathered-row count",
+        (|| -> PyResult<Bound<'py, PyAny>> {
+            let local_count = i64::try_from(rows.len()?)
+                .map_err(|_| PyOverflowError::new_err("CNOT local row count exceeds int64"))?;
+            world.call_method1("longs", (vec![local_count],))
+        })(),
+    )?;
+    let gathered_counts = world.call_method1("gather_fixed", (local,));
+    let gathered_counts = checked(py, &world, "gather CNOT row counts", gathered_counts)?;
 
-    for (source, count) in counts.into_iter().enumerate() {
-        if count != 0 {
+    let prepared = (|| -> PyResult<(Bound<'py, PyAny>, usize, Vec<(usize, usize, usize)>)> {
+        let raw_counts: Vec<i64> = gathered_counts
+            .call_method0("flatten")?
+            .call_method0("tolist")?
+            .extract()?;
+        if raw_counts.len() != size {
+            return Err(PyRuntimeError::new_err(
+                "CNOT gathered row counts returned an invalid rank count",
+            ));
+        }
+
+        let mut total = 0usize;
+        let mut sources = Vec::with_capacity(size);
+        for (source, raw_count) in raw_counts.into_iter().enumerate() {
+            let count = usize::try_from(raw_count)
+                .map_err(|_| PyRuntimeError::new_err("CNOT gathered row count is negative"))?;
+            if count != 0 {
+                sources.push((source, total, count));
+            }
+            total = total
+                .checked_add(count)
+                .ok_or_else(|| PyOverflowError::new_err("CNOT gathered row count exceeds usize"))?;
+        }
+
+        let columns = rows.call_method1("size", (1,))?;
+        let result = rows.call_method1("new_empty", ((total, columns),))?;
+        let rank: usize = world.getattr("rank")?.extract()?;
+        Ok((result, rank, sources))
+    })();
+    let (result, rank, sources) =
+        checked_local(py, &world, "prepare CNOT gathered-row buffer", prepared)?;
+
+    for (source, begin, count) in sources {
+        let stage = format!("prepare CNOT row broadcast from rank {source}");
+        let part = (|| -> PyResult<Bound<'py, PyAny>> {
             let part = result.call_method1("narrow", (0, begin, count))?;
             if source == rank {
                 part.call_method1("copy_", (rows.clone(),))?;
             }
-            world.call_method1("broadcast", (&part, source))?;
-        }
-        begin = begin
-            .checked_add(count)
-            .ok_or_else(|| PyOverflowError::new_err("CNOT gathered row count exceeds usize"))?;
+            Ok(part)
+        })();
+        let part = checked(py, &world, &stage, part)?;
+
+        let stage = format!("broadcast CNOT rows from rank {source}");
+        let broadcast = world.call_method1("broadcast", (&part, source));
+        checked(py, &world, &stage, broadcast)?;
     }
     Ok(result)
 }
+
 
 pub(crate) fn exchange<'py>(
     py: Python<'py>,
