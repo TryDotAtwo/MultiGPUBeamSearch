@@ -1,3 +1,10 @@
+## 2026-11-20 - Enter World for CNOT validation collectives
+
+- CNOT validation helpers and the direct rank-exchange fixture now enter `World` before rank-coordinated checks. Capability tests use the actual `World` negotiation interface. Search and exchange algorithms are unchanged.
+- RED: [Actions run 44714626102](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44714626102) failed with 4 tests, alongside 274 passed and 2 skipped. Two helper tests supplied a mock without the new capability API; two real-Gloo helpers used `World` outside its entered context. Artifact [14618627216](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44714626102/artifacts/14618627216), SHA-256 `976e92b81ffb09e27915228e1c6f2ae397e8c51664fee0648a2972bcddf59533`.
+- GREEN: [Actions run 44715949615](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44715949615) at `8e494c5b0ac0cdedf44c21eb2cc459c466132a2b` passed Rust CNOT checks, PyO3 build, 278 Python tests (2 skipped, 104 warnings), and NCCL probe syntax. Artifact [14618694452](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44715949615/artifacts/14618694452), SHA-256 `6b570f42d4244585b5abc4e015b79494daacab19b663d37a75e8ae07848a346d`.
+- This is hosted CPU/Gloo and PyO3-build evidence. It does not verify physical CUDA/NCCL. The earlier status-only Vast workflow [44714626948](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44714626948) found the configured instance exited and skipped checkout/build/GPU execution.
+
 ## 2026-11-20 - Coordinate CNOT BaseException failures across ranks
 
 - Multi-rank checked CNOT stages now capture Python `BaseException` values, including `KeyboardInterrupt`, into the existing rank-wide error vote. The Rust checked ABI follows the same rule; single-rank calls preserve the original exception.
