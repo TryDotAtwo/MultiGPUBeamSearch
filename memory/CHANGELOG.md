@@ -2595,6 +2595,6 @@ and unsupported legacy shapes retain the Python formula. No beam width, rank
 order, collective, search output, or CUDA operation changed. Hosted RED/GREEN
 RED run [44651491013](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44651491013) found the missing PyO3 method; its test import omission was corrected. An intermediate fallback-fixture failure was fixed. GREEN run [44652345373](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44652345373) passed the Rust planning contract, PyO3 build, 260 Python tests (2 skipped), and NCCL probe syntax. Artifact 14590718645, SHA256 `53f863655ff5a1c428a8b1abc4b840065a3708b619c2c42615db7fcec89e72d0`. Evidence:
 `test_results/refactor_20261120/rust-rank-frontier-quotas/GITHUB_STATUS.md`.
-Physical multi-GPU runtime remains unverified.
+Main commit `148b2a826a369b7601e904ea409e0cc5301c75c9` also passed the 260-test CPU/PyO3 suite (2 skipped) in Actions run [44652813652](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44652813652); artifact 14592080300, SHA256 `3f519592bd4f5a38140257a025b3fb20d7701064f250b5228c4f4af6308555f7`. Physical multi-GPU runtime remains unverified.
 
 
