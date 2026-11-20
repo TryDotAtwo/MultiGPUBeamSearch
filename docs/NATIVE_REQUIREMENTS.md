@@ -233,4 +233,3 @@ and unstable measurements cannot produce an accepted default.
 The authorized total is USD 50 including associated costs. This task may operate
 only its own leases. Preserve billing/lease records and stop owned paid resources
 when their work ends; do not infer authorization over another project's instances.
-
