@@ -1,5 +1,14 @@
 # Конфиг
 
+## Rust-владелец CPU CNOT child application, 2026-11-20
+
+Для typed CNOT compatibility path пакетное применение физических ходов к
+CPU-состояниям выполняет beam-core::cnot::apply_gate_words. Формат packed
+матриц, control-major ID, XOR полной строки, tail mask и результат PyTorch
+int64 сохраняются. CUDA child kernels и Python-only fallback не меняются.
+Результаты hosted CPU/PyO3 проверки: test_results/refactor_20261120/cnot-rust-cpu-children/GITHUB_STATUS.md.
+Этот путь не подтверждает физическое выполнение CUDA/NCCL на нескольких GPU.
+
 ## Rust-владелец CNOT CPU/legacy batch fallback, 2026-11-20
 
 Typed `PyCnotSearchInput` compatibility dispatch больше не вызывает
@@ -9,12 +18,14 @@ Typed `PyCnotSearchInput` compatibility dispatch больше не вызыва�
 generation-order deduplication, score validation и формы выходных tensors.
 При наличии fused CUDA hooks они остаются приоритетным путём.
 
-cnot_children, cnot_first_unseen и cnot_owners остаются существующими
-доменными операциями: CUDA dispatch использует прежние C++/CUDA kernels,
-CPU/reference реализация — Torch. pack_cnot_route больше не вызывается из
-typed Rust compatibility path: Rust проверяет source rank, dtype и диапазон
-move ID, затем собирает тот же int64 route lane. Остальные CPU/reference
-primitives ещё требуют отдельного переноса.
+Для typed Rust compatibility path CPU-расширение CNOT теперь применяет
+упакованные операции через beam_core::cnot::apply_gate_words; физический
+алфавит ходов, XOR контрольной строки и очистка tail padding сохранены.
+CUDA dispatch и Python-only engine продолжают использовать прежний
+cnot_children путь. cnot_first_unseen и cnot_owners сохраняют прежние
+CUDA/C++ kernels и CPU/reference Torch реализации. pack_cnot_route больше не
+вызывается из typed Rust compatibility path: Rust проверяет source rank,
+dtype и диапазон move ID, затем собирает тот же int64 route lane.
 
 Python-only engine и старые stage providers сохраняют fallback. Алгоритм
 поиска, scoring, precision, state layout и transport не менялись.

@@ -106,6 +106,45 @@ fn construction_replay_checks_order_all_words_and_move_bounds() {
 }
 
 #[test]
+fn apply_gate_words_matches_cnot_replay_and_clears_tail_padding() {
+    for wires in [3u32, 65, 129, 256] {
+        let stride = (wires as usize).div_ceil(64);
+        let mut words = vec![0u64; wires as usize * stride];
+        for row in 0..wires as usize {
+            words[row * stride + row / 64] |= 1u64 << (row % 64);
+        }
+        let tail_bits = wires % 64;
+        if tail_bits != 0 {
+            let invalid_bit = 1u64 << 63;
+            for row in 0..wires as usize {
+                words[row * stride + stride - 1] |= invalid_bit;
+            }
+        }
+        let id = CnotGate {
+            control: wires - 1,
+            target: 0,
+        }
+        .encode(wires)
+        .unwrap();
+        beam_core::cnot::apply_gate_words(wires, &mut words, id).unwrap();
+
+        let bytes: Vec<u8> = words.iter().flat_map(|word| word.to_le_bytes()).collect();
+        let matrix = CnotMatrix::from_le_bytes(wires, &bytes).unwrap();
+        assert!(matrix.verifies_construction(&[id]).unwrap());
+        if tail_bits != 0 {
+            let valid_mask = (1u64 << tail_bits) - 1;
+            for row in 0..wires as usize {
+                assert_eq!(words[row * stride + stride - 1] & !valid_mask, 0);
+            }
+        }
+    }
+
+    let mut words = vec![0u64; 3];
+    assert!(beam_core::cnot::apply_gate_words(3, &mut words, 6).is_err());
+    assert!(beam_core::cnot::apply_gate_words(3, &mut words[..2], 0).is_err());
+}
+
+#[test]
 fn identity_check_covers_the_complete_packed_matrix() {
     for n in [2, 63, 64, 65, 127, 128, 129, 256] {
         let mut packed = identity(n as usize);

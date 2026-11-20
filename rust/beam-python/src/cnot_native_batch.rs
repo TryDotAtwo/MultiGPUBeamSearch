@@ -6,7 +6,7 @@ use crate::cnot_scorer_dispatch;
 use pyo3::{
     exceptions::PyValueError,
     prelude::*,
-    types::{PyDict, PyTuple},
+    types::{PyDict, PyList, PyTuple},
 };
 
 fn slice<'py>(
@@ -80,6 +80,139 @@ pub(crate) fn scores<'py>(
     Ok(tensor)
 }
 
+fn cpu_children<'py>(
+    py: Python<'py>,
+    parents: &Bound<'py, PyAny>,
+    parent_indices: &Bound<'py, PyAny>,
+    moves: &Bound<'py, PyAny>,
+    n: i64,
+    words: i64,
+) -> PyResult<Bound<'py, PyAny>> {
+    if parents.getattr("is_cuda")?.is_truthy()? || !(2..=256).contains(&n) {
+        return Err(PyValueError::new_err("invalid CPU CNOT parent tensor"));
+    }
+    let expected_words = (n + 63) / 64;
+    if words != expected_words {
+        return Err(PyValueError::new_err("invalid CNOT packed row width"));
+    }
+    let parent_shape: Vec<i64> = parents.getattr("shape")?.extract()?;
+    let index_shape: Vec<i64> = parent_indices.getattr("shape")?.extract()?;
+    let move_shape: Vec<i64> = moves.getattr("shape")?.extract()?;
+    if parent_shape.len() != 3 || parent_shape[1] != n || parent_shape[2] != words {
+        return Err(PyValueError::new_err("invalid CNOT parent tensor shape"));
+    }
+    if index_shape.len() != 1 || move_shape != index_shape {
+        return Err(PyValueError::new_err(
+            "expected equally sized one-dimensional CNOT descriptors",
+        ));
+    }
+
+    let torch = py.import("torch")?;
+    let int64 = torch.getattr("int64")?;
+    let uint16 = torch.getattr("uint16")?;
+    let parents_are_int64 = parents
+        .getattr("dtype")?
+        .call_method1("__eq__", (&int64,))?
+        .is_truthy()?;
+    let indices_are_int64 = parent_indices
+        .getattr("dtype")?
+        .call_method1("__eq__", (&int64,))?
+        .is_truthy()?;
+    let moves_are_int64 = moves
+        .getattr("dtype")?
+        .call_method1("__eq__", (&int64,))?
+        .is_truthy()?;
+    let moves_are_uint16 = moves
+        .getattr("dtype")?
+        .call_method1("__eq__", (&uint16,))?
+        .is_truthy()?;
+    if !parents_are_int64 || !indices_are_int64 || !(moves_are_int64 || moves_are_uint16) {
+        return Err(PyValueError::new_err(
+            "expected int64 CNOT states and indices, and int64/uint16 moves",
+        ));
+    }
+    let parent_device = parents.getattr("device")?;
+    for descriptor in [parent_indices, moves] {
+        if descriptor
+            .getattr("device")?
+            .call_method1("__ne__", (&parent_device,))?
+            .is_truthy()?
+        {
+            return Err(PyValueError::new_err(
+                "CNOT parents and descriptors must use the same device",
+            ));
+        }
+    }
+
+    let n_usize =
+        usize::try_from(n).map_err(|_| PyValueError::new_err("CNOT wire count overflow"))?;
+    let words_usize =
+        usize::try_from(words).map_err(|_| PyValueError::new_err("CNOT row width overflow"))?;
+    let matrix_words = n_usize
+        .checked_mul(words_usize)
+        .ok_or_else(|| PyValueError::new_err("CNOT matrix size overflow"))?;
+    let parent_count = usize::try_from(parent_shape[0])
+        .map_err(|_| PyValueError::new_err("CNOT parent count overflow"))?;
+    let expected_parent_words = parent_count
+        .checked_mul(matrix_words)
+        .ok_or_else(|| PyValueError::new_err("CNOT parent tensor size overflow"))?;
+    let parents_flat = parents
+        .call_method0("contiguous")?
+        .call_method1("reshape", (-1,))?
+        .call_method0("tolist")?
+        .extract::<Vec<i64>>()?;
+    if parents_flat.len() != expected_parent_words {
+        return Err(PyValueError::new_err("invalid CNOT parent tensor storage"));
+    }
+    let indices: Vec<i64> = parent_indices.call_method0("tolist")?.extract()?;
+    let moves_i64: Vec<i64> = moves
+        .call_method1("to", (&int64,))?
+        .call_method0("tolist")?
+        .extract()?;
+    if indices.len() != moves_i64.len() {
+        return Err(PyValueError::new_err("CNOT descriptor length mismatch"));
+    }
+
+    let output_words = indices
+        .len()
+        .checked_mul(matrix_words)
+        .ok_or_else(|| PyValueError::new_err("CNOT output size overflow"))?;
+    let mut output = vec![0u64; output_words];
+    for (child, (&parent_index, &move_id)) in indices.iter().zip(&moves_i64).enumerate() {
+        let parent_index = usize::try_from(parent_index)
+            .map_err(|_| PyValueError::new_err("CNOT parent index is outside the batch"))?;
+        if parent_index >= parent_count {
+            return Err(PyValueError::new_err(
+                "CNOT parent index is outside the batch",
+            ));
+        }
+        let move_id = u32::try_from(move_id)
+            .map_err(|_| PyValueError::new_err("CNOT move is outside the physical alphabet"))?;
+        let parent_start = parent_index
+            .checked_mul(matrix_words)
+            .ok_or_else(|| PyValueError::new_err("CNOT parent offset overflow"))?;
+        let child_start = child
+            .checked_mul(matrix_words)
+            .ok_or_else(|| PyValueError::new_err("CNOT output offset overflow"))?;
+        for word in 0..matrix_words {
+            output[child_start + word] = parents_flat[parent_start + word] as u64;
+        }
+        beam_core::cnot::apply_gate_words(
+            n as u32,
+            &mut output[child_start..child_start + matrix_words],
+            move_id,
+        )
+        .map_err(|_| PyValueError::new_err("CNOT move or packed matrix is invalid"))?;
+    }
+
+    let values = PyList::new(py, output.iter().copied().map(|word| word as i64))?;
+    let kwargs = PyDict::new(py);
+    kwargs.set_item("dtype", int64)?;
+    kwargs.set_item("device", parent_device)?;
+    let tensor = torch.call_method("tensor", (values,), Some(&kwargs))?;
+    tensor.call_method1("reshape", (indices.len() as i64, n, words))
+}
+
 pub(crate) fn expand<'py>(
     py: Python<'py>,
     world: &Bound<'py, PyAny>,
@@ -120,9 +253,12 @@ pub(crate) fn expand<'py>(
         .call_method("arange", (count,), Some(&arange_kwargs))?
         .call_method1("repeat_interleave", (k,))?;
     let moves = moves.call_method1("reshape", (-1,))?;
-    let children = match device_domain.as_deref_mut() {
-        Some(domain) => domain.children(py, parents, &indices, &moves)?,
-        None => native.call_method1("cnot_children", (parents, &indices, &moves))?,
+    let children = if let Some(domain) = device_domain.as_deref_mut() {
+        domain.children(py, parents, &indices, &moves)?
+    } else if parents.getattr("is_cuda")?.is_truthy()? {
+        native.call_method1("cnot_children", (parents, &indices, &moves))?
+    } else {
+        cpu_children(py, parents, &indices, &moves, n, words)?
     };
     let parent_slots = indices.call_method1("__add__", (begin,))?;
     let generation = parent_slots

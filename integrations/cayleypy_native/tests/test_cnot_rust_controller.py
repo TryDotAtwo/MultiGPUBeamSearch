@@ -889,3 +889,19 @@ def test_rust_compatibility_backend_bypasses_cnot_native_route_helper(monkeypatc
     assert asdict(result) == asdict(reference)
     assert result.status == "solved"
     assert cnot.replay_cnot(4, result.gates) == rows
+
+def test_rust_cpu_search_applies_children_without_python_tensor_helper(monkeypatch):
+    require_controller()
+    from multigpubeamsearch import cnot_native
+
+    rows, scorer = (8, 4, 2, 1), WireFixture(9)
+    options = dict(width=5, shortlist=9, max_depth=4, mode="qhat", audit=True)
+    reference = cnot.search_cnot(cnot.pack_rows(rows), scorer, engine="python", **options)
+
+    def forbidden(*_args, **_kwargs):
+        pytest.fail("Rust CNOT CPU expansion called the Python tensor child helper")
+
+    monkeypatch.setattr(cnot_native, "cnot_children", forbidden)
+    result = cnot.search_cnot(cnot.pack_rows(rows), scorer, engine="rust", **options)
+
+    assert asdict(result) == asdict(reference)

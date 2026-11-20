@@ -77,6 +77,39 @@ impl CnotGate {
     }
 }
 
+/// Apply one physical CNOT to a row-major packed matrix in place.
+///
+/// The slice contains exactly wires * ceil(wires / 64) u64 words. Padding
+/// bits in each row's final word are cleared, matching the public CPU tensor
+/// helper. CUDA dispatch keeps using its existing kernels.
+pub fn apply_gate_words(wires: u32, words: &mut [u64], id: u32) -> Result<()> {
+    let stride = words_per_row(wires)?;
+    let rows = wires as usize;
+    let required = rows
+        .checked_mul(stride)
+        .ok_or(ContractError::Overflow("CNOT packed matrix"))?;
+    if words.len() != required {
+        return Err(ContractError::Invalid("CNOT packed matrix length"));
+    }
+
+    let gate = CnotGate::decode(wires, id)?;
+    let control = gate.control as usize * stride;
+    let target = gate.target as usize * stride;
+    for part in 0..stride {
+        words[target + part] ^= words[control + part];
+    }
+
+    let tail_bits = wires % 64;
+    if tail_bits != 0 {
+        let tail_mask = (1u64 << tail_bits) - 1;
+        for row in 0..rows {
+            let last = row * stride + stride - 1;
+            words[last] &= tail_mask;
+        }
+    }
+    Ok(())
+}
+
 /// An owned, validated input. Its words are never borrowed across the Python
 /// or native boundary; every logical bit participates in equality.
 #[derive(Clone, Debug, PartialEq, Eq)]

@@ -1,5 +1,14 @@
 # Rust/native runtime
 
+## Rust-owned CPU CNOT child application
+
+The typed Rust compatibility path now applies packed CPU CNOT children through
+beam-core::cnot::apply_gate_words, preserving control-major move IDs, whole-row
+XOR, int64 tensor layout, and tail-padding clearing. CUDA child kernels and
+Python-only fallbacks are unchanged. Hosted CPU/PyO3 evidence is in
+test_results/refactor_20261120/cnot-rust-cpu-children/GITHUB_STATUS.md; it
+does not establish physical CUDA/NCCL multi-GPU execution.
+
 ## Compatibility-preserving inference selection
 
 `autotune.select_inference` can use `beam-core::inference::select_inference_compatible` through the optional PyO3 function `inference_select_compatible`. For ordinary `Measurement` rows it keeps the existing rejection rules, median/MAD estimates, CPython-seeded bootstrap interval, baseline recovery and tie ordering. Python retains the previous implementation as a fallback for older extensions and values outside the Rust adapter's supported shape.
