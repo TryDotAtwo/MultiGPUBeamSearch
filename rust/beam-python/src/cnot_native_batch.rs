@@ -358,12 +358,8 @@ fn cpu_first_unseen<'py>(
         .extract()?;
     let closed_words: Vec<u64> = closed_flat.into_iter().map(|word| word as u64).collect();
     let child_words: Vec<u64> = children_flat.into_iter().map(|word| word as u64).collect();
-    let selected = beam_core::cnot::first_unseen_indices(
-        n as u32,
-        &closed_words,
-        &child_words,
-    )
-    .map_err(|_| PyValueError::new_err("invalid packed CNOT state batch"))?;
+    let selected = beam_core::cnot::first_unseen_indices(n as u32, &closed_words, &child_words)
+        .map_err(|_| PyValueError::new_err("invalid packed CNOT state batch"))?;
 
     let indices = PyList::new(py, selected.iter().map(|&index| index as i64))?;
     let kwargs = PyDict::new(py);
