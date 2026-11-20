@@ -9,6 +9,7 @@ on:
     paths:
       - .github/workflows/installed-wheel-validation.yml
       - integrations/cayleypy_native/tests/installed_wheel_smoke.py
+      - tools/verify_cnot.py
       - integrations/cayleypy_native/pyproject.toml
       - integrations/cayleypy_native/build_backend.py
       - integrations/cayleypy_native/multigpubeamsearch/**
@@ -58,6 +59,15 @@ jobs:
           mkdir -p "$RUNNER_TEMP/mgbs-wheel-smoke"
           cd "$RUNNER_TEMP/mgbs-wheel-smoke"
           env -u PYTHONPATH python "$GITHUB_WORKSPACE/integrations/cayleypy_native/tests/installed_wheel_smoke.py" 2>&1 | tee "$GITHUB_WORKSPACE/test_results/refactor_20261120/installed-wheel/smoke.log"
+      - name: Run public CNOT search through the installed wheel
+        run: |
+          set -o pipefail
+          mkdir -p "$RUNNER_TEMP/mgbs-wheel-smoke"
+          cd "$RUNNER_TEMP/mgbs-wheel-smoke"
+          env -u PYTHONPATH python "$GITHUB_WORKSPACE/tools/verify_cnot.py" \
+            --case wide --backend gloo --engine rust \
+            --output "$GITHUB_WORKSPACE/test_results/refactor_20261120/installed-wheel/cnot-wide-rust.json" \
+            2>&1 | tee "$GITHUB_WORKSPACE/test_results/refactor_20261120/installed-wheel/cnot-wide-rust.log"
       - name: Upload wheel validation logs
         if: always()
         uses: actions/upload-artifact@v4
