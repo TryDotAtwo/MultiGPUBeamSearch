@@ -439,12 +439,28 @@ jobs:
             "$source_sha" "$control_marker_count" "$descriptor_marker_count" "92f3ec8e6a6ef831916a9d3ba9bbdae9307c9850d61334916a2b3e690c0020c4" > "${log_dir}/receipt.json"
           cat "${log_dir}/receipt.json"
           REMOTE
-          if ! ssh "${ssh_opts[@]}" "root@${host}" \
+          remote_exit=0
+          if ssh "${ssh_opts[@]}" "root@${host}" \
             "timeout --signal=TERM --kill-after=60s '${ALLOWED_RUNTIME_SECONDS}s' bash -s -- '${REMOTE_ROOT}/source' '${REMOTE_ROOT}' '${key_blob}' '${remote_archive}' '${ARCHIVE_SHA}' '${SOURCE_SHA}'" \
             < "${RUNNER_TEMP}/run-cnot-control.sh" > "$remote_log" 2>&1; then
-            tail -n 100 "$remote_log"
-            exit 1
+            remote_exit=0
+          else
+            remote_exit=$?
           fi
+          result_archive="${RUNNER_TEMP}/beam-gpu-acceptance-test-results.tar.gz"
+          if ssh "${ssh_opts[@]}" "root@${host}" \
+            "tar -C '${REMOTE_ROOT}' -czf - test_results/refactor_20261121/gpu-acceptance" \
+            > "$result_archive"; then
+            echo "Retrieved remote GPU test_results for the Actions artifact."
+          else
+            rm -f "$result_archive"
+            echo "Remote test_results could not be retrieved; the remote console log remains available." >&2
+          fi
+          if [[ "$remote_exit" != 0 ]]; then
+            tail -n 100 "$remote_log"
+            exit "$remote_exit"
+          fi
+          test -s "$result_archive"
           cat "$remote_log"
           control_marker_count="$(grep -c 'CNOT_CONTROL_COLLECTIVES_OK' "$remote_log")"
           descriptor_marker_count="$(grep -c 'CNOT_DEVICE_UNSEEN_OK' "$remote_log")"
@@ -467,5 +483,6 @@ jobs:
           path: |
             ${{ runner.temp }}/vast-status.json
             ${{ runner.temp }}/beam-gpu-acceptance.log
+            ${{ runner.temp }}/beam-gpu-acceptance-test-results.tar.gz
           if-no-files-found: warn
           retention-days: 7
