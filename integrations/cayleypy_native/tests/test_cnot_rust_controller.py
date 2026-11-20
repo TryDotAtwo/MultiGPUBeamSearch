@@ -1054,3 +1054,61 @@ def test_rust_cpu_search_assigns_owners_without_python_tensor_helper(monkeypatch
     result = cnot.search_cnot(cnot.pack_rows(rows), scorer, engine="rust", **options)
 
     assert asdict(result) == asdict(reference)
+
+
+def distributed_cnot_selection_failure_after_gather(rank, rendezvous):
+    torch.set_num_threads(1)
+    dist.init_process_group(
+        "gloo",
+        init_method=rendezvous,
+        rank=rank,
+        world_size=2,
+        timeout=timedelta(seconds=15),
+    )
+    original_argsort = torch.argsort
+    message = "fixture CNOT selection finish failed on rank one"
+    try:
+        require_controller()
+        if rank == 1:
+            def fail_singleton_sort(tensor, *args, **kwargs):
+                if tensor.numel() == 1:
+                    raise RuntimeError(message)
+                return original_argsort(tensor, *args, **kwargs)
+            torch.argsort = fail_singleton_sort
+
+        with pytest.raises(RuntimeError) as error:
+            cnot.search_cnot(
+                cnot.pack_rows((8, 4, 2, 1)),
+                WireFixture(9),
+                width=1,
+                shortlist=3,
+                max_depth=3,
+                mode="qhat",
+                engine="rust",
+            )
+        expected = (
+            "select CNOT frontier failed: "
+            f"rank 1: RuntimeError: {message}"
+        )
+        assert str(error.value) == expected, (
+            f"selection failure returned {str(error.value)!r}; expected {expected!r}"
+        )
+
+        probe = torch.tensor([rank + 1], dtype=torch.int64)
+        dist.all_reduce(probe)
+        assert probe.item() == 3
+    finally:
+        torch.argsort = original_argsort
+        dist.destroy_process_group()
+
+
+@pytest.mark.skipif(not dist.is_gloo_available(), reason="two CPU ranks require Gloo")
+def test_two_gloo_ranks_coordinate_cnot_selection_failure_after_gather_and_keep_world(
+        tmp_path):
+    require_controller()
+    rendezvous = (tmp_path / "cnot-selection-finish").resolve().as_uri()
+    mp.spawn(
+        distributed_cnot_selection_failure_after_gather,
+        args=(rendezvous,),
+        nprocs=2,
+    )
