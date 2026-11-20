@@ -158,12 +158,9 @@ pub fn owner_ranks(wires: u32, packed: &[u64], world_size: u32) -> Result<Vec<u3
                 word
             };
             let position = (index as u64).wrapping_add(1);
-            lo ^= cnot_owner_mix64(
-                value ^ position.wrapping_mul(0x9e37_79b9_7f4a_7c15),
-            );
-            hi ^= cnot_owner_mix64(
-                value.wrapping_add(position.wrapping_mul(0xd6e8_feb8_6659_fd93)),
-            );
+            lo ^= cnot_owner_mix64(value ^ position.wrapping_mul(0x9e37_79b9_7f4a_7c15));
+            hi ^=
+                cnot_owner_mix64(value.wrapping_add(position.wrapping_mul(0xd6e8_feb8_6659_fd93)));
         }
 
         lo ^= u64::from(wires);

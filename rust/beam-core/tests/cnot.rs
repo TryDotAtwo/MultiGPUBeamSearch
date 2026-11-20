@@ -198,13 +198,7 @@ fn identity_check_covers_the_complete_packed_matrix() {
 
 #[test]
 fn owner_ranks_match_position_hash_and_ignore_row_padding() {
-    let states = [
-        0, 0, 0,
-        1, 0, 0,
-        1, 2, 4,
-        7, 0, 1,
-        1, 2, 4,
-    ];
+    let states = [0, 0, 0, 1, 0, 0, 1, 2, 4, 7, 0, 1, 1, 2, 4];
     assert_eq!(
         beam_core::cnot::owner_ranks(3, &states, 251).unwrap(),
         vec![31, 180, 140, 61, 140]
