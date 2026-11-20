@@ -4,7 +4,7 @@
 //! coarse stage, and uses the same goal and error collectives as the reference.
 use crate::cnot_native_checked::gather_error_messages_v2;
 use pyo3::{
-    exceptions::{PyException, PyOverflowError, PyRuntimeError, PyZeroDivisionError},
+    exceptions::{PyException, PyKeyboardInterrupt, PyOverflowError, PyRuntimeError, PyZeroDivisionError},
     prelude::*,
     types::PyDict,
 };
@@ -102,11 +102,13 @@ pub(crate) fn goal<'py>(
     begin: u64,
     identity: &Bound<'py, PyAny>,
 ) -> PyResult<Option<(u64, u32)>> {
-    let result = local_goal(py, world, parents, lex, begin, identity);
+    let result = local_goal(py, world, parents, lex, begin, identity)
+        .and_then(|value| py.check_signals().map(|()| value));
     let (key, slot, alphabet, error) = match result {
         Ok((key, slot, alphabet)) => (key, slot, Some(alphabet), None),
         Err(error) => {
-            if !error.is_instance_of::<PyException>(py)
+            if (!error.is_instance_of::<PyException>(py)
+                && !error.is_instance_of::<PyKeyboardInterrupt>(py))
                 || world.getattr("size")?.extract::<usize>()? == 1
             {
                 return Err(error);
@@ -137,14 +139,19 @@ pub(crate) fn goal<'py>(
     if rows.iter().any(|(_, _, failed)| *failed != 0) {
         let size: usize = world.getattr("size")?.extract()?;
         let messages = gather_error_messages_v2(world, size, error.as_deref())?;
-        return Err(PyRuntimeError::new_err(format!(
-            "find CNOT goal failed: {}",
-            messages
-                .into_iter()
-                .filter(|message| !message.is_empty())
-                .collect::<Vec<_>>()
-                .join(" | ")
-        )));
+        let interrupted = messages
+            .iter()
+            .any(|message| message.contains(": KeyboardInterrupt:"));
+        let details = messages
+            .into_iter()
+            .filter(|message| !message.is_empty())
+            .collect::<Vec<_>>()
+            .join(" | ");
+        let diagnostic = format!("find CNOT goal failed: {details}");
+        if interrupted {
+            return Err(PyKeyboardInterrupt::new_err(diagnostic));
+        }
+        return Err(PyRuntimeError::new_err(diagnostic));
     }
     let (best_key, best_slot) = rows
         .iter()

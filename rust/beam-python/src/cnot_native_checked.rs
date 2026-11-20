@@ -4,7 +4,7 @@
 //! object gather for compatibility; the v2 path gathers UTF-8 diagnostics as
 //! fixed-size tensors over the existing world transport. Torch owns buffers.
 use pyo3::{
-    exceptions::{PyBaseException, PyOverflowError, PyRuntimeError},
+    exceptions::{PyBaseException, PyKeyboardInterrupt, PyOverflowError, PyRuntimeError},
     prelude::*,
     types::{PyDict, PyList},
 };
@@ -173,6 +173,7 @@ fn checked_impl<'py>(
     result: PyResult<Bound<'py, PyAny>>,
     byte_gather: bool,
 ) -> PyResult<Bound<'py, PyAny>> {
+    let result = result.and_then(|value| py.check_signals().map(|()| value));
     let size: usize = world.getattr("size")?.extract()?;
     if size == 1 {
         return result;
@@ -207,14 +208,19 @@ fn checked_impl<'py>(
             let gathered: Vec<Option<String>> = errors.extract()?;
             gathered.into_iter().flatten().collect()
         };
-        return Err(PyRuntimeError::new_err(format!(
-            "{stage} failed: {}",
-            messages
-                .into_iter()
-                .filter(|message| !message.is_empty())
-                .collect::<Vec<_>>()
-                .join(" | ")
-        )));
+        let interrupted = messages
+            .iter()
+            .any(|message| message.contains(": KeyboardInterrupt:"));
+        let details = messages
+            .into_iter()
+            .filter(|message| !message.is_empty())
+            .collect::<Vec<_>>()
+            .join(" | ");
+        let diagnostic = format!("{stage} failed: {details}");
+        if interrupted {
+            return Err(PyKeyboardInterrupt::new_err(diagnostic));
+        }
+        return Err(PyRuntimeError::new_err(diagnostic));
     }
     Ok(value.unwrap_or_else(|| py.None().into_bound(py)))
 }
@@ -244,10 +250,6 @@ pub(crate) fn checked_compat<'py>(
     stage: &str,
     result: PyResult<Bound<'py, PyAny>>,
 ) -> PyResult<Bound<'py, PyAny>> {
-    let size: usize = world.getattr("size")?.extract()?;
-    if size == 1 {
-        return result;
-    }
     checked_v2(py, world, stage, result)
 }
 
