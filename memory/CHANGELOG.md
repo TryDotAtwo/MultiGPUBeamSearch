@@ -3186,4 +3186,15 @@ Main commit `148b2a826a369b7601e904ea409e0cc5301c75c9` also passed the 260-test 
 - Hosted RED `44909951209` reproduced five failures: a mutated two-rank report
   could be accepted as world size one; missing digest/root/survivor hashes were
   accepted; and the backend verdict dropped the report digest. The hosted CPU
-  GREEN is pending. No GPU execution was started.
+  source harness `44910114647` and installed-wheel CPU validation
+  `44910114686` passed. The GPU job was skipped; no CUDA/NCCL run was started.
+
+## 2026-11-21 - Record the CUDA worker's observed GPU identity
+
+- Strict CNOT acceptance now selects devices by full UUID and asks the CUDA
+  driver for the UUID belonging to the worker's current context. Python and
+  Rust receipts compare that observed value with the expected rank mapping;
+  Gloo carries rank metadata. A CPU fake-driver fixture covers reordered
+  visible ordinals, selected-device mismatch, and duplicate expected UUIDs.
+- Hosted source/wheel checks for this change are pending. No Vast instance was
+  started and no physical GPU identity has been observed in this step.

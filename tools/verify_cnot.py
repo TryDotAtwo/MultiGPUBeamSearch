@@ -233,6 +233,26 @@ def main(argv=None, *, scorer_factory=None, manage_process_group=True):
         device = torch.device("cuda", torch.cuda.current_device()) if "nccl" in initialized_backend else torch.device("cpu")
     try:
         with World(device) as world:
+            identity = world.checked("prepare CNOT acceptance identity", acceptance_identity)
+            identity_contract = None if identity is None else {
+                "run_id": identity["run_id"],
+                "case_id": identity["case_id"],
+                "source_sha": identity["source_sha"],
+                "wheel_sha256": identity["wheel_sha256"],
+                "gpu_uuids": identity["gpu_uuids"],
+                "evidence_dir": str(identity["evidence_dir"]),
+            }
+            identity_digest = hashlib.sha256(json.dumps(
+                identity_contract, sort_keys=True, separators=(",", ":")
+            ).encode("utf-8")).digest()
+            world.require_engine_consensus(list(identity_digest))
+            if identity is not None:
+                world.checked(
+                    "observe CNOT physical GPU UUID",
+                    lambda: gpu_uuid_for_rank(
+                        world.rank, world.size, device=device, torch_module=torch
+                    ),
+                )
             if args.case in ("trained", "trained-deep"):
                 rows, k, default_width = ((1, 7, 4, 10), 3, 2) if args.case == "trained-deep" else ((1, 2, 7, 8), 11, 8)
                 width = default_width if args.width is None else args.width
@@ -262,19 +282,6 @@ def main(argv=None, *, scorer_factory=None, manage_process_group=True):
                                         and layer["distinct"] > layer["retained"] == width for layer in output["layers"]),
                                     "both GPUs must expand, score and retain in the same saturated layer")
                     world.checked("trained layer participation", check_participation)
-                identity = world.checked("prepare CNOT acceptance identity", acceptance_identity)
-                identity_contract = None if identity is None else {
-                    "run_id": identity["run_id"],
-                    "case_id": identity["case_id"],
-                    "source_sha": identity["source_sha"],
-                    "wheel_sha256": identity["wheel_sha256"],
-                    "gpu_uuids": identity["gpu_uuids"],
-                    "evidence_dir": str(identity["evidence_dir"]),
-                }
-                identity_digest = hashlib.sha256(json.dumps(
-                    identity_contract, sort_keys=True, separators=(",", ":")
-                ).encode("utf-8")).digest()
-                world.require_engine_consensus(list(identity_digest))
                 if identity is not None:
 
                     def prepare_hardware_identity():
@@ -284,7 +291,7 @@ def main(argv=None, *, scorer_factory=None, manage_process_group=True):
                             host=socket.gethostname(),
                             device=str(device),
                             gpu=torch.cuda.get_device_name(device) if device.type == "cuda" else None,
-                            gpu_uuid=gpu_uuid_for_rank(world.rank, world.size),
+                            gpu_uuid=gpu_uuid_for_rank(world.rank, world.size, device=device),
                         )
 
                     hardware = world.checked("prepare CNOT rank/device receipt", prepare_hardware_identity)
@@ -299,7 +306,7 @@ def main(argv=None, *, scorer_factory=None, manage_process_group=True):
                     )
                 devices = [None] * world.size
                 if world.size > 1:
-                    dist.all_gather_object(devices, hardware)
+                    dist.all_gather_object(devices, hardware, group=world._control_group)
                 else:
                     devices[0] = hardware
 

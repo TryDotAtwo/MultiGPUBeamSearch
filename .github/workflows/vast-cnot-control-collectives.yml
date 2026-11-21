@@ -20,6 +20,7 @@ on:
       - tools/verify_cnot.py
       - tools/cnot_acceptance_events.py
       - tools/test_cnot_acceptance_events.py
+      - tools/test_cnot_gpu_identity.py
       - tools/verify_cnot_gpu_pair.py
       - tools/test_verify_cnot_gpu_pair.py
       - tools/fixtures/cnot_acceptance_event_v1.jsonl
@@ -34,6 +35,7 @@ on:
       - memory/CHANGELOG.md
       - rust/beam-**
       - integrations/cayleypy_native/multigpubeamsearch/cnot*.py
+      - integrations/cayleypy_native/multigpubeamsearch/gpu_identity.py
 permissions:
   contents: read
 
@@ -57,13 +59,16 @@ jobs:
           python-version: "3.11"
       - name: Compile source-only acceptance helpers
         id: compile_source
-        run: python -m py_compile tools/verify_permutation_cuda.py tools/verify_cnot.py tools/cnot_acceptance_events.py tools/test_cnot_acceptance_events.py tools/verify_cnot_gpu_pair.py tools/test_verify_cnot_gpu_pair.py tools/test_vast_result_transport.py tools/vast_instance_contract.py tools/test_vast_instance_contract.py tools/vast_private_preflight.py tools/test_vast_private_preflight.py integrations/cayleypy_native/tests/installed_verify_cnot_gloo_lifecycle.py
+        run: python -m py_compile tools/verify_permutation_cuda.py tools/verify_cnot.py tools/cnot_acceptance_events.py tools/test_cnot_acceptance_events.py tools/test_cnot_gpu_identity.py tools/verify_cnot_gpu_pair.py tools/test_verify_cnot_gpu_pair.py tools/test_vast_result_transport.py tools/vast_instance_contract.py tools/test_vast_instance_contract.py tools/vast_private_preflight.py tools/test_vast_private_preflight.py integrations/cayleypy_native/tests/installed_verify_cnot_gloo_lifecycle.py integrations/cayleypy_native/multigpubeamsearch/gpu_identity.py
       - name: Test the versioned per-invocation CNOT event verifier
         id: cnot_event_verifier
         run: python tools/test_cnot_acceptance_events.py -v
       - name: Test paired CNOT campaign receipt binding
         id: cnot_pair_verifier
         run: python tools/test_verify_cnot_gpu_pair.py -v
+      - name: Test physical GPU UUID selection with a CPU fake driver
+        id: cnot_gpu_identity
+        run: python tools/test_cnot_gpu_identity.py -v
       - name: Test target identity, hardware and lifetime budget with API fixtures
         id: instance_contract
         run: python tools/test_vast_instance_contract.py -v
@@ -101,6 +106,10 @@ jobs:
           subprocess.run(["bash", "-n", str(payload)], check=True)
           subprocess.run(["bash", "-n", str(worker_path)], check=True)
           stream5_source = Path("rust/beam-python/src/cnot_stream5.rs").read_text(encoding="utf-8")
+          rust_acceptance_source = Path("rust/beam-python/src/cnot_acceptance.rs").read_text(encoding="utf-8")
+          python_acceptance_source = Path("integrations/cayleypy_native/multigpubeamsearch/cnot_acceptance.py").read_text(encoding="utf-8")
+          cuda_identity_source = Path("integrations/cayleypy_native/multigpubeamsearch/gpu_identity.py").read_text(encoding="utf-8")
+          verify_cnot_source = Path("tools/verify_cnot.py").read_text(encoding="utf-8")
           archive_command = 'tar -czf "$archive" CMakeLists.txt Cargo.toml Cargo.lock cmake cuda integrations/cayleypy_native integrations/cnot_scorer native rust src tools tests'
           if archive_command not in source:
               raise SystemExit("the remote source archive must include root CMake test sources")
@@ -112,6 +121,14 @@ jobs:
               raise SystemExit("backend event validation must read completed per-case logs")
           if '--trace "${result_dir}/cuda-nccl.log"' in worker_text:
               raise SystemExit("do not read the outer tee log before the producer exits")
+          if "MGBS_CNOT_ACCEPTANCE_OBSERVED_GPU_UUID" not in python_acceptance_source or "MGBS_CNOT_ACCEPTANCE_OBSERVED_GPU_UUID" not in rust_acceptance_source:
+              raise SystemExit("the Rust and Python producers must use the observed CUDA-context UUID")
+          if "cuCtxGetDevice" not in cuda_identity_source or "cuDeviceGetUuid" not in cuda_identity_source:
+              raise SystemExit("physical GPU identity must come from the current CUDA context")
+          if "dist.all_gather_object(devices, hardware, group=world._control_group)" not in verify_cnot_source:
+              raise SystemExit("rank hardware metadata must use the Gloo control group")
+          if 'run_trained_case cnot-trained-qhat-1-gpu "${physical_gpu_uuids[0]}"' not in worker_text:
+              raise SystemExit("trained workers must expose devices by full physical UUID")
           for required in (
               'instance_id="$7"',
               'manifest_sha="$8"',
@@ -121,6 +138,7 @@ jobs:
               'MGBS_CNOT_OWNED_LIBRARY="$domain_library"',
               'BEAM_CNOT_OWNED_LIBRARY="$domain_library"',
               'stream5_active',
+              'MGBS_CNOT_ACCEPTANCE_OBSERVED_GPU_UUID',
           ):
               if required not in source and required not in payload_text and required not in worker_text and required not in stream5_source:
                   raise SystemExit(f"missing acceptance contract: {required}")
@@ -181,6 +199,7 @@ jobs:
           COMPILE_OUTCOME: ${{ steps.compile_source.outcome }}
           CNOT_EVENT_VERIFIER_OUTCOME: ${{ steps.cnot_event_verifier.outcome }}
           CNOT_PAIR_VERIFIER_OUTCOME: ${{ steps.cnot_pair_verifier.outcome }}
+          CNOT_GPU_IDENTITY_OUTCOME: ${{ steps.cnot_gpu_identity.outcome }}
           INSTANCE_CONTRACT_OUTCOME: ${{ steps.instance_contract.outcome }}
           PRIVATE_RECEIPT_OUTCOME: ${{ steps.private_receipt_test.outcome }}
           TRANSPORT_OUTCOME: ${{ steps.transport_test.outcome }}
@@ -196,6 +215,7 @@ jobs:
           - Python source compile: ${COMPILE_OUTCOME}
           - Versioned CNOT event serialization and negative verifier fixtures: ${CNOT_EVENT_VERIFIER_OUTCOME}
           - Final CNOT paired campaign report/per-rank identity verifier: ${CNOT_PAIR_VERIFIER_OUTCOME}
+          - Current CUDA-context UUID selection and matching receipts: ${CNOT_GPU_IDENTITY_OUTCOME}
           - New 2x RTX 3060 target and elapsed-cost contract: ${INSTANCE_CONTRACT_OUTCOME}
           - Pinned private manifest/checkpoint receipt parser: ${PRIVATE_RECEIPT_OUTCOME}
           - Extracted remote payload success/failure plus SSH result retrieval after key revocation: ${TRANSPORT_OUTCOME}

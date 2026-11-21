@@ -136,15 +136,15 @@ run_trained_case() {
     return "$case_exit"
   fi
 }
-run_trained_case cnot-trained-qhat-1-gpu 0 1 "${physical_gpu_uuids[0]}" \
+run_trained_case cnot-trained-qhat-1-gpu "${physical_gpu_uuids[0]}" 1 "${physical_gpu_uuids[0]}" \
   --case trained --backend nccl --mode qhat --engine rust --require-rust-scorer \
   --library "$scorer_library" --manifest "$manifest" \
   --output "${result_dir}/cnot-trained-qhat-1-gpu.json"
-run_trained_case cnot-trained-deep-paired-1-gpu 0 1 "${physical_gpu_uuids[0]}" \
+run_trained_case cnot-trained-deep-paired-1-gpu "${physical_gpu_uuids[0]}" 1 "${physical_gpu_uuids[0]}" \
   --case trained-deep --backend nccl --mode proposal --width 2 --engine rust --require-rust-scorer \
   --library "$scorer_library" --manifest "$manifest" \
   --output "${result_dir}/cnot-trained-deep-paired-1-gpu.json"
-run_trained_case cnot-trained-deep-paired-2-gpu 0,1 2 "${physical_gpu_uuids[0]},${physical_gpu_uuids[1]}" \
+run_trained_case cnot-trained-deep-paired-2-gpu "${physical_gpu_uuids[0]},${physical_gpu_uuids[1]}" 2 "${physical_gpu_uuids[0]},${physical_gpu_uuids[1]}" \
   --case trained-deep --backend nccl --mode proposal --width 2 --engine rust --require-rust-scorer \
   --library "$scorer_library" --manifest "$manifest" \
   --output "${result_dir}/cnot-trained-deep-paired-2-gpu.json"

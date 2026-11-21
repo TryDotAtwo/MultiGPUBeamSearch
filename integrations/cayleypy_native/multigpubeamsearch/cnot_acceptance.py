@@ -8,6 +8,11 @@ from pathlib import Path
 import re
 import sys
 
+try:
+    from .gpu_identity import observe_current_cuda_uuid
+except ImportError:  # standalone hosted protocol fixture
+    from gpu_identity import observe_current_cuda_uuid
+
 
 EVENT_SCHEMA = "org.trydotatwo.multigpubeamsearch.cnot.acceptance"
 EVENT_VERSION = 1
@@ -15,6 +20,7 @@ EVENT_PREFIX = "CNOT_ACCEPTANCE_EVENT "
 TOKEN_RE = re.compile(r"[A-Za-z0-9_-]+\Z")
 SHA40_RE = re.compile(r"[0-9a-fA-F]{40}\Z")
 SHA64_RE = re.compile(r"[0-9a-fA-F]{64}\Z")
+_OBSERVED_GPU_UUIDS = {}
 
 
 def acceptance_identity():
@@ -32,6 +38,8 @@ def acceptance_identity():
     gpu_uuids = [item.strip() for item in raw_uuids.split(",") if item.strip()]
     if not gpu_uuids or any(any(char.isspace() for char in item) for item in gpu_uuids):
         raise RuntimeError("CNOT acceptance requires physical GPU UUIDs")
+    if len(set(gpu_uuids)) != len(gpu_uuids):
+        raise RuntimeError("CNOT acceptance requires unique physical GPU UUIDs")
     evidence_dir = os.environ.get("CNOT_RUST_EVIDENCE")
     if not evidence_dir:
         raise RuntimeError("CNOT_RUST_EVIDENCE must identify the per-rank receipt root")
@@ -45,7 +53,7 @@ def acceptance_identity():
     }
 
 
-def gpu_uuid_for_rank(rank, world_size):
+def gpu_uuid_for_rank(rank, world_size, *, device=None, torch_module=None, driver=None):
     identity = acceptance_identity()
     if identity is None:
         return None
@@ -54,7 +62,30 @@ def gpu_uuid_for_rank(rank, world_size):
         raise RuntimeError(
             f"CNOT acceptance has {len(identity['gpu_uuids'])} GPU UUIDs for rank {rank}/{world_size}"
         )
-    return identity["gpu_uuids"][local_rank]
+    expected_uuid = identity["gpu_uuids"][local_rank]
+    if device is None:
+        if torch_module is None:
+            import torch as torch_module
+        device = torch_module.device("cuda", torch_module.cuda.current_device())
+    cache_key = (local_rank, str(device), expected_uuid)
+    observed_uuid = _OBSERVED_GPU_UUIDS.get(cache_key)
+    if observed_uuid is None:
+        observed_uuid = observe_current_cuda_uuid(
+            device, torch_module=torch_module, driver=driver
+        )
+        if observed_uuid != expected_uuid:
+            raise RuntimeError(
+                f"CNOT acceptance rank {rank} selected GPU {observed_uuid}, expected {expected_uuid}"
+            )
+        _OBSERVED_GPU_UUIDS[cache_key] = observed_uuid
+        os.environ["MGBS_CNOT_ACCEPTANCE_OBSERVED_GPU_UUID"] = observed_uuid
+    elif observed_uuid != expected_uuid:
+        raise RuntimeError(
+            f"CNOT acceptance rank {rank} selected GPU {observed_uuid}, expected {expected_uuid}"
+        )
+    elif os.environ.get("MGBS_CNOT_ACCEPTANCE_OBSERVED_GPU_UUID") != observed_uuid:
+        raise RuntimeError("CNOT acceptance observed GPU UUID changed during this process")
+    return observed_uuid
 
 
 def report_sha256(report):
@@ -69,7 +100,7 @@ def _event(identity, kind, world, fields):
     size = int(world.size)
     pid = os.getpid()
     device = str(world.device)
-    uuid = gpu_uuid_for_rank(rank, size)
+    uuid = gpu_uuid_for_rank(rank, size, device=world.device)
     if uuid is None:
         raise RuntimeError("acceptance event has no physical GPU UUID")
     if any(not isinstance(key, str) or not isinstance(value, str) for key, value in fields.items()):

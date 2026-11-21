@@ -3,7 +3,7 @@ use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::PyResult;
 use serde::Serialize;
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, BTreeSet},
     env,
     fs::{self, OpenOptions},
     io::Write,
@@ -84,6 +84,9 @@ pub(crate) fn identity() -> Result<Option<Identity>, String> {
             {
                 return Err("CNOT acceptance requires a comma-separated physical GPU UUID list".into());
             }
+            if gpu_uuids.iter().collect::<BTreeSet<_>>().len() != gpu_uuids.len() {
+                return Err("CNOT acceptance requires unique physical GPU UUIDs".into());
+            }
             let evidence_dir = PathBuf::from(required_environment("CNOT_RUST_EVIDENCE")?);
             if evidence_dir.as_os_str().is_empty() {
                 return Err("CNOT_RUST_EVIDENCE must identify the receipt root".into());
@@ -124,7 +127,7 @@ pub(crate) fn contract_fields(contract: &str) -> PyResult<BTreeMap<String, Strin
     Ok(fields)
 }
 
-fn local_gpu_uuid(identity: &Identity, rank: u32, world: u32) -> Result<&str, String> {
+fn local_gpu_uuid(identity: &Identity, rank: u32, world: u32) -> Result<String, String> {
     let local_rank = env::var("LOCAL_RANK")
         .ok()
         .and_then(|value| value.parse::<usize>().ok())
@@ -135,7 +138,14 @@ fn local_gpu_uuid(identity: &Identity, rank: u32, world: u32) -> Result<&str, St
             identity.gpu_uuids.len()
         ));
     }
-    Ok(&identity.gpu_uuids[local_rank])
+    let expected = &identity.gpu_uuids[local_rank];
+    let observed = required_environment("MGBS_CNOT_ACCEPTANCE_OBSERVED_GPU_UUID")?;
+    if &observed != expected {
+        return Err(format!(
+            "CNOT acceptance rank {rank} observed GPU {observed}, expected {expected}"
+        ));
+    }
+    Ok(observed)
 }
 
 fn encode_event(
@@ -194,7 +204,7 @@ pub(crate) fn emit(
         return Ok(());
     };
     let gpu_uuid = local_gpu_uuid(&identity, rank, world).map_err(PyRuntimeError::new_err)?;
-    let payload = encode_event(&identity, kind, rank, world, pid, device, gpu_uuid, fields)
+    let payload = encode_event(&identity, kind, rank, world, pid, device, &gpu_uuid, fields)
         .map_err(PyRuntimeError::new_err)?;
 
     let receipt_dir = identity.evidence_dir.join(&identity.run_id).join(&identity.case_id);

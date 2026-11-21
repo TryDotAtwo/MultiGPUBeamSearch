@@ -18,9 +18,12 @@ on:
       - tools/test_cnot_acceptance_events.py
       - tools/verify_cnot_gpu_pair.py
       - tools/test_verify_cnot_gpu_pair.py
+      - tools/test_cnot_gpu_identity.py
+      - integrations/cayleypy_native/multigpubeamsearch/gpu_identity.py
       - tools/fixtures/cnot_acceptance_event_v1.jsonl
       - integrations/cayleypy_native/tests/cnot_device_domain_admission_fixture.c
       - tools/verify_cnot.py
+      - integrations/cayleypy_native/multigpubeamsearch/cnot_acceptance.py
       - integrations/cayleypy_native/pyproject.toml
       - integrations/cayleypy_native/build_backend.py
       - integrations/cayleypy_native/multigpubeamsearch/**
@@ -117,6 +120,16 @@ jobs:
         run: |
           set -o pipefail
           python "$GITHUB_WORKSPACE/tools/test_verify_cnot_gpu_pair.py" -v 2>&1 | tee "$GITHUB_WORKSPACE/test_results/refactor_20261121/rust-cnot-admission/cnot-pair-verifier.log"
+      - name: Verify the installed wheel packages CUDA identity helper
+        id: wheel_gpu_identity
+        working-directory: ${{ runner.temp }}
+        run: |
+          python - <<'PY'
+          import multigpubeamsearch.gpu_identity as identity
+          assert callable(identity.observe_current_cuda_uuid)
+          print("INSTALLED_GPU_IDENTITY_HELPER=" + identity.__file__)
+          PY
+          python "$GITHUB_WORKSPACE/tools/test_cnot_gpu_identity.py" -v
       - name: Exercise verify_cnot World lifecycle with two Gloo ranks
         id: verify_cnot_lifecycle
         env:

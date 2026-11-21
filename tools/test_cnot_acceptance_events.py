@@ -14,6 +14,7 @@ import cnot_acceptance_events as protocol
 ROOT = Path(__file__).resolve().parent
 FIXTURE = ROOT / "fixtures" / "cnot_acceptance_event_v1.jsonl"
 PYTHON_PRODUCER_PATH = ROOT.parent / "integrations" / "cayleypy_native" / "multigpubeamsearch" / "cnot_acceptance.py"
+sys.path.insert(0, str(PYTHON_PRODUCER_PATH.parent))
 PYTHON_PRODUCER_SPEC = importlib.util.spec_from_file_location("cnot_acceptance_python_producer", PYTHON_PRODUCER_PATH)
 PYTHON_PRODUCER = importlib.util.module_from_spec(PYTHON_PRODUCER_SPEC)
 PYTHON_PRODUCER_SPEC.loader.exec_module(PYTHON_PRODUCER)
@@ -180,12 +181,45 @@ class AcceptanceEventProtocolTest(unittest.TestCase):
             "domain_sha256": DOMAIN_SHA, "checkpoint_sha256": CHECKPOINT_SHA,
             "search_manifest_sha256": MANIFEST_SHA, "scorer_library_sha256": SCORER_SHA,
         }
-        with mock.patch.dict(os.environ, environment), mock.patch.object(PYTHON_PRODUCER.os, "getpid", return_value=4000):
+        PYTHON_PRODUCER._OBSERVED_GPU_UUIDS.clear()
+        with mock.patch.dict(os.environ, environment), \
+                mock.patch.object(PYTHON_PRODUCER.os, "getpid", return_value=4000), \
+                mock.patch.object(PYTHON_PRODUCER, "observe_current_cuda_uuid", return_value="GPU-0001"):
             identity = PYTHON_PRODUCER.acceptance_identity()
             event = PYTHON_PRODUCER._event(identity, "backend_admission", world, fields)
+            self.assertEqual(os.environ.get("MGBS_CNOT_ACCEPTANCE_OBSERVED_GPU_UUID"), "GPU-0001")
         serialized = protocol.serialize_event(event)
         expected = FIXTURE.read_text(encoding="utf-8").strip().split(protocol.EVENT_PREFIX, 1)[1]
         self.assertEqual(serialized, expected)
+
+    def test_python_producer_rejects_a_uuid_that_differs_from_the_selected_gpu(self):
+        environment = {
+            "MGBS_CNOT_ACCEPTANCE_RUN_ID": "attempt-17",
+            "MGBS_CNOT_ACCEPTANCE_CASE": "trained-paired-1-gpu",
+            "MGBS_CNOT_ACCEPTANCE_SOURCE_SHA": SOURCE_SHA,
+            "MGBS_CNOT_ACCEPTANCE_WHEEL_SHA256": WHEEL_SHA,
+            "MGBS_CNOT_ACCEPTANCE_GPU_UUIDS": "GPU-expected",
+            "CNOT_RUST_EVIDENCE": str(ROOT / "unused-receipts"),
+        }
+        PYTHON_PRODUCER._OBSERVED_GPU_UUIDS.clear()
+        with mock.patch.dict(os.environ, environment), \
+                mock.patch.object(PYTHON_PRODUCER, "observe_current_cuda_uuid", return_value="GPU-other"):
+            identity = PYTHON_PRODUCER.acceptance_identity()
+            with self.assertRaisesRegex(RuntimeError, "selected GPU GPU-other, expected GPU-expected"):
+                PYTHON_PRODUCER.gpu_uuid_for_rank(0, 1, device="cuda:0")
+
+    def test_acceptance_rejects_duplicate_expected_physical_uuids(self):
+        environment = {
+            "MGBS_CNOT_ACCEPTANCE_RUN_ID": "attempt-17",
+            "MGBS_CNOT_ACCEPTANCE_CASE": "trained-paired-2-gpu",
+            "MGBS_CNOT_ACCEPTANCE_SOURCE_SHA": SOURCE_SHA,
+            "MGBS_CNOT_ACCEPTANCE_WHEEL_SHA256": WHEEL_SHA,
+            "MGBS_CNOT_ACCEPTANCE_GPU_UUIDS": "GPU-same,GPU-same",
+            "CNOT_RUST_EVIDENCE": str(ROOT / "unused-receipts"),
+        }
+        with mock.patch.dict(os.environ, environment):
+            with self.assertRaisesRegex(RuntimeError, "unique physical GPU UUIDs"):
+                PYTHON_PRODUCER.acceptance_identity()
 
     def test_world_one_and_two_receipts_validate_without_cross_run_merging(self):
         for world in (1, 2):

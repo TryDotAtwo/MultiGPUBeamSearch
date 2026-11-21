@@ -3475,3 +3475,11 @@ checked across ranks. These hosted checks validate control flow and receipt
 contracts only; they do not prove CUDA/NCCL execution. The physical gate stays
 pending until a matched installed-wheel run on one and two physical RTX 3060s
 passes with per-rank backend evidence and independent replay.
+
+For strict acceptance, each worker exposes the selected GPU through its full
+physical UUID in `CUDA_VISIBLE_DEVICES`, initializes that CUDA device, then
+reads the current context's device UUID through the CUDA driver. Python and
+Rust event producers and the result report use the observed UUID and compare
+it with the expected rank mapping. Host metadata is gathered over the Gloo
+control group. CPU fake-driver checks can validate mapping and rejection
+logic, but only physical runs confirm the selected 3060 devices.
