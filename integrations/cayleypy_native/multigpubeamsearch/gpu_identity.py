@@ -5,7 +5,7 @@ from dataclasses import dataclass
 import re
 import threading
 
-GPU_UUID_RE = re.compile(r"GPU-[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}\\Z")
+GPU_UUID_RE = re.compile(r"GPU-[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}\Z")
 
 @dataclass(frozen=True)
 class CudaDeviceObservation:
