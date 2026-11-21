@@ -88,7 +88,7 @@ def test_vendored_headers_invalidate_native_source_fingerprint(tmp_path, relativ
     prepare_native_source_tree(tmp_path)
     (tmp_path / "CMakeLists.txt").write_text("project(example)")
     header = tmp_path / relative
-    header.parent.mkdir(parents=True)
+    header.parent.mkdir(parents=True, exist_ok=True)
     header.write_text("vendor header version one")
 
     configuration = {"shape": shape_contract(contract()), "backend": "mlp", "sm": [86]}
