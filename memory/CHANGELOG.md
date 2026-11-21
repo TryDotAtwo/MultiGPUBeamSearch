@@ -3211,6 +3211,20 @@ Main commit `148b2a826a369b7601e904ea409e0cc5301c75c9` also passed the 260-test 
   leaves the reserved stop time intact; remote execution also preserves the
   result retrieval window. Private SSH retries share one phase deadline.
 - Hosted RED `44912127310` confirmed that the previous transport retrieved
-  results despite a synthetic deadline failure. The fix is being verified by
-  hosted CPU/Gloo and installed-wheel workflows. No Vast dispatch or physical
-  GPU run was started.
+  results despite a synthetic deadline failure. Hosted RED `44912845491`
+  exposed a one-second Decimal undercount at a repeating rate; exact rational
+  arithmetic now computes the deadline. Hosted CPU harness `44913195522`
+  passed the endpoint fixtures, budget phases, remote-payload execution and
+  success/failure retrieval. Its installed-wheel/GPU job was skipped. No Vast
+  dispatch or physical GPU run was started.
+
+## 2026-11-21 - Guard vendored native build inputs before Vast dispatch
+
+- Review found that the new-host source archive omitted `third_party/`, even
+  though permutation runner and scorer sources include nlohmann/json and
+  picosha2 headers from that tree. The native source fingerprint also omitted
+  `third_party`, allowing a stale build cache after a header change.
+- Added hosted regression coverage for real archive creation/extraction,
+  missing-header rejection and fingerprint changes for both vendored headers.
+  The source archive packager and fingerprint fix are not yet implemented;
+  hosted RED evidence is pending. No paid run was started.

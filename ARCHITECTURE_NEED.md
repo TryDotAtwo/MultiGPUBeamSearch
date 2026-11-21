@@ -14,9 +14,23 @@ instance с ровно двумя desktop RTX 3060 и остаётся в ост
 окно для извлечения receipt и частичных результатов. При нехватке времени
 следующая фаза не стартует. Остановка подтверждается свежим API readback.
 
-Hosted CPU gate на текущем SHA ещё проверяет этот контракт. Это не является
-физической CUDA/NCCL проверкой; для instance и GPU требуется отдельный
-acceptance receipt.
+Hosted CPU harness `44913195522` подтвердил выбор endpoint-пары, точную
+арифметику срока, пересчёт budget для каждой фазы, отказ при нехватке времени
+и сбор частичных результатов после ошибки. Installed-wheel и GPU job в этом
+push-run были `skipped`.
+
+Физический gate пока не готов к запуску. Workflow ещё получает SHA manifest
+GL4 с целевой машины во время preflight вместо сверки с доверенным staging
+receipt. До появления проверяемого pin и нового валидированного предложения
+2× desktop RTX 3060 физический dispatch запрещён. Hosted проверки не являются
+физической CUDA/NCCL проверкой.
+
+Дополнительный build blocker: acceptance source archive пока не включает
+`third_party/`, хотя ленивый permutation runner напрямую включает
+`nlohmann/json.hpp`, а scorer использует `picosha2.h`. Native
+`source_digest()` также не учитывает эти vendored headers. Hosted regression
+tests для archive extraction и изменения fingerprint добавлены; реализация и
+зелёное подтверждение ещё не выполнены.
 
 ## CNOT SIGINT handling across ranks, 2026-11-20
 

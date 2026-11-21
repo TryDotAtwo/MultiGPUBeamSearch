@@ -42,6 +42,22 @@ def test_abi_and_rust_changes_invalidate_native_cache(tmp_path, relative):
     assert source_digest(tmp_path)!=first
 
 
+@pytest.mark.parametrize("relative", [
+    "third_party/nlohmann/json.hpp",
+    "third_party/picosha2/picosha2.h",
+])
+def test_vendored_headers_invalidate_native_source_fingerprint(tmp_path, relative):
+    (tmp_path / "CMakeLists.txt").write_text("project(example)")
+    header = tmp_path / relative
+    header.parent.mkdir(parents=True)
+    header.write_text("vendor header version one")
+
+    first = source_digest(tmp_path)
+    header.write_text("vendor header version two")
+
+    assert source_digest(tmp_path) != first
+
+
 @pytest.mark.parametrize("logical,physical", [(8, 16), (72, 80), (88, 96), (96, 112), (120, 128), (128, 144)])
 def test_shape_reserves_metadata_padding(logical, physical):
     assert shape_contract(contract(logical))["storage_len"] == physical

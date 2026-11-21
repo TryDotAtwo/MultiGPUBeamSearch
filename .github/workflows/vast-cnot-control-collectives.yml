@@ -32,7 +32,10 @@ on:
       - tools/test_vast_private_preflight.py
       - tools/vast_result_transport.sh
       - tools/test_vast_result_transport.py
+      - tools/test_vast_source_archive.py
       - tools/vast_cnot_gpu_acceptance.sh
+      - integrations/cayleypy_native/tests/test_build.py
+      - integrations/cayleypy_native/multigpubeamsearch/build.py
       - integrations/cayleypy_native/tests/installed_verify_cnot_gloo_lifecycle.py
       - memory/CHANGELOG.md
       - rust/beam-**
@@ -61,7 +64,7 @@ jobs:
           python-version: "3.11"
       - name: Compile source-only acceptance helpers
         id: compile_source
-        run: python -m py_compile tools/verify_permutation_cuda.py tools/verify_cnot.py tools/cnot_acceptance_events.py tools/test_cnot_acceptance_events.py tools/test_cnot_gpu_identity.py tools/verify_cnot_gpu_pair.py tools/test_verify_cnot_gpu_pair.py tools/test_vast_result_transport.py tools/vast_instance_contract.py tools/test_vast_instance_contract.py tools/vast_budget_deadline.py tools/test_vast_budget_deadline.py tools/vast_private_preflight.py tools/test_vast_private_preflight.py integrations/cayleypy_native/tests/installed_verify_cnot_gloo_lifecycle.py integrations/cayleypy_native/multigpubeamsearch/gpu_identity.py
+        run: python -m py_compile tools/verify_permutation_cuda.py tools/verify_cnot.py tools/cnot_acceptance_events.py tools/test_cnot_acceptance_events.py tools/test_cnot_gpu_identity.py tools/verify_cnot_gpu_pair.py tools/test_verify_cnot_gpu_pair.py tools/test_vast_result_transport.py tools/test_vast_source_archive.py tools/vast_instance_contract.py tools/test_vast_instance_contract.py tools/vast_budget_deadline.py tools/test_vast_budget_deadline.py tools/vast_private_preflight.py tools/test_vast_private_preflight.py integrations/cayleypy_native/tests/installed_verify_cnot_gloo_lifecycle.py integrations/cayleypy_native/multigpubeamsearch/gpu_identity.py
       - name: Test the versioned per-invocation CNOT event verifier
         id: cnot_event_verifier
         run: python tools/test_cnot_acceptance_events.py -v
@@ -83,6 +86,12 @@ jobs:
       - name: Test extracted remote payload and result retrieval
         id: transport_test
         run: python tools/test_vast_result_transport.py -v
+      - name: Test packaged source archive and vendored headers
+        id: source_archive_test
+        run: |
+          set -o pipefail
+          mkdir -p test_results/refactor_20261121/vast-source-archive
+          python tools/test_vast_source_archive.py -v 2>&1 | tee test_results/refactor_20261121/vast-source-archive/archive-test.log
       - name: Syntax-check embedded remote Bash and Python payloads
         id: syntax_check
         shell: bash
@@ -209,6 +218,7 @@ jobs:
           BUDGET_DEADLINE_OUTCOME: ${{ steps.budget_deadline.outcome }}
           PRIVATE_RECEIPT_OUTCOME: ${{ steps.private_receipt_test.outcome }}
           TRANSPORT_OUTCOME: ${{ steps.transport_test.outcome }}
+          SOURCE_ARCHIVE_OUTCOME: ${{ steps.source_archive_test.outcome }}
           SYNTAX_OUTCOME: ${{ steps.syntax_check.outcome }}
         shell: bash
         run: |
@@ -226,6 +236,7 @@ jobs:
           - Absolute per-phase deadline and stop-reserve checks: ${BUDGET_DEADLINE_OUTCOME}
           - Pinned private manifest/checkpoint receipt parser: ${PRIVATE_RECEIPT_OUTCOME}
           - Extracted remote payload success/failure plus SSH result retrieval after key revocation: ${TRANSPORT_OUTCOME}
+          - Source archive contains and extracts the vendored build headers: ${SOURCE_ARCHIVE_OUTCOME}
           - Remote Bash and embedded Python syntax: ${SYNTAX_OUTCOME}
           - This receipt does not claim CUDA, NCCL, or private-checkpoint acceptance.
           EOF
@@ -234,7 +245,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: gpu-acceptance-source-${{ github.run_id }}
-          path: ${{ runner.temp }}/gpu-acceptance-source/GITHUB_STATUS.md
+          path: |
+            ${{ runner.temp }}/gpu-acceptance-source/GITHUB_STATUS.md
+            test_results/refactor_20261121/vast-source-archive/archive-test.log
           if-no-files-found: error
           retention-days: 30
 
