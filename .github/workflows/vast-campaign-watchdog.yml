@@ -41,24 +41,32 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          report="test_results/refactor_20261121/vast-campaign-watchdog/watchdog-${GITHUB_RUN_ID}.json"
-          python3 tools/vast_campaign_watchdog.py --report "$report"
-          python3 - "$report" "$GITHUB_STEP_SUMMARY" <<'PY'
-          import json, pathlib, sys
-          report = json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))
-          rows = report.get("campaigns", [])
-          with pathlib.Path(sys.argv[2]).open("a", encoding="utf-8") as output:
-              output.write("## Vast campaign watchdog\n\n")
-              output.write(f"- Marked campaigns inspected: {len(rows)}\n")
-              output.write(f"- Confirmed stopped: {sum(bool(row.get('confirmed')) for row in rows)}\n")
-              output.write(f"- Errors: {len(report.get('errors', []))}\n")
-              output.write("- Stopped instances retain storage billing; this workflow does not delete data.\n")
-          PY
-      - name: Upload stop/readback evidence
-        if: always() && (steps.watchdog.outputs.campaigns_found == 'true' || github.event_name == 'workflow_run' || failure())
+          report="${RUNNER_TEMP}/vast-campaign-watchdog-private.json"
+          if python3 tools/vast_campaign_watchdog.py --report "$report" >/dev/null 2>&1; then
+            echo "watchdog_result=completed" >> "$GITHUB_OUTPUT"
+          else
+            echo "watchdog_result=failed" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
+      - name: Write redacted watchdog status
+        if: always()
+        env:
+          WATCHDOG_OUTCOME: ${{ steps.watchdog.outcome }}
+        shell: bash
+        run: |
+          python3 tools/vast_public_status.py \
+            --inventory-query not_run \
+            --preflight-outcome skipped \
+            --gpu-outcome skipped \
+            --cleanup-outcome skipped \
+            --watchdog-outcome "$WATCHDOG_OUTCOME" \
+            --output "${RUNNER_TEMP}/cnot-public-status.json" \
+            --summary "$GITHUB_STEP_SUMMARY"
+      - name: Upload redacted watchdog status
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: vast-campaign-watchdog-${{ github.run_id }}
-          path: test_results/refactor_20261121/vast-campaign-watchdog/
-          if-no-files-found: warn
-          retention-days: 30
+          name: vast-watchdog-status-${{ github.run_id }}
+          path: ${{ runner.temp }}/cnot-public-status.json
+          if-no-files-found: error
+          retention-days: 7
