@@ -101,3 +101,6 @@ Keep an active goal until the migration and required verification are complete.
 
 
 2026-11-22 CNOT reference-order acceptance follow-up: compare the selected cutoff against independently computed scorer reference values. Report a determinate separated boundary, exact ties under the full existing path-word tie-break, or an explicitly ambiguous boundary within the scoring tolerance. Keep this in the verifier only; do not change search, scorer, kernels, precision or numerical policy. Run the fixtures through the installed wheel and keep physical CUDA/NCCL acceptance separate.
+
+
+2026-11-22: Иван заменил прежнюю фиксированную постановку кампании на измерительную цель для CNOT: довести полную модель и глобальный GPU beam search до воспроизводимого запуска с независимым точным replay; измерить качество в зависимости от принятых обновлений, wall time и полной стоимости; выбрать самый дешёвый подтверждённый режим с практическим выигрышем над базовым поиском либо зафиксировать проверенный диапазон без выигрыша. Устройство, объём обучения и геометрия поиска выбираются по данным. Ресурсные разрешения, владение, бюджет, приватность данных и подтверждение cleanup остаются отдельными обязательными gate; зелёный hosted CI не доказывает физический GPU/NCCL запуск.
