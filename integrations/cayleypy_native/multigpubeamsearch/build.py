@@ -10,6 +10,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 from pathlib import Path
 from pathlib import PurePosixPath
 import shutil
@@ -20,6 +21,41 @@ from typing import Any
 
 from .errors import NativeBackendError, NativeUnavailable
 
+
+
+def acceptance_rank_trace_identity(environment=None):
+    """Return the strict, opt-in identity for a physical acceptance build/run."""
+    environment = os.environ if environment is None else environment
+    enabled = environment.get("MGBS_ACCEPTANCE_RANK_TRACE", "0")
+    if enabled == "0":
+        if any(name in environment for name in (
+            "MGBS_ACCEPTANCE_RUN_ID", "MGBS_ACCEPTANCE_CASE_ID",
+            "MGBS_ACCEPTANCE_SOURCE_SHA", "MGBS_ACCEPTANCE_WHEEL_SHA256",
+        )):
+            raise NativeBackendError("acceptance rank-trace identity was supplied while tracing is disabled")
+        return None
+    if enabled != "1":
+        raise NativeBackendError("MGBS_ACCEPTANCE_RANK_TRACE must be exactly 0 or 1")
+    identity = {
+        "run_id": environment.get("MGBS_ACCEPTANCE_RUN_ID", ""),
+        "case_id": environment.get("MGBS_ACCEPTANCE_CASE_ID", ""),
+        "source_sha": environment.get("MGBS_ACCEPTANCE_SOURCE_SHA", ""),
+        "wheel_sha256": environment.get("MGBS_ACCEPTANCE_WHEEL_SHA256", ""),
+    }
+    for name in ("run_id", "case_id"):
+        if re.fullmatch(r"[A-Za-z0-9_.-]+", identity[name]) is None:
+            raise NativeBackendError(f"MGBS_ACCEPTANCE_{name.upper()} must be a portable nonempty label")
+    for name, digits in (("source_sha", 40), ("wheel_sha256", 64)):
+        value = identity[name]
+        if re.fullmatch(rf"[0-9a-f]{{{digits}}}", value) is None:
+            raise NativeBackendError(f"MGBS_ACCEPTANCE_{name.upper()} must be a lowercase SHA256/Git digest")
+    return identity
+
+
+def _validate_acceptance_rank_trace(metadata: dict, requested: bool) -> None:
+    observed = metadata.get("acceptance_rank_trace", False)
+    if type(observed) is not bool or observed != requested:
+        raise NativeBackendError("runner acceptance rank-trace build mode does not match the request")
 
 def file_sha256(path: Path) -> str:
     digest = hashlib.sha256()
@@ -248,9 +284,11 @@ def configure_command(source: Path, build_dir: Path, cutlass: Path, contract,
 
 
 def ensure_runner(contract, model, options, architectures: tuple[int, ...], run_dir: Path, *, nccl_digest_cache=None) -> tuple[Path, dict[str, Any]]:
+    acceptance_trace = acceptance_rank_trace_identity() is not None
     if options.runner_path is not None:
         metadata = validate_runner(options.runner_path, contract, model.backend, architectures)
         _validate_index_sort(metadata, options.experimental_index_sort)
+        _validate_acceptance_rank_trace(metadata, acceptance_trace)
         observed = metadata.get("inference_backend", "cutlass")
         if observed != options.inference_backend:
             raise NativeUnavailable("existing runner inference backend does not match GPU selection")

@@ -1,3 +1,9 @@
+## 2026-11-21 - Add acceptance-only saturated permutation GPU evidence
+
+- Added an opt-in native build identity for the permutation acceptance trace. The trace binds run/case/call, source and installed-wheel hashes, native build and binary hashes, rank/PID, CUDA UUID observed from the active context, shard count, and a bounded post-cutoff frontier snapshot.
+- Added a deterministic LRX(4) width-3 CPU oracle and installed-wheel verifier path alongside the existing width-64 smoke. The new path runs two calls in one Rust session for one and two GPUs and checks exact global survivors and independent replay. No kernel or numerical policy changed.
+- Status at this commit: hosted CI pending; physical 1/2-GPU validation not run. Vast dispatch stays gated on the previously documented cost and staging checks.
+
 ## 2026-11-21 - Add saturated permutation acceptance contracts
 
 - Implemented an independent CPU oracle for the existing Hash128 owner/shard order, full-hash dedup, equal-score tie cutoff and contiguous rank partition. The hosted CPU gate now checks a saturated width-3 LRX(4) fixture, cross-rank duplicate states, run/call-bound rank traces and zero padding. Physical CUDA trace wiring follows separately.

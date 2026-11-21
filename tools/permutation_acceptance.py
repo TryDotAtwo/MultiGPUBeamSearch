@@ -68,6 +68,7 @@ class MT19937_64:
 @dataclass(frozen=True)
 class Candidate:
     state: tuple[int, ...]
+    path: tuple[int, ...]
     hash128: tuple[int, int]  # (lo, hi), matching the C++ storage layout
     source_rank: int
     owner_rank: int
@@ -202,6 +203,7 @@ def _step(
     for source_rank, frontier in enumerate(frontier_by_rank):
         for parent_idx, parent in enumerate(frontier):
             parent_state = tuple(parent) if initial else parent.state
+            parent_path = () if initial else parent.path
             for move_id, generator in enumerate(generators):
                 child = _move(parent_state, generator)
                 h = hash_state(child)
@@ -213,6 +215,7 @@ def _step(
                 payload_id = parent_idx * len(generators) + move_id
                 candidate = Candidate(
                     state=child,
+                    path=parent_path + (move_id,),
                     hash128=h,
                     source_rank=source_rank,
                     owner_rank=owner_rank,
@@ -419,8 +422,10 @@ def validate_depth_flow_trace(
     depth: int,
     beam_width: int,
     source_sha: str | None = None,
+    wheel_sha256: str | None = None,
     build_key: str | None = None,
     binary_sha256: str | None = None,
+    require_frontier_snapshot: bool = False,
 ) -> tuple[dict[str, object], ...]:
     """Validate one complete, saturated trace call without merging other runs."""
     for name, value in (("run_id", run_id), ("case_id", case_id)):
@@ -428,6 +433,20 @@ def validate_depth_flow_trace(
             raise ValueError(f"{name} must be a nonempty portable label")
     if world_size not in (1, 2) or beam_width <= 0 or depth < 0 or call_id <= 0:
         raise ValueError("invalid trace topology, width, depth or call identity")
+    expected_digests = (
+        ("source_sha", source_sha, 40),
+        ("wheel_sha256", wheel_sha256, 64),
+        ("build_key", build_key, 64),
+        ("binary_sha256", binary_sha256, 64),
+    )
+    for name, value, digits in expected_digests:
+        if value is not None and (
+            not isinstance(value, str)
+            or len(value) != digits
+            or any(character not in "0123456789abcdef" for character in value.lower())
+        ):
+            raise ValueError(f"{name} must be a {digits}-digit hexadecimal digest")
+
     selected = [
         record
         for record in _parse_trace(log)
@@ -468,8 +487,12 @@ def validate_depth_flow_trace(
         if not _HEX_UUID.fullmatch(gpu_uuid):
             raise ValueError("rank trace lacks an observed CUDA GPU UUID")
         row["gpu_uuid"] = gpu_uuid.lower().removeprefix("gpu-")
+        if require_frontier_snapshot and not record.get("frontier_snapshot"):
+            raise ValueError("rank trace lacks its frontier snapshot path")
         if source_sha is not None and record.get("source_sha") != source_sha:
             raise ValueError("rank trace source SHA differs from this acceptance case")
+        if wheel_sha256 is not None and record.get("wheel_sha256") != wheel_sha256:
+            raise ValueError("rank trace wheel SHA256 differs from this acceptance case")
         if build_key is not None and record.get("build_key") != build_key:
             raise ValueError("rank trace native build key differs from the accepted binary")
         if binary_sha256 is not None and record.get("binary_sha256") != binary_sha256:
@@ -486,7 +509,7 @@ def validate_depth_flow_trace(
         raise ValueError("rank traces do not identify distinct physical GPUs")
     shared = (
         "final_global_less", "final_global_equal", "final_total_available",
-        "final_global_keep", "shard_count", "source_sha", "build_key", "binary_sha256",
+        "final_global_keep", "shard_count", "source_sha", "wheel_sha256", "build_key", "binary_sha256",
     )
     for key in shared:
         if len({row.get(key) for row in rows}) != 1:
@@ -497,6 +520,10 @@ def validate_depth_flow_trace(
     keep = int(rows[0]["final_global_keep"])
     if less != 0 or equal <= beam_width or available <= beam_width or keep != beam_width:
         raise ValueError("depth is not an exact, saturated equal-score global cutoff")
+    if sum(int(row["final_candidate_count"]) for row in rows) != available:
+        raise ValueError("rank candidate counts do not sum to the global deduplicated input")
+    if sum(int(row["final_request_count"]) for row in rows) != keep:
+        raise ValueError("rank final requests do not sum to the exact global beam width")
     if sum(int(row["next_frontier_size"]) for row in rows) != beam_width:
         raise ValueError("rank-local output counts do not sum to the requested global width")
     return tuple(rows)

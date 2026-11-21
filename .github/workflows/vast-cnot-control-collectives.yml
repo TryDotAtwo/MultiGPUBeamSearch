@@ -17,7 +17,12 @@ on:
       - "codex/beam-*"
     paths:
       - .github/workflows/vast-cnot-control-collectives.yml
+      - CMakeLists.txt
+      - tools/production_runner.cu
       - tools/verify_permutation_cuda.py
+      - tools/permutation_acceptance.py
+      - tools/test_permutation_acceptance.py
+      - tools/vast_cnot_gpu_acceptance.sh
       - tools/verify_cnot.py
       - tools/cnot_acceptance_events.py
       - tools/test_cnot_acceptance_events.py
@@ -75,7 +80,7 @@ jobs:
           python-version: "3.11"
       - name: Compile source-only acceptance helpers
         id: compile_source
-        run: python -m py_compile tools/verify_permutation_cuda.py tools/verify_cnot.py tools/cnot_acceptance_events.py tools/test_cnot_acceptance_events.py tools/test_cnot_gpu_identity.py tools/verify_cnot_gpu_pair.py tools/test_verify_cnot_gpu_pair.py tools/test_vast_result_transport.py tools/test_vast_source_archive.py tools/create_vast_source_archive.py tools/vast_instance_contract.py tools/test_vast_instance_contract.py tools/vast_budget_deadline.py tools/test_vast_budget_deadline.py tools/vast_campaign_guard.py tools/test_vast_campaign_guard.py tools/vast_campaign_watchdog.py tools/test_vast_campaign_watchdog.py tools/test_vast_campaign_workflow.py tools/vast_private_preflight.py tools/test_vast_private_preflight.py integrations/cayleypy_native/tests/installed_verify_cnot_gloo_lifecycle.py integrations/cayleypy_native/multigpubeamsearch/gpu_identity.py
+        run: python -m py_compile tools/verify_permutation_cuda.py tools/permutation_acceptance.py tools/test_permutation_acceptance.py tools/verify_cnot.py tools/cnot_acceptance_events.py tools/test_cnot_acceptance_events.py tools/test_cnot_gpu_identity.py tools/verify_cnot_gpu_pair.py tools/test_verify_cnot_gpu_pair.py tools/test_vast_result_transport.py tools/test_vast_source_archive.py tools/create_vast_source_archive.py tools/vast_instance_contract.py tools/test_vast_instance_contract.py tools/vast_budget_deadline.py tools/test_vast_budget_deadline.py tools/vast_campaign_guard.py tools/test_vast_campaign_guard.py tools/vast_campaign_watchdog.py tools/test_vast_campaign_watchdog.py tools/test_vast_campaign_workflow.py tools/vast_private_preflight.py tools/test_vast_private_preflight.py integrations/cayleypy_native/tests/installed_verify_cnot_gloo_lifecycle.py integrations/cayleypy_native/multigpubeamsearch/gpu_identity.py
       - name: Test the versioned per-invocation CNOT event verifier
         id: cnot_event_verifier
         run: python tools/test_cnot_acceptance_events.py -v

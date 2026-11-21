@@ -6,9 +6,14 @@ from __future__ import annotations
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import patch
 
 import cayleypy as cp
-from multigpubeamsearch.build import configure_command
+from multigpubeamsearch.build import (
+    acceptance_rank_trace_identity,
+    configure_command,
+    _validate_acceptance_rank_trace,
+)
 from multigpubeamsearch.contracts import GraphContract
 from permutation_acceptance import (
     MT19937_64,
@@ -35,6 +40,7 @@ def _trace(rank: int, *, pid: int, gpu_uuid: str, run_id="run-42", case_id="perm
         "final_candidate_count": 11 if rank == 0 else 8,
         "final_request_count": 2 if rank == 0 else 1,
         "next_frontier_size": 2 if rank == 0 else 1,
+        "frontier_snapshot": f"/tmp/acceptance_frontier_call_2_rank_{rank}.bin",
     }
     return "depth_flow_trace " + " ".join(f"{key}={value}" for key, value in fields.items())
 
@@ -42,6 +48,35 @@ def _trace(rank: int, *, pid: int, gpu_uuid: str, run_id="run-42", case_id="perm
 class PermutationAcceptanceTests(unittest.TestCase):
     def test_mt19937_64_matches_std_engine_seed_vector(self):
         self.assertEqual(MT19937_64(5489).next(), 14514284786278117030)
+
+    def test_acceptance_trace_identity_is_strict_and_opt_in(self):
+        with patch.dict("os.environ", {}, clear=True):
+            self.assertIsNone(acceptance_rank_trace_identity())
+        identity = {
+            "MGBS_ACCEPTANCE_RANK_TRACE": "1",
+            "MGBS_ACCEPTANCE_RUN_ID": "run-42",
+            "MGBS_ACCEPTANCE_CASE_ID": "permutation-saturated-b3-world-2",
+            "MGBS_ACCEPTANCE_SOURCE_SHA": "a" * 40,
+            "MGBS_ACCEPTANCE_WHEEL_SHA256": "b" * 64,
+        }
+        with patch.dict("os.environ", identity, clear=True):
+            self.assertEqual(acceptance_rank_trace_identity(), {
+                "run_id": "run-42",
+                "case_id": "permutation-saturated-b3-world-2",
+                "source_sha": "a" * 40,
+                "wheel_sha256": "b" * 64,
+            })
+        with patch.dict("os.environ", {**identity, "MGBS_ACCEPTANCE_WHEEL_SHA256": "bad"}, clear=True):
+            with self.assertRaisesRegex(Exception, "MGBS_ACCEPTANCE_WHEEL_SHA256"):
+                acceptance_rank_trace_identity()
+
+    def test_acceptance_trace_runner_metadata_must_match_requested_mode(self):
+        _validate_acceptance_rank_trace({"acceptance_rank_trace": True}, True)
+        _validate_acceptance_rank_trace({}, False)
+        with self.assertRaisesRegex(Exception, "does not match"):
+            _validate_acceptance_rank_trace({}, True)
+        with self.assertRaisesRegex(Exception, "does not match"):
+            _validate_acceptance_rank_trace({"acceptance_rank_trace": True}, False)
 
     def test_trace_build_flag_is_explicit_and_off_by_default(self):
         contract = SimpleNamespace(state_len=4, move_count=16)
@@ -84,6 +119,11 @@ class PermutationAcceptanceTests(unittest.TestCase):
         self.assertGreater(two_gpu.cross_source_duplicate_count, 0)
         self.assertEqual(tuple(map(len, two_gpu.frontier_by_rank)), (2, 1))
         self.assertEqual(len({c.hash128 for c in two_gpu.ordered_survivors}), 3)
+        self.assertEqual(
+            tuple(candidate.hash128 for candidate in fixture.worlds[1].steps[1].ordered_survivors),
+            tuple(candidate.hash128 for candidate in fixture.worlds[2].steps[1].ordered_survivors),
+            "B=3 tie-break must return the same ordered full Hash128 winners on one and two GPUs",
+        )
 
     def test_trace_binds_call_case_and_both_observed_rank_devices(self):
         log = "\n".join((
@@ -95,6 +135,7 @@ class PermutationAcceptanceTests(unittest.TestCase):
             call_id=2, world_size=2, depth=1, beam_width=3,
             source_sha="a" * 40, wheel_sha256="b" * 64,
             build_key="c" * 64, binary_sha256="d" * 64,
+            require_frontier_snapshot=True,
         )
         self.assertEqual(tuple(row["rank"] for row in rows), (0, 1))
         self.assertEqual(tuple(row["gpu_uuid"] for row in rows), ("0" * 32, "1" * 32))
@@ -111,6 +152,7 @@ class PermutationAcceptanceTests(unittest.TestCase):
             "\n".join((rows[0], rows[1].replace("run_id=run-42", "run_id=foreign"))),
             "\n".join((rows[0], rows[1].replace("final_global_keep=3", "final_global_keep=2"))),
             "\n".join((rows[0], rows[1].replace("final_global_equal=19", "final_global_equal=3"))),
+            "\n".join((rows[0], rows[1].replace("final_candidate_count=8", "final_candidate_count=2"))),
         )
         for log in cases:
             with self.subTest(log=log):
@@ -119,6 +161,18 @@ class PermutationAcceptanceTests(unittest.TestCase):
                         log, run_id="run-42", case_id="permutation-saturated-b3",
                         call_id=2, world_size=2, depth=1, beam_width=3,
                     )
+
+    def test_cpp_producer_emits_acceptance_identity_and_observed_device(self):
+        source = Path(__file__).with_name("production_runner.cu").read_text(encoding="utf-8")
+        for token in (
+            "MGBS_ACCEPTANCE_RANK_TRACE", "MGBS_ACCEPTANCE_RUN_ID",
+            "MGBS_ACCEPTANCE_CASE_ID", "MGBS_ACCEPTANCE_SOURCE_SHA",
+            "MGBS_ACCEPTANCE_WHEEL_SHA256", "MGBS_ACCEPTANCE_BUILD_KEY",
+            "MGBS_ACCEPTANCE_BINARY_SHA256", "cudaGetDevice(&active_cuda_device)",
+            "cudaDeviceGetUuid(&active_cuda_uuid", "frontier_snapshot=",
+        ):
+            with self.subTest(token=token):
+                self.assertIn(token, source)
 
     def test_frontier_snapshot_checks_shape_and_zero_padding(self):
         raw = bytes((1, 0, 2, 3)) + bytes(12) + bytes((3, 2, 1, 0)) + bytes(12)

@@ -5076,13 +5076,63 @@ int run_production_runner(int argc, char** argv) {
 #if BEAM_DEBUG_DEPTH_FLOW_TRACE
         // Opt-in, bounded diagnostic snapshots. Compiled out of release runs;
         // the offline checker compares logical states across all ranks.
+        const char* acceptance_trace_value = std::getenv("MGBS_ACCEPTANCE_RANK_TRACE");
+        const bool acceptance_trace_enabled = acceptance_trace_value != nullptr &&
+            std::strcmp(acceptance_trace_value, "1") == 0;
+        if (acceptance_trace_value != nullptr && std::strcmp(acceptance_trace_value, "0") != 0 &&
+            !acceptance_trace_enabled) {
+            throw std::runtime_error("MGBS_ACCEPTANCE_RANK_TRACE must be exactly 0 or 1");
+        }
+        std::string acceptance_run_id;
+        std::string acceptance_case_id;
+        std::string acceptance_source_sha;
+        std::string acceptance_wheel_sha256;
+        std::string acceptance_build_key;
+        std::string acceptance_binary_sha256;
+        std::string acceptance_gpu_uuid;
+        std::filesystem::path acceptance_snapshot_path;
+        if (acceptance_trace_enabled) {
+            if (world_size > 2U) {
+                throw std::runtime_error("acceptance rank trace supports only one or two ranks");
+            }
+            const auto required_trace_value = [](const char* name) {
+                const auto value = required_env_path(name).string();
+                if (value.find_first_of(" \t\r\n") != std::string::npos) {
+                    throw std::runtime_error(std::string("acceptance trace value contains whitespace: ") + name);
+                }
+                return value;
+            };
+            acceptance_run_id = required_trace_value("MGBS_ACCEPTANCE_RUN_ID");
+            acceptance_case_id = required_trace_value("MGBS_ACCEPTANCE_CASE_ID");
+            acceptance_source_sha = required_trace_value("MGBS_ACCEPTANCE_SOURCE_SHA");
+            acceptance_wheel_sha256 = required_trace_value("MGBS_ACCEPTANCE_WHEEL_SHA256");
+            acceptance_build_key = required_trace_value("MGBS_ACCEPTANCE_BUILD_KEY");
+            acceptance_binary_sha256 = required_trace_value("MGBS_ACCEPTANCE_BINARY_SHA256");
+            int active_cuda_device = -1;
+            BEAM_CUDA_CHECK(cudaGetDevice(&active_cuda_device));
+            cudaUUID_t active_cuda_uuid{};
+            BEAM_CUDA_CHECK(cudaDeviceGetUuid(&active_cuda_uuid, active_cuda_device));
+            std::ostringstream uuid_text;
+            uuid_text << std::hex << std::setfill('0');
+            for (const auto byte : active_cuda_uuid.bytes) {
+                uuid_text << std::setw(2) << static_cast<unsigned int>(static_cast<unsigned char>(byte));
+            }
+            acceptance_gpu_uuid = uuid_text.str();
+        }
         const auto frontier_dump_dir = env_path("BEAM_DEBUG_FRONTIER_DUMP_DIR", "");
-        if (!frontier_dump_dir.empty()) {
-            if (frontier_size > 1048576ULL || !std::filesystem::is_directory(frontier_dump_dir)) {
+        const bool acceptance_snapshot = acceptance_trace_enabled && depth == 1U;
+        if (!frontier_dump_dir.empty() || acceptance_snapshot) {
+            const auto dump_dir = frontier_dump_dir.empty()
+                ? std::filesystem::current_path()
+                : frontier_dump_dir;
+            if (frontier_size > 1048576ULL || !std::filesystem::is_directory(dump_dir)) {
                 throw std::runtime_error("invalid bounded frontier snapshot request");
             }
-            const auto dump_path = frontier_dump_dir /
-                ("depth_" + std::to_string(depth) + "_rank_" + std::to_string(rank) + ".bin");
+            const auto dump_name = acceptance_snapshot
+                ? "acceptance_frontier_call_" + std::to_string(task_index + 1U) + "_rank_" +
+                    std::to_string(rank) + ".bin"
+                : "depth_" + std::to_string(depth) + "_rank_" + std::to_string(rank) + ".bin";
+            const auto dump_path = dump_dir / dump_name;
             if (std::filesystem::exists(dump_path)) {
                 throw std::runtime_error("frontier snapshot already exists");
             }
@@ -5096,6 +5146,9 @@ int run_production_runner(int argc, char** argv) {
                        static_cast<std::streamsize>(snapshot.size() * sizeof(State128)));
             dump.close();
             if (!dump) throw std::runtime_error("frontier snapshot write failed");
+            if (acceptance_snapshot) {
+                acceptance_snapshot_path = std::filesystem::absolute(dump_path);
+            }
         }
         std::cout << "depth_flow_trace"
                   << " rank=" << rank
@@ -5126,8 +5179,29 @@ int run_production_runner(int argc, char** argv) {
                   << " final_threshold=" << final_state.final_threshold
                   << " final_candidate_count=" << final_state.final_candidate_count
                   << " final_request_count=" << final_state.final_request_count
-                  << " next_frontier_size=" << final_state.next_frontier_size
-                  << "\n";
+                  << " next_frontier_size=" << final_state.next_frontier_size;
+        if (acceptance_trace_enabled) {
+#if defined(__linux__)
+            const auto process_id = static_cast<std::uint64_t>(::getpid());
+#else
+            const std::uint64_t process_id = 0U;
+#endif
+            std::cout << " run_id=" << acceptance_run_id
+                      << " case_id=" << acceptance_case_id
+                      << " call_id=" << (task_index + 1U)
+                      << " world_size=" << world_size
+                      << " source_sha=" << acceptance_source_sha
+                      << " wheel_sha256=" << acceptance_wheel_sha256
+                      << " build_key=" << acceptance_build_key
+                      << " binary_sha256=" << acceptance_binary_sha256
+                      << " pid=" << process_id
+                      << " gpu_uuid=" << acceptance_gpu_uuid
+                      << " shard_count=" << config.shard_count;
+            if (!acceptance_snapshot_path.empty()) {
+                std::cout << " frontier_snapshot=" << acceptance_snapshot_path.string();
+            }
+        }
+        std::cout << "\n";
 #endif
         const auto depth_end = std::chrono::steady_clock::now();
         const double depth_sec = std::chrono::duration<double>(depth_end - depth_start).count();

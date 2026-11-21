@@ -160,7 +160,7 @@ export TORCH_EXTENSIONS_DIR="${run_root}/torch-extensions"
 export RUST_BACKTRACE=1
 mkdir -p "$CNOT_RUST_EVIDENCE"
 MGBS_TQP_LIBRARY="$scorer_library" MGBS_TQP_MANIFEST="$manifest" "$wheel_python" -m unittest discover -s "$source_dir/integrations/cayleypy_native/tests" -p test_cnot_scorer.py -v
-"$wheel_python" "$source_dir/tools/verify_permutation_cuda.py" --source-dir "$source_dir" --cache-dir "${run_root}/permutation-cache" --cutlass-dir "$cutlass_dir" --output "${result_dir}/permutation-1-and-2-gpu.json"
+"$wheel_python" "$source_dir/tools/verify_permutation_cuda.py" --source-dir "$source_dir" --cache-dir "${run_root}/permutation-cache" --cutlass-dir "$cutlass_dir" --output "${result_dir}/permutation-1-and-2-gpu.json" --source-sha "$source_sha" --wheel-sha256 "$wheel_sha256" --acceptance-run-id "$acceptance_run_id"
 
 expected_checkpoint_sha="$expected_checkpoint"
 # Paired topology gate: same GL4 root/head/checkpoint/mode/B/K/precision.

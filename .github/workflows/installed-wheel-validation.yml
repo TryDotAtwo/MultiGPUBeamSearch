@@ -20,6 +20,10 @@ on:
       - tools/test_cnot_acceptance_events.py
       - tools/verify_cnot_gpu_pair.py
       - tools/test_verify_cnot_gpu_pair.py
+      - CMakeLists.txt
+      - tools/production_runner.cu
+      - tools/verify_permutation_cuda.py
+      - tools/vast_cnot_gpu_acceptance.sh
       - tools/permutation_acceptance.py
       - tools/test_permutation_acceptance.py
       - tools/test_cnot_gpu_identity.py
@@ -144,6 +148,8 @@ jobs:
         run: |
           set -o pipefail
           mkdir -p "$GITHUB_WORKSPACE/test_results/refactor_20261121/permutation-acceptance"
+          python -m py_compile "$GITHUB_WORKSPACE/tools/permutation_acceptance.py" "$GITHUB_WORKSPACE/tools/test_permutation_acceptance.py" "$GITHUB_WORKSPACE/tools/verify_permutation_cuda.py"
+          bash -n "$GITHUB_WORKSPACE/tools/vast_cnot_gpu_acceptance.sh"
           python "$GITHUB_WORKSPACE/tools/test_permutation_acceptance.py" -v 2>&1 | tee "$GITHUB_WORKSPACE/test_results/refactor_20261121/permutation-acceptance/cpu-contract.log"
       - name: Verify the installed wheel packages CUDA identity helper
         id: wheel_gpu_identity
@@ -223,6 +229,7 @@ jobs:
           VERIFY_CNOT_LIFECYCLE: ${{ steps.verify_cnot_lifecycle.outcome }}
           EVENT_SERDE: ${{ steps.event_serde.outcome }}
           VAST_WORKFLOW_LINT: ${{ steps.vast_workflow_lint.outcome }}
+          PERMUTATION_ACCEPTANCE_CPU: ${{ steps.permutation_acceptance_cpu.outcome }}
         run: |
           set -euo pipefail
           mkdir -p test_results/refactor_20261121/rust-cnot-admission
@@ -240,6 +247,8 @@ jobs:
           - Public CNOT Rust-controller search: ${PUBLIC_SEARCH}
           - Run-scoped backend event protocol and negative validator fixtures: ${ACCEPTANCE_EVENTS}
           - Final paired CNOT campaign verifier and per-rank identity binding: ${CNOT_PAIR_VERIFIER}
+          - Independent saturated permutation CPU oracle, strict trace parser and production source contracts: ${PERMUTATION_ACCEPTANCE_CPU}
+          - Physical saturated permutation 1/2 GPU case: not run by hosted CPU workflow.
           - Rust serde producer matches the JSONL fixture consumed by the verifier: ${EVENT_SERDE}
           - Actual verify_cnot entry under two-rank Gloo with rank-local scorer failures and subsequent healthy runs: ${VERIFY_CNOT_LIFECYCLE}
           - New-host GPU workflow scheduling and expression validation: ${VAST_WORKFLOW_LINT}
@@ -253,5 +262,6 @@ jobs:
           path: |
             test_results/refactor_20261120/installed-wheel
             test_results/refactor_20261121/rust-cnot-admission/hosted-run.md
+            test_results/refactor_20261121/permutation-acceptance
           if-no-files-found: error
           retention-days: 30

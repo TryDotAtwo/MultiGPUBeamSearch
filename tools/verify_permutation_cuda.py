@@ -7,6 +7,8 @@ import argparse
 from collections import deque
 import itertools
 import json
+import os
+import re
 from pathlib import Path
 
 import cayleypy as cp
@@ -14,6 +16,13 @@ import torch
 from multigpubeamsearch import NativeModel, NativeOptions, NativeSession, beam_search
 from multigpubeamsearch.contracts import GraphContract
 from multigpubeamsearch.results import resolve_move_path
+from multigpubeamsearch.build import shape_contract
+from permutation_acceptance import (
+    build_saturated_reference_fixture,
+    decode_frontier_snapshot,
+    hash_state,
+    validate_depth_flow_trace,
+)
 
 
 def move(state, generator):
@@ -154,6 +163,147 @@ def run_layout(graph, contract, model, source_dir, cache_dir, cutlass_dir, devic
         }
 
 
+def run_saturated_layout(graph, contract, model, source_dir, cache_dir, cutlass_dir, devices, fixture, *, source_sha, wheel_sha256, run_id):
+    """Run the B=3 cutoff twice in one Rust session and validate rank-local CUDA evidence."""
+    world_size = len(devices)
+    case_id = f"permutation-saturated-b3-world-{world_size}"
+    identity = {
+        "MGBS_ACCEPTANCE_RANK_TRACE": "1",
+        "MGBS_ACCEPTANCE_RUN_ID": run_id,
+        "MGBS_ACCEPTANCE_CASE_ID": case_id,
+        "MGBS_ACCEPTANCE_SOURCE_SHA": source_sha,
+        "MGBS_ACCEPTANCE_WHEEL_SHA256": wheel_sha256,
+    }
+    old_environment = {name: os.environ.get(name) for name in identity}
+    os.environ.update(identity)
+    try:
+        options = NativeOptions(source_dir=source_dir, cache_dir=cache_dir, cutlass_dir=cutlass_dir, devices=devices)
+        expected = fixture.worlds[world_size].steps[1]
+        if expected.keep_count != 3 or expected.eligible_distinct <= 3:
+            raise AssertionError("CPU oracle did not produce a saturated B=3 global cutoff")
+        with NativeSession(engine="rust") as session:
+            if session._engine != "rust":
+                raise AssertionError("saturated search did not select the Rust session owner")
+            reports = []
+            worker_pids = None
+            rank_identities = None
+            for call_id in (1, 2):
+                result = beam_search(
+                    graph, backend="native", native_options=options, predictor=model,
+                    start_state=list(fixture.start), beam_width=3, max_steps=2, return_path=True,
+                )
+                if result.path_found is True or result.path is not None:
+                    raise AssertionError("distance-at-least-three fixture unexpectedly solved within two steps")
+                metadata = result.native_metadata
+                build = metadata.get("build")
+                if not isinstance(build, dict) or build.get("acceptance_rank_trace") is not True:
+                    raise AssertionError("Rust result lacks acceptance-instrumented runner provenance")
+                build_key = build.get("build_key")
+                binary_sha256 = build.get("binary_sha256")
+                log_value = metadata.get("log_path")
+                if not isinstance(log_value, str) or not log_value:
+                    run_dir_value = metadata.get("run_dir")
+                    if isinstance(run_dir_value, str) and run_dir_value:
+                        log_value = str(Path(run_dir_value) / "native.log")
+                log_path = Path(log_value or "")
+                if not log_path.is_file():
+                    raise AssertionError(f"per-rank native log is missing: {log_path}")
+                rows = validate_depth_flow_trace(
+                    log_path.read_text(encoding="utf-8", errors="replace"),
+                    run_id=run_id, case_id=case_id, call_id=call_id,
+                    world_size=world_size, depth=1, beam_width=3,
+                    source_sha=source_sha, wheel_sha256=wheel_sha256,
+                    build_key=build_key, binary_sha256=binary_sha256,
+                    require_frontier_snapshot=True,
+                )
+                if any(int(row["shard_count"]) != 64 for row in rows):
+                    raise AssertionError("the accepted search did not use the requested 64 shards")
+                if any(int(row["final_global_less"]) != 0 for row in rows):
+                    raise AssertionError("equal-score fixture unexpectedly has candidates below its cutoff")
+                if any(int(row["final_global_equal"]) != expected.eligible_distinct for row in rows):
+                    raise AssertionError("global equal-score count differs from the independent distinct oracle")
+                if any(int(row["final_total_available"]) != expected.eligible_distinct for row in rows):
+                    raise AssertionError("global candidate total differs from the independent distinct oracle")
+                if any(int(row["final_global_keep"]) != 3 for row in rows):
+                    raise AssertionError("the global winner count differs from the requested B=3")
+                if [int(row["next_frontier_size"]) for row in rows] != [len(frontier) for frontier in expected.frontier_by_rank]:
+                    raise AssertionError("rank-local winner counts differ from the CPU partition")
+                if sum(int(row["final_candidate_count"]) for row in rows) != expected.eligible_distinct:
+                    raise AssertionError("rank candidate counts differ from the independent CPU dedup oracle")
+                if sum(int(row["final_request_count"]) for row in rows) != 3:
+                    raise AssertionError("rank final requests do not sum to the exact B=3 global cutoff")
+                if [int(row["frontier_size"]) for row in rows] != list(expected.input_counts):
+                    raise AssertionError("rank input counts differ from the CPU frontier partition")
+                if [int(row["generated"]) for row in rows] != [count * contract.move_count for count in expected.input_counts]:
+                    raise AssertionError("rank expansion counts differ from frontier size times move count")
+                observed_frontier = []
+                for rank, row in enumerate(rows):
+                    raw = Path(str(row["frontier_snapshot"])).read_bytes()
+                    states = decode_frontier_snapshot(raw, state_len=contract.state_len,
+                                                     storage_len=shape_contract(contract)["storage_len"])
+                    expected_states = tuple(candidate.state for candidate in expected.frontier_by_rank[rank])
+                    if states != expected_states:
+                        raise AssertionError(f"rank {rank} frontier differs from the independent CPU winner oracle")
+                    observed_frontier.extend(states)
+                expected_order = tuple(candidate.state for candidate in expected.ordered_survivors)
+                if tuple(observed_frontier) != expected_order:
+                    raise AssertionError("observed rank frontiers do not preserve the global survivor order")
+                for candidate in expected.ordered_survivors:
+                    replayed = tuple(fixture.start)
+                    for move_index in candidate.path:
+                        replayed = move(replayed, contract.generators[move_index])
+                    if replayed != candidate.state:
+                        raise AssertionError("independent replay failed for a retained CPU-oracle candidate")
+                workers = getattr(session, "_workers", None)
+                pids = tuple(workers.pids) if workers is not None else ()
+                if len(pids) != world_size or len(set(pids)) != world_size:
+                    raise AssertionError(f"expected one Rust rank worker per device; got {pids}")
+                trace_pids = tuple(int(row["pid"]) for row in rows)
+                current_rank_identities = tuple((int(row["pid"]), str(row["gpu_uuid"])) for row in rows)
+                if trace_pids != pids:
+                    raise AssertionError("rank trace PIDs do not match the Rust session worker processes")
+                if worker_pids is None:
+                    worker_pids = pids
+                    rank_identities = current_rank_identities
+                elif worker_pids != pids:
+                    raise AssertionError("Rust rank workers changed between repeated session calls")
+                elif current_rank_identities != rank_identities:
+                    raise AssertionError("repeated Rust session calls changed rank-to-device identity")
+                reused = getattr(workers, "_last_reused", None) if workers is not None else None
+                if call_id == 2 and reused is not True:
+                    raise AssertionError("second saturated search did not reuse the existing Rust workers")
+                reports.append({
+                    "call_id": call_id, "session_reused": bool(reused),
+                    "worker_pids": list(pids), "build_key": build_key,
+                    "binary_sha256": binary_sha256, "log_path": str(log_path),
+                    "eligible_distinct": expected.eligible_distinct, "beam_width": 3,
+                    "cross_source_duplicates": expected.cross_source_duplicate_count,
+                    "rank_evidence": [
+                        {key: row[key] for key in ("rank", "pid", "gpu_uuid", "frontier_size", "generated", "final_candidate_count", "final_request_count", "next_frontier_size", "frontier_snapshot")}
+                        for row in rows
+                    ],
+                    "ordered_survivor_hashes": [
+                        {"lo": f"{candidate.hash128[0]:016x}", "hi": f"{candidate.hash128[1]:016x}"}
+                        for candidate in expected.ordered_survivors
+                    ],
+                })
+            return {
+                "case_id": case_id, "world_size": world_size,
+                "devices": list(devices), "worker_pids": list(worker_pids or ()),
+                "gpu_names": [torch.cuda.get_device_name(device) for device in devices],
+                "fixture_start": list(fixture.start), "scramble": list(fixture.scramble),
+                "exact_distance": fixture.distance, "input_counts": list(expected.input_counts),
+                "eligible_distinct": expected.eligible_distinct, "keep_count": expected.keep_count,
+                "cross_source_duplicates": expected.cross_source_duplicate_count,
+                "ordered_survivor_hashes": reports[0]["ordered_survivor_hashes"],
+                "calls": reports, "independent_replay": True,
+            }
+    finally:
+        for name, old_value in old_environment.items():
+            if old_value is None:
+                os.environ.pop(name, None)
+            else:
+                os.environ[name] = old_value
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source-dir", type=Path, required=True)
@@ -161,7 +311,16 @@ def main():
     parser.add_argument("--cutlass-dir", type=Path, required=True,
                         help="verified, pinned CUTLASS source prepared before the GPU smoke")
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--source-sha", required=True)
+    parser.add_argument("--wheel-sha256", required=True)
+    parser.add_argument("--acceptance-run-id", required=True)
     args = parser.parse_args()
+    if re.fullmatch(r"[0-9a-f]{40}", args.source_sha) is None:
+        raise SystemExit("--source-sha must be a lowercase 40-digit Git SHA")
+    if re.fullmatch(r"[0-9a-f]{64}", args.wheel_sha256) is None:
+        raise SystemExit("--wheel-sha256 must be a lowercase SHA256")
+    if re.fullmatch(r"[A-Za-z0-9_.-]+", args.acceptance_run_id) is None:
+        raise SystemExit("--acceptance-run-id must be a portable nonempty label")
 
     if not (args.cutlass_dir / "include/cutlass/cutlass.h").is_file():
         raise SystemExit(f"verified CUTLASS headers are missing: {args.cutlass_dir}")
@@ -178,6 +337,11 @@ def main():
     model_dir.parent.mkdir(parents=True, exist_ok=True)
     write_zero_mlp(model_dir, contract)
     model = NativeModel(model_dir, contract.graph_hash)
+    saturated = build_saturated_reference_fixture(
+        contract.center, contract.generators, beam_width=3, shard_count=64
+    )
+    saturated_contract = GraphContract.from_graph(graph, saturated.start)
+    saturated_model = NativeModel(model_dir, saturated_contract.graph_hash)
 
     reports = [
         run_layout(graph, contract, model, args.source_dir.resolve(), args.cache_dir.resolve(),
@@ -185,15 +349,31 @@ def main():
         run_layout(graph, contract, model, args.source_dir.resolve(), args.cache_dir.resolve(),
                    args.cutlass_dir.resolve(), (0, 1), exact, scramble),
     ]
+    saturated_reports = [
+        run_saturated_layout(graph, saturated_contract, saturated_model, args.source_dir.resolve(),
+                             args.cache_dir.resolve(), args.cutlass_dir.resolve(), (0,), saturated,
+                             source_sha=args.source_sha, wheel_sha256=args.wheel_sha256,
+                             run_id=args.acceptance_run_id),
+        run_saturated_layout(graph, saturated_contract, saturated_model, args.source_dir.resolve(),
+                             args.cache_dir.resolve(), args.cutlass_dir.resolve(), (0, 1), saturated,
+                             source_sha=args.source_sha, wheel_sha256=args.wheel_sha256,
+                             run_id=args.acceptance_run_id),
+    ]
+    if saturated_reports[0]["ordered_survivor_hashes"] != saturated_reports[1]["ordered_survivor_hashes"]:
+        raise AssertionError("one- and two-GPU saturated searches selected different ordered survivor hashes")
     report = {
         "fixture": "cayleypy.LRX(4)",
         "state_len": contract.state_len,
         "move_count": contract.move_count,
         "model": "known finite FP16 MLP artifact",
+        "source_sha": args.source_sha,
+        "wheel_sha256": args.wheel_sha256,
+        "acceptance_run_id": args.acceptance_run_id,
         "python": __import__("sys").version.split()[0],
         "torch": str(torch.__version__),
         "cuda": torch.version.cuda,
         "runs": reports,
+        "saturated_b3": saturated_reports,
     }
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")

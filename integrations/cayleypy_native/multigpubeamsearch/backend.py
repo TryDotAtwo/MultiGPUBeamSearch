@@ -589,6 +589,17 @@ def _run_native_once(contract, model, options, beam_width, max_steps, run_dir, d
                 or runtime.build_metadata.get("backend") != model.backend):
             raise NativeBackendError("prepared native runner does not match graph/model")
     build_metadata = runtime.build_metadata
+    from .build import acceptance_rank_trace_identity
+    acceptance_trace = acceptance_rank_trace_identity()
+    if acceptance_trace is not None:
+        if build_metadata.get("acceptance_rank_trace") is not True:
+            raise NativeBackendError("strict acceptance requested but the selected runner lacks rank-trace instrumentation")
+        build_key = build_metadata.get("build_key")
+        binary_sha256 = build_metadata.get("binary_sha256")
+        if not isinstance(build_key, str) or re.fullmatch(r"[0-9a-f]{64}", build_key) is None:
+            raise NativeBackendError("acceptance runner metadata has no valid native build key")
+        if not isinstance(binary_sha256, str) or re.fullmatch(r"[0-9a-f]{64}", binary_sha256) is None:
+            raise NativeBackendError("acceptance runner metadata has no valid binary SHA256")
     puzzle = run_dir / "puzzle_info.json"
     inputs = run_dir / "test.csv"
     from . import rust_control
@@ -597,6 +608,11 @@ def _run_native_once(contract, model, options, beam_width, max_steps, run_dir, d
         # The native CSV reader requires a bare numeric ID and a quoted state cell.
         inputs.write_text('initial_state_id,initial_state\n0,"' + ",".join(map(str, contract.start)) + '"\n', encoding="utf-8")
     env = child_environment(tuple(devices), run_dir)
+    # Native calibration runs may reuse the trace-enabled binary, but only the
+    # actual search gets an acceptance identity or emits rank snapshots.
+    for acceptance_name in tuple(env):
+        if acceptance_name.startswith("MGBS_ACCEPTANCE_"):
+            env.pop(acceptance_name, None)
     env.update({"BEAM_GENERATOR_PATH": str(puzzle), "BEAM_PUZZLE_INFO_JSON": str(puzzle),
                 "BEAM_TEST_CSV": str(inputs), "BEAM_WEIGHT_DIR": str(model.weights_dir),
                 "BEAM_RUNTIME_CONFIG_MODE": "auto", "BEAM_SOLVED_NEIGHBORHOOD_RADIUS": str(effective_touch_bfs_radius),
@@ -783,6 +799,17 @@ def _run_native_once(contract, model, options, beam_width, max_steps, run_dir, d
         (run_dir/'runtime-config.json').write_text(json.dumps(
             {'mode':'auto','profile':runtime.profile,'microbatch':microbatch_metadata,
              'search_budget':search_budget},indent=2)+'\n',encoding='utf-8')
+    if acceptance_trace is not None:
+        env.update({
+            "MGBS_ACCEPTANCE_RANK_TRACE": "1",
+            "MGBS_ACCEPTANCE_RUN_ID": acceptance_trace["run_id"],
+            "MGBS_ACCEPTANCE_CASE_ID": acceptance_trace["case_id"],
+            "MGBS_ACCEPTANCE_SOURCE_SHA": acceptance_trace["source_sha"],
+            "MGBS_ACCEPTANCE_WHEEL_SHA256": acceptance_trace["wheel_sha256"],
+            "MGBS_ACCEPTANCE_BUILD_KEY": build_key,
+            "MGBS_ACCEPTANCE_BINARY_SHA256": binary_sha256,
+            "BEAM_SHARD_COUNT": "64",
+        })
     args = [str(runner), "0", str(forward_depth_limit), str(beam_width)]
     # Apply search policy only after calibration: probes must not collect solutions.
     env.update(BEAM_SOLVE_BUCKET_MODE=str(int(options.solution_mode == 'collect')),
