@@ -1,5 +1,24 @@
 # Конфиг
 
+## Saturated permutation acceptance, 2026-11-21
+
+The installed-wheel acceptance keeps the public LRX(4), B=64 smoke and adds a
+separate LRX(5), B=3 saturated case. An independent CPU oracle checks full
+Hash128 deduplication, the existing owner/shard and equal-score cutoff order,
+rank-local frontiers, cross-rank duplicates, exact global width and independent
+replay. The selected LRX(5) witness has the same ordered winners at world sizes
+1 and 2 without changing the production tie policy. Each topology runs twice
+inside one Rust session; per-rank traces bind source, wheel, build and binary
+hashes, PID, observed CUDA UUID, rank work and bounded frontier snapshots.
+
+Hosted source harness `44943664015` and installed-wheel run `44943664035`
+passed on source SHA `bcd92d0a404802604cabf28f7a477ffe41c8d7de`. The wheel gate
+ran 11 permutation acceptance contracts, CNOT dtype/admission/Gloo checks and
+the public CNOT search with a CPU scorer. Its physical job was skipped; this
+evidence does not establish CUDA/NCCL execution. The source and wheel artifacts
+are recorded in
+`test_results/refactor_20261121/rust-cnot-admission/GITHUB_STATUS.md`.
+
 ## Новая физическая приёмка Vast: срок и SSH маршрут, 2026-11-21
 
 Разрешённый физический gate использует только один новый, уже работающий
