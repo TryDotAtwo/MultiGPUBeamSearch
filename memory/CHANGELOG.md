@@ -2,7 +2,7 @@
 
 - The campaign marker now records the exact instance ID, Actions run and attempt, spend cap, and prior Vast label. The main workflow verifies a fresh account listing before enabling cleanup.
 - A separate scheduled and workflow-completion watchdog stops only a marked, ID-matching 2x RTX 3060 campaign and confirms both stopped state and prior-label restoration with fresh API reads.
-- Hosted CPU fixtures cover marker identity, API stop/readback, label restoration, and the workflow ordering. The watchdog preserves instance data; stopped storage remains billable. Physical dispatch remains gated until the total storage-cost disposition is resolved.
+- Hosted source harness `44931235596` and installed-wheel run `44931235590` passed; the physical GPU job was skipped. The CPU fixtures cover marker identity, API stop/readback, label restoration, and workflow ordering. The watchdog preserves instance data; stopped storage remains billable. Physical dispatch remains gated until the total storage-cost disposition is resolved.
 
 ## 2026-11-21 - Preflight CayleyPy, NCCL and pinned CUTLASS before build
 

@@ -1,18 +1,13 @@
-# Rust CNOT strict admission and phase boundaries
+# Rust + CUDA/C++ migration acceptance status
 
 Source branch: `codex/beam-3060-preflight-20261121`
-Source SHA: `78087abe5c1b8e794c9e16aa934f6afe084c0f8b`
+Tested source SHA: `b682c6ffea3ab7ab24ce0d36fe4fcabee59cc505`
 
-| Gate | Current status | Evidence |
+| Gate | Status | Evidence |
 |---|---|---|
-| Strict backend admission: ABI/capability and activation agreement, Rust controller/scorer, checkpoint/manifest, DeviceDomain and Stream 5 contract | PASS on hosted CPU Gloo | [run 44891727924](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44891727924), artifact [14701749750](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44891727924/artifacts/14701749750) |
-| Dtype contract: int64 states/indices, int64/uint16 move IDs, warning-as-error installed wheel | PASS | [run 44891727924](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44891727924), artifact [14701749750](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44891727924/artifacts/14701749750) |
-| Gloo rank-local failures: winner packet and history edge on both ranks, then an independently replayed public search in the same group | PASS | [run 44891727924](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44891727924), artifact [14701749750](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44891727924/artifacts/14701749750) |
-| Vast target identity, lifetime cost cap, private manifest receipt, fake SSH partial-result retrieval | PASS for hosted fixtures and source syntax | [run 44891727882](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44891727882), artifact [14701789289](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44891727882/artifacts/14701789289) |
-| Physical CUDA/NCCL 1/2 GPU acceptance on RTX 3060 | PENDING; not run | No new instance was dispatched; live private-input staging and physical rank/device evidence remain unverified |
+| Vast campaign identity, marker ordering, bounded stop/readback and prior-label restoration | PASS on hosted Linux CPU fixtures; no live Vast API call | [source run 44931235596](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44931235596), [artifact 14717802816](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44931235596/artifacts/14717802816) |
+| Installed wheel build, public CNOT search, strict backend admission, dtype and two-rank Gloo failure/reuse | PASS on hosted Linux CPU/Gloo | [wheel run 44931235590](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44931235590), [artifact 14717507673](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44931235590/artifacts/14717507673) |
+| CUDA/NCCL permutation and CNOT on physical 1/2 GPU | PENDING; GPU job skipped | No GPU instance was rented or dispatched. Physical backend, rank participation, saturation, replay and error recovery remain unverified. |
+| Hard $10 total-cost bound | BLOCKED | Vast storage continues billing after stop. The current 24-hour reserve is not a lifetime cap; no data deletion was authorized or performed. |
 
-The installed-wheel job also passed public CNOT search and Actionlint. These
-results establish CPU/Gloo behavior for the installed wheel and acceptance
-harness source checks; they do not establish CUDA, NCCL, trained-checkpoint
-execution, or physical 1-/2-GPU parity. No local build/test, paid GPU work, or
-result download was used.
+The hosted checks establish source/CPU behavior and an installed CPU wheel only. They do not establish trained-checkpoint execution or physical CUDA/NCCL parity.
