@@ -10,10 +10,10 @@ ROOT = Path(__file__).resolve().parents[1]
 class VastCampaignWorkflowTests(unittest.TestCase):
     def test_campaign_marker_and_cleanup_are_bound_to_one_instance(self):
         workflow = (ROOT / ".github/workflows/vast-cnot-control-collectives.yml").read_text(encoding="utf-8")
-        self.assertIn("run-name: mgbs-cnot-acceptance", workflow)
+        self.assertIn("run-name: CNOT GPU acceptance", workflow)
         contract = (ROOT / "tools/vast_instance_contract.py").read_text(encoding="utf-8")
         self.assertNotIn("safe_to_stop", contract)
-        self.assertIn("group: vast-cnot-control-${{ inputs.instance_id || github.run_id }}", workflow)
+        self.assertIn("group: vast-cnot-control-acceptance", workflow)
         self.assertIn("--run-id \"$GITHUB_RUN_ID\" --attempt \"$GITHUB_RUN_ATTEMPT\"", workflow)
 
         preflight = workflow.split("id: preflight", 1)[1].split("\n      - name:", 1)[0]
@@ -38,6 +38,36 @@ class VastCampaignWorkflowTests(unittest.TestCase):
         self.assertIn("actions: read", watchdog)
         self.assertIn("GITHUB_TOKEN: ${{ github.token }}", watchdog)
         self.assertIn("tools/vast_campaign_watchdog.py", watchdog)
+
+    def test_public_gpu_workflow_redacts_inputs_logs_and_artifacts(self):
+        workflow = (ROOT / ".github/workflows/vast-cnot-control-collectives.yml").read_text(encoding="utf-8")
+        self.assertNotIn("inputs.instance_id", workflow)
+        self.assertNotIn("inputs.spend_cap_usd", workflow)
+        self.assertIn("secrets.VAST_CNOT_ACCEPTANCE_INSTANCE_ID", workflow)
+        self.assertIn("secrets.VAST_CNOT_ACCEPTANCE_CAP_USD", workflow)
+        self.assertNotIn('cat "$status"', workflow)
+        self.assertNotIn('cat "$remote_log"', workflow)
+        self.assertNotIn('cat "$lifecycle"', workflow)
+        self.assertIn("Upload redacted operational status", workflow)
+        upload = workflow.split("Upload redacted operational status", 1)[1].split("\n      - name:", 1)[0]
+        self.assertIn("cnot-public-status.json", upload)
+        for private_path in (
+            "vast-private-preflight.log",
+            "vast-status.json",
+            "vast-stop-lifecycle.json",
+            "beam-gpu-acceptance.log",
+            "beam-gpu-acceptance-test-results.tar.gz",
+        ):
+            self.assertNotIn(private_path, upload)
+
+    def test_result_transport_never_downloads_or_prints_private_results(self):
+        transport = (ROOT / "tools/vast_result_transport.sh").read_text(encoding="utf-8")
+        self.assertNotIn("VAST_SSH_RESULTS", transport)
+        self.assertNotIn("VAST_REMOTE_RESULTS_RELATIVE", transport)
+        self.assertNotIn("tail -n", transport)
+        self.assertNotIn('cat "$VAST_SSH_LOG"', transport)
+        self.assertIn("REMOTE_GPU_STATUS=passed", transport)
+        self.assertIn("REMOTE_GPU_STATUS=failed", transport)
 
 
 if __name__ == "__main__":
