@@ -48,6 +48,19 @@ PYTHONPATH=integrations/cayleypy_native python -m unittest discover \
   -s integrations/cayleypy_native/tests -p test_cnot_scorer.py -v
 ```
 
+## Current producer contract
+
+The default build remains the historical `dev_v1` adapter for the GL(4,2) fixture. The current CNOT producer uses a different loader result and search schema. Select it explicitly with `--contract panel_search_v2`; this mode archives producer commit `e17953891a36e3e3ae8b038695bfac8548ab784f` and accepts only a `cnot103_panel_search_v2` manifest. Its ordered panel indices, IDs, digest, pinned training manifest and training result are checked by the producer before a scorer is returned.
+
+```sh
+python integrations/cnot_scorer/build.py \
+  --contract panel_search_v2 \
+  --source /private/cnot-neural-synth-frontier6 \
+  --build-dir /private/mgbs-cnot-panel-v2
+```
+
+The hosted `CNOT producer panel-v2 source compatibility` workflow prepares this exact source and runs a CPU PyTorch Rust compile. That checks the source adapter and Rust API boundary only; it does not execute CUDA, restore a private trained checkpoint, or establish GPU/NCCL replay. The existing GL(4,2) fixture and Vast acceptance script remain on `dev_v1` until a matching private panel-v2 training result and manifest are available.
+
 ## Experimental packet scoring
 
 When the matching `_beam_runtime` extension is installed, public `TQPScorer`
