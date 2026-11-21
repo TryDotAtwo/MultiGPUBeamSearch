@@ -6,6 +6,7 @@ import sys
 import tempfile
 
 import torch.distributed as dist
+from multigpubeamsearch.cnot_cli import initialize_world
 
 
 ROOT = Path(os.environ["GITHUB_WORKSPACE"]).resolve()
@@ -25,6 +26,7 @@ def invoke(case, output, scorer_factory=None):
     result = verify_cnot.main(
         ["--case", case, "--backend", "gloo", "--engine", "rust", "--output", str(output)],
         scorer_factory=scorer_factory,
+        manage_process_group=False,
     )
     if case == "wide" and int(os.environ["RANK"]) == 0:
         report = json.loads(output.read_text(encoding="utf-8"))
@@ -37,6 +39,7 @@ def main():
     rank = int(os.environ["RANK"])
     output_root = Path(os.environ["RUNNER_TEMP"])
     output_root.mkdir(parents=True, exist_ok=True)
+    initialize_world("gloo")
     observations = []
     for failed_rank in (0, 1):
         def factory(*_args, target=failed_rank, **_kwargs):
@@ -54,11 +57,12 @@ def main():
         else:
             raise AssertionError(f"rank-local scorer failure on {failed_rank} was not propagated")
 
-        # main() must close World before destroying/reinitializing the process group.
+        # The public verifier must close its per-search World while retaining
+        # the torchrun process group for a healthy retry on the same ranks.
         invoke("wide", output_root / f"healthy-after-{failed_rank}.json")
 
     if dist.is_initialized():
-        raise AssertionError("verify_cnot.main left the default process group initialized")
+        dist.destroy_process_group()
     (output_root / f"verify-cnot-lifecycle-rank-{rank}.json").write_text(
         json.dumps(observations, sort_keys=True), encoding="utf-8"
     )

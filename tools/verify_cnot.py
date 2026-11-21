@@ -198,7 +198,7 @@ def validate_distribution(device, engine="auto"):
         return world.checked("all-rank validation", inspect)
 
 
-def main(argv=None, *, scorer_factory=None):
+def main(argv=None, *, scorer_factory=None, manage_process_group=True):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--case", choices=("trained", "trained-deep", "wide", "topology"), required=True)
     parser.add_argument("--backend", choices=("nccl", "gloo"), default="nccl")
@@ -218,7 +218,19 @@ def main(argv=None, *, scorer_factory=None):
         if args.engine == "python":
             parser.error("--require-rust-scorer cannot be combined with --engine python")
         args.engine = "rust"
-    device = initialize_world(args.backend)
+    if manage_process_group:
+        if dist.is_initialized():
+            parser.error("verify_cnot.main owns process-group initialization when manage_process_group is true")
+        device = initialize_world(args.backend)
+    else:
+        if not dist.is_initialized():
+            parser.error("verify_cnot.main requires an initialized process group when manage_process_group is false")
+        initialized_backend = str(dist.get_backend()).lower()
+        if args.backend not in initialized_backend:
+            parser.error(
+                f"requested backend {args.backend!r} differs from initialized process group {initialized_backend!r}"
+            )
+        device = torch.device("cuda", torch.cuda.current_device()) if "nccl" in initialized_backend else torch.device("cpu")
     try:
         with World(device) as world:
             if args.case in ("trained", "trained-deep"):
@@ -333,7 +345,7 @@ def main(argv=None, *, scorer_factory=None):
 
                 world.checked("write CNOT result JSON", write_result)
     finally:
-        if dist.is_initialized():
+        if manage_process_group and dist.is_initialized():
             dist.destroy_process_group()
 
 

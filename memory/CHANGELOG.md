@@ -8,7 +8,15 @@
   [44897715956](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44897715956)
   built and installed the wheel, then the Rust serializer test failed at link
   time with unresolved `PyBytes_*`/`PyErr_*` symbols under `extension-module`.
-- The feature boundary and test invocation are updated; hosted GREEN is pending.
+- On source SHA `85e6ac1ed76505caf91a172ac45d7cba99a6bdc9`, the Rust serializer,
+  dtype checks, backend admission and phase-boundary checks passed in the
+  installed-wheel job. Its actual `verify_cnot.main` lifecycle test then failed
+  when it tried to reinitialize torchrun's Gloo rendezvous store after each
+  invocation. The test now holds one process group live across rank-local
+  scorer failures and healthy retries; hosted verification is pending.
+- CNOT CPU compatibility passed on the same SHA:
+  [run 44898116700](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44898116700).
+  No physical GPU job was dispatched.
 
 ## 2026-11-21 - Make CNOT runtime acceptance select Rust explicitly
 
