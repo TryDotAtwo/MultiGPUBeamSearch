@@ -8,6 +8,7 @@ on:
       - "codex/beam-*"
     paths:
       - .github/workflows/vast-cnot-control-collectives.yml
+      - .github/workflows/installed-wheel-validation.yml
       - CMakeLists.txt
       - tools/production_runner.cu
       - tools/verify_permutation_cuda.py
