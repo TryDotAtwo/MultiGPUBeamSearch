@@ -104,3 +104,6 @@ Keep an active goal until the migration and required verification are complete.
 
 
 2026-11-22: Иван заменил прежнюю фиксированную постановку кампании на измерительную цель для CNOT: довести полную модель и глобальный GPU beam search до воспроизводимого запуска с независимым точным replay; измерить качество в зависимости от принятых обновлений, wall time и полной стоимости; выбрать самый дешёвый подтверждённый режим с практическим выигрышем над базовым поиском либо зафиксировать проверенный диапазон без выигрыша. Устройство, объём обучения и геометрия поиска выбираются по данным. Ресурсные разрешения, владение, бюджет, приватность данных и подтверждение cleanup остаются отдельными обязательными gate; зелёный hosted CI не доказывает физический GPU/NCCL запуск.
+
+
+2026-11-22 follow-up: Preserve Slurm and torchrun launcher compatibility while rejecting inconsistent Slurm assignments. For uneven task counts per node, require SLURM_PROCID to equal the sum of prior nodes' step task counts plus SLURM_LOCALID; run the same contract in Python compatibility and Rust runtime paths on hosted CPU.

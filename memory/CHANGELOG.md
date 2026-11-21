@@ -3310,3 +3310,10 @@ Main commit `148b2a826a369b7601e904ea409e0cc5301c75c9` also passed the 260-test 
 - The CNOT acceptance and emergency-watchdog workflows no longer place target IDs or spend caps in dispatch inputs or run titles, print private preflight/remote/cleanup output, or retrieve private result archives. They publish only a timestamp and allowlisted status values. The installed-wheel CPU workflow now directs verbose tool output to runner-temporary files and publishes only the same status receipt.
 - Added regressions for status-only artifacts, watchdog output, private result transport, and the active CUDA-context identity contract. Fixed the GPU UUID end anchor that rejected valid physical UUIDs; test fixtures now include the complete typed context observation.
 - Hosted source harness run [44954310185](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44954310185) and installed-wheel CPU/Gloo run [44954310147](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44954310147) passed at source SHA `a4994a5a394f7d7f370b7ddc04eb08e175fc8367`. Their only uploaded artifacts were redacted status JSON files (310 and 309 bytes). The push-triggered physical CUDA/NCCL job was skipped; no GPU result is claimed.
+
+
+## 2026-11-22 - Проверять Slurm global/local rank mapping
+
+- Hosted RED `44959263103` подтвердил, что supervisor принимал `rank=11, node=1, local=4` для раскладки `8,6`; ожидаемый глобальный rank — 12.
+- Rust runtime и Python compatibility path теперь отклоняют Slurm окружение, если global rank не равен сумме task counts предшествующих узлов плюс local rank. Torchrun, Slurm корректной раскладки, запуск дочернего процесса и транспорт не менялись.
+- На SHA `901a7c630d6be25555fe7a8154bd9bb45b537f33` Rust/Python hosted CPU suite [44959505649](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44959505649) прошёл; Python набор: 323 passed, 2 skipped. Installed-wheel suite [44959505809](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44959505809) прошёл. GPU acceptance [44959505792](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44959505792) выполнил CPU harness; физический шаг пропущен.

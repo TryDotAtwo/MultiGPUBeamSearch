@@ -492,6 +492,21 @@ Python-supervisor остаётся режимом по умолчанию. Пе�
 Экспериментальный PyO3-адаптер пока требует совместимые с UTF-8 аргументы
 и значения окружения; это не полная замена старого представления Python/OS.
 
+### Slurm rank mapping, 2026-11-22
+
+Перед созданием rank-owned каталогов Python и Rust проверяют, что
+`SLURM_PROCID = sum(SLURM_STEP_TASKS_PER_NODE[..SLURM_NODEID]) + SLURM_LOCALID`.
+Это сохраняет раздачу непрерывных глобальных рангов при неодинаковом числе
+задач на узел и отклоняет противоречивое окружение до запуска дочернего
+процесса. На source SHA `901a7c630d6be25555fe7a8154bd9bb45b537f33`
+hosted CNOT CPU run [44959505649](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44959505649)
+прошёл; Rust contract и Python compatibility-набор зелёные. Installed-wheel
+run [44959505809](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44959505809)
+прошёл. RED run [44959263103](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44959263103)
+подтвердил принятие неправильного rank до исправления. GPU acceptance
+[44959505792](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44959505792)
+прошёл только hosted CPU harness; физический GPU шаг был пропущен.
+
 ## Коллективная ошибка поиска цели CNOT, 2026-11-15
 
 Локальная ошибка при проверке завершающего хода передаётся всем рангам через

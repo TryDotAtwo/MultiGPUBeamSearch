@@ -83,6 +83,7 @@ jobs:
             rustfmt --check --edition 2021 \
               rust/beam-runtime/src/cnot_search.rs \
               rust/beam-runtime/src/search_session.rs \
+              rust/beam-runtime/src/cluster.rs \
               rust/beam-runtime/src/search_inputs.rs \
               rust/beam-core/src/permutation.rs \
               rust/beam-core/src/search.rs \
