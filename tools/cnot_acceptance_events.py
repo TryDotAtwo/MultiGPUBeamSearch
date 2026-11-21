@@ -364,6 +364,15 @@ def validate_case(trace_text: str, receipt_root, report: dict, *, expected_sourc
         "source_sha": expected_source_sha,
         "wheel_sha256": expected_wheel_sha256,
         "world": world,
+        "rank_devices": [
+            {
+                "rank": rank,
+                "pid": rank_identity[rank][0],
+                "device": rank_identity[rank][1],
+                "gpu_uuid": rank_identity[rank][2],
+            }
+            for rank in range(world)
+        ],
         "event_count": len(receipt_events),
         "device_domain_operations": ["owners", "expansion", "full_matrix_distinct"],
         "stream5_operations": [] if world == 1 else

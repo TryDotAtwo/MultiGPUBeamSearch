@@ -16,6 +16,8 @@ on:
       - integrations/cayleypy_native/tests/installed_verify_cnot_gloo_lifecycle.py
       - tools/cnot_acceptance_events.py
       - tools/test_cnot_acceptance_events.py
+      - tools/verify_cnot_gpu_pair.py
+      - tools/test_verify_cnot_gpu_pair.py
       - tools/fixtures/cnot_acceptance_event_v1.jsonl
       - integrations/cayleypy_native/tests/cnot_device_domain_admission_fixture.c
       - tools/verify_cnot.py
@@ -108,6 +110,11 @@ jobs:
         run: |
           set -o pipefail
           python "$GITHUB_WORKSPACE/tools/test_cnot_acceptance_events.py" -v 2>&1 | tee "$GITHUB_WORKSPACE/test_results/refactor_20261121/rust-cnot-admission/cnot-acceptance-events.log"
+      - name: Verify paired CNOT acceptance result binding on CPU
+        id: cnot_pair_verifier
+        run: |
+          set -o pipefail
+          python "$GITHUB_WORKSPACE/tools/test_verify_cnot_gpu_pair.py" -v 2>&1 | tee "$GITHUB_WORKSPACE/test_results/refactor_20261121/rust-cnot-admission/cnot-pair-verifier.log"
       - name: Exercise verify_cnot World lifecycle with two Gloo ranks
         id: verify_cnot_lifecycle
         env:
@@ -171,6 +178,7 @@ jobs:
           PHASE_BOUNDARIES: ${{ steps.phase_boundaries.outcome }}
           PUBLIC_SEARCH: ${{ steps.public_search.outcome }}
           ACCEPTANCE_EVENTS: ${{ steps.acceptance_events.outcome }}
+          CNOT_PAIR_VERIFIER: ${{ steps.cnot_pair_verifier.outcome }}
           VERIFY_CNOT_LIFECYCLE: ${{ steps.verify_cnot_lifecycle.outcome }}
           EVENT_SERDE: ${{ steps.event_serde.outcome }}
           VAST_WORKFLOW_LINT: ${{ steps.vast_workflow_lint.outcome }}
@@ -190,6 +198,7 @@ jobs:
           - Winner packet/history failure injection and live-group reuse: ${PHASE_BOUNDARIES}
           - Public CNOT Rust-controller search: ${PUBLIC_SEARCH}
           - Run-scoped backend event protocol and negative validator fixtures: ${ACCEPTANCE_EVENTS}
+          - Final paired CNOT campaign verifier and per-rank identity binding: ${CNOT_PAIR_VERIFIER}
           - Rust serde producer matches the JSONL fixture consumed by the verifier: ${EVENT_SERDE}
           - Actual verify_cnot entry under two-rank Gloo with rank-local scorer failures and subsequent healthy runs: ${VERIFY_CNOT_LIFECYCLE}
           - New-host GPU workflow scheduling and expression validation: ${VAST_WORKFLOW_LINT}

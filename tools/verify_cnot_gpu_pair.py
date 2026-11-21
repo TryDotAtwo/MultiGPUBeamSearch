@@ -7,6 +7,8 @@ from pathlib import Path
 import re
 import sys
 
+from vast_instance_contract import validate_instance_id
+
 
 SHA40 = re.compile(r"[0-9a-f]{40}\Z")
 SHA64 = re.compile(r"[0-9a-f]{64}\Z")
@@ -23,6 +25,8 @@ def require(condition, message):
 
 def validate(result_dir, source_sha, instance_id, manifest_sha, checkpoint_sha,
              scorer_library_sha, wheel_sha, run_id):
+    require(validate_instance_id(str(instance_id)) == str(instance_id),
+            "receipt requires the explicitly selected new positive-decimal instance ID")
     root = Path(result_dir)
     paired_names = (
         "cnot-trained-deep-paired-1-gpu.json",
@@ -119,6 +123,22 @@ def validate(result_dir, source_sha, instance_id, manifest_sha, checkpoint_sha,
             and event_receipt.get("single_rank_transport") == (world == 1),
             f"{case_id}: strict backend verifier receipt does not match its result JSON",
         )
+        devices = event_receipt.get("rank_devices")
+        require(isinstance(devices, list) and len(devices) == world,
+                f"{case_id}: per-rank process/device identities are missing")
+        report_devices = report.get("devices") or []
+        require(
+            sorted((row.get("rank"), row.get("pid"), row.get("device"), row.get("gpu_uuid"))
+                   for row in devices)
+            == sorted((row.get("rank"), row.get("pid"), row.get("device"), row.get("gpu_uuid"))
+                      for row in report_devices),
+            f"{case_id}: backend receipts and result JSON name different rank devices",
+        )
+        require(len({row.get("pid") for row in devices}) == world,
+                f"{case_id}: rank receipts reuse a process ID")
+        if world == 2:
+            require(len({row.get("gpu_uuid") for row in devices}) == world,
+                    f"{case_id}: both ranks do not identify distinct physical GPUs")
         event_receipts[case_id] = event_receipt
 
     receipt = {

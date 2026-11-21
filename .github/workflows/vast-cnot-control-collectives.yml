@@ -21,6 +21,7 @@ on:
       - tools/cnot_acceptance_events.py
       - tools/test_cnot_acceptance_events.py
       - tools/verify_cnot_gpu_pair.py
+      - tools/test_verify_cnot_gpu_pair.py
       - tools/fixtures/cnot_acceptance_event_v1.jsonl
       - tools/vast_instance_contract.py
       - tools/test_vast_instance_contract.py
@@ -55,10 +56,13 @@ jobs:
           python-version: "3.11"
       - name: Compile source-only acceptance helpers
         id: compile_source
-        run: python -m py_compile tools/verify_permutation_cuda.py tools/verify_cnot.py tools/cnot_acceptance_events.py tools/test_cnot_acceptance_events.py tools/verify_cnot_gpu_pair.py tools/test_vast_result_transport.py tools/vast_instance_contract.py tools/test_vast_instance_contract.py tools/vast_private_preflight.py tools/test_vast_private_preflight.py integrations/cayleypy_native/tests/installed_verify_cnot_gloo_lifecycle.py
+        run: python -m py_compile tools/verify_permutation_cuda.py tools/verify_cnot.py tools/cnot_acceptance_events.py tools/test_cnot_acceptance_events.py tools/verify_cnot_gpu_pair.py tools/test_verify_cnot_gpu_pair.py tools/test_vast_result_transport.py tools/vast_instance_contract.py tools/test_vast_instance_contract.py tools/vast_private_preflight.py tools/test_vast_private_preflight.py integrations/cayleypy_native/tests/installed_verify_cnot_gloo_lifecycle.py
       - name: Test the versioned per-invocation CNOT event verifier
         id: cnot_event_verifier
         run: python tools/test_cnot_acceptance_events.py -v
+      - name: Test paired CNOT campaign receipt binding
+        id: cnot_pair_verifier
+        run: python tools/test_verify_cnot_gpu_pair.py -v
       - name: Test target identity, hardware and lifetime budget with API fixtures
         id: instance_contract
         run: python tools/test_vast_instance_contract.py -v
@@ -144,6 +148,7 @@ jobs:
         env:
           COMPILE_OUTCOME: ${{ steps.compile_source.outcome }}
           CNOT_EVENT_VERIFIER_OUTCOME: ${{ steps.cnot_event_verifier.outcome }}
+          CNOT_PAIR_VERIFIER_OUTCOME: ${{ steps.cnot_pair_verifier.outcome }}
           INSTANCE_CONTRACT_OUTCOME: ${{ steps.instance_contract.outcome }}
           PRIVATE_RECEIPT_OUTCOME: ${{ steps.private_receipt_test.outcome }}
           TRANSPORT_OUTCOME: ${{ steps.transport_test.outcome }}
@@ -158,6 +163,7 @@ jobs:
           - Commit: ${GITHUB_SHA}
           - Python source compile: ${COMPILE_OUTCOME}
           - Versioned CNOT event serialization and negative verifier fixtures: ${CNOT_EVENT_VERIFIER_OUTCOME}
+          - Final CNOT paired campaign report/per-rank identity verifier: ${CNOT_PAIR_VERIFIER_OUTCOME}
           - New 2x RTX 3060 target and elapsed-cost contract: ${INSTANCE_CONTRACT_OUTCOME}
           - Pinned private manifest/checkpoint receipt parser: ${PRIVATE_RECEIPT_OUTCOME}
           - Fake SSH result retrieval after key revocation, on success and failure: ${TRANSPORT_OUTCOME}

@@ -1,3 +1,14 @@
+## 2026-11-21 - Bind paired CNOT receipts to rank identities
+
+- `cnot_acceptance_events.validate_case` now returns the observed per-rank PID,
+  process device and physical GPU UUID identities. The paired campaign verifier
+  checks those identities against each result report, enforces a distinct UUID
+  for the two-rank case, and rejects the legacy Vast instance ID.
+- Added a standalone hosted CPU fixture for 1/2-GPU reports, shared invocation
+  binding, ordered survivors, missing rank identity, duplicate GPU UUID and
+  foreign case/instance inputs. Wired it into both source and installed-wheel
+  acceptance workflows. Hosted result is pending.
+
 ## 2026-11-21 - Separate PyO3 extension linking from Rust fixture tests
 
 - `beam-python` keeps `extension-module` as its default feature so wheel builds
@@ -13,10 +24,20 @@
   installed-wheel job. Its actual `verify_cnot.main` lifecycle test then failed
   when it tried to reinitialize torchrun's Gloo rendezvous store after each
   invocation. The test now holds one process group live across rank-local
-  scorer failures and healthy retries; hosted verification is pending.
+  scorer failures and healthy retries.
 - CNOT CPU compatibility passed on the same SHA:
   [run 44898116700](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44898116700).
-  No physical GPU job was dispatched.
+- GREEN on `98a2025c1fcb8efb942ce70570c7992a15f0df5c`: installed-wheel run
+  [44898482925](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44898482925)
+  passed wheel build/install, Rust/Python JSONL serialization, dtype checks,
+  strict backend admission, Gloo phase-failure recovery, the actual two-rank
+  `verify_cnot.main` scorer-failure/retry scenarios, public CNOT search and
+  workflow lint. CNOT CPU compatibility passed in
+  [run 44898482934](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44898482934).
+  The acceptance source harness passed in
+  [run 44898482922](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44898482922);
+  its GPU job was skipped. These results do not establish CUDA/NCCL hardware
+  acceptance. The paired campaign verifier's new standalone CPU gate is pending.
 
 ## 2026-11-21 - Make CNOT runtime acceptance select Rust explicitly
 
