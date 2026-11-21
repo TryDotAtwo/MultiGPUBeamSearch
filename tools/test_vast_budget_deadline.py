@@ -7,6 +7,75 @@ from vast_budget_deadline import phase_timeout_seconds
 
 
 class VastBudgetDeadlineTests(unittest.TestCase):
+    def test_timeout_and_cleanup_must_fit_before_stop_and_future_reserves(self):
+        seconds = phase_timeout_seconds(
+            3000,
+            stop_reserve_seconds=600,
+            future_reserve_seconds=300,
+            phase_overhead_seconds=30,
+            termination_grace_seconds=60,
+            max_seconds=1500,
+            min_seconds=10,
+            phase="remote-build-and-run",
+            now_epoch=1000,
+        )
+        self.assertEqual(seconds, 1010)
+        self.assertLessEqual(seconds + 60 + 30 + 600 + 300, 2000)
+
+    def test_exact_deadline_boundary_includes_termination_grace(self):
+        seconds = phase_timeout_seconds(
+            2000,
+            stop_reserve_seconds=600,
+            future_reserve_seconds=300,
+            phase_overhead_seconds=30,
+            termination_grace_seconds=60,
+            max_seconds=100,
+            min_seconds=10,
+            phase="retrieval",
+            now_epoch=1000,
+        )
+        self.assertEqual(seconds, 10)
+        with self.assertRaisesRegex(ValueError, "retrieval cannot start"):
+            phase_timeout_seconds(
+                1999,
+                stop_reserve_seconds=600,
+                future_reserve_seconds=300,
+                phase_overhead_seconds=30,
+                termination_grace_seconds=60,
+                max_seconds=100,
+                min_seconds=10,
+                phase="retrieval",
+                now_epoch=1000,
+            )
+
+    def test_unresponsive_ssh_costs_time_from_the_next_phase_budget(self):
+        with self.assertRaisesRegex(ValueError, "retrieval cannot start"):
+            phase_timeout_seconds(
+                1800,
+                stop_reserve_seconds=600,
+                future_reserve_seconds=0,
+                phase_overhead_seconds=200,
+                termination_grace_seconds=30,
+                max_seconds=300,
+                min_seconds=1,
+                phase="retrieval",
+                now_epoch=1000,
+            )
+
+    def test_retrieval_is_refused_when_only_stop_readback_reserve_remains(self):
+        with self.assertRaisesRegex(ValueError, "retrieval cannot start"):
+            phase_timeout_seconds(
+                1510,
+                stop_reserve_seconds=480,
+                future_reserve_seconds=0,
+                phase_overhead_seconds=15,
+                termination_grace_seconds=30,
+                max_seconds=300,
+                min_seconds=1,
+                phase="retrieval",
+                now_epoch=1000,
+            )
+
     def test_phase_timeout_uses_one_absolute_deadline_and_preserves_future_reserves(self):
         seconds = phase_timeout_seconds(
             5000,
