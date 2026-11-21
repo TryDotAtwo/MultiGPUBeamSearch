@@ -77,16 +77,16 @@ preparation_fields = {
     "binding_scope": False,
     "beam_width": "max",
     "max_steps": 1,
-    "options_repr": "NativeOptions()",
+    "options": {"inference_backend": "auto"},
     "cuda_visible_devices": None,
     "cuda_device_order": None,
     "runtime_build": {"binary_sha256": "c" * 64},
 }
-fallback_preparation = json.dumps(preparation_fields, sort_keys=True)
+typed_preparation = json.dumps(preparation_fields, sort_keys=True)
 decode_probe = runtime.SearchSession()
-assert decode_probe.begin_preparation(fallback_preparation) is False
-decode_probe.remember_preparation(fallback_preparation)
-assert decode_probe.preparation_matches(fallback_preparation) is True
+assert decode_probe.begin_preparation(typed_preparation) is False
+decode_probe.remember_preparation(typed_preparation)
+assert decode_probe.preparation_matches(typed_preparation) is True
 decode_probe.close()
 
 preparation_key = build_preparation_identity(
@@ -101,7 +101,7 @@ preparation_key = build_preparation_identity(
     binding_scope=False,
     beam_width="max",
     max_steps=1,
-    options_repr="NativeOptions()",
+    options={"inference_backend": "auto"},
     cuda_visible_devices=None,
     cuda_device_order=None,
     runtime_build={"binary_sha256": "c" * 64},
@@ -197,7 +197,7 @@ while not (directory / 'stop').exists():
         binding_scope=False,
         beam_width=64,
         max_steps=1,
-        options_repr="NativeOptions()",
+        options={"inference_backend": "auto"},
         cuda_visible_devices=None,
         cuda_device_order=None,
         runtime_build={"binary_sha256": "c" * 64},

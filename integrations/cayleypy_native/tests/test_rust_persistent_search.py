@@ -385,7 +385,7 @@ def test_rust_session_reuses_and_releases_rank_owner(tmp_path, monkeypatch, worl
             "binding_scope": False,
             "beam_width": 64,
             "max_steps": 4,
-            "options_repr": repr(options),
+            "options": rust_control.options_descriptor(options),
             "cuda_visible_devices": "0,1",
             "cuda_device_order": "PCI_BUS_ID",
             "runtime_build": {"binary_sha256": "c" * 64},
