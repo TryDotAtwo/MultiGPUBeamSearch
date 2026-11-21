@@ -81,8 +81,10 @@ class RustStream5:
 
     def __init__(self, library, world):
         self.world = world
+        self.library = library
         source = getattr(world._stream5_library, "_name", None)
-        self.library_sha256 = (
+        admitted_digest = getattr(world, "_cnot_stream5_library_sha256", None)
+        self.library_sha256 = admitted_digest or (
             hashlib.sha256(Path(source).read_bytes()).hexdigest() if source else "unknown"
         )
         identity = [bytes(library.id_size)]

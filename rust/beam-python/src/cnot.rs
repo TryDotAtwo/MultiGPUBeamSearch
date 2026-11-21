@@ -745,7 +745,7 @@ fn run_cnot_native_search<'py>(
     let selected_engine: String = admitted.get_item(2)?.extract()?;
     let use_rust = selected_engine == "rust";
 
-    crate::cnot_native_stages::preflight_strict_backend(
+    let admitted_backends = crate::cnot_native_stages::preflight_strict_backend(
         py,
         &world,
         &input_matrix.getattr("root")?,
@@ -754,7 +754,23 @@ fn run_cnot_native_search<'py>(
     )?;
 
     run_cnot_native_require_consensus(world.clone(), digest)?;
-    crate::cnot_stream5::run_cnot_native_start_transport(py, world.clone(), use_rust)?;
+    let stream5_fingerprint =
+        crate::cnot_stream5::run_cnot_native_start_transport(py, world.clone(), use_rust)?;
+    let bind_result = (|| -> PyResult<Bound<'_, PyAny>> {
+        crate::cnot_native_stages::bind_stream5_admission(
+            py,
+            admitted_backends.as_ref(),
+            &world,
+            stream5_fingerprint,
+        )?;
+        Ok(py.None().into_bound(py))
+    })();
+    crate::cnot_native_checked::checked_v2(
+        py,
+        &world,
+        "bind admitted CNOT backend handles",
+        bind_result,
+    )?;
 
     let wires: u32 = input_matrix.getattr("n")?.extract()?;
     let identity_args = PyDict::new(py);
@@ -808,6 +824,7 @@ fn run_cnot_native_search<'py>(
                 shortlist_value,
                 alphabet,
                 depth,
+                admitted_backends,
             ));
         }
 

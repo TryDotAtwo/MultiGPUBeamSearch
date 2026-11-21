@@ -15,6 +15,14 @@ use pyo3::{
 use sha2::{Digest, Sha256};
 use std::{fs, path::PathBuf};
 
+#[pyclass(name = "_CnotBackendAdmission", unsendable)]
+pub(crate) struct PyCnotBackendAdmission {
+    device_domain: Option<beam_native_sys::cnot_device_bridge::DeviceDomain>,
+    device_domain_sha256: Option<String>,
+    stream5_library_sha256: Option<String>,
+    stream5_transport: Option<Py<PyAny>>,
+}
+
 fn strict_backend_enabled() -> bool {
     matches!(
         std::env::var("MGBS_CNOT_STRICT_BACKEND").as_deref(),
@@ -58,18 +66,93 @@ pub(crate) fn file_sha256(path: &std::path::Path) -> PyResult<String> {
     Ok(encoded)
 }
 
+fn load_device_domain_admission(
+    path: &std::path::Path,
+    device: i32,
+    n: i32,
+    world: i32,
+) -> PyResult<(beam_native_sys::cnot_device_bridge::DeviceDomain, String)> {
+    let domain_sha = file_sha256(path)?;
+    let domain = beam_native_sys::cnot_device_bridge::DeviceDomain::load(path, device, n, world)?;
+    Ok((domain, domain_sha))
+}
+
+fn prepare_device_domain_checked<'py>(
+    py: Python<'py>,
+    world: &Bound<'py, PyAny>,
+    prepare: impl FnOnce() -> PyResult<(beam_native_sys::cnot_device_bridge::DeviceDomain, String)>,
+    fail_rank: Option<i64>,
+) -> PyResult<(beam_native_sys::cnot_device_bridge::DeviceDomain, String)> {
+    let mut prepared = None;
+    let local = (|| -> PyResult<Bound<'py, PyAny>> {
+        let value = prepare()?;
+        let rank: i64 = world.getattr("rank")?.extract()?;
+        if fail_rank == Some(rank) {
+            return Err(PyRuntimeError::new_err(
+                "injected CNOT DeviceDomain preparation failure",
+            ));
+        }
+        prepared = Some(value);
+        Ok(py.None().into_bound(py))
+    })();
+    checked(
+        py,
+        world,
+        "prepare admitted CNOT DeviceDomain",
+        local,
+    )?;
+    prepared.ok_or_else(|| {
+        PyRuntimeError::new_err("CNOT DeviceDomain preparation returned no admitted handle")
+    })
+}
+
 fn device_domain_contract(
     path: &std::path::Path,
     device: i32,
     n: i32,
     world: i32,
 ) -> PyResult<String> {
-    let domain = beam_native_sys::cnot_device_bridge::DeviceDomain::load(path, device, n, world)?;
-    drop(domain);
-    let domain_sha = file_sha256(path)?;
+    let (_domain, domain_sha) = load_device_domain_admission(path, device, n, world)?;
     Ok(format!(
         "domain_abi=1;device_abi=1;capabilities=owners,expansion,full_matrix_distinct;domain_sha256={domain_sha}"
     ))
+}
+
+fn emit_device_dispatch(
+    world: &Bound<'_, PyAny>,
+    rank: u32,
+    size: u32,
+    strict: bool,
+    sha256: Option<&str>,
+    operation: &str,
+    rows: usize,
+) -> PyResult<()> {
+    if !strict {
+        return Ok(());
+    }
+    let device = world.getattr("device")?.str()?.to_str()?.to_owned();
+    let fields = [
+        ("implementation".to_owned(), "DeviceDomain".to_owned()),
+        ("operation".to_owned(), operation.to_owned()),
+        ("rows".to_owned(), rows.to_string()),
+        ("abi".to_owned(), "1".to_owned()),
+        ("device_abi".to_owned(), "1".to_owned()),
+        (
+            "library_sha256".to_owned(),
+            sha256.unwrap_or("unknown").to_owned(),
+        ),
+    ]
+    .into_iter()
+    .collect();
+    crate::cnot_acceptance::emit(
+        "device_domain_dispatch",
+        rank,
+        size,
+        std::process::id(),
+        &device,
+        &fields,
+    )?;
+    Ok(())
 }
 
 fn backend_admission_contract(
@@ -132,13 +215,15 @@ pub(crate) fn preflight_strict_backend<'py>(
     root: &Bound<'py, PyAny>,
     scorer: &Bound<'py, PyAny>,
     use_rust_controller: bool,
-) -> PyResult<()> {
+) -> PyResult<Option<Py<PyCnotBackendAdmission>>> {
     let strict = strict_backend_mode(world)?;
     if !strict {
-        return Ok(());
+        return Ok(None);
     }
-    let local = (|| -> PyResult<Bound<'py, PyAny>> {
-        let contract = {
+    let (device_domain, domain_sha256) = prepare_device_domain_checked(
+        py,
+        world,
+        || {
             if !use_rust_controller {
                 return Err(PyRuntimeError::new_err(
                     "strict CNOT acceptance requires the Rust search controller",
@@ -149,98 +234,123 @@ pub(crate) fn preflight_strict_backend<'py>(
                     "strict CNOT acceptance requires CUDA DeviceDomain inputs",
                 ));
             }
-            let path = std::env::var_os("MGBS_CNOT_OWNED_LIBRARY").map(PathBuf::from);
+            let path = std::env::var_os("MGBS_CNOT_OWNED_LIBRARY")
+                .map(PathBuf::from)
+                .ok_or_else(|| {
+                    PyRuntimeError::new_err(
+                        "strict CNOT acceptance requires MGBS_CNOT_OWNED_LIBRARY",
+                    )
+                })?;
             let device: Option<i32> = root.getattr("device")?.getattr("index")?.extract()?;
             let device = device.ok_or_else(|| {
-                PyRuntimeError::new_err("strict CNOT acceptance requires an explicit CUDA device")
+                PyRuntimeError::new_err(
+                    "strict CNOT acceptance requires an explicit CUDA device",
+                )
             })?;
             let n: i32 = root.call_method1("size", (1,))?.extract()?;
             let world_size: i32 = world.getattr("size")?.extract()?;
-            let device_contract =
-                backend_admission_contract(true, path.as_deref(), true, device, n, world_size)?;
+            load_device_domain_admission(&path, device, n, world_size)
+        },
+        None,
+    )?;
+    let mut admitted_backend = None;
+    let local = (|| -> PyResult<Bound<'py, PyAny>> {
+        let device_contract = format!(
+            "strict=1;domain_abi=1;device_abi=1;capabilities=owners,expansion,full_matrix_distinct;domain_sha256={domain_sha256}"
+        );
 
-            if !scorer.is_instance_of::<crate::cnot_tqp_scorer::PyTqpScorer>() {
-                return Err(PyRuntimeError::new_err(
-                    "strict CNOT acceptance requires the Rust TQP checkpoint scorer",
-                ));
-            }
-            let metadata = scorer.getattr("metadata")?;
-            let checkpoint: String =
-                metadata
-                    .get_item("checkpoint_sha256")?
-                    .extract()
-                    .map_err(|_| {
-                        PyRuntimeError::new_err("Rust TQP scorer metadata lacks checkpoint_sha256")
-                    })?;
-            let search_manifest: String = metadata
-                .get_item("search_manifest_sha256")?
-                .extract()
-                .map_err(|_| {
-                    PyRuntimeError::new_err("Rust TQP scorer metadata lacks search_manifest_sha256")
-                })?;
-            let scorer_library: String = metadata
-                .get_item("scorer_library_sha256")?
-                .extract()
-                .map_err(|_| {
-                    PyRuntimeError::new_err("Rust TQP scorer metadata lacks scorer_library_sha256")
-                })?;
-            let expected = std::env::var("MGBS_CNOT_EXPECTED_CHECKPOINT_SHA256")
-                .map_err(|_| {
-                    PyRuntimeError::new_err(
-                        "strict CNOT acceptance requires MGBS_CNOT_EXPECTED_CHECKPOINT_SHA256",
-                    )
-                })?
-                .to_ascii_lowercase();
-            if expected.len() != 64
-                || !expected.bytes().all(|byte| byte.is_ascii_hexdigit())
-                || checkpoint.to_ascii_lowercase() != expected
-            {
-                return Err(PyRuntimeError::new_err(format!(
-                    "strict CNOT checkpoint mismatch: expected={expected} actual={checkpoint}"
-                )));
-            }
-            let expected_manifest = std::env::var("MGBS_CNOT_EXPECTED_SEARCH_MANIFEST_SHA256")
-                .map_err(|_| {
-                    PyRuntimeError::new_err(
-                        "strict CNOT acceptance requires MGBS_CNOT_EXPECTED_SEARCH_MANIFEST_SHA256",
-                    )
-                })?
-                .to_ascii_lowercase();
-            if expected_manifest.len() != 64
-                || !expected_manifest
-                    .bytes()
-                    .all(|byte| byte.is_ascii_hexdigit())
-                || search_manifest.to_ascii_lowercase() != expected_manifest
-            {
-                return Err(PyRuntimeError::new_err(format!(
-                    "strict CNOT search manifest mismatch: expected={expected_manifest} actual={search_manifest}"
-                )));
-            }
-            let expected_scorer_library = std::env::var("MGBS_CNOT_EXPECTED_TQP_LIBRARY_SHA256")
-                .map_err(|_| {
-                    PyRuntimeError::new_err(
-                        "strict CNOT acceptance requires MGBS_CNOT_EXPECTED_TQP_LIBRARY_SHA256",
-                    )
-                })?
-                .to_ascii_lowercase();
-            if expected_scorer_library.len() != 64
-                || !expected_scorer_library
-                    .bytes()
-                    .all(|byte| byte.is_ascii_hexdigit())
-                || scorer_library.to_ascii_lowercase() != expected_scorer_library
-            {
-                return Err(PyRuntimeError::new_err(format!(
-                    "strict CNOT scorer library mismatch: expected={expected_scorer_library} actual={scorer_library}"
-                )));
-            }
-            format!(
-                "{device_contract};scorer=rust-tqp;scorer_abi=1;checkpoint_sha256={expected};search_manifest_sha256={expected_manifest};scorer_library_sha256={expected_scorer_library}"
-            )
-        };
+        if !scorer.is_instance_of::<crate::cnot_tqp_scorer::PyTqpScorer>() {
+            return Err(PyRuntimeError::new_err(
+                "strict CNOT acceptance requires the Rust TQP checkpoint scorer",
+            ));
+        }
+        let metadata = scorer.getattr("metadata")?;
+        let checkpoint: String = metadata
+            .get_item("checkpoint_sha256")?
+            .extract()
+            .map_err(|_| {
+                PyRuntimeError::new_err("Rust TQP scorer metadata lacks checkpoint_sha256")
+            })?;
+        let search_manifest: String = metadata
+            .get_item("search_manifest_sha256")?
+            .extract()
+            .map_err(|_| {
+                PyRuntimeError::new_err("Rust TQP scorer metadata lacks search_manifest_sha256")
+            })?;
+        let scorer_library: String = metadata
+            .get_item("scorer_library_sha256")?
+            .extract()
+            .map_err(|_| {
+                PyRuntimeError::new_err("Rust TQP scorer metadata lacks scorer_library_sha256")
+            })?;
+        let expected = std::env::var("MGBS_CNOT_EXPECTED_CHECKPOINT_SHA256")
+            .map_err(|_| {
+                PyRuntimeError::new_err(
+                    "strict CNOT acceptance requires MGBS_CNOT_EXPECTED_CHECKPOINT_SHA256",
+                )
+            })?
+            .to_ascii_lowercase();
+        if expected.len() != 64
+            || !expected.bytes().all(|byte| byte.is_ascii_hexdigit())
+            || checkpoint.to_ascii_lowercase() != expected
+        {
+            return Err(PyRuntimeError::new_err(format!(
+                "strict CNOT checkpoint mismatch: expected={expected} actual={checkpoint}"
+            )));
+        }
+        let expected_manifest = std::env::var("MGBS_CNOT_EXPECTED_SEARCH_MANIFEST_SHA256")
+            .map_err(|_| {
+                PyRuntimeError::new_err(
+                    "strict CNOT acceptance requires MGBS_CNOT_EXPECTED_SEARCH_MANIFEST_SHA256",
+                )
+            })?
+            .to_ascii_lowercase();
+        if expected_manifest.len() != 64
+            || !expected_manifest
+                .bytes()
+                .all(|byte| byte.is_ascii_hexdigit())
+            || search_manifest.to_ascii_lowercase() != expected_manifest
+        {
+            return Err(PyRuntimeError::new_err(format!(
+                "strict CNOT search manifest mismatch: expected={expected_manifest} actual={search_manifest}"
+            )));
+        }
+        let expected_scorer_library = std::env::var("MGBS_CNOT_EXPECTED_TQP_LIBRARY_SHA256")
+            .map_err(|_| {
+                PyRuntimeError::new_err(
+                    "strict CNOT acceptance requires MGBS_CNOT_EXPECTED_TQP_LIBRARY_SHA256",
+                )
+            })?
+            .to_ascii_lowercase();
+        if expected_scorer_library.len() != 64
+            || !expected_scorer_library
+                .bytes()
+                .all(|byte| byte.is_ascii_hexdigit())
+            || scorer_library.to_ascii_lowercase() != expected_scorer_library
+        {
+            return Err(PyRuntimeError::new_err(format!(
+                "strict CNOT scorer library mismatch: expected={expected_scorer_library} actual={scorer_library}"
+            )));
+        }
+        let contract = format!(
+            "{device_contract};scorer=rust-tqp;scorer_abi=1;checkpoint_sha256={expected};search_manifest_sha256={expected_manifest};scorer_library_sha256={expected_scorer_library}"
+        );
+        admitted_backend = Some(Py::new(
+            py,
+            PyCnotBackendAdmission {
+                device_domain: Some(device_domain),
+                device_domain_sha256: Some(domain_sha256),
+                stream5_library_sha256: None,
+                stream5_transport: None,
+            },
+        )?);
         Ok(pyo3::types::PyString::new(py, &contract).into_any())
     })();
     let contract = checked(py, world, "admit strict CNOT backends", local)?;
     let contract: String = contract.extract()?;
+    let admitted = admitted_backend.ok_or_else(|| {
+        PyRuntimeError::new_err("strict CNOT admission returned no retained backend handle")
+    })?;
     let consensus_contract = (|| -> PyResult<Bound<'py, PyAny>> {
         let identity = crate::cnot_acceptance::identity().map_err(PyRuntimeError::new_err)?;
         let value = if let Some(identity) = identity {
@@ -261,11 +371,11 @@ pub(crate) fn preflight_strict_backend<'py>(
     )?;
     let consensus_contract: String = consensus_contract.extract()?;
     require_backend_consensus(world, &consensus_contract)?;
-    let rank: u32 = world.getattr("rank")?.extract()?;
-    let size: u32 = world.getattr("size")?.extract()?;
-    let pid = std::process::id();
-    let device = world.getattr("device")?.str()?.to_str()?.to_owned();
     let receipt_write = (|| -> PyResult<Bound<'py, PyAny>> {
+        let rank: u32 = world.getattr("rank")?.extract()?;
+        let size: u32 = world.getattr("size")?.extract()?;
+        let pid = std::process::id();
+        let device = world.getattr("device")?.str()?.to_str()?.to_owned();
         let fields = crate::cnot_acceptance::contract_fields(&contract)?;
         crate::cnot_acceptance::emit("backend_admission", rank, size, pid, &device, &fields)?;
         let controller_fields = [
@@ -302,6 +412,34 @@ pub(crate) fn preflight_strict_backend<'py>(
         Ok(py.None().into_bound(py))
     })();
     checked(py, world, "write CNOT admission receipts", receipt_write)?;
+    Ok(Some(admitted))
+}
+
+pub(crate) fn bind_stream5_admission<'py>(
+    py: Python<'py>,
+    admission: Option<&Py<PyCnotBackendAdmission>>,
+    world: &Bound<'py, PyAny>,
+    library_sha256: Option<String>,
+) -> PyResult<()> {
+    let Some(admission) = admission else {
+        return Ok(());
+    };
+    let size: usize = world.getattr("size")?.extract()?;
+    if size <= 1 {
+        return Ok(());
+    }
+    let digest = library_sha256.ok_or_else(|| {
+        PyRuntimeError::new_err("strict CNOT admission lacks the Rust Stream 5 fingerprint")
+    })?;
+    let transport = world.getattr("transport")?;
+    if transport.is_none() {
+        return Err(PyRuntimeError::new_err(
+            "strict CNOT admission lacks its live Rust Stream 5 transport",
+        ));
+    }
+    let mut admission = admission.borrow_mut(py);
+    admission.stream5_library_sha256 = Some(digest);
+    admission.stream5_transport = Some(transport.unbind());
     Ok(())
 }
 
@@ -353,6 +491,7 @@ struct NativeStages<'py> {
     device_domain_sha256: Option<String>,
     stream5_library_sha256: Option<String>,
     device_domain: Option<beam_native_sys::cnot_device_bridge::DeviceDomain>,
+    _stream5_transport: Option<Py<PyAny>>,
 }
 
 impl<'py> NativeStages<'py> {
@@ -365,39 +504,39 @@ impl<'py> NativeStages<'py> {
         scorer: Bound<'py, PyAny>,
         mode: String,
         audit: bool,
+        admission: Option<Py<PyCnotBackendAdmission>>,
     ) -> PyResult<Self> {
         let n = root.call_method1("size", (1,))?.extract()?;
         let words = root.call_method1("size", (2,))?.extract()?;
         let rank = world.getattr("rank")?.extract()?;
         let size = world.getattr("size")?.extract()?;
-        let device_domain_path = std::env::var_os("MGBS_CNOT_OWNED_LIBRARY").map(PathBuf::from);
         let strict_backend = strict_backend_enabled();
-        let device_domain_sha256 = if strict_backend {
-            device_domain_path.as_deref().map(file_sha256).transpose()?
-        } else {
+        let (device_domain, device_domain_sha256, stream5_library_sha256, stream5_transport) =
+            if let Some(admission) = admission {
+                let mut admission = admission.borrow_mut(py);
+                (
+                    admission.device_domain.take(),
+                    admission.device_domain_sha256.take(),
+                    admission.stream5_library_sha256.take(),
+                    admission.stream5_transport.take(),
+                )
+            } else {
+                (None, None, None, None)
+            };
+        if strict_backend && device_domain.is_none() {
+            return Err(PyRuntimeError::new_err(
+                "strict CNOT acceptance requires its admitted DeviceDomain handle",
+            ));
+        }
+        if strict_backend && size > 1 && (stream5_library_sha256.is_none() || stream5_transport.is_none()) {
+            return Err(PyRuntimeError::new_err(
+                "strict CNOT acceptance requires its admitted Stream 5 handle and fingerprint",
+            ));
+        }
+        let device_domain_path = if strict_backend {
             None
-        };
-        let stream5_library_sha256 = if strict_backend && size > 1 {
-            let transport = world.getattr("transport")?;
-            let name: String = transport
-                .getattr("__class__")?
-                .getattr("__name__")?
-                .extract()?;
-            if name != "RustStream5" {
-                return Err(PyRuntimeError::new_err(
-                    "strict CNOT acceptance requires Rust Stream 5 before search startup",
-                ));
-            }
-            let library = world.getattr("_stream5_library")?;
-            if library.is_none() {
-                return Err(PyRuntimeError::new_err(
-                    "strict CNOT acceptance requires the admitted Stream 5 shared library",
-                ));
-            }
-            let path: PathBuf = library.getattr("_name")?.extract()?;
-            Some(file_sha256(&path)?)
         } else {
-            None
+            std::env::var_os("MGBS_CNOT_OWNED_LIBRARY").map(PathBuf::from)
         };
         Ok(Self {
             py,
@@ -428,7 +567,8 @@ impl<'py> NativeStages<'py> {
             strict_backend,
             device_domain_sha256,
             stream5_library_sha256,
-            device_domain: None,
+            device_domain,
+            _stream5_transport: stream5_transport,
         })
     }
 
@@ -453,60 +593,37 @@ impl<'py> NativeStages<'py> {
             }
             return Ok(false);
         }
+        if self.device_domain.is_some() {
+            return Ok(true);
+        }
+        if self.strict_backend {
+            return Err(PyRuntimeError::new_err(
+                "strict CNOT acceptance cannot load an unadmitted DeviceDomain",
+            ));
+        }
         let Some(path) = &self.device_domain_path else {
-            if self.strict_backend {
-                return Err(PyRuntimeError::new_err(
-                    "strict CNOT acceptance requires MGBS_CNOT_OWNED_LIBRARY",
-                ));
-            }
             return Ok(false);
         };
-        if self.device_domain.is_none() {
-            let device = tensor.getattr("device")?.getattr("index")?.extract()?;
-            self.device_domain = Some(beam_native_sys::cnot_device_bridge::DeviceDomain::load(
-                path,
-                device,
-                self.n as i32,
-                self.size as i32,
-            )?);
-        }
+        let device = tensor.getattr("device")?.getattr("index")?.extract()?;
+        self.device_domain = Some(beam_native_sys::cnot_device_bridge::DeviceDomain::load(
+            path,
+            device,
+            self.n as i32,
+            self.size as i32,
+        )?);
         Ok(true)
     }
 
     fn trace_device_dispatch(&self, operation: &str, rows: usize) -> PyResult<()> {
-        if !self.strict_backend {
-            return Ok(());
-        }
-        let device = self.world.getattr("device")?.str()?.to_str()?.to_owned();
-        let rank = self.rank;
-        let world = self.size;
-        let pid = std::process::id();
-        let sha = self.device_domain_sha256.as_deref().unwrap_or("unknown");
-        let fields = [
-            ("implementation".to_owned(), "DeviceDomain".to_owned()),
-            ("operation".to_owned(), operation.to_owned()),
-            ("rows".to_owned(), rows.to_string()),
-            ("abi".to_owned(), "1".to_owned()),
-            ("device_abi".to_owned(), "1".to_owned()),
-            ("library_sha256".to_owned(), sha.to_owned()),
-        ]
-        .into_iter()
-        .collect();
-        let receipt = crate::cnot_acceptance::emit(
-            "device_domain_dispatch",
-            rank,
-            world,
-            pid,
-            &device,
-            &fields,
-        );
-        checked(
-            self.py,
+        emit_device_dispatch(
             &self.world,
-            "write DeviceDomain dispatch receipt",
-            receipt.map(|()| self.py.None().into_bound(self.py)),
-        )?;
-        Ok(())
+            self.rank,
+            self.size,
+            self.strict_backend,
+            self.device_domain_sha256.as_deref(),
+            operation,
+            rows,
+        )
     }
 
     fn expand_batch(&mut self, begin: u64, k: u32) -> PyResult<Bound<'py, PyAny>> {
@@ -745,6 +862,52 @@ impl<'py> NativeStages<'py> {
             .call_method1("__floordiv__", (count.max(1),))?;
         Ok((new_closed, wire, targets))
     }
+}
+
+#[pyfunction(name = "_probe_cnot_device_stage_vote")]
+fn probe_cnot_device_stage_vote(world: Bound<'_, PyAny>, fail_rank: i64) -> PyResult<()> {
+    let py = world.py();
+    let rank: u32 = world.getattr("rank")?.extract()?;
+    let size: u32 = world.getattr("size")?.extract()?;
+    let local = (|| -> PyResult<Bound<'_, PyAny>> {
+        if i64::from(rank) == fail_rank {
+            return Err(PyRuntimeError::new_err(
+                "injected DeviceDomain stage failure before dispatch trace",
+            ));
+        }
+        // Use the exact local-only event helper called by the production
+        // owners/expand/distinct stages. The enclosing vote is their sole
+        // collective for this rank-local stage.
+        emit_device_dispatch(&world, rank, size, true, Some("fixture"), "expansion", 1)?;
+        Ok(py.None().into_bound(py))
+    })();
+    checked(
+        py,
+        &world,
+        "rank parent actions and expand",
+        local,
+    )?;
+    Ok(())
+}
+
+#[pyfunction(name = "_probe_cnot_device_domain_vote")]
+fn probe_cnot_device_domain_vote(
+    py: Python<'_>,
+    world: Bound<'_, PyAny>,
+    path: String,
+    device: i32,
+    n: i32,
+    fail_rank: i64,
+) -> PyResult<String> {
+    let world_size: i32 = world.getattr("size")?.extract()?;
+    let path = PathBuf::from(path);
+    let (_domain, domain_sha256) = prepare_device_domain_checked(
+        py,
+        &world,
+        || load_device_domain_admission(&path, device, n, world_size),
+        (fail_rank >= 0).then_some(fail_rank),
+    )?;
+    Ok(format!("domain_abi=1;domain_sha256={domain_sha256}"))
 }
 
 impl Backend for NativeStages<'_> {
@@ -1264,6 +1427,7 @@ impl Backend for NativeStages<'_> {
 }
 
 #[pyfunction]
+#[pyo3(signature=(world, root, identity, input, scorer, mode, audit, width, shortlist, alphabet, max_depth, admission=None))]
 #[allow(clippy::too_many_arguments)]
 fn run_cnot_native<'py>(
     py: Python<'py>,
@@ -1278,8 +1442,10 @@ fn run_cnot_native<'py>(
     shortlist: u32,
     alphabet: u32,
     max_depth: u64,
+    admission: Option<Py<PyCnotBackendAdmission>>,
 ) -> PyResult<Py<PyAny>> {
-    let mut backend = NativeStages::new(py, world, root, identity, input, scorer, mode, audit)?;
+    let mut backend =
+        NativeStages::new(py, world, root, identity, input, scorer, mode, audit, admission)?;
     let options = Options {
         rank: backend.rank,
         world: backend.size,
@@ -1304,7 +1470,10 @@ pub(crate) fn run_cnot_native_all_ranks_support(
 }
 
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
+    module.add_class::<PyCnotBackendAdmission>()?;
     module.add_function(wrap_pyfunction!(run_cnot_native, module)?)?;
+    module.add_function(wrap_pyfunction!(probe_cnot_device_stage_vote, module)?)?;
+    module.add_function(wrap_pyfunction!(probe_cnot_device_domain_vote, module)?)?;
     module.add_function(wrap_pyfunction!(run_cnot_native_all_ranks_support, module)?)?;
     module.add_function(wrap_pyfunction!(probe_cnot_backend_admission, module)?)?;
     module.add_function(wrap_pyfunction!(require_cnot_backend_consensus, module)?)

@@ -1,3 +1,24 @@
+## 2026-11-21 - Retain admitted CNOT backend handles through search startup
+
+- Strict CNOT admission now prepares one live DeviceDomain through a rank-wide
+  Gloo vote, then carries its handle and SHA-256 into the Rust stages. Stream 5
+  carries its fingerprint and live transport through the same admission object;
+  the compatibility path does not add library hashing.
+- Device dispatch tracing now only emits its local receipt. The existing stage
+  vote reports any trace failure, and a new installed-wheel regression injects
+  pre-trace failure on either Gloo rank before a healthy retry. DeviceDomain
+  preparation failure/retry uses the same production preparation helper.
+- Stream 5 setup and admitted-handle binding now coordinate local preparation,
+  transport construction and receipt failures before peers advance to another
+  collective. `run_cnot_native` keeps its previous Python call shape by making
+  the admission handle optional.
+- P0 remote payload harness is green on source SHA `ae5d3acd3fd4a809b40e2f25600e02224bbcd5bc`:
+  [Actions run 44904838667](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44904838667).
+  The installed-wheel job on that pre-P1 SHA failed at the existing backend
+  admission test because `_probe_cnot_device_domain_vote` was missing; the P1
+  patch adds it. New installed-wheel/Gloo results are pending. CUDA/NCCL remains
+  unrun and no Vast instance was started.
+
 ## 2026-11-21 - Bind paired CNOT receipts to rank identities
 
 - `cnot_acceptance_events.validate_case` now returns the observed per-rank PID,
