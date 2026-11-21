@@ -89,5 +89,10 @@ fn trace_native_tqp(
     ]
     .into_iter()
     .collect();
-    crate::cnot_acceptance::emit("tqp_scorer_dispatch", rank, size, pid, &device, &fields)
+    let py = world.py();
+    let active_device = world.getattr("device")?;
+    let observation = crate::cnot_native_stages::observe_acceptance_gpu(py, world, &active_device)?;
+    crate::cnot_acceptance::emit(
+        "tqp_scorer_dispatch", rank, size, pid, &device, &fields, observation.as_ref()
+    )
 }

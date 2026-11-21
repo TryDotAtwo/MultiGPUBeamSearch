@@ -31,7 +31,7 @@ fn strict_backend_enabled() -> bool {
     )
 }
 
-fn observe_acceptance_gpu(
+pub(crate) fn observe_acceptance_gpu(
     py: Python<'_>,
     world: &Bound<'_, PyAny>,
     device: &Bound<'_, PyAny>,
