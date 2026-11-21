@@ -3027,3 +3027,8 @@ Main commit `148b2a826a369b7601e904ea409e0cc5301c75c9` also passed the 260-test 
   replaying the returned sequence. Removed an unused `known_hosts` assignment
   from SSH key attachment after Actionlint flagged it. Hosted rerun is pending;
   no local tests or GPU run were produced.
+- The rerun passed installed-wheel build/smoke, dtype warning-as-error, strict
+  backend admission, two-rank Gloo failure injection with same-group recovery,
+  and public CNOT search. Actionlint then found two unused retry-loop counters
+  and an unused remote result-directory variable; they are removed before the
+  next lint run. No physical GPU test was run.

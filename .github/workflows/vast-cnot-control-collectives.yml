@@ -229,7 +229,7 @@ jobs:
           remote_log="${RUNNER_TEMP}/vast-private-preflight.log"
           ssh_opts=(-i "$key_file" -p "$SSH_PORT" -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$known_hosts" -o ConnectTimeout=15 -o ServerAliveInterval=10 -o ServerAliveCountMax=2)
           ready=false
-          for attempt in {1..12}; do
+          for _ in {1..12}; do
             if ssh "${ssh_opts[@]}" "root@${SSH_HOST}" true >/dev/null 2>"${RUNNER_TEMP}/vast-cnot-ssh.err"; then
               ready=true
               break
@@ -652,7 +652,6 @@ jobs:
           fi
           exit "$run_exit"
           REMOTE
-          result_dir_remote="${REMOTE_ROOT}/test_results/refactor_20261121/gpu-acceptance"
           VAST_SSH_PRIVATE_KEY="$key_file" \
           VAST_SSH_KNOWN_HOSTS="$known_hosts" \
           VAST_SSH_HOST="$SSH_HOST" \
@@ -701,7 +700,7 @@ jobs:
               --data-binary "$body" "https://console.vast.ai/api/v0/instances/${INSTANCE_ID}/" > "$response"
             jq -e '.success == true' "$response" >/dev/null
             stopped=false
-            for attempt in {1..12}; do
+            for _ in {1..12}; do
               curl --fail --silent --show-error --max-time 20 \
                 -H "Authorization: Bearer ${VAST_API_KEY}" -H "Accept: application/json" \
                 "https://console.vast.ai/api/v0/instances/" > "$instances"
