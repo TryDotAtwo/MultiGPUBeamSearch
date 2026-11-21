@@ -3175,3 +3175,15 @@ Main commit `148b2a826a369b7601e904ea409e0cc5301c75c9` also passed the 260-test 
   records worker and `tee` exit codes. CNOT event validation reads closed
   per-case logs instead of the concurrently written outer tee log. Hosted
   GREEN and worker syntax checks are pending; no GPU run was made.
+
+## 2026-11-21 - Bind paired CNOT verdicts to report digests
+
+- The pair verifier now validates each report's world against its expected
+  topology and acceptance envelope, recomputes the canonical report digest,
+  and requires valid root and per-layer survivor SHA-256 values for qhat and
+  paired trained cases. The per-case backend verdict carries that digest, and
+  campaign aggregation requires it to match the result report.
+- Hosted RED `44909951209` reproduced five failures: a mutated two-rank report
+  could be accepted as world size one; missing digest/root/survivor hashes were
+  accepted; and the backend verdict dropped the report digest. The hosted CPU
+  GREEN is pending. No GPU execution was started.

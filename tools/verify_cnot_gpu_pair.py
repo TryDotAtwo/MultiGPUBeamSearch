@@ -7,6 +7,7 @@ from pathlib import Path
 import re
 import sys
 
+from cnot_acceptance_events import report_sha256
 from vast_instance_contract import validate_instance_id
 
 
@@ -23,6 +24,31 @@ def require(condition, message):
         raise ValueError(message)
 
 
+def validate_report_integrity(report, expected_world, report_name):
+    world = report.get("world")
+    require(type(world) is int and world == expected_world,
+            f"{report_name}: report world does not match its expected topology")
+    acceptance = report.get("acceptance")
+    require(isinstance(acceptance, dict) and acceptance.get("world") == world,
+            f"{report_name}: acceptance and report world sizes differ")
+    digest = acceptance.get("report_sha256")
+    require(isinstance(digest, str) and SHA64.fullmatch(digest),
+            f"{report_name}: report SHA-256 is missing or malformed")
+    require(digest == report_sha256(report),
+            f"{report_name}: report bytes differ from the accepted report digest")
+    root_sha = report.get("root_sha256")
+    require(isinstance(root_sha, str) and SHA64.fullmatch(root_sha),
+            f"{report_name}: root state SHA-256 is missing or malformed")
+    layers = report.get("layers")
+    require(isinstance(layers, list) and layers,
+            f"{report_name}: ordered survivor layers are missing")
+    for index, layer in enumerate(layers):
+        winner_sha = layer.get("winners_sha256") if isinstance(layer, dict) else None
+        require(isinstance(winner_sha, str) and SHA64.fullmatch(winner_sha),
+                f"{report_name}: layer {index} survivor SHA-256 is missing or malformed")
+    return digest
+
+
 def validate(result_dir, source_sha, instance_id, manifest_sha, checkpoint_sha,
              scorer_library_sha, wheel_sha, run_id):
     require(validate_instance_id(str(instance_id)) == str(instance_id),
@@ -33,6 +59,10 @@ def validate(result_dir, source_sha, instance_id, manifest_sha, checkpoint_sha,
         "cnot-trained-deep-paired-2-gpu.json",
     )
     left, right = (load_json(root / name) for name in paired_names)
+    paired_report_digests = [
+        validate_report_integrity(left, 1, paired_names[0]),
+        validate_report_integrity(right, 2, paired_names[1]),
+    ]
     for report in (left, right):
         model = report.get("model") or {}
         require(
@@ -77,6 +107,7 @@ def validate(result_dir, source_sha, instance_id, manifest_sha, checkpoint_sha,
 
     qhat_name = "cnot-trained-qhat-1-gpu.json"
     qhat = load_json(root / qhat_name)
+    qhat_report_digest = validate_report_integrity(qhat, 1, qhat_name)
     model = qhat.get("model") or {}
     require(
         model.get("checkpoint_sha256") == checkpoint_sha
@@ -99,6 +130,11 @@ def validate(result_dir, source_sha, instance_id, manifest_sha, checkpoint_sha,
         "cnot-trained-deep-paired-1-gpu": (paired_names[0], 1),
         "cnot-trained-deep-paired-2-gpu": (paired_names[1], 2),
     }
+    report_digests = {
+        "cnot-trained-qhat-1-gpu": qhat_report_digest,
+        "cnot-trained-deep-paired-1-gpu": paired_report_digests[0],
+        "cnot-trained-deep-paired-2-gpu": paired_report_digests[1],
+    }
     event_receipts = {}
     for case_id, (report_name, world) in case_expectations.items():
         report = load_json(root / report_name)
@@ -108,6 +144,7 @@ def validate(result_dir, source_sha, instance_id, manifest_sha, checkpoint_sha,
             and identity.get("case_id") == case_id
             and identity.get("source_sha") == source_sha
             and identity.get("wheel_sha256") == wheel_sha
+            and report.get("world") == world
             and identity.get("world") == world,
             f"{report_name}: result identity is not bound to this run, wheel and topology",
         )
@@ -120,6 +157,8 @@ def validate(result_dir, source_sha, instance_id, manifest_sha, checkpoint_sha,
             and event_receipt.get("source_sha") == source_sha
             and event_receipt.get("wheel_sha256") == wheel_sha
             and event_receipt.get("world") == world
+            and event_receipt.get("report_sha256") == report_digests[case_id]
+            and identity.get("report_sha256") == report_digests[case_id]
             and event_receipt.get("single_rank_transport") == (world == 1),
             f"{case_id}: strict backend verifier receipt does not match its result JSON",
         )

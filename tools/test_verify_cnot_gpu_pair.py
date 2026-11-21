@@ -185,6 +185,8 @@ class VerifyCnotGpuPairTests(unittest.TestCase):
                     else:
                         for layer in report["layers"]:
                             layer.pop("winners_sha256", None)
+                    if mutation != "report_sha256":
+                        report["acceptance"]["report_sha256"] = protocol.report_sha256(report)
                     path.write_text(json.dumps(report), encoding="utf-8")
                 with self.assertRaises(ValueError):
                     _validate(root)

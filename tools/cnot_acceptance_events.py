@@ -176,7 +176,8 @@ def validate_case(trace_text: str, receipt_root, report: dict, *, expected_sourc
     world = report.get("world")
     if type(world) is not int or world not in (1, 2) or acceptance.get("world") != world:
         _fail("CNOT result JSON has an invalid or inconsistent world size")
-    if acceptance.get("report_sha256") != report_sha256(report):
+    validated_report_sha256 = report_sha256(report)
+    if acceptance.get("report_sha256") != validated_report_sha256:
         _fail("result JSON hash differs from its terminal acceptance event")
     transport = "single_rank_no_exchange" if world == 1 else "rust_stream5_nccl"
     if acceptance.get("transport") != transport:
@@ -364,6 +365,7 @@ def validate_case(trace_text: str, receipt_root, report: dict, *, expected_sourc
         "source_sha": expected_source_sha,
         "wheel_sha256": expected_wheel_sha256,
         "world": world,
+        "report_sha256": validated_report_sha256,
         "rank_devices": [
             {
                 "rank": rank,
