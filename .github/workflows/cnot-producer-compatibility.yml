@@ -1,0 +1,78 @@
+name: CNOT producer panel-v2 source compatibility
+
+on:
+  push:
+    branches:
+      - "codex/beam-*"
+    paths:
+      - .github/workflows/cnot-producer-compatibility.yml
+      - integrations/cnot_scorer/**
+      - integrations/cayleypy_native/multigpubeamsearch/build.py
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  compile-current-producer-adapter:
+    name: Compile pinned panel-v2 adapter with CPU PyTorch
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: TryDotAtwo/cnot-neural-synth-frontier6
+          ref: e17953891a36e3e3ae8b038695bfac8548ab784f
+          path: cnot-producer
+          fetch-depth: 1
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install pinned CPU PyTorch
+        id: pytorch
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install torch==2.9.0 --index-url https://download.pytorch.org/whl/cpu > "${RUNNER_TEMP}/producer-adapter-pip.log" 2>&1
+      - name: Prepare the pinned producer source and compile the injected bridge
+        id: cpu_compile
+        shell: bash
+        env:
+          LIBTORCH_USE_PYTORCH: "1"
+          CARGO_TARGET_DIR: ${{ runner.temp }}/cnot-panel-v2-target
+        run: |
+          set -euo pipefail
+          build_dir="${RUNNER_TEMP}/cnot-panel-v2-build"
+          if ! python integrations/cnot_scorer/build.py --contract panel_search_v2 \
+              --source "${GITHUB_WORKSPACE}/cnot-producer" \
+              --build-dir "$build_dir" --prepare-only > "${RUNNER_TEMP}/producer-adapter-prepare.log" 2>&1; then
+            echo "source_adapter=failed" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
+          native="$build_dir/native"
+          torch_lib="$(python -c 'import pathlib, torch; print(pathlib.Path(torch.__file__).parent / "lib")')"
+          export LD_LIBRARY_PATH="$torch_lib:${LD_LIBRARY_PATH:-}"
+          if ! cargo check --locked --features torch --lib --manifest-path "$native/Cargo.toml" \
+              > "${RUNNER_TEMP}/producer-adapter-cargo.log" 2>&1; then
+            echo "source_adapter=failed" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
+          echo "source_adapter=passed" >> "$GITHUB_OUTPUT"
+      - name: Publish redacted source status
+        if: always()
+        env:
+          OUTCOME: ${{ steps.cpu_compile.outcome }}
+        shell: bash
+        run: |
+          if [[ "$OUTCOME" == "success" ]]; then
+            echo "CNOT producer adapter: passed (CPU compile; GPU runtime not run)." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "CNOT producer adapter: failed (CPU compile; GPU runtime not run)." >> "$GITHUB_STEP_SUMMARY"
+          fi
