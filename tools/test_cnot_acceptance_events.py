@@ -4,6 +4,7 @@ import importlib.util
 import os
 from pathlib import Path
 import sys
+from types import SimpleNamespace
 import tempfile
 import unittest
 from unittest import mock
@@ -181,13 +182,13 @@ class AcceptanceEventProtocolTest(unittest.TestCase):
             "domain_sha256": DOMAIN_SHA, "checkpoint_sha256": CHECKPOINT_SHA,
             "search_manifest_sha256": MANIFEST_SHA, "scorer_library_sha256": SCORER_SHA,
         }
-        PYTHON_PRODUCER._OBSERVED_GPU_UUIDS.clear()
+        PYTHON_PRODUCER._PINNED_GPU_OBSERVATIONS.clear()
         with mock.patch.dict(os.environ, environment), \
                 mock.patch.object(PYTHON_PRODUCER.os, "getpid", return_value=4000), \
-                mock.patch.object(PYTHON_PRODUCER, "observe_current_cuda_uuid", return_value="GPU-0001"):
+                mock.patch.object(PYTHON_PRODUCER, "observe_current_cuda_context", return_value=SimpleNamespace(device_ordinal=0, gpu_uuid="GPU-0001", context_handle=0xCAFE, thread_id=42)):
             identity = PYTHON_PRODUCER.acceptance_identity()
             event = PYTHON_PRODUCER._event(identity, "backend_admission", world, fields)
-            self.assertEqual(os.environ.get("MGBS_CNOT_ACCEPTANCE_OBSERVED_GPU_UUID"), "GPU-0001")
+            self.assertEqual(event["gpu_uuid"], "GPU-0001")
         serialized = protocol.serialize_event(event)
         expected = FIXTURE.read_text(encoding="utf-8").strip().split(protocol.EVENT_PREFIX, 1)[1]
         self.assertEqual(serialized, expected)
@@ -201,11 +202,11 @@ class AcceptanceEventProtocolTest(unittest.TestCase):
             "MGBS_CNOT_ACCEPTANCE_GPU_UUIDS": "GPU-expected",
             "CNOT_RUST_EVIDENCE": str(ROOT / "unused-receipts"),
         }
-        PYTHON_PRODUCER._OBSERVED_GPU_UUIDS.clear()
+        PYTHON_PRODUCER._PINNED_GPU_OBSERVATIONS.clear()
         with mock.patch.dict(os.environ, environment), \
-                mock.patch.object(PYTHON_PRODUCER, "observe_current_cuda_uuid", return_value="GPU-other"):
+                mock.patch.object(PYTHON_PRODUCER, "observe_current_cuda_context", return_value=SimpleNamespace(device_ordinal=0, gpu_uuid="GPU-other", context_handle=0xCAFE, thread_id=42)):
             identity = PYTHON_PRODUCER.acceptance_identity()
-            with self.assertRaisesRegex(RuntimeError, "selected GPU GPU-other, expected GPU-expected"):
+            with self.assertRaisesRegex(RuntimeError, "observed GPU GPU-other, expected GPU-expected"):
                 PYTHON_PRODUCER.gpu_uuid_for_rank(0, 1, device="cuda:0")
 
     def test_acceptance_rejects_duplicate_expected_physical_uuids(self):
