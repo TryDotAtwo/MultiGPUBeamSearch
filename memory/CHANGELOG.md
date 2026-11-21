@@ -3101,6 +3101,17 @@ Main commit `148b2a826a369b7601e904ea409e0cc5301c75c9` also passed the 260-test 
   whose written result is checked. The lifecycle job has a bounded timeout.
 - The unpaired duplicate two-GPU trained-deep case was removed. The matched
   one-/two-GPU pair remains in the manual hardware workflow.
-- These checks are pending on the current source SHA until hosted Actions
-  reports them. No Vast instance was started; physical CUDA/NCCL acceptance is
-  still pending.
+- At `fe520518`, hosted source validation `44899191042` and installed-wheel
+  validation `44899191012` passed, including the paired-result verifier,
+  `verify_cnot.main` lifecycle, public CNOT search and workflow lint. The GPU
+  job was skipped; no CUDA/NCCL or trained-checkpoint execution was established.
+
+## 2026-11-21 - Vote rank-local backend preparation
+
+- Added an installed-wheel two-rank Gloo regression scenario for DeviceDomain
+  preparation failures after local ABI admission. It injects one failure on
+  rank 0 and then rank 1, requires a common phase error, and makes a healthy
+  admission/collective on the same process group after each failure.
+- The test currently references the planned `_probe_cnot_device_domain_vote`
+  boundary and is intentionally awaiting the hosted RED run before the runtime
+  change. No backend implementation or GPU execution has changed in this step.

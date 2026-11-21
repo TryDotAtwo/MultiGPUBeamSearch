@@ -137,6 +137,44 @@ def public_activation_worker(rank, rendezvous, output_dir):
         dist.destroy_process_group()
 
 
+def domain_prepare_failure_worker(rank, rendezvous, output_dir, library):
+    """A failed rank-local backend prepare must be voted before later Gloo work."""
+    torch.set_num_threads(1)
+    dist.init_process_group(
+        "gloo", init_method=rendezvous, rank=rank, world_size=2,
+        timeout=timedelta(seconds=20),
+    )
+    observations = []
+    try:
+        with World("cpu") as world:
+            for failed_rank in (0, 1):
+                try:
+                    RUNTIME._probe_cnot_device_domain_vote(
+                        world, str(library), rank, 4, failed_rank
+                    )
+                except Exception as error:
+                    failure = {"kind": type(error).__name__, "error": str(error)}
+                else:
+                    failure = {"kind": "missing-failure", "error": ""}
+
+                # Both ranks must still be in the same Gloo phase after the
+                # rank-local failure has been reported to every participant.
+                world.require_engine_consensus(
+                    f"after-device-domain-failure-{failed_rank}".encode()
+                )
+                healthy = RUNTIME._probe_cnot_device_domain_vote(
+                    world, str(library), rank, 4, -1
+                )
+                world.require_engine_consensus(healthy.encode())
+                observations.append({"failed_rank": failed_rank, **failure,
+                                    "healthy_contract": healthy})
+        Path(output_dir, f"domain-vote-rank-{rank}.json").write_text(
+            json.dumps(observations), encoding="utf-8"
+        )
+    finally:
+        dist.destroy_process_group()
+
+
 def main():
     with tempfile.TemporaryDirectory(prefix="mgbs-cnot-admission-") as temporary:
         root = Path(temporary)
@@ -193,6 +231,22 @@ def main():
         ]
         assert public_activation_results[0] == public_activation_results[1], public_activation_results
         assert "CNOT search engine settings differ between ranks" in public_activation_results[0]["error"]
+
+        domain_vote_dir = root / "device-domain-rank-failure"
+        domain_vote_dir.mkdir()
+        domain_vote_rendezvous = (domain_vote_dir / "rendezvous").resolve().as_uri()
+        mp.spawn(domain_prepare_failure_worker,
+                 args=(domain_vote_rendezvous, str(domain_vote_dir), valid),
+                 nprocs=2, join=True)
+        domain_vote_results = [
+            json.loads((domain_vote_dir / f"domain-vote-rank-{rank}.json").read_text())
+            for rank in range(2)
+        ]
+        assert domain_vote_results[0] == domain_vote_results[1], domain_vote_results
+        for failed_rank, result in enumerate(domain_vote_results[0]):
+            assert result["failed_rank"] == failed_rank, result
+            assert "prepare admitted CNOT DeviceDomain failed" in result["error"], result
+            assert "domain_abi=1" in result["healthy_contract"], result
 
     print("CNOT_BACKEND_ADMISSION_CPU_OK")
 
