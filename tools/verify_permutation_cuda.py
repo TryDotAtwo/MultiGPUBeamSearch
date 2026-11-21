@@ -337,11 +337,17 @@ def main():
     model_dir.parent.mkdir(parents=True, exist_ok=True)
     write_zero_mlp(model_dir, contract)
     model = NativeModel(model_dir, contract.graph_hash)
-    saturated = build_saturated_reference_fixture(
-        contract.center, contract.generators, beam_width=3, shard_count=64
+    saturated_graph = cp.CayleyGraph(cp.PermutationGroups.lrx(5), device="cpu")
+    saturated_base = GraphContract.from_graph(
+        saturated_graph, saturated_graph.definition.central_state
     )
-    saturated_contract = GraphContract.from_graph(graph, saturated.start)
-    saturated_model = NativeModel(model_dir, saturated_contract.graph_hash)
+    saturated = build_saturated_reference_fixture(
+        saturated_base.center, saturated_base.generators, beam_width=3, shard_count=64
+    )
+    saturated_contract = GraphContract.from_graph(saturated_graph, saturated.start)
+    saturated_model_dir = args.cache_dir.resolve() / "zero-mlp-saturated-lrx5"
+    write_zero_mlp(saturated_model_dir, saturated_contract)
+    saturated_model = NativeModel(saturated_model_dir, saturated_contract.graph_hash)
 
     reports = [
         run_layout(graph, contract, model, args.source_dir.resolve(), args.cache_dir.resolve(),
@@ -350,11 +356,11 @@ def main():
                    args.cutlass_dir.resolve(), (0, 1), exact, scramble),
     ]
     saturated_reports = [
-        run_saturated_layout(graph, saturated_contract, saturated_model, args.source_dir.resolve(),
+        run_saturated_layout(saturated_graph, saturated_contract, saturated_model, args.source_dir.resolve(),
                              args.cache_dir.resolve(), args.cutlass_dir.resolve(), (0,), saturated,
                              source_sha=args.source_sha, wheel_sha256=args.wheel_sha256,
                              run_id=args.acceptance_run_id),
-        run_saturated_layout(graph, saturated_contract, saturated_model, args.source_dir.resolve(),
+        run_saturated_layout(saturated_graph, saturated_contract, saturated_model, args.source_dir.resolve(),
                              args.cache_dir.resolve(), args.cutlass_dir.resolve(), (0, 1), saturated,
                              source_sha=args.source_sha, wheel_sha256=args.wheel_sha256,
                              run_id=args.acceptance_run_id),
@@ -363,6 +369,7 @@ def main():
         raise AssertionError("one- and two-GPU saturated searches selected different ordered survivor hashes")
     report = {
         "fixture": "cayleypy.LRX(4)",
+        "saturated_fixture": "cayleypy.LRX(5)",
         "state_len": contract.state_len,
         "move_count": contract.move_count,
         "model": "known finite FP16 MLP artifact",
