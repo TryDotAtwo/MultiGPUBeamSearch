@@ -1,5 +1,13 @@
 # Конфиг
 
+## Installed-wheel проверка штатного выбора CNOT-контроллера, 2026-11-22
+
+Публичная точка `verify_cnot.main` проверяется с `engine=auto` на двух Gloo-рангах. В healthy retry тест подменяет callback Python reference-loop на ошибку; успешный результат подтверждает, что установленный wheel выбрал Rust controller. До каждого retry тест отдельно инъецирует сбой загрузки scorer только на rank 0, затем только на rank 1, и проверяет последующий запуск в той же живой группе.
+
+На tested source SHA `a517f8afec9de82ad3fe1958fe8b83ba5df2fafa` installed-wheel run [44955518273](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44955518273) прошёл, вместе с прежними PyO3 dtype, strict-admission, event, verifier и permutation CPU gates. Hosted source harness [44955518309](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44955518309) прошёл. Оба артефакта содержат только redacted status. Физический CUDA/NCCL job был пропущен.
+
+Это подтверждает выбор штатного Rust controller на CPU/Gloo и восстановление живой группы после согласованной ошибки. Оно не подтверждает CUDA/NCCL, обученный checkpoint scorer на GPU, физическую работу рангов или завершение полного переноса. Остаточная граница Python `World`/Torch и scheduler/profile preparation остаётся открытой; общий статус — `test_results/refactor_20261121/rust-cnot-admission/GITHUB_STATUS.md`.
+
 ## Независимая проверка reference cutoff CNOT, 2026-11-22
 
 CPU acceptance теперь сравнивает порядок выбранных состояний с независимыми оценками scorer. Отчёт сохраняет, был ли cutoff underfilled, точно равным с полным сравнением path word, отделённым от границы погрешности или неоднозначным внутри допуска. Для неоднозначной границы проверка явно не утверждает устойчивый выбор по эталонным оценкам; для точных ties проверяется прежний полный tie-break по path word.
