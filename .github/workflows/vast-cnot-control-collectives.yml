@@ -190,8 +190,8 @@ jobs:
               raise SystemExit("backend event validation must read completed per-case logs")
           if '--trace "${result_dir}/cuda-nccl.log"' in worker_text:
               raise SystemExit("do not read the outer tee log before the producer exits")
-          if "MGBS_CNOT_ACCEPTANCE_OBSERVED_GPU_UUID" not in python_acceptance_source or "MGBS_CNOT_ACCEPTANCE_OBSERVED_GPU_UUID" not in rust_acceptance_source:
-              raise SystemExit("the Rust and Python producers must use the observed CUDA-context UUID")
+          if "observe_current_cuda_context" not in python_acceptance_source or "local_gpu_uuid(" not in rust_acceptance_source:
+              raise SystemExit("the Rust and Python producers must bind events to the observed CUDA-context UUID")
           if "cuCtxGetDevice" not in cuda_identity_source or "cuDeviceGetUuid" not in cuda_identity_source:
               raise SystemExit("physical GPU identity must come from the current CUDA context")
           if "dist.all_gather_object(devices, hardware, group=world._control_group)" not in verify_cnot_source:
