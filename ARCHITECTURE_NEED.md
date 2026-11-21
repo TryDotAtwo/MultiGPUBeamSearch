@@ -8,6 +8,12 @@
 
 Это подтверждает выбор штатного Rust controller на CPU/Gloo и восстановление живой группы после согласованной ошибки. Оно не подтверждает CUDA/NCCL, обученный checkpoint scorer на GPU, физическую работу рангов или завершение полного переноса. Остаточная граница Python `World`/Torch и scheduler/profile preparation остаётся открытой; общий статус — `test_results/refactor_20261121/rust-cnot-admission/GITHUB_STATUS.md`.
 
+## Typed CNOT controller choice in beam-runtime, 2026-11-22
+
+The Rust runtime now owns the controller selection table for public `auto`, `python`, and `rust` requests. The PyO3 boundary keeps the existing public value checks, then calls the typed `beam_runtime::cnot_search::select_engine` function. If depth exceeds the native `u64` range, `auto` and `python` keep the reference path, while explicit `rust` returns the existing error. Search stages, scoring, kernels and precision are unchanged.
+
+The runtime policy has unit coverage for each selection branch. The installed-wheel two-rank Gloo test uses `engine=auto` for both healthy retries and replaces the Python reference-loop callback with a failing sentinel. Injected scorer-load failures on rank 0 and rank 1 remain explicitly Rust; each is followed by a successful search in the same Gloo group. On tested SHA `0606965a210c9cc2417b729433471e3d5ca6988c`, the Rust CNOT CPU/Gloo gate passed in [run 44956473123](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44956473123), the installed wheel passed in [run 44956473162](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44956473162), and the hosted source harness passed in [run 44956473161](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44956473161). The physical GPU job was skipped. Full context ownership and physical CUDA/NCCL acceptance remain open.
+
 ## Независимая проверка reference cutoff CNOT, 2026-11-22
 
 CPU acceptance теперь сравнивает порядок выбранных состояний с независимыми оценками scorer. Отчёт сохраняет, был ли cutoff underfilled, точно равным с полным сравнением path word, отделённым от границы погрешности или неоднозначным внутри допуска. Для неоднозначной границы проверка явно не утверждает устойчивый выбор по эталонным оценкам; для точных ties проверяется прежний полный tie-break по path word.
