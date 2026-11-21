@@ -765,6 +765,7 @@ jobs:
       - name: Write redacted operational status
         if: always()
         env:
+          SOURCE_OUTCOME: ${{ needs.validate-source.result }}
           INVENTORY_QUERY: ${{ steps.preflight.outputs.inventory_query || 'not_run' }}
           PREFLIGHT_OUTCOME: ${{ steps.preflight.outcome }}
           GPU_OUTCOME: ${{ steps.remote.outcome }}
@@ -772,6 +773,7 @@ jobs:
         shell: bash
         run: |
           python3 tools/vast_public_status.py \
+            --source-outcome "$SOURCE_OUTCOME" \
             --inventory-query "$INVENTORY_QUERY" \
             --preflight-outcome "$PREFLIGHT_OUTCOME" \
             --gpu-outcome "$GPU_OUTCOME" \
