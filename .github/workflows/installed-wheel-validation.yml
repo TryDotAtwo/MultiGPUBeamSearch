@@ -21,6 +21,8 @@ on:
       - tools/verify_cnot_gpu_pair.py
       - tools/test_verify_cnot_gpu_pair.py
       - tools/test_cnot_gpu_identity.py
+      - tools/vast_campaign_guard.py
+      - tools/test_vast_campaign_guard.py
       - integrations/cayleypy_native/multigpubeamsearch/gpu_identity.py
       - tools/fixtures/cnot_acceptance_event_v1.jsonl
       - integrations/cayleypy_native/tests/cnot_device_domain_admission_fixture.c
