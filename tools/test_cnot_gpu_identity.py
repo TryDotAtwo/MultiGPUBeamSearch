@@ -186,7 +186,7 @@ class CnotGpuIdentityTests(unittest.TestCase):
             "CNOT_RUST_EVIDENCE": "/tmp/mgbs-test",
             "LOCAL_RANK": "0",
         }
-        observation = SimpleNamespace(device_ordinal=1, gpu_uuid=uuids[0], context_handle=0x111)
+        observation = SimpleNamespace(device_ordinal=1, gpu_uuid=uuids[0], context_handle=0x111, thread_id=42)
         with mock.patch.dict(os.environ, variables, clear=False), mock.patch.object(
             acceptance, "observe_current_cuda_context", return_value=observation
         ):
@@ -217,8 +217,8 @@ class CnotGpuIdentityTests(unittest.TestCase):
             "LOCAL_RANK": "0",
         }
         observations = [
-            SimpleNamespace(device_ordinal=0, gpu_uuid=expected_uuid, context_handle=0x111),
-            SimpleNamespace(device_ordinal=0, gpu_uuid=expected_uuid, context_handle=0x222),
+            SimpleNamespace(device_ordinal=0, gpu_uuid=expected_uuid, context_handle=0x111, thread_id=42),
+            SimpleNamespace(device_ordinal=0, gpu_uuid=expected_uuid, context_handle=0x222, thread_id=42),
         ]
         with mock.patch.dict(os.environ, variables, clear=False), mock.patch.object(
             acceptance, "observe_current_cuda_context", side_effect=observations
