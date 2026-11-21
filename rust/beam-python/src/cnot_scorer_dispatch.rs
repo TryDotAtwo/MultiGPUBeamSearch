@@ -57,7 +57,10 @@ pub(crate) fn child_values<'py>(
 }
 
 fn strict_acceptance() -> bool {
-    matches!(std::env::var("MGBS_CNOT_STRICT_BACKEND").as_deref(), Ok("1"))
+    matches!(
+        std::env::var("MGBS_CNOT_STRICT_BACKEND").as_deref(),
+        Ok("1")
+    )
 }
 
 fn trace_native_tqp(

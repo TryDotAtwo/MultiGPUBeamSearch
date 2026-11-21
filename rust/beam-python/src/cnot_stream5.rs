@@ -288,9 +288,9 @@ pub(crate) fn run_cnot_native_start_transport<'py>(
             .err()
             .map(|error| error.to_string())
             .unwrap_or_else(|| "another rank rejected its Stream 5 ABI".to_owned());
-        return Err(PyRuntimeError::new_err(
-            format!("strict CNOT acceptance requires Rust Stream 5 ABI on every rank: {detail}"),
-        ));
+        return Err(PyRuntimeError::new_err(format!(
+            "strict CNOT acceptance requires Rust Stream 5 ABI on every rank: {detail}"
+        )));
     }
     if use_rust {
         let (_, rust_transport, _, library, digest) = local?;
@@ -302,10 +302,7 @@ pub(crate) fn run_cnot_native_start_transport<'py>(
             let contract = format!(
                 "stream5_abi=1;owned_abi=1;exchange_abi=1;collectives_abi=1;library_sha256={digest}"
             );
-            world.call_method1(
-                "require_engine_consensus",
-                (contract.as_bytes().to_vec(),),
-            )?;
+            world.call_method1("require_engine_consensus", (contract.as_bytes().to_vec(),))?;
             let rank: u32 = world.getattr("rank")?.extract()?;
             let size: u32 = world.getattr("size")?.extract()?;
             let pid = std::process::id();

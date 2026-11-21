@@ -113,7 +113,7 @@ fn prepare_cnot_input<'py>(
 
     // Retain the exact public snapshot semantics: validation, raw hashing and
     // replay all refer to this owned contiguous tensor after the caller returns.
-    let mut clone_kwargs = PyDict::new(py);
+    let clone_kwargs = PyDict::new(py);
     clone_kwargs.set_item("memory_format", torch.getattr("contiguous_format")?)?;
     let snapshot = root
         .call_method0("detach")?
@@ -776,8 +776,10 @@ fn run_cnot_native_search<'py>(
             world.clone(),
             !native_stages.is_none(),
         )?;
-        if matches!(std::env::var("MGBS_CNOT_STRICT_BACKEND").as_deref(), Ok("1"))
-            && !supports_native
+        if matches!(
+            std::env::var("MGBS_CNOT_STRICT_BACKEND").as_deref(),
+            Ok("1")
+        ) && !supports_native
         {
             return Err(PyRuntimeError::new_err(
                 "strict CNOT acceptance requires the Rust native stage runner on every rank",

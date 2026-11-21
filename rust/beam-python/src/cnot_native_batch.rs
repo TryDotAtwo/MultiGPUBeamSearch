@@ -160,6 +160,7 @@ fn cpu_children<'py>(
     }
 
     let torch = py.import("torch")?;
+    let int64 = torch.getattr("int64")?;
     validate_cpu_batch_dtypes(py, parents, parent_indices, moves)?;
     let parent_device = parents.getattr("device")?;
     for descriptor in [parent_indices, moves] {

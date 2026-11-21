@@ -2992,5 +2992,10 @@ Main commit `148b2a826a369b7601e904ea409e0cc5301c75c9` also passed the 260-test 
   manifest/checkpoint propagation. The explicit GPU workflow accepts only a
   validated 2x desktop RTX 3060 ID and combines wheel/model/backend/lifecycle,
   elapsed-time, and estimated-cost receipts. It does not rent hardware.
-- Current changes await hosted Actions validation. No local builds, logs,
-  result archives, paid compute, CUDA, or NCCL runs were produced.
+- Initial hosted run for `ce74de3` exposed formatting and compile blockers before
+  the installed-wheel tests: `cargo fmt --check`, two missing `int64` bindings,
+  and an invalid PyO3 extraction of Python `None` into Rust `()`. The next
+  revision fixes these source issues; dtype, admission, and Gloo tests remain
+  pending until the wheel builds.
+- No local build, test, logs, result archives, paid compute, CUDA, or NCCL runs
+  were produced. Full hosted logs remain in Actions artifacts.

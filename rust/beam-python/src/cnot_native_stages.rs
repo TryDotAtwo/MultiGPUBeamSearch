@@ -16,7 +16,10 @@ use sha2::{Digest, Sha256};
 use std::{fs, path::PathBuf};
 
 fn strict_backend_enabled() -> bool {
-    matches!(std::env::var("MGBS_CNOT_STRICT_BACKEND").as_deref(), Ok("1"))
+    matches!(
+        std::env::var("MGBS_CNOT_STRICT_BACKEND").as_deref(),
+        Ok("1")
+    )
 }
 
 pub(crate) fn strict_backend_mode(world: &Bound<'_, PyAny>) -> PyResult<bool> {
@@ -104,16 +107,12 @@ fn probe_cnot_backend_admission(
 }
 
 fn require_backend_consensus(world: &Bound<'_, PyAny>, contract: &str) -> PyResult<()> {
-    world
-        .call_method1("require_engine_consensus", (contract.as_bytes().to_vec(),))?
-        .extract::<()>()
+    world.call_method1("require_engine_consensus", (contract.as_bytes().to_vec(),))?;
+    Ok(())
 }
 
 #[pyfunction(name = "_require_cnot_backend_consensus")]
-fn require_cnot_backend_consensus(
-    world: Bound<'_, PyAny>,
-    contract: &str,
-) -> PyResult<()> {
+fn require_cnot_backend_consensus(world: Bound<'_, PyAny>, contract: &str) -> PyResult<()> {
     require_backend_consensus(&world, contract)
 }
 
@@ -144,23 +143,14 @@ pub(crate) fn preflight_strict_backend<'py>(
                 ));
             }
             let path = std::env::var_os("MGBS_CNOT_OWNED_LIBRARY").map(PathBuf::from);
-            let device: Option<i32> = root
-                .getattr("device")?
-                .getattr("index")?
-                .extract()?;
+            let device: Option<i32> = root.getattr("device")?.getattr("index")?.extract()?;
             let device = device.ok_or_else(|| {
                 PyRuntimeError::new_err("strict CNOT acceptance requires an explicit CUDA device")
             })?;
             let n: i32 = root.call_method1("size", (1,))?.extract()?;
             let world_size: i32 = world.getattr("size")?.extract()?;
-            let device_contract = backend_admission_contract(
-                true,
-                path.as_deref(),
-                true,
-                device,
-                n,
-                world_size,
-            )?;
+            let device_contract =
+                backend_admission_contract(true, path.as_deref(), true, device, n, world_size)?;
 
             if !scorer.is_instance_of::<crate::cnot_tqp_scorer::PyTqpScorer>() {
                 return Err(PyRuntimeError::new_err(
@@ -168,27 +158,24 @@ pub(crate) fn preflight_strict_backend<'py>(
                 ));
             }
             let metadata = scorer.getattr("metadata")?;
-            let checkpoint: String = metadata
-                .get_item("checkpoint_sha256")?
-                .extract()
-                .map_err(|_| {
-                    PyRuntimeError::new_err("Rust TQP scorer metadata lacks checkpoint_sha256")
-                })?;
+            let checkpoint: String =
+                metadata
+                    .get_item("checkpoint_sha256")?
+                    .extract()
+                    .map_err(|_| {
+                        PyRuntimeError::new_err("Rust TQP scorer metadata lacks checkpoint_sha256")
+                    })?;
             let search_manifest: String = metadata
                 .get_item("search_manifest_sha256")?
                 .extract()
                 .map_err(|_| {
-                    PyRuntimeError::new_err(
-                        "Rust TQP scorer metadata lacks search_manifest_sha256",
-                    )
+                    PyRuntimeError::new_err("Rust TQP scorer metadata lacks search_manifest_sha256")
                 })?;
             let scorer_library: String = metadata
                 .get_item("scorer_library_sha256")?
                 .extract()
                 .map_err(|_| {
-                    PyRuntimeError::new_err(
-                        "Rust TQP scorer metadata lacks scorer_library_sha256",
-                    )
+                    PyRuntimeError::new_err("Rust TQP scorer metadata lacks scorer_library_sha256")
                 })?;
             let expected = std::env::var("MGBS_CNOT_EXPECTED_CHECKPOINT_SHA256")
                 .map_err(|_| {
@@ -213,7 +200,9 @@ pub(crate) fn preflight_strict_backend<'py>(
                 })?
                 .to_ascii_lowercase();
             if expected_manifest.len() != 64
-                || !expected_manifest.bytes().all(|byte| byte.is_ascii_hexdigit())
+                || !expected_manifest
+                    .bytes()
+                    .all(|byte| byte.is_ascii_hexdigit())
                 || search_manifest.to_ascii_lowercase() != expected_manifest
             {
                 return Err(PyRuntimeError::new_err(format!(
@@ -228,7 +217,9 @@ pub(crate) fn preflight_strict_backend<'py>(
                 })?
                 .to_ascii_lowercase();
             if expected_scorer_library.len() != 64
-                || !expected_scorer_library.bytes().all(|byte| byte.is_ascii_hexdigit())
+                || !expected_scorer_library
+                    .bytes()
+                    .all(|byte| byte.is_ascii_hexdigit())
                 || scorer_library.to_ascii_lowercase() != expected_scorer_library
             {
                 return Err(PyRuntimeError::new_err(format!(
@@ -248,7 +239,9 @@ pub(crate) fn preflight_strict_backend<'py>(
     let size: u32 = world.getattr("size")?.extract()?;
     let pid = std::process::id();
     let device = world.getattr("device")?.str()?.to_str()?.to_owned();
-    eprintln!("CNOT_BACKEND_ADMISSION rank={rank} world={size} pid={pid} device={device} {contract}");
+    eprintln!(
+        "CNOT_BACKEND_ADMISSION rank={rank} world={size} pid={pid} device={device} {contract}"
+    );
     eprintln!(
         "CNOT_RUST_CONTROLLER rank={rank} world={size} pid={pid} device={device} implementation=RustNativeStages abi=1 active=1"
     );
@@ -323,10 +316,7 @@ impl<'py> NativeStages<'py> {
         let device_domain_path = std::env::var_os("MGBS_CNOT_OWNED_LIBRARY").map(PathBuf::from);
         let strict_backend = strict_backend_enabled();
         let device_domain_sha256 = if strict_backend {
-            device_domain_path
-                .as_deref()
-                .map(file_sha256)
-                .transpose()?
+            device_domain_path.as_deref().map(file_sha256).transpose()?
         } else {
             None
         };
@@ -610,10 +600,7 @@ impl<'py> NativeStages<'py> {
         let received = cnot_native_exchange::exchange(self.py, &self.world, rows, targets, true)?;
         if self.strict_backend && self.size > 1 {
             let device = self.world.getattr("device")?.str()?.to_str()?.to_owned();
-            let sha = self
-                .stream5_library_sha256
-                .as_deref()
-                .unwrap_or("unknown");
+            let sha = self.stream5_library_sha256.as_deref().unwrap_or("unknown");
             eprintln!(
                 "CNOT_RUST_STREAM5_DISPATCH rank={} world={} pid={} device={} implementation=RustStream5/NCCL operation=exchange abi=1 owned_abi=1 exchange_abi=1 library_sha256={} rows={}",
                 self.rank,
@@ -859,13 +846,7 @@ impl Backend for NativeStages<'_> {
                         .call_method1(
                             "winner_packet",
                             (
-                                &ranks,
-                                &local,
-                                &new_lex,
-                                &meta,
-                                &children,
-                                &closed,
-                                self.rank,
+                                &ranks, &local, &new_lex, &meta, &children, &closed, self.rank,
                                 self.size,
                             ),
                         )?;
@@ -883,15 +864,10 @@ impl Backend for NativeStages<'_> {
                 let count = builtins.getattr("int")?.call1((count,))?;
                 let native = builtins.getattr("bool")?.call1((use_native,))?;
                 let ops = ops.unwrap_or_else(|| self.py.None().into_bound(self.py));
-                Ok(PyTuple::new(self.py, [
-                    new_closed,
-                    wire,
-                    targets,
-                    ops,
-                    native,
-                    count,
-                ])?
-                .into_any())
+                Ok(
+                    PyTuple::new(self.py, [new_closed, wire, targets, ops, native, count])?
+                        .into_any(),
+                )
             })(),
         )?;
         let new_closed = packet.get_item(0)?;
@@ -937,9 +913,8 @@ impl Backend for NativeStages<'_> {
                     .call_method0("item")?
                     .extract()?;
                 let stat_values = vec![
-                    i64::try_from(parents.len()?).map_err(|_| {
-                        PyOverflowError::new_err("CNOT parent count exceeds int64")
-                    })?,
+                    i64::try_from(parents.len()?)
+                        .map_err(|_| PyOverflowError::new_err("CNOT parent count exceeds int64"))?,
                     i64::try_from(candidates.len()?).map_err(|_| {
                         PyOverflowError::new_err("CNOT candidate count exceeds int64")
                     })?,
@@ -947,16 +922,13 @@ impl Backend for NativeStages<'_> {
                     i64::try_from(children.len()?).map_err(|_| {
                         PyOverflowError::new_err("CNOT distinct count exceeds int64")
                     })?,
-                    i64::try_from(received.len()?).map_err(|_| {
-                        PyOverflowError::new_err("CNOT winner count exceeds int64")
-                    })?,
+                    i64::try_from(received.len()?)
+                        .map_err(|_| PyOverflowError::new_err("CNOT winner count exceeds int64"))?,
                 ];
                 self.world.call_method1("longs", (stat_values,))
             })(),
         )?;
-        let gathered_stats = self
-            .world
-            .call_method1("gather_fixed", (&local_stats,));
+        let gathered_stats = self.world.call_method1("gather_fixed", (&local_stats,));
         let gathered_stats = checked(
             self.py,
             &self.world,
@@ -971,12 +943,11 @@ impl Backend for NativeStages<'_> {
                 let stats = gathered_stats.call_method0("tolist")?;
                 let rows: Vec<Vec<i64>> = stats.extract()?;
                 let distinct = rows.iter().try_fold(0_i64, |sum, row| {
-                    let count = row.get(3).ok_or_else(|| {
-                        PyRuntimeError::new_err("invalid CNOT rank statistics")
-                    })?;
-                    sum.checked_add(*count).ok_or_else(|| {
-                        PyOverflowError::new_err("CNOT rank statistics overflow")
-                    })
+                    let count = row
+                        .get(3)
+                        .ok_or_else(|| PyRuntimeError::new_err("invalid CNOT rank statistics"))?;
+                    sum.checked_add(*count)
+                        .ok_or_else(|| PyOverflowError::new_err("CNOT rank statistics overflow"))
                 })?;
                 let distinct = self
                     .py
@@ -1016,8 +987,8 @@ impl Backend for NativeStages<'_> {
                         .call_method0("contiguous")?
                         .call_method1("view", (torch.getattr("int64")?,))?
                         .call_method1("unsqueeze", (1,))?;
-                    let flat = children
-                        .call_method1("reshape", (children.len()?, self.n * self.words))?;
+                    let flat =
+                        children.call_method1("reshape", (children.len()?, self.n * self.words))?;
                     Ok(torch
                         .call_method1("cat", (PyTuple::new(self.py, [values, meta, flat])?, 1))?
                         .into_any())
@@ -1035,9 +1006,7 @@ impl Backend for NativeStages<'_> {
                 &self.world,
                 "materialize CNOT candidate audit rows",
                 (|| -> PyResult<Bound<'_, PyAny>> {
-                    candidate_rows
-                        .call_method0("cpu")?
-                        .call_method0("tolist")
+                    candidate_rows.call_method0("cpu")?.call_method0("tolist")
                 })(),
             )?;
             checked(
