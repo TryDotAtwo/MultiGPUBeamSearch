@@ -66,10 +66,10 @@ class VastInstanceContractTests(unittest.TestCase):
         # deadline includes staging, transfer, retrieval and stop reserves.
         self.assertEqual(plan["elapsed_before_dispatch_seconds"], 1800)
         self.assertEqual(plan["allowed_remote_runtime_seconds"], 5400)
-        self.assertEqual(plan["budget_deadline_epoch"], 1_800_075_000.0)
+        self.assertEqual(plan["budget_deadline_epoch"], 1_800_070_514.0)
         self.assertEqual(plan["stop_reserve_seconds"], 1200)
-        self.assertEqual(plan["retrieval_reserve_seconds"], 300)
-        self.assertEqual(plan["setup_transfer_reserve_seconds"], 1260)
+        self.assertEqual(plan["retrieval_reserve_seconds"], 650)
+        self.assertEqual(plan["setup_transfer_reserve_seconds"], 1455)
         self.assertEqual(plan["ssh_host"], "192.0.2.40")
         self.assertEqual(plan["ssh_port"], 22440)
 

@@ -1,3 +1,9 @@
+## 2026-11-21 - Reserve the full Vast campaign budget
+
+- The instance contract now requires the fresh storage and bandwidth rates, bounds both source and result archives, subtracts their cost plus 24 hours of stopped storage, and reserves phase wall time, SSH setup, TERM/KILL grace, retrieval and stop time before computing a runtime deadline.
+- Each hosted phase obtains its timeout from the same absolute deadline. The private preflight, source staging and upload retain future execution, result collection and stop reserves.
+- Hosted verification is required before physical dispatch. Vast storage billing continues after stop; the current 24-hour storage reserve is only an estimate and does not cap longer retention.
+
 ## 2026-11-21 - Retain admitted CNOT backend handles through search startup
 
 - Strict CNOT admission now prepares one live DeviceDomain through a rank-wide

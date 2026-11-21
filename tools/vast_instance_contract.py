@@ -22,7 +22,16 @@ MIN_REMOTE_RUNTIME_SECONDS = 1200
 PRIVATE_PREFLIGHT_RESERVE_SECONDS = 300
 SOURCE_STAGING_RESERVE_SECONDS = 60
 UPLOAD_RESERVE_SECONDS = 900
-RETRIEVAL_RESERVE_SECONDS = 300
+SSH_MASTER_RESERVE_SECONDS = 35
+REMOTE_RUNTIME_TERMINATION_GRACE_SECONDS = 60
+SOURCE_STAGING_WALL_SECONDS = 60 + 15 + 10
+UPLOAD_WALL_SECONDS = 900 + 35 + 30
+PRIVATE_PREFLIGHT_WALL_SECONDS = 300 + 70
+RETRIEVAL_RESERVE_SECONDS = 650  # archive, bounded transfer, cleanup, SSH and TERM/KILL overheads
+MAX_SOURCE_ARCHIVE_BYTES = 1_073_741_824
+MAX_RESULT_ARCHIVE_BYTES = 1_073_741_824
+POST_STOP_STORAGE_RESERVE_HOURS = 24
+BYTES_PER_GB = Decimal("1000000000")
 
 
 def validate_instance_id(value: str) -> str:
@@ -126,22 +135,45 @@ def acceptance_plan(
         raise ValueError("Vast API instance start_date is in the future")
     host, port = _ssh_endpoint(row)
 
-    # Divide exact decimal rationals so a repeating quotient such as
-    # $10 / $0.48/hour does not round down from 75,000 to 74,999 seconds.
-    lifetime_budget_seconds = int(Fraction(spend_cap) * 3600 // Fraction(rate))
+    try:
+        storage_rate = Decimal(str(row.get("storage_cost")))
+        download_rate = Decimal(str(row.get("inet_down_cost")))
+        upload_rate = Decimal(str(row.get("inet_up_cost")))
+    except (InvalidOperation, TypeError):
+        raise ValueError("Vast API did not provide storage and ingress/egress bandwidth rates") from None
+    if any(not value.is_finite() or value < 0 for value in (storage_rate, download_rate, upload_rate)):
+        raise ValueError("Vast API returned invalid storage or ingress/egress bandwidth rates")
+    now = Decimal(str(now_epoch if now_epoch is not None else datetime.now(timezone.utc).timestamp()))
+    if not now.is_finite() or start > now + Decimal(30):
+        raise ValueError("Vast API instance start_date is in the future")
+    host, port = _ssh_endpoint(row)
+
+    # Reserve the maximum allowed source/result transfer and one day of
+    # stopped storage before allocating any of the remaining cap to runtime.
+    transfer_reserve = (
+        Decimal(MAX_SOURCE_ARCHIVE_BYTES) * download_rate
+        + Decimal(MAX_RESULT_ARCHIVE_BYTES) * upload_rate
+    ) / BYTES_PER_GB
+    storage_reserve = storage_rate * Decimal(POST_STOP_STORAGE_RESERVE_HOURS)
+    compute_budget = spend_cap - transfer_reserve - storage_reserve
+    if compute_budget <= 0:
+        raise ValueError("the spend cap does not cover bounded network transfer and 24 hours of stopped storage")
+    lifetime_budget_seconds = int(Fraction(compute_budget) * 3600 // Fraction(rate))
     elapsed_seconds = max(0, int(now - start))
     remaining_before_reserve = lifetime_budget_seconds - elapsed_seconds
     setup_transfer_reserve = (
-        PRIVATE_PREFLIGHT_RESERVE_SECONDS
-        + SOURCE_STAGING_RESERVE_SECONDS
-        + UPLOAD_RESERVE_SECONDS
+        PRIVATE_PREFLIGHT_WALL_SECONDS
+        + SOURCE_STAGING_WALL_SECONDS
+        + UPLOAD_WALL_SECONDS
+        + SSH_MASTER_RESERVE_SECONDS
     )
     runtime_seconds = min(
         MAX_REMOTE_RUNTIME_SECONDS,
         remaining_before_reserve
         - RESERVE_SECONDS
         - RETRIEVAL_RESERVE_SECONDS
-        - setup_transfer_reserve,
+        - setup_transfer_reserve
+        - REMOTE_RUNTIME_TERMINATION_GRACE_SECONDS,
     )
     if runtime_seconds < MIN_REMOTE_RUNTIME_SECONDS:
         raise ValueError(
@@ -153,6 +185,15 @@ def acceptance_plan(
         "gpu_name": str(row.get("gpu_name")),
         "gpu_count": int(Decimal(str(row.get("num_gpus")))),
         "hourly_rate_usd": str(rate),
+        "storage_rate_usd_per_hour": str(storage_rate),
+        "storage_retention_reserve_hours": POST_STOP_STORAGE_RESERVE_HOURS,
+        "storage_retention_reserve_usd": str(storage_reserve),
+        "bandwidth_download_usd_per_gb": str(download_rate),
+        "bandwidth_upload_usd_per_gb": str(upload_rate),
+        "network_transfer_reserve_usd": str(transfer_reserve),
+        "max_source_archive_bytes": MAX_SOURCE_ARCHIVE_BYTES,
+        "max_result_archive_bytes": MAX_RESULT_ARCHIVE_BYTES,
+        "remote_timeout_termination_grace_seconds": REMOTE_RUNTIME_TERMINATION_GRACE_SECONDS,
         "spend_cap_usd": str(spend_cap),
         "instance_start_epoch": float(start),
         "elapsed_before_dispatch_seconds": elapsed_seconds,
@@ -165,7 +206,6 @@ def acceptance_plan(
         "ssh_host": host,
         "ssh_port": port,
     }
-
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
@@ -209,6 +249,8 @@ def main() -> int:
             output.write(f"budget_deadline_epoch={report['budget_deadline_epoch']}\n")
             output.write(f"stop_reserve_seconds={report['stop_reserve_seconds']}\n")
             output.write(f"retrieval_reserve_seconds={report['retrieval_reserve_seconds']}\n")
+            output.write(f"max_source_archive_bytes={report['max_source_archive_bytes']}\n")
+            output.write(f"max_result_archive_bytes={report['max_result_archive_bytes']}\n")
             output.write(f"ssh_host={report['ssh_host']}\n")
             output.write(f"ssh_port={report['ssh_port']}\n")
         print(json.dumps(report, sort_keys=True))

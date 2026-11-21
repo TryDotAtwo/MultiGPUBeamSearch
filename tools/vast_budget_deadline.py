@@ -32,6 +32,8 @@ def phase_timeout_seconds(
     *,
     stop_reserve_seconds,
     future_reserve_seconds,
+    phase_overhead_seconds=0,
+    termination_grace_seconds=0,
     max_seconds,
     min_seconds,
     phase,
@@ -46,16 +48,18 @@ def phase_timeout_seconds(
         raise ValueError("deadline_epoch and now_epoch must be positive")
     stop_reserve = _whole_seconds(stop_reserve_seconds, "stop_reserve_seconds", allow_zero=True)
     future_reserve = _whole_seconds(future_reserve_seconds, "future_reserve_seconds", allow_zero=True)
+    phase_overhead = _whole_seconds(phase_overhead_seconds, "phase_overhead_seconds", allow_zero=True)
+    termination_grace = _whole_seconds(termination_grace_seconds, "termination_grace_seconds", allow_zero=True)
     maximum = _whole_seconds(max_seconds, "max_seconds", allow_zero=False)
     minimum = _whole_seconds(min_seconds, "min_seconds", allow_zero=False)
     if minimum > maximum:
         raise ValueError("min_seconds cannot exceed max_seconds")
     remaining = int((deadline - now).to_integral_value(rounding=ROUND_FLOOR))
-    available = remaining - stop_reserve - future_reserve
+    available = remaining - stop_reserve - future_reserve - phase_overhead - termination_grace
     if available < minimum:
         raise ValueError(
-            f"{phase} cannot start: {max(0, available)} seconds remain before reserves, "
-            f"but at least {minimum} are required"
+            f"{phase} cannot start: {max(0, available)} command seconds remain after stop, future, "
+            f"phase-overhead and termination-grace reserves, but at least {minimum} are required"
         )
     return min(maximum, available)
 
@@ -65,6 +69,8 @@ def main(argv=None):
     parser.add_argument("--deadline-epoch", required=True)
     parser.add_argument("--stop-reserve-seconds", required=True, type=int)
     parser.add_argument("--future-reserve-seconds", required=True, type=int)
+    parser.add_argument("--phase-overhead-seconds", type=int, default=0)
+    parser.add_argument("--termination-grace-seconds", type=int, default=0)
     parser.add_argument("--max-seconds", required=True, type=int)
     parser.add_argument("--min-seconds", required=True, type=int)
     parser.add_argument("--phase", required=True)
@@ -74,6 +80,8 @@ def main(argv=None):
             args.deadline_epoch,
             stop_reserve_seconds=args.stop_reserve_seconds,
             future_reserve_seconds=args.future_reserve_seconds,
+            phase_overhead_seconds=args.phase_overhead_seconds,
+            termination_grace_seconds=args.termination_grace_seconds,
             max_seconds=args.max_seconds,
             min_seconds=args.min_seconds,
             phase=args.phase,
