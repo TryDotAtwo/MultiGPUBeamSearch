@@ -22,12 +22,24 @@ class SyntheticScorer:
         return children.new_zeros((len(children),), dtype=children.dtype)
 
 
-def invoke(case, output, scorer_factory=None):
-    result = verify_cnot.main(
-        ["--case", case, "--backend", "gloo", "--engine", "rust", "--output", str(output)],
-        scorer_factory=scorer_factory,
-        manage_process_group=False,
-    )
+def invoke(case, output, scorer_factory=None, *, engine="rust", forbid_python_reference=False):
+    from multigpubeamsearch import cnot
+
+    original_search = cnot._search
+    if forbid_python_reference:
+        def forbidden_python_reference(*_args, **_kwargs):
+            raise AssertionError("engine=auto entered the Python CNOT reference loop")
+        cnot._search = forbidden_python_reference
+    try:
+        result = verify_cnot.main(
+            ["--case", case, "--backend", "gloo", "--engine", engine, "--output", str(output)],
+            scorer_factory=scorer_factory,
+            manage_process_group=False,
+        )
+    finally:
+        cnot._search = original_search
+    if forbid_python_reference and int(os.environ["RANK"]) == 0:
+        print("VERIFY_CNOT_AUTO_DEFAULT_RUST_CONTROLLER_PASS", flush=True)
     if case == "wide" and int(os.environ["RANK"]) == 0:
         report = json.loads(output.read_text(encoding="utf-8"))
         if report.get("status") != "solved" or not report.get("bitwise_replay"):
@@ -59,7 +71,12 @@ def main():
 
         # The public verifier must close its per-search World while retaining
         # the torchrun process group for a healthy retry on the same ranks.
-        invoke("wide", output_root / f"healthy-after-{failed_rank}.json")
+        invoke(
+            "wide",
+            output_root / f"healthy-after-{failed_rank}.json",
+            engine="auto",
+            forbid_python_reference=True,
+        )
 
     if dist.is_initialized():
         dist.destroy_process_group()
