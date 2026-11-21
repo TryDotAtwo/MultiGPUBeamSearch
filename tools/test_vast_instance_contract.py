@@ -20,6 +20,10 @@ def instance(**changes):
         "gpu_name": "RTX 3060",
         "num_gpus": 2,
         "dph_total": 0.48,
+        "dph_base": 0.46,
+        "storage_cost": 0.02,
+        "inet_down_cost": 0.05,
+        "inet_up_cost": 0.06,
         "start_date": 1_800_000_000.0,
         "public_ipaddr": "192.0.2.40",
         "ports": {"22/tcp": [{"HostPort": 22440}]},
@@ -68,6 +72,22 @@ class VastInstanceContractTests(unittest.TestCase):
         self.assertEqual(plan["setup_transfer_reserve_seconds"], 1260)
         self.assertEqual(plan["ssh_host"], "192.0.2.40")
         self.assertEqual(plan["ssh_port"], 22440)
+
+    def test_spend_plan_reserves_bounded_network_transfer_and_stopped_storage(self):
+        plan = acceptance_plan(instance(), Decimal("10"), now_epoch=1_800_001_800)
+        self.assertEqual(plan["network_transfer_reserve_usd"], "0.11811160064")
+        self.assertEqual(plan["storage_retention_reserve_hours"], 24)
+        self.assertEqual(plan["storage_retention_reserve_usd"], "0.48")
+        self.assertEqual(plan["max_source_archive_bytes"], 1_073_741_824)
+        self.assertEqual(plan["max_result_archive_bytes"], 1_073_741_824)
+        self.assertEqual(plan["budget_deadline_epoch"], 1_800_070_514.0)
+
+    def test_missing_network_or_storage_rates_fail_closed(self):
+        for field in ("storage_cost", "inet_down_cost", "inet_up_cost"):
+            with self.subTest(field=field), self.assertRaisesRegex(ValueError, "storage and ingress/egress bandwidth rates"):
+                values = instance()
+                values.pop(field)
+                acceptance_plan(values, Decimal("10"), now_epoch=1_800_000_000)
 
     def test_ssh_host_and_port_are_selected_from_one_complete_api_pair(self):
         direct = acceptance_plan(
