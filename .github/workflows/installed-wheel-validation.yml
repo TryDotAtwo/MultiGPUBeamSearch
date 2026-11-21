@@ -38,6 +38,7 @@ on:
       - tools/fixtures/cnot_acceptance_event_v1.jsonl
       - integrations/cayleypy_native/tests/cnot_device_domain_admission_fixture.c
       - tools/verify_cnot.py
+      - tools/test_cnot_reference_order.py
       - integrations/cayleypy_native/multigpubeamsearch/cnot_acceptance.py
       - integrations/cayleypy_native/pyproject.toml
       - integrations/cayleypy_native/build_backend.py
@@ -139,6 +140,13 @@ jobs:
         run: |
           set -o pipefail
           python "$GITHUB_WORKSPACE/tools/test_cnot_acceptance_events.py" -v 2>&1 | tee "$GITHUB_WORKSPACE/test_results/refactor_20261121/rust-cnot-admission/cnot-acceptance-events.log"
+      - name: Verify CNOT reference-score ordering and boundary ties
+        id: cnot_reference_order
+        run: |
+          set -o pipefail
+          mkdir -p "$GITHUB_WORKSPACE/test_results/refactor_20261121/rust-cnot-admission"
+          python -m py_compile "$GITHUB_WORKSPACE/tools/test_cnot_reference_order.py"
+          env -u PYTHONPATH python "$GITHUB_WORKSPACE/tools/test_cnot_reference_order.py" -v 2>&1 | tee "$GITHUB_WORKSPACE/test_results/refactor_20261121/rust-cnot-admission/cnot-reference-order.log"
       - name: Verify paired CNOT acceptance result binding on CPU
         id: cnot_pair_verifier
         run: |
