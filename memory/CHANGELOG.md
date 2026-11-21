@@ -1,6 +1,6 @@
 ## 2026-11-21 - Add saturated permutation acceptance contracts
 
-- Added a hosted CPU gate for a width-3 LRX(4) reference case, rank/run-boundary validation and bounded frontier snapshot decoding. This test-first commit intentionally precedes the oracle and runtime trace implementation.
+- Implemented an independent CPU oracle for the existing Hash128 owner/shard order, full-hash dedup, equal-score tie cutoff and contiguous rank partition. The hosted CPU gate now checks a saturated width-3 LRX(4) fixture, cross-rank duplicate states, run/call-bound rank traces and zero padding. Physical CUDA trace wiring follows separately.
 
 ## 2026-11-21 - Bind campaign shutdown to the selected Vast instance
 
