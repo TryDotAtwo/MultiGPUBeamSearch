@@ -269,6 +269,74 @@ mod tests {
         );
     }
 
+    fn complete_dispatch_capabilities() -> DispatchCapabilities {
+        DispatchCapabilities {
+            native_controller: true,
+            checked_control: true,
+            native_stages: true,
+            stream5_start: true,
+            world_exchange: true,
+            fixed_gather: true,
+            row_gather: true,
+            broadcast: true,
+            compatibility_controller: true,
+        }
+    }
+
+    #[test]
+    fn runtime_selects_public_cnot_path_from_typed_capabilities() {
+        let complete = complete_dispatch_capabilities();
+        assert_eq!(
+            select_dispatch(RequestedEngine::Auto, true, false, complete),
+            Ok(DispatchPath::RustController)
+        );
+
+        let mut compatibility = complete;
+        compatibility.native_controller = false;
+        compatibility.checked_control = false;
+        assert_eq!(
+            select_dispatch(RequestedEngine::Auto, true, false, compatibility),
+            Ok(DispatchPath::RustCompatibility)
+        );
+
+        assert_eq!(
+            select_dispatch(RequestedEngine::Auto, true, false, DispatchCapabilities::default()),
+            Ok(DispatchPath::PythonReference)
+        );
+        assert_eq!(
+            select_dispatch(RequestedEngine::Python, true, false, complete),
+            Ok(DispatchPath::PythonReference)
+        );
+        assert_eq!(
+            select_dispatch(RequestedEngine::Rust, true, false, DispatchCapabilities::default()),
+            Err(DispatchError::RustControllerUnavailable)
+        );
+    }
+
+    #[test]
+    fn strict_public_cnot_path_requires_all_native_rank_capabilities() {
+        let complete = complete_dispatch_capabilities();
+        assert_eq!(
+            select_dispatch(RequestedEngine::Auto, true, true, complete),
+            Ok(DispatchPath::RustController)
+        );
+        assert_eq!(
+            select_dispatch(RequestedEngine::Python, true, true, complete),
+            Err(DispatchError::StrictRequiresRustController)
+        );
+
+        let mut missing = complete;
+        missing.native_stages = false;
+        assert_eq!(
+            select_dispatch(RequestedEngine::Auto, true, true, missing),
+            Err(DispatchError::StrictBackendUnavailable)
+        );
+        assert_eq!(
+            select_dispatch(RequestedEngine::Auto, false, true, complete),
+            Err(DispatchError::StrictRequiresRustController)
+        );
+    }
+
     #[derive(Default)]
     struct Mock {
         calls: Vec<String>,
