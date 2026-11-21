@@ -38,6 +38,12 @@ class VastCampaignWorkflowTests(unittest.TestCase):
         self.assertIn("actions: read", watchdog)
         self.assertIn("GITHUB_TOKEN: ${{ github.token }}", watchdog)
         self.assertIn("tools/vast_campaign_watchdog.py", watchdog)
+        self.assertNotIn('cat "$report"', watchdog)
+        self.assertIn("Upload redacted watchdog status", watchdog)
+        upload = watchdog.split("Upload redacted watchdog status", 1)[1].split("\n      - name:", 1)[0]
+        self.assertIn("cnot-public-status.json", upload)
+        self.assertNotIn("watchdog-${GITHUB_RUN_ID}.json", upload)
+        self.assertNotIn("vast-campaign-watchdog/", upload)
 
     def test_public_gpu_workflow_redacts_inputs_logs_and_artifacts(self):
         workflow = (ROOT / ".github/workflows/vast-cnot-control-collectives.yml").read_text(encoding="utf-8")
