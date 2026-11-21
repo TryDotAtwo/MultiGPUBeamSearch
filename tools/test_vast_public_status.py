@@ -28,6 +28,7 @@ class VastPublicStatusTests(unittest.TestCase):
             gpu_acceptance="failed",
             cleanup="unverified",
             watchdog="not_run",
+            source_validation="passed",
         )
         self.assertEqual(
             report,
@@ -38,6 +39,7 @@ class VastPublicStatusTests(unittest.TestCase):
                 "gpu_acceptance": "failed",
                 "cleanup": "unverified",
                 "watchdog": "not_run",
+                "source_validation": "passed",
             },
         )
         self.assertNotIn("instance_id", json.dumps(report))
@@ -51,6 +53,7 @@ class VastPublicStatusTests(unittest.TestCase):
             summary_text = summary.read_text(encoding="utf-8")
             self.assertIn("Checked at UTC", summary_text)
             self.assertIn("GPU acceptance: failed", summary_text)
+            self.assertIn("Source validation: passed", summary_text)
             self.assertNotIn("instance_id", summary_text)
             self.assertNotIn("checkpoint", summary_text)
         with self.assertRaisesRegex(ValueError, "not allowlisted"):
@@ -61,6 +64,7 @@ class VastPublicStatusTests(unittest.TestCase):
                 gpu_acceptance="failed",
                 cleanup="unverified",
                 watchdog="private label and ID",
+                source_validation="passed",
             )
 
 
