@@ -15,6 +15,7 @@ on:
       - integrations/cayleypy_native/tests/installed_cnot_phase_boundaries.py
       - integrations/cayleypy_native/tests/installed_verify_cnot_gloo_lifecycle.py
       - integrations/cayleypy_native/tests/test_build.py
+      - integrations/cayleypy_native/tests/test_public_index_sort_build.py
       - integrations/cayleypy_native/multigpubeamsearch/native_source_manifest.json
       - tools/cnot_acceptance_events.py
       - tools/test_cnot_acceptance_events.py

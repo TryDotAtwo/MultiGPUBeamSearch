@@ -318,11 +318,14 @@ def build_saturated_reference_fixture(
     beam_width: int,
     shard_count: int = 64,
 ) -> SaturatedFixture:
-    """Choose the first deterministic exact-distance>=3 LRX state that saturates.
+    """Choose a deterministic LRX state with a saturated, topology-parity cutoff.
 
     The first beam creates three adjacent states, partitioned 2+1 for two
     ranks. Their next expansion necessarily sends the initial state back from
     both ranks; full Hash128 owner/shard routing decides which three survive.
+    This tied-score witness has identical ordered Hash128 winners on one and
+    two ranks, allowing an exact paired topology assertion without modifying
+    production scoring or tie policy.
     """
     center = tuple(map(int, center))
     generators = tuple(tuple(map(int, generator)) for generator in generators)
@@ -363,6 +366,8 @@ def build_saturated_reference_fixture(
                 and two_gpu.cross_source_duplicate_count > 0
                 and two_gpu.keep_count == beam_width
                 and all(two_gpu.frontier_by_rank)
+                and tuple(c.hash128 for c in worlds[1].steps[1].ordered_survivors)
+                    == tuple(c.hash128 for c in worlds[2].steps[1].ordered_survivors)
             ):
                 return SaturatedFixture(
                     start=start,

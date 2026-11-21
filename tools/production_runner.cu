@@ -5202,6 +5202,7 @@ int run_production_runner(int argc, char** argv) {
             }
         }
         std::cout << "\n";
+        if (acceptance_trace_enabled) std::cout.flush();
 #endif
         const auto depth_end = std::chrono::steady_clock::now();
         const double depth_sec = std::chrono::duration<double>(depth_end - depth_start).count();

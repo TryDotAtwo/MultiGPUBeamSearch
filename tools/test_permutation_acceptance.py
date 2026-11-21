@@ -92,6 +92,7 @@ class PermutationAcceptanceTests(unittest.TestCase):
     def setUpClass(cls):
         graph = cp.CayleyGraph(cp.PermutationGroups.lrx(4), device="cpu")
         contract = GraphContract.from_graph(graph, graph.definition.central_state)
+        cls.generators = tuple(tuple(map(int, item)) for item in contract.generators)
         cls.fixture = build_saturated_reference_fixture(
             contract.center, contract.generators, beam_width=3
         )
@@ -101,7 +102,7 @@ class PermutationAcceptanceTests(unittest.TestCase):
             for candidate in self.fixture.worlds[world_size].steps[1].ordered_survivors:
                 state = tuple(self.fixture.start)
                 for move_id in candidate.path:
-                    state = tuple(state[source] for source in self.fixture.generators[move_id])
+                    state = tuple(state[source] for source in self.generators[move_id])
                 self.assertEqual(state, candidate.state)
 
     def test_lrx4_b3_reference_saturates_and_deduplicates_across_ranks(self):
@@ -169,7 +170,7 @@ class PermutationAcceptanceTests(unittest.TestCase):
             "MGBS_ACCEPTANCE_CASE_ID", "MGBS_ACCEPTANCE_SOURCE_SHA",
             "MGBS_ACCEPTANCE_WHEEL_SHA256", "MGBS_ACCEPTANCE_BUILD_KEY",
             "MGBS_ACCEPTANCE_BINARY_SHA256", "cudaGetDevice(&active_cuda_device)",
-            "cudaDeviceGetUuid(&active_cuda_uuid", "frontier_snapshot=",
+            "cudaDeviceGetUuid(&active_cuda_uuid", "frontier_snapshot=", "std::cout.flush()",
         ):
             with self.subTest(token=token):
                 self.assertIn(token, source)

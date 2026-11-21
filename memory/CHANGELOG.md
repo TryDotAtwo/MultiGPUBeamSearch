@@ -2,7 +2,8 @@
 
 - Added an opt-in native build identity for the permutation acceptance trace. The trace binds run/case/call, source and installed-wheel hashes, native build and binary hashes, rank/PID, CUDA UUID observed from the active context, shard count, and a bounded post-cutoff frontier snapshot.
 - Added a deterministic LRX(4) width-3 CPU oracle and installed-wheel verifier path alongside the existing width-64 smoke. The new path runs two calls in one Rust session for one and two GPUs and checks exact global survivors and independent replay. No kernel or numerical policy changed.
-- Status at this commit: hosted CI pending; physical 1/2-GPU validation not run. Vast dispatch stays gated on the previously documented cost and staging checks.
+- Hosted RED on source SHA `38cbae6` (`44941059326`) found three CPU acceptance issues: the build option was not wired into CMake, replay tests used a nonexistent fixture field, and the first tied fixture did not yield topology-parity winners. Follow-up now wires the opt-in build mode, replays through the graph generators, and searches deterministically for a saturated witness with identical ordered winners. CNOT CPU run `44941059323` also exposed a synthetic build fixture missing manifest-required source files; the fixture now supplies them. Reruns are pending.
+- Physical 1/2-GPU validation has not run. Vast dispatch stays gated on the previously documented cost and staging checks.
 
 ## 2026-11-21 - Add saturated permutation acceptance contracts
 

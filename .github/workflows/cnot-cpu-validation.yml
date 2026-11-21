@@ -40,6 +40,7 @@ on:
       - integrations/cayleypy_native/multigpubeamsearch/rust_control.py
       - integrations/cayleypy_native/multigpubeamsearch/contracts.py
       - integrations/cayleypy_native/tests/test_backend.py
+      - integrations/cayleypy_native/tests/test_public_index_sort_build.py
       - integrations/cayleypy_native/tests/test_rust_graph_contract.py
       - integrations/cayleypy_native/tests/cnot_stream5_control_nccl.py
       - cuda/cnot_stream5_bridge.cu

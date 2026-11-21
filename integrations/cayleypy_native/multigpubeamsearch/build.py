@@ -255,7 +255,7 @@ def _validate_index_sort(metadata: dict, requested: bool) -> None:
 def configure_command(source: Path, build_dir: Path, cutlass: Path, contract,
                       backend: str, architectures: tuple[int, ...], programs: dict[str, str],
                       *, nccl: dict[str, str] | None = None, inference_backend="cutlass", calibration=False,
-                      experimental_index_sort=False) -> list[str]:
+                      experimental_index_sort=False, acceptance_rank_trace=False) -> list[str]:
     shape = shape_contract(contract)
     command = [programs["cmake"], "-S", str(source), "-B", str(build_dir),
                "-DCMAKE_BUILD_TYPE=Release", f"-DCMAKE_CXX_COMPILER={programs['cxx']}",
@@ -270,7 +270,9 @@ def configure_command(source: Path, build_dir: Path, cutlass: Path, contract,
                "-DBEAM_EXPERIMENTAL_OWNER_RADIX=OFF",
                "-DBEAM_EXPERIMENTAL_SCORE_BITS=OFF",
                "-DBEAM_ENABLE_DEBUG=ON", "-DBEAM_ENABLE_DEBUG_LOGS=ON",
-               "-DBEAM_ENABLE_DEPTH_LOGS=OFF", "-DBEAM_DEBUG_STREAM_TIMING=OFF",
+               "-DBEAM_ENABLE_DEPTH_LOGS=OFF",
+               "-DBEAM_DEBUG_DEPTH_FLOW_TRACE=" + ("ON" if acceptance_rank_trace else "OFF"),
+               "-DBEAM_DEBUG_STREAM_TIMING=OFF",
                "-DBEAM_DEBUG_INFERENCE_TRACE=OFF", "-DBEAM_DEBUG_PATH_TRACE=OFF"]
     if nccl is not None:
         command += [f"-DNCCL_INCLUDE_DIR={nccl['include_dir']}", f"-DNCCL_LIBRARY={nccl['library']}",
@@ -321,6 +323,9 @@ def ensure_runner(contract, model, options, architectures: tuple[int, ...], run_
                      "toolchain": toolchain_identity(programs), "target": target, "nccl": nccl,
                      "build_mode": "release-debug-logs-v1", "inference_backend": options.inference_backend,
                      'calibration_binary_name': calibration_target}
+    if acceptance_trace:
+        # Acceptance instrumentation gets a separate binary cache identity.
+        specification['acceptance_rank_trace'] = True
     if options.experimental_index_sort:
         # Omission for the default preserves the identity of legacy OFF builds.
         specification['experimental_index_sort'] = True
@@ -344,6 +349,7 @@ def ensure_runner(contract, model, options, architectures: tuple[int, ...], run_
     if (build_dir / "native-build.json").is_file():
         metadata = validate_runner(runner, contract, model.backend, architectures)
         _validate_index_sort(metadata, options.experimental_index_sort)
+        _validate_acceptance_rank_trace(metadata, acceptance_trace)
         if metadata.get('build_key') != key or any(metadata.get(k) != v for k, v in specification.items()):
             raise NativeBackendError("cached native runner build key or provenance does not match the request")
         return runner, metadata
@@ -363,7 +369,8 @@ def ensure_runner(contract, model, options, architectures: tuple[int, ...], run_
         env["TORCH_CUDA_ARCH_LIST"] = ";".join(f"{sm // 10}.{sm % 10}" for sm in architectures)
         run_process(configure_command(source, build_dir, cutlass, contract, model.backend, architectures, programs, nccl=nccl,
                                      inference_backend=options.inference_backend, calibration=bool(calibration_target),
-                                     experimental_index_sort=options.experimental_index_sort),
+                                     experimental_index_sort=options.experimental_index_sort,
+                                      acceptance_rank_trace=acceptance_trace),
                     cwd=run_dir, env=env, timeout=options.build_timeout_seconds, log_path=run_dir / "cmake-configure.log")
         targets=[target]+([calibration_target] if calibration_target else [])
         run_process([programs["cmake"], "--build", str(build_dir), "--target", *targets,
