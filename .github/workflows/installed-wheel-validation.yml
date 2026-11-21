@@ -23,6 +23,10 @@ on:
       - tools/test_cnot_gpu_identity.py
       - tools/vast_campaign_guard.py
       - tools/test_vast_campaign_guard.py
+      - tools/vast_campaign_watchdog.py
+      - tools/test_vast_campaign_watchdog.py
+      - tools/test_vast_campaign_workflow.py
+      - .github/workflows/vast-campaign-watchdog.yml
       - integrations/cayleypy_native/multigpubeamsearch/gpu_identity.py
       - tools/fixtures/cnot_acceptance_event_v1.jsonl
       - integrations/cayleypy_native/tests/cnot_device_domain_admission_fixture.c
@@ -193,6 +197,7 @@ jobs:
           mkdir -p "$GITHUB_WORKSPACE/test_results/refactor_20261121/rust-cnot-admission"
           go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12 \
             .github/workflows/vast-cnot-control-collectives.yml \
+            .github/workflows/vast-campaign-watchdog.yml \
             2>&1 | tee "$GITHUB_WORKSPACE/test_results/refactor_20261121/rust-cnot-admission/vast-workflow-actionlint.log"
       - name: Write hosted verification status board
         if: always()

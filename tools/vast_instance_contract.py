@@ -113,14 +113,14 @@ def _ssh_endpoint(row: dict) -> tuple[str, int]:
     return host, port
 
 
-def acceptance_plan(
+def lifetime_budget_deadline(
     row: dict,
-    spend_cap: Decimal,
+    spend_cap: Decimal | str,
     *,
     now_epoch: Decimal | int | float | None = None,
 ) -> dict:
-    if str(row.get("actual_status") or row.get("cur_state") or "").lower() != "running":
-        raise ValueError("the verified 2x RTX 3060 instance must already be running")
+    """Compute the spend deadline without depending on SSH availability."""
+    cap = parse_cap(str(spend_cap))
     try:
         rate = Decimal(str(row.get("dph_total")))
         start = Decimal(str(row.get("start_date")))
@@ -133,8 +133,6 @@ def acceptance_plan(
     now = Decimal(str(now_epoch if now_epoch is not None else datetime.now(timezone.utc).timestamp()))
     if not now.is_finite() or start > now + Decimal(30):
         raise ValueError("Vast API instance start_date is in the future")
-    host, port = _ssh_endpoint(row)
-
     try:
         storage_rate = Decimal(str(row.get("storage_cost")))
         download_rate = Decimal(str(row.get("inet_down_cost")))
@@ -143,24 +141,49 @@ def acceptance_plan(
         raise ValueError("Vast API did not provide storage and ingress/egress bandwidth rates") from None
     if any(not value.is_finite() or value < 0 for value in (storage_rate, download_rate, upload_rate)):
         raise ValueError("Vast API returned invalid storage or ingress/egress bandwidth rates")
-    now = Decimal(str(now_epoch if now_epoch is not None else datetime.now(timezone.utc).timestamp()))
-    if not now.is_finite() or start > now + Decimal(30):
-        raise ValueError("Vast API instance start_date is in the future")
-    host, port = _ssh_endpoint(row)
 
-    # Reserve the maximum allowed source/result transfer and one day of
-    # stopped storage before allocating any of the remaining cap to runtime.
     transfer_reserve = (
         Decimal(MAX_SOURCE_ARCHIVE_BYTES) * download_rate
         + Decimal(MAX_RESULT_ARCHIVE_BYTES) * upload_rate
     ) / BYTES_PER_GB
     storage_reserve = storage_rate * Decimal(POST_STOP_STORAGE_RESERVE_HOURS)
-    compute_budget = spend_cap - transfer_reserve - storage_reserve
+    compute_budget = cap - transfer_reserve - storage_reserve
     if compute_budget <= 0:
         raise ValueError("the spend cap does not cover bounded network transfer and 24 hours of stopped storage")
-    lifetime_budget_seconds = int(Fraction(compute_budget) * 3600 // Fraction(rate))
+    lifetime_seconds = int(Fraction(compute_budget) * 3600 // Fraction(rate))
     elapsed_seconds = max(0, int(now - start))
-    remaining_before_reserve = lifetime_budget_seconds - elapsed_seconds
+    return {
+        "hourly_rate_usd": str(rate),
+        "storage_rate_usd_per_hour": str(storage_rate),
+        "storage_retention_reserve_hours": POST_STOP_STORAGE_RESERVE_HOURS,
+        "storage_retention_reserve_usd": str(storage_reserve),
+        "bandwidth_download_usd_per_gb": str(download_rate),
+        "bandwidth_upload_usd_per_gb": str(upload_rate),
+        "network_transfer_reserve_usd": str(transfer_reserve),
+        "max_source_archive_bytes": MAX_SOURCE_ARCHIVE_BYTES,
+        "max_result_archive_bytes": MAX_RESULT_ARCHIVE_BYTES,
+        "spend_cap_usd": str(cap),
+        "instance_start_epoch": float(start),
+        "elapsed_before_dispatch_seconds": elapsed_seconds,
+        "estimated_cost_before_dispatch_usd": str(rate * Decimal(elapsed_seconds) / Decimal(3600)),
+        "lifetime_budget_seconds": lifetime_seconds,
+        "budget_deadline_epoch": float(start + Decimal(lifetime_seconds)),
+    }
+
+
+def acceptance_plan(
+    row: dict,
+    spend_cap: Decimal,
+    *,
+    now_epoch: Decimal | int | float | None = None,
+) -> dict:
+    if str(row.get("actual_status") or row.get("cur_state") or "").lower() != "running":
+        raise ValueError("the verified 2x RTX 3060 instance must already be running")
+    lifetime = lifetime_budget_deadline(row, spend_cap, now_epoch=now_epoch)
+    host, port = _ssh_endpoint(row)
+    elapsed_seconds = lifetime["elapsed_before_dispatch_seconds"]
+    lifetime_seconds = lifetime["lifetime_budget_seconds"]
+    remaining_before_reserve = lifetime_seconds - elapsed_seconds
     setup_transfer_reserve = (
         PRIVATE_PREFLIGHT_WALL_SECONDS
         + SOURCE_STAGING_WALL_SECONDS
@@ -180,33 +203,19 @@ def acceptance_plan(
             "the $10 lifetime cap leaves less than 20 minutes for remote work after elapsed time and shutdown reserve"
         )
     return {
+        **lifetime,
         "instance_id": str(row["id"]),
         "actual_status": str(row.get("actual_status") or row.get("cur_state")),
         "gpu_name": str(row.get("gpu_name")),
         "gpu_count": int(Decimal(str(row.get("num_gpus")))),
-        "hourly_rate_usd": str(rate),
-        "storage_rate_usd_per_hour": str(storage_rate),
-        "storage_retention_reserve_hours": POST_STOP_STORAGE_RESERVE_HOURS,
-        "storage_retention_reserve_usd": str(storage_reserve),
-        "bandwidth_download_usd_per_gb": str(download_rate),
-        "bandwidth_upload_usd_per_gb": str(upload_rate),
-        "network_transfer_reserve_usd": str(transfer_reserve),
-        "max_source_archive_bytes": MAX_SOURCE_ARCHIVE_BYTES,
-        "max_result_archive_bytes": MAX_RESULT_ARCHIVE_BYTES,
         "remote_timeout_termination_grace_seconds": REMOTE_RUNTIME_TERMINATION_GRACE_SECONDS,
-        "spend_cap_usd": str(spend_cap),
-        "instance_start_epoch": float(start),
-        "elapsed_before_dispatch_seconds": elapsed_seconds,
-        "estimated_cost_before_dispatch_usd": str(rate * Decimal(elapsed_seconds) / Decimal(3600)),
         "allowed_remote_runtime_seconds": runtime_seconds,
-        "budget_deadline_epoch": float(start + Decimal(lifetime_budget_seconds)),
         "stop_reserve_seconds": RESERVE_SECONDS,
         "retrieval_reserve_seconds": RETRIEVAL_RESERVE_SECONDS,
         "setup_transfer_reserve_seconds": setup_transfer_reserve,
         "ssh_host": host,
         "ssh_port": port,
     }
-
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--payload", required=True, type=Path)
@@ -233,10 +242,6 @@ def main() -> int:
                 "num_gpus": int(Decimal(str(row.get("num_gpus")))),
             }, sort_keys=True))
             return 0
-        # Once account ownership and exact hardware are established, ensure
-        # every later preflight failure can still stop this new target.
-        with args.github_output.open("a", encoding="utf-8") as output:
-            output.write("safe_to_stop=true\n")
         report = acceptance_plan(row, cap)
         report["checked_at_utc"] = datetime.now(timezone.utc).isoformat()
         report["gpu_test"] = "ready"

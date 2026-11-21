@@ -1,4 +1,5 @@
 name: Installed-wheel permutation and CNOT GPU acceptance
+run-name: mgbs-cnot-acceptance instance=${{ inputs.instance_id || 'unselected' }} cap=${{ inputs.spend_cap_usd || 'unselected' }}
 
 on:
   workflow_dispatch:
@@ -30,6 +31,10 @@ on:
       - tools/test_vast_budget_deadline.py
       - tools/vast_campaign_guard.py
       - tools/test_vast_campaign_guard.py
+      - tools/vast_campaign_watchdog.py
+      - tools/test_vast_campaign_watchdog.py
+      - tools/test_vast_campaign_workflow.py
+      - .github/workflows/vast-campaign-watchdog.yml
       - tools/vast_private_preflight.py
       - tools/test_vast_private_preflight.py
       - tools/vast_result_transport.sh
@@ -70,7 +75,7 @@ jobs:
           python-version: "3.11"
       - name: Compile source-only acceptance helpers
         id: compile_source
-        run: python -m py_compile tools/verify_permutation_cuda.py tools/verify_cnot.py tools/cnot_acceptance_events.py tools/test_cnot_acceptance_events.py tools/test_cnot_gpu_identity.py tools/verify_cnot_gpu_pair.py tools/test_verify_cnot_gpu_pair.py tools/test_vast_result_transport.py tools/test_vast_source_archive.py tools/create_vast_source_archive.py tools/vast_instance_contract.py tools/test_vast_instance_contract.py tools/vast_budget_deadline.py tools/test_vast_budget_deadline.py tools/vast_campaign_guard.py tools/test_vast_campaign_guard.py tools/vast_private_preflight.py tools/test_vast_private_preflight.py integrations/cayleypy_native/tests/installed_verify_cnot_gloo_lifecycle.py integrations/cayleypy_native/multigpubeamsearch/gpu_identity.py
+        run: python -m py_compile tools/verify_permutation_cuda.py tools/verify_cnot.py tools/cnot_acceptance_events.py tools/test_cnot_acceptance_events.py tools/test_cnot_gpu_identity.py tools/verify_cnot_gpu_pair.py tools/test_verify_cnot_gpu_pair.py tools/test_vast_result_transport.py tools/test_vast_source_archive.py tools/create_vast_source_archive.py tools/vast_instance_contract.py tools/test_vast_instance_contract.py tools/vast_budget_deadline.py tools/test_vast_budget_deadline.py tools/vast_campaign_guard.py tools/test_vast_campaign_guard.py tools/vast_campaign_watchdog.py tools/test_vast_campaign_watchdog.py tools/test_vast_campaign_workflow.py tools/vast_private_preflight.py tools/test_vast_private_preflight.py integrations/cayleypy_native/tests/installed_verify_cnot_gloo_lifecycle.py integrations/cayleypy_native/multigpubeamsearch/gpu_identity.py
       - name: Test the versioned per-invocation CNOT event verifier
         id: cnot_event_verifier
         run: python tools/test_cnot_acceptance_events.py -v
@@ -89,6 +94,18 @@ jobs:
       - name: Test campaign marker and independent watchdog decisions
         id: campaign_guard_test
         run: python tools/test_vast_campaign_guard.py -v
+      - name: Test independent Vast stop watchdog with mocked APIs
+        id: campaign_watchdog_test
+        run: |
+          set -o pipefail
+          mkdir -p test_results/refactor_20261121/vast-campaign-watchdog
+          python tools/test_vast_campaign_watchdog.py -v 2>&1 | tee test_results/refactor_20261121/vast-campaign-watchdog/watchdog-test.log
+      - name: Verify campaign marker, cleanup and watchdog workflow ordering
+        id: campaign_workflow_test
+        run: |
+          set -o pipefail
+          mkdir -p test_results/refactor_20261121/vast-campaign-watchdog
+          python tools/test_vast_campaign_workflow.py -v 2>&1 | tee test_results/refactor_20261121/vast-campaign-watchdog/workflow-test.log
       - name: Test private manifest and checkpoint receipt parsing
         id: private_receipt_test
         run: python tools/test_vast_private_preflight.py -v
@@ -234,6 +251,8 @@ jobs:
           BUDGET_DEADLINE_OUTCOME: ${{ steps.budget_deadline.outcome }}
           PRIVATE_RECEIPT_OUTCOME: ${{ steps.private_receipt_test.outcome }}
           CAMPAIGN_GUARD_OUTCOME: ${{ steps.campaign_guard_test.outcome }}
+          CAMPAIGN_WATCHDOG_OUTCOME: ${{ steps.campaign_watchdog_test.outcome }}
+          CAMPAIGN_WORKFLOW_OUTCOME: ${{ steps.campaign_workflow_test.outcome }}
           TRANSPORT_OUTCOME: ${{ steps.transport_test.outcome }}
           SOURCE_ARCHIVE_OUTCOME: ${{ steps.source_archive_test.outcome }}
           SYNTAX_OUTCOME: ${{ steps.syntax_check.outcome }}
@@ -251,7 +270,9 @@ jobs:
           - Current CUDA-context UUID selection and matching receipts: ${CNOT_GPU_IDENTITY_OUTCOME}
           - New 2x RTX 3060 target and elapsed-cost contract: ${INSTANCE_CONTRACT_OUTCOME}
           - Absolute per-phase deadline and stop-reserve checks: ${BUDGET_DEADLINE_OUTCOME}
-          - Campaign marker and independent stop-watchdog decisions: ${CAMPAIGN_GUARD_OUTCOME}
+          - Instance-bound campaign marker and stop decisions: ${CAMPAIGN_GUARD_OUTCOME}
+          - Independent watchdog, bounded stop readback and prior-label restoration: ${CAMPAIGN_WATCHDOG_OUTCOME}
+          - Marker-before-stop and workflow trigger ordering: ${CAMPAIGN_WORKFLOW_OUTCOME}
           - Pinned private-input and offline CUTLASS preflight receipt parser: ${PRIVATE_RECEIPT_OUTCOME}
           - Extracted remote payload success/failure plus SSH result retrieval after key revocation: ${TRANSPORT_OUTCOME}
           - Source archive contains and extracts the vendored build headers: ${SOURCE_ARCHIVE_OUTCOME}
@@ -266,6 +287,7 @@ jobs:
           path: |
             ${{ runner.temp }}/gpu-acceptance-source/GITHUB_STATUS.md
             test_results/refactor_20261121/vast-source-archive/archive-test.log
+            test_results/refactor_20261121/vast-campaign-watchdog/
           if-no-files-found: error
           retention-days: 30
 
@@ -300,6 +322,26 @@ jobs:
           curl --fail --silent --show-error --retry 2 --retry-delay 2 --max-time 30 \
             -H "Authorization: Bearer ${VAST_API_KEY}" -H "Accept: application/json" \
             "https://console.vast.ai/api/v0/instances/" > "$instances"
+          python3 tools/vast_instance_contract.py --verify-target-only \
+            --payload "$instances" --instance-id "$VAST_INSTANCE_ID" >/dev/null
+          campaign_label="$(python3 tools/vast_campaign_guard.py label \
+            --payload "$instances" --instance-id "$VAST_INSTANCE_ID" \
+            --run-id "$GITHUB_RUN_ID" --attempt "$GITHUB_RUN_ATTEMPT" \
+            --spend-cap-usd "$SPEND_CAP_USD")"
+          label_request="$(jq -cn --arg label "$campaign_label" '{label:$label}')"
+          response="${RUNNER_TEMP}/vast-campaign-label-response.json"
+          curl --fail --silent --show-error --max-time 30 -X PUT \
+            -H "Authorization: Bearer ${VAST_API_KEY}" -H "Content-Type: application/json" \
+            --data-binary "$label_request" \
+            "https://console.vast.ai/api/v0/instances/${VAST_INSTANCE_ID}/" > "$response"
+          jq -e '.success == true' "$response" >/dev/null
+          curl --fail --silent --show-error --retry 2 --retry-delay 2 --max-time 30 \
+            -H "Authorization: Bearer ${VAST_API_KEY}" -H "Accept: application/json" \
+            "https://console.vast.ai/api/v0/instances/" > "$instances"
+          python3 tools/vast_campaign_guard.py verify \
+            --payload "$instances" --instance-id "$VAST_INSTANCE_ID" --label "$campaign_label"
+          echo "campaign_label=$campaign_label" >> "$GITHUB_OUTPUT"
+          echo "safe_to_stop=true" >> "$GITHUB_OUTPUT"
           python3 tools/vast_instance_contract.py \
             --payload "$instances" --instance-id "$VAST_INSTANCE_ID" \
             --spend-cap-usd "$SPEND_CAP_USD" --report "$status" --github-output "$GITHUB_OUTPUT"
@@ -673,6 +715,7 @@ jobs:
         env:
           VAST_API_KEY: ${{ secrets.VAST_API_KEY }}
           INSTANCE_ID: ${{ env.VAST_INSTANCE_ID }}
+          CAMPAIGN_LABEL: ${{ steps.preflight.outputs.campaign_label }}
         shell: bash
         run: |
           set -euo pipefail
@@ -681,31 +724,53 @@ jobs:
           trap 'rm -f "$key_file" "${key_file}.pub" "$known_hosts"' EXIT
           instances="${RUNNER_TEMP}/vast-stop-readback.json"
           lifecycle="${RUNNER_TEMP}/vast-stop-lifecycle.json"
-          curl --fail --silent --show-error --retry 2 --retry-delay 2 --max-time 30 \
+          curl --fail --silent --show-error --max-time 20 \
             -H "Authorization: Bearer ${VAST_API_KEY}" -H "Accept: application/json" \
             "https://console.vast.ai/api/v0/instances/" > "$instances"
-          python3 tools/vast_instance_contract.py --verify-target-only --payload "$instances" --instance-id "$INSTANCE_ID"
+          python3 tools/vast_campaign_guard.py verify --payload "$instances" --instance-id "$INSTANCE_ID" --label "$CAMPAIGN_LABEL"
           current="$(jq -er --arg id "$INSTANCE_ID" '.instances[] | select((.id|tostring)==$id) | (.actual_status // .cur_state // "unknown")' "$instances")"
           if [[ "$current" == "stopped" || "$current" == "exited" ]]; then
             printf '{"instance_id":"%s","stop":"already_stopped","readback":"%s"}\n' "$INSTANCE_ID" "$current" > "$lifecycle"
           else
             body='{"state":"stopped"}'
             response="${RUNNER_TEMP}/vast-stop-response.json"
-            curl --fail --silent --show-error --max-time 30 -X PUT \
+            curl --fail --silent --show-error --max-time 20 -X PUT \
               -H "Authorization: Bearer ${VAST_API_KEY}" -H "Content-Type: application/json" \
               --data-binary "$body" "https://console.vast.ai/api/v0/instances/${INSTANCE_ID}/" > "$response"
             jq -e '.success == true' "$response" >/dev/null
             stopped=false
-            for _ in {1..12}; do
+            for _ in {1..6}; do
               curl --fail --silent --show-error --max-time 20 \
                 -H "Authorization: Bearer ${VAST_API_KEY}" -H "Accept: application/json" \
                 "https://console.vast.ai/api/v0/instances/" > "$instances"
               current="$(jq -er --arg id "$INSTANCE_ID" '.instances[] | select((.id|tostring)==$id) | (.actual_status // .cur_state // "unknown")' "$instances")"
               if [[ "$current" == "stopped" || "$current" == "exited" ]]; then stopped=true; break; fi
-              sleep 5
+              sleep 3
             done
             printf '{"instance_id":"%s","stop":"requested","readback":"%s","confirmed":%s}\n' "$INSTANCE_ID" "$current" "$stopped" > "$lifecycle"
             [[ "$stopped" == true ]] || { echo "Vast did not confirm stopped state for the validated new target." >&2; exit 1; }
+          fi
+          if [[ -n "$CAMPAIGN_LABEL" ]]; then
+            restore_body="${RUNNER_TEMP}/vast-restore-label.json"
+            python3 tools/vast_campaign_guard.py restore-body --label "$CAMPAIGN_LABEL" --output "$restore_body"
+            restore_response="${RUNNER_TEMP}/vast-restore-label-response.json"
+            curl --fail --silent --show-error --max-time 30 -X PUT \
+              -H "Authorization: Bearer ${VAST_API_KEY}" -H "Content-Type: application/json" \
+              --data-binary "@$restore_body" \
+              "https://console.vast.ai/api/v0/instances/${INSTANCE_ID}/" > "$restore_response"
+            jq -e '.success == true' "$restore_response" >/dev/null
+            curl --fail --silent --show-error --max-time 20 \
+              -H "Authorization: Bearer ${VAST_API_KEY}" -H "Accept: application/json" \
+              "https://console.vast.ai/api/v0/instances/" > "$instances"
+            python3 tools/vast_campaign_guard.py verify-restored \
+              --payload "$instances" --instance-id "$INSTANCE_ID" --label "$CAMPAIGN_LABEL"
+            python3 - "$lifecycle" <<'PY'
+          import json, pathlib, sys
+          path = pathlib.Path(sys.argv[1])
+          lifecycle = json.loads(path.read_text(encoding="utf-8"))
+          lifecycle["prior_label_restored"] = True
+          path.write_text(json.dumps(lifecycle, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+          PY
           fi
           python3 - "${RUNNER_TEMP}/vast-status.json" "$lifecycle" \
             "${RUNNER_TEMP}/beam-gpu-acceptance-test-results.tar.gz" "$INSTANCE_ID" <<'PY'
@@ -714,6 +779,7 @@ jobs:
           report = json.loads(status_path.read_text(encoding="utf-8")) if status_path.exists() else {"instance_id": sys.argv[4]}
           lifecycle = json.loads(lifecycle_path.read_text(encoding="utf-8"))
           report["lifecycle"] = lifecycle
+          report["storage_billing_continues_after_stop"] = True
           stopped_at = int(time.time())
           start = report.get("instance_start_epoch")
           hourly = report.get("hourly_rate_usd")
