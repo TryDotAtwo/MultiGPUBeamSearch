@@ -97,9 +97,7 @@ print("synthetic GPU execution log", flush=True)
 raise SystemExit(int(os.environ["FAKE_REMOTE_EXIT"]))
 """
 
-FAKE_PYTHON = r"""#!/bin/sh
-exec "$SYSTEM_PYTHON" - "$@" <<'PY'
-import os
+FAKE_PYTHON = r"""import os
 import sys
 
 args = sys.argv[1:]
@@ -113,7 +111,6 @@ if phase and phase == os.environ.get("FAKE_DEADLINE_PHASE_FAILURE"):
     raise SystemExit(2)
 python = os.environ["SYSTEM_PYTHON"]
 os.execv(python, [python, *args])
-PY
 """
 
 
@@ -134,7 +131,7 @@ class VastResultTransportTests(unittest.TestCase):
         fake_ssh.write_text(FAKE_SSH, encoding="utf-8")
         fake_ssh.chmod(0o755)
         fake_python = bin_dir / "python3"
-        fake_python.write_text(FAKE_PYTHON, encoding="utf-8")
+        fake_python.write_text(f"#!{sys.executable}\n" + FAKE_PYTHON, encoding="utf-8")
         fake_python.chmod(0o755)
 
         key_file = root / "ssh-key"
@@ -161,9 +158,10 @@ class VastResultTransportTests(unittest.TestCase):
             "VAST_SSH_SCRIPT": str(remote_script),
             "VAST_REMOTE_ROOT": "/workspace/synthetic-run",
             "VAST_REMOTE_RESULTS_RELATIVE": "test_results/refactor_20261121/gpu-acceptance",
-            "VAST_REMOTE_RUNTIME_SECONDS": "1200",
+            "VAST_REMOTE_RUNTIME_MAX_SECONDS": "1200",
             "VAST_BUDGET_DEADLINE_EPOCH": str(int(time.time()) + deadline_seconds_from_now),
             "VAST_STOP_RESERVE_SECONDS": "1200",
+            "VAST_RETRIEVAL_RESERVE_SECONDS": "300",
             "VAST_RETRIEVAL_MAX_SECONDS": "300",
             "SYSTEM_PYTHON": sys.executable,
             "FAKE_DEADLINE_PHASE_FAILURE": fail_deadline_phase,
@@ -188,7 +186,11 @@ class VastResultTransportTests(unittest.TestCase):
             capture_output=True,
             check=False,
         )
-        events = [json.loads(line) for line in events_file.read_text(encoding="utf-8").splitlines()]
+        events = (
+            [json.loads(line) for line in events_file.read_text(encoding="utf-8").splitlines()]
+            if events_file.is_file()
+            else []
+        )
         return completed, results_archive, events
 
     def assert_results_archive(self, archive_path: Path) -> None:
