@@ -1,5 +1,5 @@
 import pytest
-from multigpubeamsearch.cluster import plan_cluster
+from multigpubeamsearch.cluster import plan_cluster, scheduler_rank
 
 
 @pytest.mark.parametrize('counts',[(1,),(8,),(8,)*16,(2,4,1)])
@@ -30,3 +30,20 @@ def test_exact_top_k_and_physical_storage_for_two_nodes():
     assert plan.effective_beam == 1_000_003
     assert plan.local_frontier_capacity == 62_501
     assert plan.alignment == 262_144
+
+
+@pytest.mark.parametrize(("rank", "local", "node"), [
+    ("11", "4", "1"),
+    ("13", "4", "1"),
+    ("4", "4", "1"),
+])
+def test_slurm_global_rank_matches_node_and_local_assignment(rank, local, node):
+    env = {
+        "SLURM_PROCID": rank,
+        "SLURM_LOCALID": local,
+        "SLURM_NODEID": node,
+        "SLURM_STEP_NUM_TASKS": "14",
+        "SLURM_STEP_TASKS_PER_NODE": "8,6",
+    }
+    with pytest.raises(ValueError, match="rank.*node/local"):
+        scheduler_rank(env)

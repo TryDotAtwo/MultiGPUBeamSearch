@@ -83,3 +83,18 @@ fn malformed_assignments_are_rejected() {
         assert!(result.is_err());
     }
 }
+
+
+#[test]
+fn slurm_global_rank_must_match_node_and_local_assignment() {
+    for (rank, local, node) in [("11", "4", "1"), ("13", "4", "1"), ("4", "4", "1")] {
+        let result = scheduler_rank(&env(&[
+            ("SLURM_PROCID", rank),
+            ("SLURM_LOCALID", local),
+            ("SLURM_NODEID", node),
+            ("SLURM_STEP_NUM_TASKS", "14"),
+            ("SLURM_STEP_TASKS_PER_NODE", "8,6"),
+        ]));
+        assert!(result.is_err(), "accepted rank={rank}, node={node}, local={local}");
+    }
+}

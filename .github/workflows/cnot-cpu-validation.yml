@@ -9,6 +9,8 @@ on:
       - codex/beam-*
     paths:
       - .github/workflows/cnot-cpu-validation.yml
+      - integrations/cayleypy_native/multigpubeamsearch/cluster.py
+      - integrations/cayleypy_native/tests/test_cluster.py
       - integrations/cayleypy_native/multigpubeamsearch/cnot.py
       - integrations/cayleypy_native/multigpubeamsearch/pipeline_cache.py
       - integrations/cayleypy_native/multigpubeamsearch/pipeline_profiles.py
@@ -102,6 +104,7 @@ jobs:
               rust/beam-runtime/tests/search_session.rs \
               rust/beam-runtime/tests/session_preparation_identity.rs\
               rust/beam-runtime/tests/search_inputs.rs \
+              rust/beam-runtime/tests/cluster.rs \
               rust/beam-runtime/tests/cnot_exchange.rs
             rustfmt --check --edition 2021 rust/beam-core/src/inference.rs rust/beam-core/src/cnot.rs rust/beam-core/tests/cnot.rs
             rustfmt --check --edition 2021 rust/beam-python/src/planning.rs
@@ -113,6 +116,7 @@ jobs:
             cargo test --locked -p beam-runtime --test search_session
             cargo test --locked -p beam-runtime --test session_preparation_identity
             cargo test --locked -p beam-runtime --test search_inputs
+            cargo test --locked -p beam-runtime --test cluster
             cargo test --locked -p beam-native-sys cnot_tqp_scorer
             cargo check --locked -p beam-python
           } 2>&1 | tee test_results/refactor_20261120/cnot-rust-domain-fallback/cnot-rust-cpu.log
@@ -127,6 +131,7 @@ jobs:
         run: |
           set -o pipefail
           python -m pytest -q \
+            integrations/cayleypy_native/tests/test_cluster.py \
             integrations/cayleypy_native/tests/test_backend.py \
             integrations/cayleypy_native/tests/test_pipeline_cache.py \
             integrations/cayleypy_native/tests/test_pipeline_profiles.py \
