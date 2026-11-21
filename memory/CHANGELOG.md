@@ -1,3 +1,15 @@
+## 2026-11-21 - Separate PyO3 extension linking from Rust fixture tests
+
+- `beam-python` keeps `extension-module` as its default feature so wheel builds
+  preserve the existing PyO3 module behavior. The Rust event serialization
+  fixture test disables that feature so its executable links against Python
+  instead of leaving extension-module symbols unresolved.
+- RED: installed-wheel workflow run
+  [44897715956](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44897715956)
+  built and installed the wheel, then the Rust serializer test failed at link
+  time with unresolved `PyBytes_*`/`PyErr_*` symbols under `extension-module`.
+- The feature boundary and test invocation are updated; hosted GREEN is pending.
+
 ## 2026-11-21 - Make CNOT runtime acceptance select Rust explicitly
 
 - `tools/verify_cnot.py` accepts `--engine`, reports the selected engine and scorer runtime type, and `--require-rust-scorer` requires both the Rust controller and the PyO3 Rust-owned TQP scorer for trained checkpoint cases. The search algorithm and scorer numerics are unchanged.

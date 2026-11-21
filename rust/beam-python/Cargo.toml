@@ -3,6 +3,9 @@ name = "beam-python"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+[features]
+default = ["extension-module"]
+extension-module = ["pyo3/extension-module"]
 [lib]
 name = "_beam_runtime"
 crate-type = ["cdylib"]
