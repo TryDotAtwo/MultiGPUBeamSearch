@@ -81,6 +81,7 @@ fn slurm_counts(value: &str) -> Result<Vec<u64>> {
 
 pub fn scheduler_rank(env: &BTreeMap<String, String>) -> Result<ScheduledRank> {
     let (world, rank, local_size, local, node);
+    let mut rank_offset = None;
     if env.contains_key("TORCHELASTIC_RUN_ID") || !env.contains_key("SLURM_PROCID") {
         world = number(env, "WORLD_SIZE")?;
         rank = number(env, "RANK")?;
@@ -116,11 +117,19 @@ pub fn scheduler_rank(env: &BTreeMap<String, String>) -> Result<ScheduledRank> {
             ));
         }
         local_size = counts[node as usize];
+        rank_offset = Some(counts[..node as usize].iter().sum::<u64>());
     }
     if !(1..=MAX_WORLD_SIZE).contains(&world) || rank >= world || local >= local_size {
         return Err(ClusterError::Invalid(format!(
             "invalid rank or world size (maximum {MAX_WORLD_SIZE})"
         )));
+    }
+    if let Some(offset) = rank_offset {
+        if rank != offset + local {
+            return Err(ClusterError::Invalid(
+                "Slurm rank does not match node/local assignment".into(),
+            ));
+        }
     }
     Ok(ScheduledRank {
         global_rank: rank,

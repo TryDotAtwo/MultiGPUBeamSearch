@@ -47,3 +47,17 @@ def test_slurm_global_rank_matches_node_and_local_assignment(rank, local, node):
     }
     with pytest.raises(ValueError, match="rank.*node/local"):
         scheduler_rank(env)
+
+
+
+def test_slurm_global_rank_accepts_valid_node_local_mapping():
+    rank = scheduler_rank({
+        "SLURM_PROCID": "12",
+        "SLURM_LOCALID": "4",
+        "SLURM_NODEID": "1",
+        "SLURM_STEP_NUM_TASKS": "14",
+        "SLURM_STEP_TASKS_PER_NODE": "8,6",
+    })
+    assert (rank.global_rank, rank.node_rank, rank.local_rank, rank.world_size, rank.local_world_size) == (
+        12, 1, 4, 14, 6
+    )

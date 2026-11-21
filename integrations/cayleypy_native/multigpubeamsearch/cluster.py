@@ -94,6 +94,7 @@ def _slurm_counts(text):
 def scheduler_rank(environ=None):
     """Read the actual torchrun or Slurm step assignment, including task masks."""
     env = os.environ if environ is None else environ
+    rank_offset = None
     # A torchrun agent can itself occupy a single Slurm task. Conversely, a
     # direct srun child inherits normalized RANK variables from this launcher.
     if "TORCHELASTIC_RUN_ID" in env or "SLURM_PROCID" not in env:
@@ -108,8 +109,11 @@ def scheduler_rank(environ=None):
         if sum(counts) != world or node >= len(counts):
             raise ValueError("Slurm node counts disagree with the current step")
         local_size = counts[node]
+        rank_offset = sum(counts[:node])
     if not 1 <= world <= MAX_WORLD_SIZE or rank >= world or local >= local_size:
         raise ValueError(f"invalid rank or world size (maximum {MAX_WORLD_SIZE})")
+    if rank_offset is not None and rank != rank_offset + local:
+        raise ValueError("Slurm rank does not match node/local assignment")
     return ScheduledRank(rank, node, local, world, local_size)
 
 
