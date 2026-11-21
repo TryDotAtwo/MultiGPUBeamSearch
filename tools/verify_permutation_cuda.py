@@ -22,6 +22,7 @@ from permutation_acceptance import (
     decode_frontier_snapshot,
     hash_state,
     validate_depth_flow_trace,
+    permutation_report_sha256,
 )
 
 
@@ -279,7 +280,7 @@ def run_saturated_layout(graph, contract, model, source_dir, cache_dir, cutlass_
                     "eligible_distinct": expected.eligible_distinct, "beam_width": 3,
                     "cross_source_duplicates": expected.cross_source_duplicate_count,
                     "rank_evidence": [
-                        {key: row[key] for key in ("rank", "pid", "gpu_uuid", "frontier_size", "generated", "final_candidate_count", "final_request_count", "next_frontier_size", "frontier_snapshot")}
+                        {key: row[key] for key in ("rank", "pid", "gpu_uuid", "frontier_size", "generated", "final_global_less", "final_global_equal", "final_total_available", "final_global_keep", "final_candidate_count", "final_request_count", "next_frontier_size", "frontier_snapshot")}
                         for row in rows
                     ],
                     "ordered_survivor_hashes": [
@@ -372,6 +373,8 @@ def main():
         "saturated_fixture": "cayleypy.LRX(5)",
         "state_len": contract.state_len,
         "move_count": contract.move_count,
+        "saturated_state_len": saturated_contract.state_len,
+        "saturated_move_count": saturated_contract.move_count,
         "model": "known finite FP16 MLP artifact",
         "source_sha": args.source_sha,
         "wheel_sha256": args.wheel_sha256,
@@ -382,6 +385,7 @@ def main():
         "runs": reports,
         "saturated_b3": saturated_reports,
     }
+    report["report_sha256"] = permutation_report_sha256(report)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     print(json.dumps(report, separators=(",", ":")), flush=True)

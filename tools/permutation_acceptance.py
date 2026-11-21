@@ -9,6 +9,8 @@ from __future__ import annotations
 from collections import defaultdict, deque
 from dataclasses import dataclass
 from functools import lru_cache
+import hashlib
+import json
 import re
 from typing import Iterable, Sequence
 
@@ -19,6 +21,19 @@ _TRACE_MARKER = "depth_flow_trace"
 _KV = re.compile(r"([A-Za-z_][A-Za-z0-9_]*)=([^\s]+)")
 _HEX_UUID = re.compile(r"(?:GPU-)?[0-9a-fA-F]{32}\Z")
 _LABEL = re.compile(r"[A-Za-z0-9_.-]+\Z")
+
+
+def permutation_report_sha256(report: dict) -> str:
+    """Hash a permutation acceptance report without its self-referential digest."""
+    if not isinstance(report, dict):
+        raise TypeError("permutation acceptance report must be an object")
+    payload = dict(report)
+    payload.pop("report_sha256", None)
+    encoded = json.dumps(
+        payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+    )
+    return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
+
 
 
 class MT19937_64:

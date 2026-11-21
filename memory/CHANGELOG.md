@@ -3317,3 +3317,9 @@ Main commit `148b2a826a369b7601e904ea409e0cc5301c75c9` also passed the 260-test 
 - Hosted RED `44959263103` подтвердил, что supervisor принимал `rank=11, node=1, local=4` для раскладки `8,6`; ожидаемый глобальный rank — 12.
 - Rust runtime и Python compatibility path теперь отклоняют Slurm окружение, если global rank не равен сумме task counts предшествующих узлов плюс local rank. Torchrun, Slurm корректной раскладки, запуск дочернего процесса и транспорт не менялись.
 - На SHA `901a7c630d6be25555fe7a8154bd9bb45b537f33` Rust/Python hosted CPU suite [44959505649](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44959505649) прошёл; Python набор: 323 passed, 2 skipped. Installed-wheel suite [44959505809](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44959505809) прошёл. GPU acceptance [44959505792](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44959505792) выполнил CPU harness; физический шаг пропущен.
+
+
+## 2026-11-22 - Bind paired CNOT acceptance to saturated permutation report
+
+- Replaced the permutation world-size-only check in the paired CNOT verifier with validation of the LRX(4) Rust smoke and saturated LRX(5) B=3 1/2-GPU cases. The receipt now carries the canonical permutation report SHA-256, exact cutoff summary, independent replay status, and per-world rank identities.
+- The report includes per-rank candidate/cutoff counts, worker and GPU UUIDs, binary/build digests, two-call Rust-session reuse, full ordered Hash128 survivors, and fixture replay evidence. Search behavior, kernels, scoring and precision are unchanged.

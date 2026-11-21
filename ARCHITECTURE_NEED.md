@@ -1,5 +1,10 @@
 # Конфиг
 
+## Paired permutation acceptance receipt contract, 2026-11-22
+
+The CNOT campaign verifier now checks the permutation report as a run-bound acceptance artifact. A valid report must bind source SHA, installed wheel SHA and acceptance run ID; include the existing LRX(4) one/two-GPU replay and the saturated LRX(5), B=3 oracle case; prove the exact global cutoff after cross-rank dedup; and carry two ordered calls from one reused Rust session per topology. Each call must match per-rank PIDs, observed CUDA UUIDs, build/binary hashes, expansions, global cutoff counts, retained frontier counts, complete Hash128 survivor order and independent replay status. The canonical report digest is verified before the final paired receipt is written. Hosted fixtures reject world-size-only JSON, foreign identities, missing/duplicate ranks or GPUs, unsaturated counts, changed winner order, missing session reuse and a body modified after digest. This is a CPU-verifier contract; it does not establish physical CUDA/NCCL execution.
+
+
 ## Installed-wheel проверка штатного выбора CNOT-контроллера, 2026-11-22
 
 Публичная точка `verify_cnot.main` проверяется с `engine=auto` на двух Gloo-рангах. В healthy retry тест подменяет callback Python reference-loop на ошибку; успешный результат подтверждает, что установленный wheel выбрал Rust controller. До каждого retry тест отдельно инъецирует сбой загрузки scorer только на rank 0, затем только на rank 1, и проверяет последующий запуск в той же живой группе.

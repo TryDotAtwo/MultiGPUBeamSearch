@@ -1,7 +1,6 @@
 """Hosted CPU tests for the final CNOT 1/2-GPU acceptance verifier."""
 from __future__ import annotations
 
-import hashlib
 import json
 from pathlib import Path
 import sys
@@ -14,6 +13,7 @@ sys.path.insert(0, str(TOOLS))
 import cnot_acceptance_events as protocol
 import test_cnot_acceptance_events as event_fixture
 import verify_cnot_gpu_pair
+from permutation_acceptance import permutation_report_sha256
 
 
 SOURCE_SHA = "a" * 40
@@ -83,10 +83,7 @@ def _build_case(root: Path, case_id: str, world: int, mode: str, width: int, sho
 
 
 def _permutation_report_sha256(report):
-    payload = dict(report)
-    payload.pop("report_sha256", None)
-    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
-    return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
+    return permutation_report_sha256(report)
 
 
 def _build_permutation_report():
@@ -158,6 +155,7 @@ def _build_permutation_report():
                 "worker_pids": pids,
                 "build_key": build_key,
                 "binary_sha256": binary_sha,
+                "log_path": f"/remote/test/{world}-{call}.log",
                 "eligible_distinct": 12,
                 "beam_width": 3,
                 "cross_source_duplicates": 1,
@@ -189,6 +187,8 @@ def _build_permutation_report():
         "saturated_fixture": "cayleypy.LRX(5)",
         "state_len": 24,
         "move_count": 10,
+        "saturated_state_len": 5,
+        "saturated_move_count": 10,
         "model": "known finite FP16 MLP artifact",
         "source_sha": SOURCE_SHA,
         "wheel_sha256": WHEEL_SHA,
@@ -238,6 +238,9 @@ class VerifyCnotGpuPairTests(unittest.TestCase):
             result = _validate(root)
             self.assertTrue(result["paired_cnot_survivor_hashes_match"])
             self.assertEqual(result["paired_cnot_world_sizes"], [1, 2])
+            self.assertEqual(result["permutation_report_sha256"], _build_permutation_report()["report_sha256"])
+            self.assertEqual(result["permutation_saturated_world_sizes"], [1, 2])
+            self.assertTrue(result["permutation_saturated_survivor_hashes_match"])
             self.assertEqual(
                 result["strict_backend_cases"]["cnot-trained-deep-paired-2-gpu"]["rank_devices"],
                 [
