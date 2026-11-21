@@ -3016,5 +3016,8 @@ Main commit `148b2a826a369b7601e904ea409e0cc5301c75c9` also passed the 260-test 
   contract activation mismatch. It then exposed a test assertion expecting
   RuntimeError where the public Python setting-consensus API correctly raises
   ValueError. The assertion is corrected; installed-wheel admission and the
-  phase-boundary gate are pending. Full logs are in Actions artifacts; no local
-  tests or GPU run were produced.
+  phase-boundary script then exposed the same multiprocessing main-guard issue;
+  it is corrected. Actionlint identified malformed YAML at the skipped-run
+  summary line in the new-host workflow; that command is now a block scalar.
+  Final hosted admission/phase-boundary/YAML lint checks are pending. Full logs
+  remain in Actions artifacts; no local tests or GPU run were produced.

@@ -115,39 +115,44 @@ def worker(rank, rendezvous, output_dir, phase, fail_rank):
         dist.destroy_process_group()
 
 
-with tempfile.TemporaryDirectory(prefix="mgbs-cnot-phases-") as temporary:
-    root = Path(temporary)
-    for phase, fail_rank in (
-        ("winner packet", 0),
-        ("winner packet", 1),
-        ("history edge", 0),
-        ("history edge", 1),
-    ):
-        phase_dir = root / f"{phase.replace(' ', '-')}-rank-{fail_rank}"
-        phase_dir.mkdir()
-        rendezvous = (phase_dir / "rendezvous").resolve().as_uri()
-        mp.spawn(
-            worker,
-            args=(rendezvous, str(phase_dir), phase, fail_rank),
-            nprocs=2,
-            join=True,
-        )
-        reports = [
-            json.loads((phase_dir / f"rank-{rank}.json").read_text())
-            for rank in range(2)
-        ]
-        if reports[0]["collective_error"] != reports[1]["collective_error"]:
-            raise AssertionError(f"ranks disagreed on {phase} failure: {reports!r}")
-        expected = (
-            f"prepare CNOT winner packet failed: rank {fail_rank}: RuntimeError: injected winner packet"
-            if phase == "winner packet"
-            else f"prepare CNOT history edge failed: rank {fail_rank}: RuntimeError: injected history edge"
-        )
-        if expected not in reports[0]["collective_error"]:
-            raise AssertionError(f"wrong error phase or owner: {reports!r}")
-        if any(not row["injection_fired"] and row["rank"] == fail_rank for row in reports):
-            raise AssertionError(f"missing one-rank injection: {reports!r}")
-        if any(row["recovery_search"] != "passed" or row["gates"] != [0] for row in reports):
-            raise AssertionError(f"the live process group did not recover: {reports!r}")
+def main():
+    with tempfile.TemporaryDirectory(prefix="mgbs-cnot-phases-") as temporary:
+        root = Path(temporary)
+        for phase, fail_rank in (
+            ("winner packet", 0),
+            ("winner packet", 1),
+            ("history edge", 0),
+            ("history edge", 1),
+        ):
+            phase_dir = root / f"{phase.replace(' ', '-')}-rank-{fail_rank}"
+            phase_dir.mkdir()
+            rendezvous = (phase_dir / "rendezvous").resolve().as_uri()
+            mp.spawn(
+                worker,
+                args=(rendezvous, str(phase_dir), phase, fail_rank),
+                nprocs=2,
+                join=True,
+            )
+            reports = [
+                json.loads((phase_dir / f"rank-{rank}.json").read_text())
+                for rank in range(2)
+            ]
+            if reports[0]["collective_error"] != reports[1]["collective_error"]:
+                raise AssertionError(f"ranks disagreed on {phase} failure: {reports!r}")
+            expected = (
+                f"prepare CNOT winner packet failed: rank {fail_rank}: RuntimeError: injected winner packet"
+                if phase == "winner packet"
+                else f"prepare CNOT history edge failed: rank {fail_rank}: RuntimeError: injected history edge"
+            )
+            if expected not in reports[0]["collective_error"]:
+                raise AssertionError(f"wrong error phase or owner: {reports!r}")
+            if any(not row["injection_fired"] and row["rank"] == fail_rank for row in reports):
+                raise AssertionError(f"missing one-rank injection: {reports!r}")
+            if any(row["recovery_search"] != "passed" or row["gates"] != [0] for row in reports):
+                raise AssertionError(f"the live process group did not recover: {reports!r}")
 
-print("CNOT_GLOO_REAL_PHASE_FAILURES_OK")
+    print("CNOT_GLOO_REAL_PHASE_FAILURES_OK")
+
+
+if __name__ == "__main__":
+    main()

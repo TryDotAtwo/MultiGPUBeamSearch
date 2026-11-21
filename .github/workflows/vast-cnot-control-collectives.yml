@@ -744,7 +744,8 @@ jobs:
       - name: Report a skipped physical run
         if: steps.preflight.outcome == 'success' && steps.preflight.outputs.instance_running != 'true'
         shell: bash
-        run: echo "GPU acceptance skipped: the selected new instance is not running; it was not started." >> "$GITHUB_STEP_SUMMARY"
+        run: |
+          echo "GPU acceptance skipped: the selected new instance is not running; it was not started." >> "$GITHUB_STEP_SUMMARY"
       - name: Upload sanitized preflight, lifecycle and remote results
         if: always()
         uses: actions/upload-artifact@v4

@@ -107,6 +107,7 @@ jobs:
         if: always()
         run: |
           set -o pipefail
+          mkdir -p "$GITHUB_WORKSPACE/test_results/refactor_20261121/rust-cnot-admission"
           go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12 \
             .github/workflows/vast-cnot-control-collectives.yml \
             2>&1 | tee "$GITHUB_WORKSPACE/test_results/refactor_20261121/rust-cnot-admission/vast-workflow-actionlint.log"
