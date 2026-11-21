@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 class VastCampaignWorkflowTests(unittest.TestCase):
     def test_campaign_marker_and_cleanup_are_bound_to_one_instance(self):
         workflow = (ROOT / ".github/workflows/vast-cnot-control-collectives.yml").read_text(encoding="utf-8")
-        self.assertIn("run-name: mgbs-cnot-acceptance instance=", workflow)
+        self.assertIn("run-name: CNOT GPU acceptance", workflow)
         contract = (ROOT / "tools/vast_instance_contract.py").read_text(encoding="utf-8")
         self.assertNotIn("safe_to_stop", contract)
         self.assertIn("group: vast-cnot-control-acceptance", workflow)
@@ -39,7 +39,13 @@ class VastCampaignWorkflowTests(unittest.TestCase):
         self.assertIn("GITHUB_TOKEN: ${{ github.token }}", watchdog)
         self.assertIn("tools/vast_campaign_watchdog.py", watchdog)
         self.assertNotIn('cat "$report"', watchdog)
+        self.assertIn('report="${RUNNER_TEMP}/vast-campaign-watchdog-private.json"', watchdog)
+        self.assertIn('python3 tools/vast_campaign_watchdog.py --report "$report" >/dev/null 2>&1', watchdog)
+        self.assertIn("Write redacted watchdog status", watchdog)
         self.assertIn("Upload redacted watchdog status", watchdog)
+        self.assertNotIn('Marked campaigns inspected:', watchdog)
+        self.assertNotIn('Confirmed stopped:', watchdog)
+        self.assertNotIn('path: test_results/refactor_20261121/vast-campaign-watchdog/', watchdog)
         upload = watchdog.split("Upload redacted watchdog status", 1)[1].split("\n      - name:", 1)[0]
         self.assertIn("cnot-public-status.json", upload)
         self.assertNotIn("watchdog-${GITHUB_RUN_ID}.json", upload)
@@ -69,7 +75,7 @@ class VastCampaignWorkflowTests(unittest.TestCase):
     def test_result_transport_never_downloads_or_prints_private_results(self):
         transport = (ROOT / "tools/vast_result_transport.sh").read_text(encoding="utf-8")
         self.assertNotIn("VAST_SSH_RESULTS", transport)
-        self.assertNotIn("VAST_REMOTE_RESULTS_RELATIVE", transport)
+        self.assertIn("VAST_REMOTE_RESULTS_RELATIVE", transport)
         self.assertNotIn("tail -n", transport)
         self.assertNotIn('cat "$VAST_SSH_LOG"', transport)
         self.assertIn("REMOTE_GPU_STATUS=passed", transport)
