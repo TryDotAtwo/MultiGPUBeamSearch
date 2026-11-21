@@ -756,21 +756,23 @@ fn run_cnot_native_search<'py>(
     run_cnot_native_require_consensus(world.clone(), digest)?;
     let stream5_fingerprint =
         crate::cnot_stream5::run_cnot_native_start_transport(py, world.clone(), use_rust)?;
-    let bind_result = (|| -> PyResult<Bound<'_, PyAny>> {
-        crate::cnot_native_stages::bind_stream5_admission(
+    if let Some(admission) = admitted_backends.as_ref() {
+        let bind_result = (|| -> PyResult<Bound<'_, PyAny>> {
+            crate::cnot_native_stages::bind_stream5_admission(
+                py,
+                Some(admission),
+                &world,
+                stream5_fingerprint,
+            )?;
+            Ok(py.None().into_bound(py))
+        })();
+        crate::cnot_native_checked::checked_v2(
             py,
-            admitted_backends.as_ref(),
             &world,
-            stream5_fingerprint,
+            "bind admitted CNOT backend handles",
+            bind_result,
         )?;
-        Ok(py.None().into_bound(py))
-    })();
-    crate::cnot_native_checked::checked_v2(
-        py,
-        &world,
-        "bind admitted CNOT backend handles",
-        bind_result,
-    )?;
+    }
 
     let wires: u32 = input_matrix.getattr("n")?.extract()?;
     let identity_args = PyDict::new(py);
@@ -812,20 +814,36 @@ fn run_cnot_native_search<'py>(
         let depth: u64 = max_depth.extract()?;
 
         if supports_native {
-            return native_stages.call1((
-                world,
-                input_matrix.getattr("root")?,
-                identity,
-                input_matrix,
-                scorer,
-                mode,
-                audit,
-                width,
-                shortlist_value,
-                alphabet,
-                depth,
-                admitted_backends,
-            ));
+            let native_root = input_matrix.getattr("root")?;
+            return match admitted_backends {
+                Some(admission) => native_stages.call1((
+                    world,
+                    native_root,
+                    identity,
+                    input_matrix,
+                    scorer,
+                    mode,
+                    audit,
+                    width,
+                    shortlist_value,
+                    alphabet,
+                    depth,
+                    admission,
+                )),
+                None => native_stages.call1((
+                    world,
+                    native_root,
+                    identity,
+                    input_matrix,
+                    scorer,
+                    mode,
+                    audit,
+                    width,
+                    shortlist_value,
+                    alphabet,
+                    depth,
+                )),
+            };
         }
 
         let compatibility_stages = compatibility_stages_builder.call1((

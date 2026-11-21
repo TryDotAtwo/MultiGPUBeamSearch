@@ -384,6 +384,7 @@ def test_rust_top_level_controller_preserves_compatibility_stage_fallback(monkey
         ("gloo-any-rank-failed", False),
         ("longs", digest_values),
         ("gather-fixed", digest_values),
+        ("gloo-any-rank-failed", False),
         ("identity", 4, "cpu"),
         ("gloo-any-rank-failed", False),
         ("native-runner",),

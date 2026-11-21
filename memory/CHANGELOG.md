@@ -14,10 +14,17 @@
   the admission handle optional.
 - P0 remote payload harness is green on source SHA `ae5d3acd3fd4a809b40e2f25600e02224bbcd5bc`:
   [Actions run 44904838667](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44904838667).
-  The installed-wheel job on that pre-P1 SHA failed at the existing backend
-  admission test because `_probe_cnot_device_domain_vote` was missing; the P1
-  patch adds it. New installed-wheel/Gloo results are pending. CUDA/NCCL remains
-  unrun and no Vast instance was started.
+  The first P1 installed wheel on source SHA `29aee4dc9f5161f65a7b338da0bf4f665b2642bf`
+  passed all 15 build, install, strict-admission, Gloo recovery, verifier and
+  public-search steps in
+  [Actions run 44906873707](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44906873707).
+  Its source harness passed in
+  [run 44906873808](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44906873808);
+  the GPU job was skipped. The CNOT compatibility workflow on that SHA found
+  two stale event expectations around the newly voted Stream 5 preparation and
+  optional admission argument; the follow-up keeps the old call shape and
+  updates the vote-order expectation. That compatibility rerun is pending.
+  CUDA/NCCL remains unrun and no Vast instance was started.
 
 ## 2026-11-21 - Bind paired CNOT receipts to rank identities
 
