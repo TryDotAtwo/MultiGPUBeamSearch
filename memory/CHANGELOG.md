@@ -3006,3 +3006,11 @@ Main commit `148b2a826a369b7601e904ea409e0cc5301c75c9` also passed the 260-test 
   also showed that single-rank compatibility fixtures need no distributed
   agreement method. These are corrected in the next source revision; hosted
   reruns are pending. The physical 2x RTX 3060 gate remains unrun.
+- At `d6e1bc2`, hosted CPU/Gloo validation passed Rust checks, PyO3 build, 306
+  compatibility tests (2 skipped), and NCCL-probe syntax. Installed-wheel
+  build, smoke, and warning-as-error dtype tests passed, then its backend
+  admission run found a real variable-length collective contract: different
+  strict activation values produced differently sized Gloo tensors. The
+  admission contract is now SHA-256-normalized before collective comparison;
+  hosted wheel rerun and phase-boundary tests are pending. Full logs are in
+  Actions artifacts; no local tests or GPU run were produced.

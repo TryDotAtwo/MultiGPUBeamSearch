@@ -110,7 +110,11 @@ fn probe_cnot_backend_admission(
 }
 
 fn require_backend_consensus(world: &Bound<'_, PyAny>, contract: &str) -> PyResult<()> {
-    world.call_method1("require_engine_consensus", (contract.as_bytes().to_vec(),))?;
+    // Rank-local failures can make the textual contracts differ in length.
+    // Compare a fixed-size digest so Gloo never enters all_gather with
+    // mismatched tensor sizes.
+    let digest = Sha256::digest(contract.as_bytes()).to_vec();
+    world.call_method1("require_engine_consensus", (digest,))?;
     Ok(())
 }
 
