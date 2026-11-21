@@ -1,17 +1,8 @@
 name: Installed-wheel permutation and CNOT GPU acceptance
-run-name: mgbs-cnot-acceptance instance=${{ inputs.instance_id || 'unselected' }} cap=${{ inputs.spend_cap_usd || 'unselected' }}
+run-name: CNOT GPU acceptance
 
 on:
   workflow_dispatch:
-    inputs:
-      instance_id:
-        description: "Decimal ID of the new, account-owned 2x desktop RTX 3060 instance. The legacy ID is prohibited."
-        required: true
-        type: string
-      spend_cap_usd:
-        description: "Lifetime USD ceiling, including elapsed time since Vast start_date (maximum $10)."
-        required: true
-        type: string
   push:
     branches:
       - "codex/beam-*"
@@ -63,7 +54,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: vast-cnot-control-${{ inputs.instance_id || github.run_id }}
+  group: vast-cnot-control-acceptance
   cancel-in-progress: false
 
 jobs:
@@ -82,61 +73,76 @@ jobs:
           python-version: "3.11"
       - name: Compile source-only acceptance helpers
         id: compile_source
-        run: python -m py_compile tools/verify_permutation_cuda.py tools/permutation_acceptance.py tools/test_permutation_acceptance.py tools/verify_cnot.py tools/cnot_acceptance_events.py tools/test_cnot_acceptance_events.py tools/test_cnot_gpu_identity.py tools/verify_cnot_gpu_pair.py tools/test_verify_cnot_gpu_pair.py tools/test_vast_result_transport.py tools/test_vast_public_status.py tools/test_vast_source_archive.py tools/create_vast_source_archive.py tools/vast_instance_contract.py tools/test_vast_instance_contract.py tools/vast_budget_deadline.py tools/test_vast_budget_deadline.py tools/vast_campaign_guard.py tools/test_vast_campaign_guard.py tools/vast_campaign_watchdog.py tools/test_vast_campaign_watchdog.py tools/test_vast_campaign_workflow.py tools/vast_private_preflight.py tools/test_vast_private_preflight.py integrations/cayleypy_native/tests/installed_verify_cnot_gloo_lifecycle.py integrations/cayleypy_native/multigpubeamsearch/gpu_identity.py
+        run: python -m py_compile tools/verify_permutation_cuda.py tools/permutation_acceptance.py tools/test_permutation_acceptance.py tools/verify_cnot.py tools/cnot_acceptance_events.py tools/test_cnot_acceptance_events.py tools/test_cnot_gpu_identity.py tools/verify_cnot_gpu_pair.py tools/test_verify_cnot_gpu_pair.py tools/test_vast_result_transport.py tools/vast_public_status.py tools/test_vast_public_status.py tools/test_vast_source_archive.py tools/create_vast_source_archive.py tools/vast_instance_contract.py tools/test_vast_instance_contract.py tools/vast_budget_deadline.py tools/test_vast_budget_deadline.py tools/vast_campaign_guard.py tools/test_vast_campaign_guard.py tools/vast_campaign_watchdog.py tools/test_vast_campaign_watchdog.py tools/test_vast_campaign_workflow.py tools/vast_private_preflight.py tools/test_vast_private_preflight.py integrations/cayleypy_native/tests/installed_verify_cnot_gloo_lifecycle.py integrations/cayleypy_native/multigpubeamsearch/gpu_identity.py
       - name: Test private result transport boundary
+        if: always()
         id: private_transport
         run: python tools/test_vast_result_transport.py -v
       - name: Test allowlisted public status receipt
+        if: always()
         id: public_status
         if: always()
         run: python tools/test_vast_public_status.py -v
       - name: Test redacted public reporting contract
+        if: always()
         id: public_redaction
         if: always()
         run: python tools/test_vast_campaign_workflow.py -v
       - name: Test the versioned per-invocation CNOT event verifier
+        if: always()
         id: cnot_event_verifier
         run: python tools/test_cnot_acceptance_events.py -v
       - name: Test paired CNOT campaign receipt binding
+        if: always()
         id: cnot_pair_verifier
         run: python tools/test_verify_cnot_gpu_pair.py -v
       - name: Test physical GPU UUID selection with a CPU fake driver
+        if: always()
         id: cnot_gpu_identity
         run: python tools/test_cnot_gpu_identity.py -v
       - name: Test target identity, hardware and lifetime budget with API fixtures
+        if: always()
         id: instance_contract
         run: python tools/test_vast_instance_contract.py -v
       - name: Test per-phase timeouts against the absolute billing deadline
+        if: always()
         id: budget_deadline
         run: python tools/test_vast_budget_deadline.py -v
       - name: Test campaign marker and independent watchdog decisions
+        if: always()
         id: campaign_guard_test
         run: python tools/test_vast_campaign_guard.py -v
       - name: Test independent Vast stop watchdog with mocked APIs
+        if: always()
         id: campaign_watchdog_test
         run: |
           set -o pipefail
           mkdir -p test_results/refactor_20261121/vast-campaign-watchdog
           python tools/test_vast_campaign_watchdog.py -v 2>&1 | tee test_results/refactor_20261121/vast-campaign-watchdog/watchdog-test.log
       - name: Verify campaign marker, cleanup and watchdog workflow ordering
+        if: always()
         id: campaign_workflow_test
         run: |
           set -o pipefail
           mkdir -p test_results/refactor_20261121/vast-campaign-watchdog
           python tools/test_vast_campaign_workflow.py -v 2>&1 | tee test_results/refactor_20261121/vast-campaign-watchdog/workflow-test.log
       - name: Test private manifest and checkpoint receipt parsing
+        if: always()
         id: private_receipt_test
         run: python tools/test_vast_private_preflight.py -v
-      - name: Test extracted remote payload and result retrieval
+      - name: Test extracted remote payload and private log retention
+        if: always()
         id: transport_test
         run: python tools/test_vast_result_transport.py -v
       - name: Test packaged source archive and vendored headers
+        if: always()
         id: source_archive_test
         run: |
           set -o pipefail
           mkdir -p test_results/refactor_20261121/vast-source-archive
           python tools/test_vast_source_archive.py -v 2>&1 | tee test_results/refactor_20261121/vast-source-archive/archive-test.log
       - name: Syntax-check embedded remote Bash and Python payloads
+        if: always()
         id: syntax_check
         shell: bash
         run: |
@@ -272,6 +278,9 @@ jobs:
           CAMPAIGN_WATCHDOG_OUTCOME: ${{ steps.campaign_watchdog_test.outcome }}
           CAMPAIGN_WORKFLOW_OUTCOME: ${{ steps.campaign_workflow_test.outcome }}
           TRANSPORT_OUTCOME: ${{ steps.transport_test.outcome }}
+          PRIVATE_TRANSPORT_OUTCOME: ${{ steps.private_transport.outcome }}
+          PUBLIC_STATUS_OUTCOME: ${{ steps.public_status.outcome }}
+          PUBLIC_REDACTION_OUTCOME: ${{ steps.public_redaction.outcome }}
           SOURCE_ARCHIVE_OUTCOME: ${{ steps.source_archive_test.outcome }}
           SYNTAX_OUTCOME: ${{ steps.syntax_check.outcome }}
         shell: bash
@@ -292,7 +301,10 @@ jobs:
           - Independent watchdog, bounded stop readback and prior-label restoration: ${CAMPAIGN_WATCHDOG_OUTCOME}
           - Marker-before-stop and workflow trigger ordering: ${CAMPAIGN_WORKFLOW_OUTCOME}
           - Pinned private-input and offline CUTLASS preflight receipt parser: ${PRIVATE_RECEIPT_OUTCOME}
-          - Extracted remote payload success/failure plus SSH result retrieval after key revocation: ${TRANSPORT_OUTCOME}
+          - Extracted remote payload success/failure with logs retained on Vast: ${TRANSPORT_OUTCOME}
+          - SSH result transport returns only status: ${PRIVATE_TRANSPORT_OUTCOME}
+          - Allowlisted public status writer and summary: ${PUBLIC_STATUS_OUTCOME}
+          - Public workflow redaction regression: ${PUBLIC_REDACTION_OUTCOME}
           - Source archive contains and extracts the vendored build headers: ${SOURCE_ARCHIVE_OUTCOME}
           - Remote Bash and embedded Python syntax: ${SYNTAX_OUTCOME}
           - This receipt does not claim CUDA, NCCL, or private-checkpoint acceptance.
@@ -316,7 +328,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 135
     env:
-      VAST_INSTANCE_ID: ${{ inputs.instance_id }}
+      VAST_INSTANCE_ID: ${{ secrets.VAST_CNOT_ACCEPTANCE_INSTANCE_ID }}
+      SPEND_CAP_USD: ${{ secrets.VAST_CNOT_ACCEPTANCE_CAP_USD }}
       SOURCE_SHA: ${{ github.sha }}
       REMOTE_ROOT: /workspace/codex-beam-gpu-acceptance-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
@@ -330,16 +343,18 @@ jobs:
         id: preflight
         env:
           VAST_API_KEY: ${{ secrets.VAST_API_KEY }}
-          SPEND_CAP_USD: ${{ inputs.spend_cap_usd }}
         shell: bash
         run: |
           set -euo pipefail
-          [[ -n "$VAST_API_KEY" ]] || { echo "VAST_API_KEY repository secret is missing." >&2; exit 1; }
+          exec 2>"${RUNNER_TEMP}/vast-preflight-private.log"
+          echo "inventory_query=failed" >> "$GITHUB_OUTPUT"
+          [[ -n "$VAST_API_KEY" ]] || { echo "Required private preflight configuration is missing." >&2; exit 1; }
           instances="${RUNNER_TEMP}/vast-instances.json"
           status="${RUNNER_TEMP}/vast-status.json"
           curl --fail --silent --show-error --retry 2 --retry-delay 2 --max-time 30 \
             -H "Authorization: Bearer ${VAST_API_KEY}" -H "Accept: application/json" \
             "https://console.vast.ai/api/v0/instances/" > "$instances"
+          echo "inventory_query=success" >> "$GITHUB_OUTPUT"
           python3 tools/vast_instance_contract.py --verify-target-only \
             --payload "$instances" --instance-id "$VAST_INSTANCE_ID" >/dev/null
           campaign_label="$(python3 tools/vast_campaign_guard.py label \
@@ -357,13 +372,12 @@ jobs:
             -H "Authorization: Bearer ${VAST_API_KEY}" -H "Accept: application/json" \
             "https://console.vast.ai/api/v0/instances/" > "$instances"
           python3 tools/vast_campaign_guard.py verify \
-            --payload "$instances" --instance-id "$VAST_INSTANCE_ID" --label "$campaign_label"
+            --payload "$instances" --instance-id "$VAST_INSTANCE_ID" --label "$campaign_label" >/dev/null
           echo "campaign_label=$campaign_label" >> "$GITHUB_OUTPUT"
           echo "safe_to_stop=true" >> "$GITHUB_OUTPUT"
           python3 tools/vast_instance_contract.py \
             --payload "$instances" --instance-id "$VAST_INSTANCE_ID" \
-            --spend-cap-usd "$SPEND_CAP_USD" --report "$status" --github-output "$GITHUB_OUTPUT"
-          cat "$status"
+            --spend-cap-usd "$SPEND_CAP_USD" --report "$status" --github-output "$GITHUB_OUTPUT" >/dev/null
       - name: Attach a one-time SSH key to the validated target
         if: steps.preflight.outputs.instance_running == 'true'
         env:
@@ -373,15 +387,15 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          exec 2>"${RUNNER_TEMP}/vast-private-runner-errors.log"
           key_file="${RUNNER_TEMP}/vast_cnot_ed25519"
-          ssh-keygen -q -t ed25519 -N "" -C "codex-cnot-${VAST_INSTANCE_ID}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" -f "$key_file"
+          ssh-keygen -q -t ed25519 -N "" -C "codex-cnot-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" -f "$key_file"
           public_key="$(cat "${key_file}.pub")"
           request="$(jq -cn --arg ssh_key "$public_key" '{ssh_key:$ssh_key}')"
           curl --fail --silent --show-error --max-time 30 -X POST \
             -H "Authorization: Bearer ${VAST_API_KEY}" -H "Content-Type: application/json" \
             --data-binary "$request" \
             "https://console.vast.ai/api/v0/instances/${VAST_INSTANCE_ID}/ssh" >/dev/null
-          echo "One-time key attached only to validated instance ${VAST_INSTANCE_ID}." >> "$GITHUB_STEP_SUMMARY"
       - name: Verify private source, checkpoint, GPU stack and disk before upload or build
         id: privatepreflight
         if: steps.preflight.outputs.instance_running == 'true'
@@ -395,6 +409,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          exec 2>>"${RUNNER_TEMP}/vast-preflight-private.log"
           private_timeout="$(python3 tools/vast_budget_deadline.py \
             --deadline-epoch "$BUDGET_DEADLINE_EPOCH" \
             --stop-reserve-seconds "$STOP_RESERVE_SECONDS" \
@@ -422,12 +437,12 @@ jobs:
             (( remaining > 0 )) || break
             sleep "$((remaining < 5 ? remaining : 5))"
           done
-          [[ "$ready" == true ]] || { echo "SSH did not become ready on validated target ${VAST_INSTANCE_ID}." >&2; exit 1; }
+          [[ "$ready" == true ]] || { echo "SSH did not become ready for private preflight." >&2; exit 1; }
           preflight_remaining=$((preflight_deadline - SECONDS))
           (( preflight_remaining > 0 )) || { echo "Private preflight deadline expired before remote checks." >&2; exit 1; }
           timeout --signal=TERM --kill-after=10s "${preflight_remaining}s" \
             ssh "${ssh_opts[@]}" -o ConnectTimeout=15 "root@${SSH_HOST}" 'bash -s' \
-            <<'REMOTE_PREFLIGHT' 2>&1 | tee "$remote_log"
+            >"$remote_log" 2>&1 <<'REMOTE_PREFLIGHT'
           set -euo pipefail
           upstream=/private/TheQuantumProject
           gl4=/private/gl4
@@ -527,7 +542,7 @@ jobs:
             "$expected_cutlass_revision" "$actual_cutlass_sha256"
           REMOTE_PREFLIGHT
           python3 tools/vast_private_preflight.py --log "$remote_log" \
-            --github-output "$GITHUB_OUTPUT" --report "${RUNNER_TEMP}/vast-status.json"
+            --github-output "$GITHUB_OUTPUT" --report "${RUNNER_TEMP}/vast-status.json" >/dev/null
       - name: Create the code-only source archive after private preflight passes
         id: archive
         if: steps.preflight.outputs.instance_running == 'true'
@@ -570,10 +585,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          exec 2>>"${RUNNER_TEMP}/vast-gpu-private.log"
           key_file="${RUNNER_TEMP}/vast_cnot_ed25519"
           known_hosts="${RUNNER_TEMP}/vast_cnot_known_hosts"
-          remote_log="${RUNNER_TEMP}/beam-gpu-acceptance.log"
-          result_archive="${RUNNER_TEMP}/beam-gpu-acceptance-test-results.tar.gz"
           ssh_opts=(-i "$key_file" -p "$SSH_PORT" -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$known_hosts" -o ConnectTimeout=15 -o ServerAliveInterval=10 -o ServerAliveCountMax=2)
           remote_archive="${REMOTE_ROOT}.tar.gz"
           upload_timeout="$(python3 tools/vast_budget_deadline.py \
@@ -652,7 +666,6 @@ jobs:
           PY
               receipt_exit=$?
             fi
-            printf 'REMOTE_FINALIZATION worker_exit_code=%s log_exit_code=%s receipt_write_exit_code=%s\n' "$worker_exit_code" "$log_exit_code" "$receipt_exit"
             if [[ "$exit_status" == 0 && "$receipt_exit" != 0 ]]; then exit_status="$receipt_exit"; fi
             exit "$exit_status"
           }
@@ -692,28 +705,22 @@ jobs:
               "$manifest_sha" "$checkpoint_sha" "$acceptance_run_id"
           }
           set +e
-          run_test 2>&1 | tee "${result_dir}/cuda-nccl.log"
-          pipeline_status=("${PIPESTATUS[@]}")
+          run_test >"${result_dir}/cuda-nccl.log" 2>&1
+          worker_exit_code=$?
           set -e
-          worker_exit_code="${pipeline_status[0]}"
-          log_exit_code="${pipeline_status[1]}"
-          final_exit="$worker_exit_code"
-          if [[ "$final_exit" == 0 && "$log_exit_code" != 0 ]]; then final_exit="$log_exit_code"; fi
-          exit "$final_exit"
+          log_exit_code=0
+          exit "$worker_exit_code"
           REMOTE
           VAST_SSH_PRIVATE_KEY="$key_file" \
           VAST_SSH_KNOWN_HOSTS="$known_hosts" \
           VAST_SSH_HOST="$SSH_HOST" \
           VAST_SSH_PORT="$SSH_PORT" \
-          VAST_SSH_LOG="$remote_log" \
-          VAST_SSH_RESULTS="$result_archive" \
           VAST_SSH_SCRIPT="${RUNNER_TEMP}/run-cnot-control.sh" \
           VAST_REMOTE_ROOT="$REMOTE_ROOT" \
           VAST_REMOTE_RUNTIME_MAX_SECONDS="5400" \
           VAST_BUDGET_DEADLINE_EPOCH="$BUDGET_DEADLINE_EPOCH" \
           VAST_STOP_RESERVE_SECONDS="$STOP_RESERVE_SECONDS" \
           VAST_RETRIEVAL_RESERVE_SECONDS="$RETRIEVAL_RESERVE_SECONDS" \
-          VAST_RETRIEVAL_MAX_SECONDS="300" \
           VAST_REMOTE_KEY_BLOB="$(awk '{print $2}' "${key_file}.pub")" \
           VAST_REMOTE_ARCHIVE="$remote_archive" \
           VAST_REMOTE_ARCHIVE_SHA="$ARCHIVE_SHA" \
@@ -725,9 +732,8 @@ jobs:
               VAST_GITHUB_RUN_ID="$GITHUB_RUN_ID" \
               VAST_GITHUB_RUN_ATTEMPT="$GITHUB_RUN_ATTEMPT" \
             bash tools/vast_result_transport.sh
-          cat "$remote_log"
-          test -s "$result_archive"
       - name: Stop only the validated new instance and read back lifecycle state
+        id: cleanup
         if: always() && steps.preflight.outputs.safe_to_stop == 'true'
         timeout-minutes: 4
         env:
@@ -737,6 +743,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          exec 2>>"${RUNNER_TEMP}/vast-cleanup-private.log"
           key_file="${RUNNER_TEMP}/vast_cnot_ed25519"
           known_hosts="${RUNNER_TEMP}/vast_cnot_known_hosts"
           trap 'rm -f "$key_file" "${key_file}.pub" "$known_hosts"' EXIT
@@ -745,7 +752,7 @@ jobs:
           curl --fail --silent --show-error --max-time 20 \
             -H "Authorization: Bearer ${VAST_API_KEY}" -H "Accept: application/json" \
             "https://console.vast.ai/api/v0/instances/" > "$instances"
-          python3 tools/vast_campaign_guard.py verify --payload "$instances" --instance-id "$INSTANCE_ID" --label "$CAMPAIGN_LABEL"
+          python3 tools/vast_campaign_guard.py verify --payload "$instances" --instance-id "$INSTANCE_ID" --label "$CAMPAIGN_LABEL" >/dev/null
           current="$(jq -er --arg id "$INSTANCE_ID" '.instances[] | select((.id|tostring)==$id) | (.actual_status // .cur_state // "unknown")' "$instances")"
           if [[ "$current" == "stopped" || "$current" == "exited" ]]; then
             printf '{"instance_id":"%s","stop":"already_stopped","readback":"%s"}\n' "$INSTANCE_ID" "$current" > "$lifecycle"
@@ -790,50 +797,28 @@ jobs:
           path.write_text(json.dumps(lifecycle, indent=2, sort_keys=True) + "\n", encoding="utf-8")
           PY
           fi
-          python3 - "${RUNNER_TEMP}/vast-status.json" "$lifecycle" \
-            "${RUNNER_TEMP}/beam-gpu-acceptance-test-results.tar.gz" "$INSTANCE_ID" <<'PY'
-          import json, pathlib, sys, tarfile, time
-          status_path, lifecycle_path, archive_path = map(pathlib.Path, sys.argv[1:4])
-          report = json.loads(status_path.read_text(encoding="utf-8")) if status_path.exists() else {"instance_id": sys.argv[4]}
-          lifecycle = json.loads(lifecycle_path.read_text(encoding="utf-8"))
-          report["lifecycle"] = lifecycle
-          report["storage_billing_continues_after_stop"] = True
-          stopped_at = int(time.time())
-          start = report.get("instance_start_epoch")
-          hourly = report.get("hourly_rate_usd")
-          if start is not None and hourly is not None:
-              elapsed = max(0, stopped_at - int(float(start)))
-              report["elapsed_until_lifecycle_readback_seconds"] = elapsed
-              report["estimated_total_cost_usd"] = f"{float(hourly) * elapsed / 3600:.6f}"
-          report["lifecycle_readback_epoch"] = stopped_at
-          report["remote_receipt_status"] = "unavailable"
-          if archive_path.is_file() and archive_path.stat().st_size:
-              try:
-                  with tarfile.open(archive_path, "r:gz") as archive:
-                      member = archive.extractfile("test_results/refactor_20261121/gpu-acceptance/receipt.json")
-                      if member is not None:
-                          report["gpu_acceptance_receipt"] = json.load(member)
-                          report["remote_receipt_status"] = "collected"
-              except Exception as error:
-                  report["remote_receipt_error"] = str(error)
-          status_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-          PY
-          cat "$lifecycle"
-      - name: Report a skipped physical run
-        if: steps.preflight.outcome == 'success' && steps.preflight.outputs.instance_running != 'true'
+      - name: Write redacted operational status
+        if: always()
+        env:
+          INVENTORY_QUERY: ${{ steps.preflight.outputs.inventory_query || 'not_run' }}
+          PREFLIGHT_OUTCOME: ${{ steps.preflight.outcome }}
+          GPU_OUTCOME: ${{ steps.remote.outcome }}
+          CLEANUP_OUTCOME: ${{ steps.cleanup.outcome }}
         shell: bash
         run: |
-          echo "GPU acceptance skipped: the selected new instance is not running; it was not started." >> "$GITHUB_STEP_SUMMARY"
-      - name: Upload sanitized preflight, lifecycle and remote results
+          python3 tools/vast_public_status.py \
+            --inventory-query "$INVENTORY_QUERY" \
+            --preflight-outcome "$PREFLIGHT_OUTCOME" \
+            --gpu-outcome "$GPU_OUTCOME" \
+            --cleanup-outcome "$CLEANUP_OUTCOME" \
+            --watchdog-outcome skipped \
+            --output "${RUNNER_TEMP}/cnot-public-status.json" \
+            --summary "$GITHUB_STEP_SUMMARY"
+      - name: Upload redacted operational status
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: vast-beam-gpu-acceptance-${{ github.run_id }}
-          path: |
-            ${{ runner.temp }}/vast-status.json
-            ${{ runner.temp }}/vast-private-preflight.log
-            ${{ runner.temp }}/vast-stop-lifecycle.json
-            ${{ runner.temp }}/beam-gpu-acceptance.log
-            ${{ runner.temp }}/beam-gpu-acceptance-test-results.tar.gz
-          if-no-files-found: warn
+          name: cnot-public-status-${{ github.run_id }}
+          path: ${{ runner.temp }}/cnot-public-status.json
+          if-no-files-found: error
           retention-days: 7
