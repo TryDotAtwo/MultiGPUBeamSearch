@@ -167,16 +167,33 @@ fn select_cnot_engine(
         ));
     }
     let equals = py.import("operator")?.getattr("eq")?;
-    if equals.call1((engine, "python"))?.is_truthy()? {
-        return Ok("python");
-    }
-    if max_depth.call_method1("__gt__", (u64::MAX,))?.is_truthy()? {
-        if equals.call1((engine, "auto"))?.is_truthy()? {
-            return Ok("python");
-        }
-        return Err(PyValueError::new_err("CNOT Rust engine depth exceeds u64"));
-    }
-    Ok("rust")
+    let requested = if equals.call1((engine, "python"))?.is_truthy()? {
+        beam_runtime::cnot_search::RequestedEngine::Python
+    } else {
+        let depth_fits_u64 = !max_depth.call_method1("__gt__", (u64::MAX,))?.is_truthy()?;
+        let requested = if equals.call1((engine, "auto"))?.is_truthy()? {
+            beam_runtime::cnot_search::RequestedEngine::Auto
+        } else {
+            beam_runtime::cnot_search::RequestedEngine::Rust
+        };
+        return selected_engine_name(
+            beam_runtime::cnot_search::select_engine(requested, depth_fits_u64)
+                .map_err(|_| PyValueError::new_err("CNOT Rust engine depth exceeds u64"))?,
+        );
+    };
+    selected_engine_name(
+        beam_runtime::cnot_search::select_engine(requested, true)
+            .map_err(|_| PyValueError::new_err("CNOT Rust engine depth exceeds u64"))?,
+    )
+}
+
+fn selected_engine_name(
+    selected: beam_runtime::cnot_search::SelectedEngine,
+) -> PyResult<&'static str> {
+    Ok(match selected {
+        beam_runtime::cnot_search::SelectedEngine::Python => "python",
+        beam_runtime::cnot_search::SelectedEngine::Rust => "rust",
+    })
 }
 
 fn cnot_admission_digest<'py>(

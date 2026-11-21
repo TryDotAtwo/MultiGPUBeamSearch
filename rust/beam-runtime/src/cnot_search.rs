@@ -4,6 +4,42 @@
 //! never receives a device pointer; each call represents a complete batch or
 //! collective, and the caller keeps the backend on its original rank thread.
 
+/// Public preference for the CNOT search controller.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RequestedEngine {
+    Auto,
+    Python,
+    Rust,
+}
+
+/// Controller selected for one admitted CNOT request.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SelectedEngine {
+    Python,
+    Rust,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EngineSelectionError {
+    RustDepthExceedsU64,
+}
+
+/// Resolve controller selection in the runtime so adapters share one policy.
+/// A depth that cannot fit the native controller remains valid for the Python
+/// reference path when the request is automatic or explicitly Python.
+pub fn select_engine(
+    requested: RequestedEngine,
+    depth_fits_u64: bool,
+) -> Result<SelectedEngine, EngineSelectionError> {
+    match requested {
+        RequestedEngine::Python => Ok(SelectedEngine::Python),
+        RequestedEngine::Auto if depth_fits_u64 => Ok(SelectedEngine::Rust),
+        RequestedEngine::Auto => Ok(SelectedEngine::Python),
+        RequestedEngine::Rust if depth_fits_u64 => Ok(SelectedEngine::Rust),
+        RequestedEngine::Rust => Err(EngineSelectionError::RustDepthExceedsU64),
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct Options {
     pub rank: u32,
@@ -208,6 +244,30 @@ pub fn search<B: Backend>(
 mod tests {
     use super::*;
     use std::collections::VecDeque;
+
+    #[test]
+    fn engine_selection_preserves_auto_reference_and_explicit_rust_depth_rules() {
+        assert_eq!(
+            select_engine(RequestedEngine::Auto, true),
+            Ok(SelectedEngine::Rust)
+        );
+        assert_eq!(
+            select_engine(RequestedEngine::Auto, false),
+            Ok(SelectedEngine::Python)
+        );
+        assert_eq!(
+            select_engine(RequestedEngine::Python, false),
+            Ok(SelectedEngine::Python)
+        );
+        assert_eq!(
+            select_engine(RequestedEngine::Rust, true),
+            Ok(SelectedEngine::Rust)
+        );
+        assert_eq!(
+            select_engine(RequestedEngine::Rust, false),
+            Err(EngineSelectionError::RustDepthExceedsU64)
+        );
+    }
 
     #[derive(Default)]
     struct Mock {
