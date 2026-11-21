@@ -85,6 +85,9 @@ jobs:
       - name: Test per-phase timeouts against the absolute billing deadline
         id: budget_deadline
         run: python tools/test_vast_budget_deadline.py -v
+      - name: Test campaign marker and independent watchdog decisions
+        id: campaign_guard_test
+        run: python tools/test_vast_campaign_guard.py -v
       - name: Test private manifest and checkpoint receipt parsing
         id: private_receipt_test
         run: python tools/test_vast_private_preflight.py -v
