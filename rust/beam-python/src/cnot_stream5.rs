@@ -346,15 +346,9 @@ pub(crate) fn run_cnot_native_start_transport<'py>(
             ]
             .into_iter()
             .collect();
-            let receipt = crate::cnot_acceptance::emit(
-                "stream5_active",
-                rank,
-                size,
-                pid,
-                &device,
-                &fields,
-            )
-            .map(|()| py.None().into_bound(py));
+            let receipt =
+                crate::cnot_acceptance::emit("stream5_active", rank, size, pid, &device, &fields)
+                    .map(|()| py.None().into_bound(py));
             super::cnot_native_checked::checked_v2(
                 py,
                 &world,

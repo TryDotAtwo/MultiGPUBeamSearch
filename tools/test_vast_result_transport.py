@@ -19,6 +19,7 @@ import io
 import json
 import os
 from pathlib import Path
+import shlex
 import socket
 import sys
 import tarfile
@@ -78,10 +79,11 @@ if command.startswith("tar -C "):
     raise SystemExit(0)
 
 event("remote")
-if ("987654321" not in command
+tokens = shlex.split(command)
+if ("987654321" not in tokens
         or "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc" not in command
         or "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd" not in command
-        or "123456789-2" not in command):
+        or tokens[-2:] != ["123456789", "2"]):
     print("the selected Vast instance ID, private hashes or GitHub run attempt was not passed into the remote receipt", file=sys.stderr)
     raise SystemExit(94)
 if not authorized_key.exists():

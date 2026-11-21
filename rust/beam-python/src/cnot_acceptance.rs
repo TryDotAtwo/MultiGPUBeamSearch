@@ -1,5 +1,6 @@
 //! Versioned, invocation-scoped CNOT backend evidence for strict acceptance.
 use pyo3::exceptions::PyRuntimeError;
+use pyo3::prelude::PyResult;
 use serde::Serialize;
 use std::{
     collections::BTreeMap,
