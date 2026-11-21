@@ -71,6 +71,12 @@ jobs:
             echo "source_adapter=failed" >> "$GITHUB_OUTPUT"
             exit 1
           fi
+          if ! cargo test --locked --features torch --lib mgbs_scorer_panel_v2::tests \
+              --manifest-path "$native/Cargo.toml" \
+              > "${RUNNER_TEMP}/producer-adapter-tests.log" 2>&1; then
+            echo "source_adapter=failed" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
           echo "source_adapter=passed" >> "$GITHUB_OUTPUT"
       - name: Publish redacted source status
         if: always()
@@ -79,7 +85,7 @@ jobs:
         shell: bash
         run: |
           if [[ "$OUTCOME" == "success" ]]; then
-            echo "CNOT producer adapter: passed (CPU compile; GPU runtime not run)." >> "$GITHUB_STEP_SUMMARY"
+            echo "CNOT producer adapter: passed (CPU compile and panel-manifest tests; GPU runtime not run)." >> "$GITHUB_STEP_SUMMARY"
           else
-            echo "CNOT producer adapter: failed (CPU compile; GPU runtime not run)." >> "$GITHUB_STEP_SUMMARY"
+            echo "CNOT producer adapter: failed (CPU compile or panel-manifest tests; GPU runtime not run)." >> "$GITHUB_STEP_SUMMARY"
           fi
