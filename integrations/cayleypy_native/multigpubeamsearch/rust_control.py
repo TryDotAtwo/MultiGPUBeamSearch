@@ -51,11 +51,27 @@ def options_descriptor(options):
             for name, value in values.items()}
 
 
-def supports_auto_max_preparation_identity():
-    """Whether this extension can decode the auto-max preparation request token."""
+def _supports_preparation_identity_schema(native):
+    version = getattr(native, 'PREPARATION_IDENTITY_SCHEMA_VERSION', 0)
+    return type(version) is int and version >= 2
+
+
+def supports_preparation_identity():
+    """Whether the extension uses structured preparation options (schema v2+)."""
     try:
         native = extension()
     except (NativeUnavailable, ImportError):
+        return False
+    return _supports_preparation_identity_schema(native)
+
+
+def supports_auto_max_preparation_identity():
+    """Whether this extension can decode auto-max in preparation schema v2+."""
+    try:
+        native = extension()
+    except (NativeUnavailable, ImportError):
+        return False
+    if not _supports_preparation_identity_schema(native):
         return False
     version = getattr(native, 'PREPARATION_IDENTITY_AUTO_MAX_VERSION', 0)
     return type(version) is int and version >= 1
@@ -64,19 +80,22 @@ def supports_auto_max_preparation_identity():
 def build_preparation_identity(*, graph_hash, geometry, center, generators,
                                model_artifact_hash, artifact_sizes, model_backend,
                                devices, binding_scope, beam_width, max_steps,
-                               options_repr, cuda_visible_devices, cuda_device_order,
+                               options, cuda_visible_devices, cuda_device_order,
                                runtime_build):
     """Build the typed resident-session identity in Rust when supported."""
     try:
         native = extension()
     except (NativeUnavailable, ImportError):
         return None
-    builder = getattr(native, 'build_preparation_identity', None)
-    if not callable(builder):
+    if not _supports_preparation_identity_schema(native):
         return None
-    runtime_build_json = (None if runtime_build is None
-                          else json.dumps(runtime_build, sort_keys=True))
+    builder = getattr(native, 'build_preparation_identity', None)
+    if not callable(builder) or type(options) is not dict:
+        return None
     try:
+        options_json = json.dumps(options, sort_keys=True, allow_nan=False)
+        runtime_build_json = (None if runtime_build is None
+                              else json.dumps(runtime_build, sort_keys=True, allow_nan=False))
         if type(beam_width) is str and beam_width == 'max':
             version = getattr(native, 'PREPARATION_IDENTITY_AUTO_MAX_VERSION', 0)
             if type(version) is not int or version < 1:
@@ -97,17 +116,15 @@ def build_preparation_identity(*, graph_hash, geometry, center, generators,
             bool(binding_scope),
             native_beam_width,
             int(max_steps),
-            options_repr,
+            options_json,
             cuda_visible_devices,
             cuda_device_order,
             runtime_build_json,
         )
     except (TypeError, ValueError, OverflowError):
-        # Older Python-compatible values remain on the existing typed wire path.
+        # Older Python-compatible values remain on the compatibility path.
         return None
     return result if isinstance(result, str) else None
-
-
 def build_session_identity(*, center, generators, graph_hash, model_artifact_hash,
                            model_backend, devices, beam_width, max_steps,
                            runtime_build, options, cuda_visible_devices,

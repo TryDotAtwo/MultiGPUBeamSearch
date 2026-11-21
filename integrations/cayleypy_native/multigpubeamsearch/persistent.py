@@ -349,15 +349,20 @@ class NativeSession:
                 model.backend,device_order,binding_scope,
                 beam_width,max_steps,options_repr,visible_devices,cuda_device_order,
                 runtime_build_key)
-            rust_preparation_identity_supported = True
+            rust_preparation_identity_supported = False
             identity_key = None
             if self._engine == 'rust':
                 from .rust_control import (
                     build_preparation_identity,
+                    options_descriptor,
                     supports_auto_max_preparation_identity,
+                    supports_preparation_identity,
                 )
+                rust_preparation_identity_supported = supports_preparation_identity()
                 if type(beam_width) is str and beam_width == 'max':
-                    rust_preparation_identity_supported = supports_auto_max_preparation_identity()
+                    rust_preparation_identity_supported = (
+                        rust_preparation_identity_supported
+                        and supports_auto_max_preparation_identity())
                 if rust_preparation_identity_supported:
                     identity_key = build_preparation_identity(
                         graph_hash=contract.graph_hash,
@@ -371,11 +376,12 @@ class NativeSession:
                         binding_scope=binding_scope,
                         beam_width=beam_width,
                         max_steps=max_steps,
-                        options_repr=options_repr,
+                        options=options_descriptor(options),
                         cuda_visible_devices=visible_devices,
                         cuda_device_order=cuda_device_order,
                         runtime_build=runtime_build,
                     )
+                    rust_preparation_identity_supported = identity_key is not None
             if identity_key is None:
                 preparation_identity = {
                     'graph_hash': contract.graph_hash,

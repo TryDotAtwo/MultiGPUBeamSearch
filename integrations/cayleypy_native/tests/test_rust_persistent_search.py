@@ -40,7 +40,7 @@ def test_compiled_rust_preparation_identity_builder_round_trips_fields():
         False,
         64,
         4,
-        "NativeOptions()",
+        json.dumps({"inference_backend": "auto"}, sort_keys=True),
         "0,1",
         "PCI_BUS_ID",
         json.dumps(runtime_build),
@@ -57,7 +57,7 @@ def test_compiled_rust_preparation_identity_builder_round_trips_fields():
         "binding_scope": False,
         "beam_width": 64,
         "max_steps": 4,
-        "options_repr": "NativeOptions()",
+        "options": {"inference_backend": "auto"},
         "cuda_visible_devices": "0,1",
         "cuda_device_order": "PCI_BUS_ID",
         "runtime_build": runtime_build,
@@ -99,6 +99,35 @@ def test_compiled_rust_preparation_identity_uses_structured_options():
     ))
     assert identity["options"] == options
     assert "options_repr" not in identity
+
+
+def test_legacy_preparation_identity_extension_is_not_used_for_typed_identity(monkeypatch):
+    from multigpubeamsearch import rust_control
+
+    calls = []
+    legacy = SimpleNamespace(build_preparation_identity=lambda *args: calls.append(args))
+    monkeypatch.setattr(rust_control, "extension", lambda: legacy)
+
+    assert rust_control.supports_preparation_identity() is False
+    result = rust_control.build_preparation_identity(
+        graph_hash="a" * 64,
+        geometry=(2, 2, 1),
+        center=(0, 1),
+        generators=((1, 0),),
+        model_artifact_hash="b" * 64,
+        artifact_sizes=(17,),
+        model_backend="mlp",
+        devices=(0,),
+        binding_scope=False,
+        beam_width=64,
+        max_steps=4,
+        options={"inference_backend": "auto"},
+        cuda_visible_devices=None,
+        cuda_device_order=None,
+        runtime_build=None,
+    )
+    assert result is None
+    assert calls == []
 
 
 def test_compiled_rust_session_identity_builder_round_trips_fields():
@@ -253,10 +282,11 @@ def test_rust_session_reuses_and_releases_rank_owner(tmp_path, monkeypatch, worl
         names = (
             "graph_hash", "geometry", "center", "generators", "model_artifact_hash",
             "artifact_sizes", "model_backend", "devices", "binding_scope", "beam_width",
-            "max_steps", "options_repr", "cuda_visible_devices", "cuda_device_order",
+            "max_steps", "options_json", "cuda_visible_devices", "cuda_device_order",
             "runtime_build",
         )
         identity = dict(zip(names, values))
+        identity["options"] = json.loads(identity.pop("options_json"))
         if identity["runtime_build"] is not None:
             identity["runtime_build"] = json.loads(identity["runtime_build"])
         return json.dumps(identity, sort_keys=True)
@@ -277,6 +307,7 @@ def test_rust_session_reuses_and_releases_rank_owner(tmp_path, monkeypatch, worl
         return json.dumps(identity, sort_keys=True)
     monkeypatch.setattr(rust_control, "extension", lambda: SimpleNamespace(
         SearchSession=Owner, SEARCH_TERMINAL_RESULT_VERSION=1,
+        PREPARATION_IDENTITY_SCHEMA_VERSION=2,
         build_preparation_identity=build_preparation_identity,
         build_session_identity=build_session_identity))
     contract = GraphContract(2, 2, ((1, 0),), ("swap",), (0, 1), (1, 0), "a" * 64)
@@ -445,7 +476,7 @@ def test_rust_session_owner_compares_typed_preparation_identity_when_extension_i
         "binding_scope": False,
         "beam_width": 64,
         "max_steps": 4,
-        "options_repr": "NativeOptions()",
+        "options": {"inference_backend": "auto"},
         "cuda_visible_devices": "0,1",
         "cuda_device_order": "PCI_BUS_ID",
         "runtime_build": {"binary_sha256": "c" * 64, "inference_backend": "cutlass"},
@@ -570,7 +601,7 @@ def test_compiled_rust_preparation_identity_builder_accepts_auto_max():
         binding_scope=False,
         beam_width="max",
         max_steps=4,
-        options_repr="NativeOptions()",
+        options={"inference_backend": "auto"},
         cuda_visible_devices="0,1",
         cuda_device_order="PCI_BUS_ID",
         runtime_build={"binary_sha256": "c" * 64, "inference_backend": "cutlass"},
@@ -609,7 +640,7 @@ def test_auto_max_identity_builder_requires_explicit_extension_capability(monkey
         binding_scope=False,
         beam_width="max",
         max_steps=4,
-        options_repr="NativeOptions()",
+        options={"inference_backend": "auto"},
         cuda_visible_devices=None,
         cuda_device_order=None,
         runtime_build=None,
