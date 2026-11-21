@@ -18,7 +18,7 @@ class FlatScorer:
 
 
 def public_search():
-    root = pack_rows(replay_cnot(3, (0,)))
+    root = pack_rows(replay_cnot(3, (0, 1)))
     return search_cnot(
         root,
         FlatScorer(),
@@ -92,7 +92,10 @@ def worker(rank, rendezvous, output_dir, phase, fail_rank):
             # The failed stage must vote before its next data-plane collective.
             # A second public search proves the process group remains usable.
             result = public_search()
-            if result.status != "solved" or result.gates != (0,):
+            if (
+                result.status != "solved"
+                or replay_cnot(3, result.gates) != replay_cnot(3, (0, 1))
+            ):
                 raise AssertionError(f"post-fault public search failed: {result!r}")
             report = {
                 "rank": rank,
@@ -148,7 +151,12 @@ def main():
                 raise AssertionError(f"wrong error phase or owner: {reports!r}")
             if any(not row["injection_fired"] and row["rank"] == fail_rank for row in reports):
                 raise AssertionError(f"missing one-rank injection: {reports!r}")
-            if any(row["recovery_search"] != "passed" or row["gates"] != [0] for row in reports):
+            if any(
+                row["recovery_search"] != "passed"
+                or row["search_status"] != "solved"
+                or replay_cnot(3, tuple(row["gates"])) != replay_cnot(3, (0, 1))
+                for row in reports
+            ):
                 raise AssertionError(f"the live process group did not recover: {reports!r}")
 
     print("CNOT_GLOO_REAL_PHASE_FAILURES_OK")

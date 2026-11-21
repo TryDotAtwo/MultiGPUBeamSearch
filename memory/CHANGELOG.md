@@ -3021,3 +3021,9 @@ Main commit `148b2a826a369b7601e904ea409e0cc5301c75c9` also passed the 260-test 
   summary line in the new-host workflow; that command is now a block scalar.
   Final hosted admission/phase-boundary/YAML lint checks are pending. Full logs
   remain in Actions artifacts; no local tests or GPU run were produced.
+- Follow-up review of the hosted phase-boundary RED showed the fixture used a
+  one-gate state that returned before winner redistribution and history-edge
+  reconstruction. The fixture now uses a two-gate state and checks recovery by
+  replaying the returned sequence. Removed an unused `known_hosts` assignment
+  from SSH key attachment after Actionlint flagged it. Hosted rerun is pending;
+  no local tests or GPU run were produced.

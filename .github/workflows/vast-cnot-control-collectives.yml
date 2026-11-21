@@ -206,7 +206,6 @@ jobs:
         run: |
           set -euo pipefail
           key_file="${RUNNER_TEMP}/vast_cnot_ed25519"
-          known_hosts="${RUNNER_TEMP}/vast_cnot_known_hosts"
           ssh-keygen -q -t ed25519 -N "" -C "codex-cnot-${VAST_INSTANCE_ID}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" -f "$key_file"
           public_key="$(cat "${key_file}.pub")"
           request="$(jq -cn --arg ssh_key "$public_key" '{ssh_key:$ssh_key}')"
