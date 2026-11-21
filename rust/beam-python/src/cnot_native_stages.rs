@@ -95,12 +95,7 @@ fn prepare_device_domain_checked<'py>(
         prepared = Some(value);
         Ok(py.None().into_bound(py))
     })();
-    checked(
-        py,
-        world,
-        "prepare admitted CNOT DeviceDomain",
-        local,
-    )?;
+    checked(py, world, "prepare admitted CNOT DeviceDomain", local)?;
     prepared.ok_or_else(|| {
         PyRuntimeError::new_err("CNOT DeviceDomain preparation returned no admitted handle")
     })
@@ -243,9 +238,7 @@ pub(crate) fn preflight_strict_backend<'py>(
                 })?;
             let device: Option<i32> = root.getattr("device")?.getattr("index")?.extract()?;
             let device = device.ok_or_else(|| {
-                PyRuntimeError::new_err(
-                    "strict CNOT acceptance requires an explicit CUDA device",
-                )
+                PyRuntimeError::new_err("strict CNOT acceptance requires an explicit CUDA device")
             })?;
             let n: i32 = root.call_method1("size", (1,))?.extract()?;
             let world_size: i32 = world.getattr("size")?.extract()?;
@@ -265,12 +258,13 @@ pub(crate) fn preflight_strict_backend<'py>(
             ));
         }
         let metadata = scorer.getattr("metadata")?;
-        let checkpoint: String = metadata
-            .get_item("checkpoint_sha256")?
-            .extract()
-            .map_err(|_| {
-                PyRuntimeError::new_err("Rust TQP scorer metadata lacks checkpoint_sha256")
-            })?;
+        let checkpoint: String =
+            metadata
+                .get_item("checkpoint_sha256")?
+                .extract()
+                .map_err(|_| {
+                    PyRuntimeError::new_err("Rust TQP scorer metadata lacks checkpoint_sha256")
+                })?;
         let search_manifest: String = metadata
             .get_item("search_manifest_sha256")?
             .extract()
@@ -528,7 +522,10 @@ impl<'py> NativeStages<'py> {
                 "strict CNOT acceptance requires its admitted DeviceDomain handle",
             ));
         }
-        if strict_backend && size > 1 && (stream5_library_sha256.is_none() || stream5_transport.is_none()) {
+        if strict_backend
+            && size > 1
+            && (stream5_library_sha256.is_none() || stream5_transport.is_none())
+        {
             return Err(PyRuntimeError::new_err(
                 "strict CNOT acceptance requires its admitted Stream 5 handle and fingerprint",
             ));
@@ -881,12 +878,7 @@ fn probe_cnot_device_stage_vote(world: Bound<'_, PyAny>, fail_rank: i64) -> PyRe
         emit_device_dispatch(&world, rank, size, true, Some("fixture"), "expansion", 1)?;
         Ok(py.None().into_bound(py))
     })();
-    checked(
-        py,
-        &world,
-        "rank parent actions and expand",
-        local,
-    )?;
+    checked(py, &world, "rank parent actions and expand", local)?;
     Ok(())
 }
 
@@ -1444,8 +1436,9 @@ fn run_cnot_native<'py>(
     max_depth: u64,
     admission: Option<Py<PyCnotBackendAdmission>>,
 ) -> PyResult<Py<PyAny>> {
-    let mut backend =
-        NativeStages::new(py, world, root, identity, input, scorer, mode, audit, admission)?;
+    let mut backend = NativeStages::new(
+        py, world, root, identity, input, scorer, mode, audit, admission,
+    )?;
     let options = Options {
         rank: backend.rank,
         world: backend.size,
