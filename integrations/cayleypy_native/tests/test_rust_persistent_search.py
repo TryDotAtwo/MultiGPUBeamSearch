@@ -397,6 +397,9 @@ def test_rust_session_reuses_and_releases_rank_owner(tmp_path, monkeypatch, worl
         assert session_identity_builds[0][0:6] == (
             [0, 1], [[1, 0]], "a" * 64, "b" * 64, "mlp", list(range(world)))
         assert json.loads(session_identity_builds[0][9])["python_session_identity"]["geometry"] == [2, 2, 1]
+        nested_options = json.loads(session_identity_builds[0][9])["python_session_identity"]
+        assert nested_options["options"] == rust_control.options_descriptor(options)
+        assert "options_repr" not in nested_options
         assert identity_builds[0][0:4] == ("a" * 64, [2, 2, 1], [0, 1], [[1, 0]])
         assert identity_builds[0][4:8] == ("b" * 64, [], "mlp", list(range(world)))
         owners[0].fail = True
