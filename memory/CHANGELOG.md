@@ -3112,6 +3112,10 @@ Main commit `148b2a826a369b7601e904ea409e0cc5301c75c9` also passed the 260-test 
   preparation failures after local ABI admission. It injects one failure on
   rank 0 and then rank 1, requires a common phase error, and makes a healthy
   admission/collective on the same process group after each failure.
+- Extended the phase-boundary test with failures immediately before the local
+  DeviceDomain dispatch trace on each rank, followed by a bounded same-group
+  public search and replay. This is intended to catch nested Gloo votes inside
+  a local trace callback.
 - The test currently references the planned `_probe_cnot_device_domain_vote`
-  boundary and is intentionally awaiting the hosted RED run before the runtime
-  change. No backend implementation or GPU execution has changed in this step.
+  and `_probe_cnot_device_stage_vote` boundaries and is awaiting hosted RED
+  evidence before the runtime changes. No GPU execution has occurred.

@@ -104,7 +104,9 @@ jobs:
         run: |
           set -o pipefail
           cd "$RUNNER_TEMP/mgbs-wheel-smoke"
-          env -u PYTHONPATH python "$GITHUB_WORKSPACE/integrations/cayleypy_native/tests/installed_cnot_phase_boundaries.py" 2>&1 | tee "$GITHUB_WORKSPACE/test_results/refactor_20261120/installed-wheel/cnot-phase-boundaries.log"
+          timeout --signal=TERM --kill-after=15s 180s \
+            env -u PYTHONPATH python "$GITHUB_WORKSPACE/integrations/cayleypy_native/tests/installed_cnot_phase_boundaries.py" \
+            2>&1 | tee "$GITHUB_WORKSPACE/test_results/refactor_20261120/installed-wheel/cnot-phase-boundaries.log"
       - name: Verify run-scoped CNOT backend event receipts
         id: acceptance_events
         run: |

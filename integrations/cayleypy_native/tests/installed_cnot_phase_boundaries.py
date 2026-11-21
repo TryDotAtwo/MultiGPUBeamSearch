@@ -10,6 +10,10 @@ import torch.multiprocessing as mp
 
 from multigpubeamsearch.cnot import pack_rows, replay_cnot, search_cnot
 from multigpubeamsearch.cnot_collectives import World
+from multigpubeamsearch.rust_control import extension
+
+
+RUNTIME = extension()
 
 
 class FlatScorer:
@@ -118,6 +122,47 @@ def worker(rank, rendezvous, output_dir, phase, fail_rank):
         dist.destroy_process_group()
 
 
+def trace_boundary_worker(rank, rendezvous, output_dir, fail_rank):
+    torch.set_num_threads(1)
+    dist.init_process_group(
+        "gloo",
+        init_method=rendezvous,
+        rank=rank,
+        world_size=2,
+        timeout=timedelta(seconds=30),
+    )
+    try:
+        with World("cpu") as world:
+            try:
+                RUNTIME._probe_cnot_device_stage_vote(world, fail_rank)
+            except RuntimeError as error:
+                collective_error = str(error)
+            else:
+                raise AssertionError("injected pre-trace failure did not abort the stage")
+
+            # The peer must not perform a second, nested vote for its local
+            # dispatch trace after this stage has already voted its failure.
+            world.require_engine_consensus(b"after-device-trace-stage-failure")
+            result = public_search()
+            if (
+                result.status != "solved"
+                or replay_cnot(3, result.gates) != replay_cnot(3, (0, 1))
+            ):
+                raise AssertionError(f"post-trace-fault public search failed: {result!r}")
+            Path(output_dir, f"trace-rank-{rank}.json").write_text(
+                json.dumps({
+                    "rank": rank,
+                    "fail_rank": fail_rank,
+                    "collective_error": collective_error,
+                    "recovery_search": "passed",
+                    "gates": list(result.gates),
+                }, sort_keys=True),
+                encoding="utf-8",
+            )
+    finally:
+        dist.destroy_process_group()
+
+
 def main():
     with tempfile.TemporaryDirectory(prefix="mgbs-cnot-phases-") as temporary:
         root = Path(temporary)
@@ -159,7 +204,36 @@ def main():
             ):
                 raise AssertionError(f"the live process group did not recover: {reports!r}")
 
-    print("CNOT_GLOO_REAL_PHASE_FAILURES_OK")
+        for fail_rank in (0, 1):
+            trace_dir = root / f"trace-stage-rank-{fail_rank}"
+            trace_dir.mkdir()
+            rendezvous = (trace_dir / "rendezvous").resolve().as_uri()
+            mp.spawn(
+                trace_boundary_worker,
+                args=(rendezvous, str(trace_dir), fail_rank),
+                nprocs=2,
+                join=True,
+            )
+            reports = [
+                json.loads((trace_dir / f"trace-rank-{rank}.json").read_text())
+                for rank in range(2)
+            ]
+            if reports[0]["collective_error"] != reports[1]["collective_error"]:
+                raise AssertionError(f"ranks disagreed on DeviceDomain trace boundary: {reports!r}")
+            expected = (
+                f"rank parent actions and expand failed: rank {fail_rank}: RuntimeError: "
+                "injected DeviceDomain stage failure before dispatch trace"
+            )
+            if expected not in reports[0]["collective_error"]:
+                raise AssertionError(f"wrong pre-trace error phase or owner: {reports!r}")
+            if any(
+                row["recovery_search"] != "passed"
+                or replay_cnot(3, tuple(row["gates"])) != replay_cnot(3, (0, 1))
+                for row in reports
+            ):
+                raise AssertionError(f"trace boundary did not recover: {reports!r}")
+
+    print("CNOT_GLOO_REAL_PHASE_AND_TRACE_BOUNDARIES_OK")
 
 
 if __name__ == "__main__":
