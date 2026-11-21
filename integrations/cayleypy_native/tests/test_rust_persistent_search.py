@@ -64,6 +64,43 @@ def test_compiled_rust_preparation_identity_builder_round_trips_fields():
     }
 
 
+def test_compiled_rust_preparation_identity_uses_structured_options():
+    from multigpubeamsearch import rust_control
+    from multigpubeamsearch.errors import NativeUnavailable
+
+    try:
+        runtime = rust_control.extension()
+    except NativeUnavailable:
+        pytest.skip("Rust extension is not built in this CPU-only job")
+
+    build = getattr(runtime, "build_preparation_identity", None)
+    assert callable(build), "Rust preparation identity builder is missing"
+    options = {
+        "inference_backend": "cutlass",
+        "calibration_frontier_max_states": 1234,
+        "source_dir": "/remote/project",
+    }
+    identity = json.loads(build(
+        "a" * 64,
+        [4, 4, 2],
+        [0, 1],
+        [[1, 0]],
+        "b" * 64,
+        [17],
+        "mlp",
+        [0],
+        False,
+        64,
+        4,
+        json.dumps(options, sort_keys=True, allow_nan=False),
+        "0",
+        "PCI_BUS_ID",
+        json.dumps({"binary_sha256": "c" * 64}),
+    ))
+    assert identity["options"] == options
+    assert "options_repr" not in identity
+
+
 def test_compiled_rust_session_identity_builder_round_trips_fields():
     from multigpubeamsearch import rust_control
     from multigpubeamsearch.errors import NativeUnavailable
