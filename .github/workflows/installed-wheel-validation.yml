@@ -8,6 +8,7 @@ on:
       - "codex/beam-*"
     paths:
       - .github/workflows/installed-wheel-validation.yml
+      - .github/workflows/vast-cnot-control-collectives.yml
       - integrations/cayleypy_native/tests/installed_wheel_smoke.py
       - integrations/cayleypy_native/tests/installed_cnot_dtype_contract.py
       - integrations/cayleypy_native/tests/installed_cnot_backend_admission.py
@@ -101,6 +102,14 @@ jobs:
             --case wide --backend gloo --engine rust \
             --output "$GITHUB_WORKSPACE/test_results/refactor_20261120/installed-wheel/cnot-wide-rust.json" \
             2>&1 | tee "$GITHUB_WORKSPACE/test_results/refactor_20261120/installed-wheel/cnot-wide-rust.log"
+      - name: Lint the new-host acceptance workflow
+        id: vast_workflow_lint
+        if: always()
+        run: |
+          set -o pipefail
+          go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12 \
+            .github/workflows/vast-cnot-control-collectives.yml \
+            2>&1 | tee "$GITHUB_WORKSPACE/test_results/refactor_20261121/rust-cnot-admission/vast-workflow-actionlint.log"
       - name: Write hosted verification status board
         if: always()
         env:
@@ -112,6 +121,7 @@ jobs:
           BACKEND_ADMISSION: ${{ steps.backend_admission.outcome }}
           PHASE_BOUNDARIES: ${{ steps.phase_boundaries.outcome }}
           PUBLIC_SEARCH: ${{ steps.public_search.outcome }}
+          VAST_WORKFLOW_LINT: ${{ steps.vast_workflow_lint.outcome }}
         run: |
           set -euo pipefail
           mkdir -p test_results/refactor_20261121/rust-cnot-admission
@@ -127,6 +137,7 @@ jobs:
           - Strict backend admission and activation mismatch over two-rank Gloo: ${BACKEND_ADMISSION}
           - Winner packet/history failure injection and live-group reuse: ${PHASE_BOUNDARIES}
           - Public CNOT Rust-controller search: ${PUBLIC_SEARCH}
+          - New-host GPU workflow scheduling and expression validation: ${VAST_WORKFLOW_LINT}
           - CUDA/NCCL physical acceptance: not run by this CPU workflow.
           EOF
       - name: Upload wheel validation logs

@@ -24,6 +24,8 @@ on:
       - tools/vast_result_transport.sh
       - tools/test_vast_result_transport.py
       - memory/CHANGELOG.md
+      - rust/beam-**
+      - integrations/cayleypy_native/multigpubeamsearch/cnot*.py
 permissions:
   contents: read
 
