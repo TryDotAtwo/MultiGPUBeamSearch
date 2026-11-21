@@ -90,7 +90,7 @@ class PermutationAcceptanceTests(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        graph = cp.CayleyGraph(cp.PermutationGroups.lrx(4), device="cpu")
+        graph = cp.CayleyGraph(cp.PermutationGroups.lrx(5), device="cpu")
         contract = GraphContract.from_graph(graph, graph.definition.central_state)
         cls.generators = tuple(tuple(map(int, item)) for item in contract.generators)
         cls.fixture = build_saturated_reference_fixture(
@@ -105,7 +105,7 @@ class PermutationAcceptanceTests(unittest.TestCase):
                     state = tuple(state[source] for source in self.generators[move_id])
                 self.assertEqual(state, candidate.state)
 
-    def test_lrx4_b3_reference_saturates_and_deduplicates_across_ranks(self):
+    def test_lrx5_b3_reference_saturates_and_deduplicates_across_ranks(self):
         fixture = self.fixture
         self.assertGreaterEqual(fixture.distance, 3)
         for world_size in (1, 2):
