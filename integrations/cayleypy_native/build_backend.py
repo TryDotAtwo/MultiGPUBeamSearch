@@ -40,6 +40,19 @@ def _bundle_checkout(root: Path, destination: Path) -> None:
                      and (path.suffix in _EXTENSIONS or path.name.startswith("LICENSE"))
                      and not any(part in (".git", "__pycache__", ".pytest_cache", "target") for part in path.parts))
     entries = [(path.relative_to(root), path) for path in sorted(set(files))]
+    contract_path = _PROJECT / "multigpubeamsearch/native_source_manifest.json"
+    try:
+        contract = json.loads(contract_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise RuntimeError("wheel source contract is missing or invalid") from error
+    required = contract.get("required_files") if isinstance(contract, dict) else None
+    if (not isinstance(required, list) or not all(isinstance(name, str) for name in required)):
+        raise RuntimeError("wheel source contract has no valid required_files list")
+    copied = {relative.as_posix() for relative, _path in entries}
+    missing = set(required) - copied
+    if missing:
+        raise RuntimeError("native source bundle is missing required files: " + ", ".join(sorted(missing)))
+    entries.append((Path("tools/native_source_manifest.json"), contract_path))
     entries.append((Path("LICENSE"), _PROJECT / "LICENSE"))
     manifest = {}
     for relative, path in entries:
@@ -54,9 +67,29 @@ def _bundle_checkout(root: Path, destination: Path) -> None:
 
 def _verify_bundle(bundle: Path) -> None:
     manifest = json.loads((bundle / "source_manifest.json").read_text(encoding="utf-8"))
-    if not isinstance(manifest, dict) or not {"CMakeLists.txt", "cuda/cnot_domain.cu",
-                                              "tools/production_runner.cu"} <= set(manifest):
+    if not isinstance(manifest, dict):
         raise RuntimeError("source distribution has an incomplete native source manifest")
+    contract_source = _PROJECT / "multigpubeamsearch/native_source_manifest.json"
+    bundled_contract = bundle / "tools/native_source_manifest.json"
+    if (contract_source.is_symlink() or not contract_source.is_file()
+            or bundled_contract.is_symlink() or not bundled_contract.is_file()):
+        raise RuntimeError("source distribution is missing tools/native_source_manifest.json")
+    try:
+        contract = json.loads(contract_source.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise RuntimeError("source distribution has an invalid native source manifest") from error
+    required = contract.get("required_files") if isinstance(contract, dict) else None
+    if (not isinstance(contract, dict) or contract.get("schema_version") != 1
+            or not isinstance(required, list)
+            or not all(isinstance(name, str) for name in required)):
+        raise RuntimeError("source distribution has an invalid native source contract")
+    if (bundled_contract.read_bytes().replace(b"\r\n", b"\n")
+            != contract_source.read_bytes().replace(b"\r\n", b"\n")):
+        raise RuntimeError("source distribution native source manifest differs from wheel contract")
+    required_paths = {*required, "tools/native_source_manifest.json"}
+    if not required_paths <= set(manifest):
+        missing = ", ".join(sorted(required_paths - set(manifest)))
+        raise RuntimeError(f"source distribution omits required native source files: {missing}")
     for name, expected in manifest.items():
         path = bundle / name
         if (not path.resolve().is_relative_to(bundle.resolve()) or path.is_symlink()

@@ -25,12 +25,15 @@ receipt. До появления проверяемого pin и нового в
 2× desktop RTX 3060 физический dispatch запрещён. Hosted проверки не являются
 физической CUDA/NCCL проверкой.
 
-Дополнительный build blocker: acceptance source archive пока не включает
-`third_party/`, хотя ленивый permutation runner напрямую включает
-`nlohmann/json.hpp`, а scorer использует `picosha2.h`. Native
-`source_digest()` также не учитывает эти vendored headers. Hosted regression
-tests для archive extraction и изменения fingerprint добавлены; реализация и
-зелёное подтверждение ещё не выполнены.
+Контракт исходников теперь находится в
+`integrations/cayleypy_native/multigpubeamsearch/native_source_manifest.json`.
+Vast packager создаёт source archive из объявленных roots и отклоняет
+отсутствующие обязательные файлы. Wheel source bundle проверяет те же пути,
+даже если generated file manifest пропустил один из них; native fingerprint
+включает объявленные roots и vendor headers. Hosted RED `44914169925`
+подтвердил отсутствие packager, а `44914169994` — отсутствие vendor headers в
+fingerprint. Реализация теперь в PR-ветке; hosted GREEN ожидается. Платный
+запуск не выполнялся.
 
 ## CNOT SIGINT handling across ranks, 2026-11-20
 

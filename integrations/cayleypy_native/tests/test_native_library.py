@@ -17,6 +17,15 @@ def fixture(tmp_path, monkeypatch):
     (source / 'src').mkdir(parents=True)
     (source / 'CMakeLists.txt').write_text('cmake')
     (source / 'src/model.cpp').write_text('source')
+    repository = Path(__file__).resolve().parents[3]
+    native_contract = json.loads(
+        (repository / 'integrations/cayleypy_native/multigpubeamsearch/native_source_manifest.json')
+        .read_text(encoding='utf-8'))
+    for relative in native_contract['required_files']:
+        path = source / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        if not path.exists():
+            path.write_text('synthetic native input')
     cutlass = tmp_path / 'cutlass'
     (cutlass / 'include').mkdir(parents=True)
     (cutlass / 'include/header.h').write_text('cutlass')

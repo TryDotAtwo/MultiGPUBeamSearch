@@ -1,7 +1,11 @@
 """CPU-only build contract tests; no CUDA compilation or GPU claims."""
 import json
+import hashlib
+import importlib.util
 from pathlib import Path
 from types import SimpleNamespace
+import sys
+import types
 
 import pytest
 
@@ -14,7 +18,40 @@ def contract(state_len=88, move_count=24):
     return SimpleNamespace(state_len=state_len, move_count=move_count)
 
 
+def native_source_contract():
+    path = Path(__file__).resolve().parents[1] / "multigpubeamsearch/native_source_manifest.json"
+    return json.loads(path.read_text(encoding="utf-8")), path
+
+
+def prepare_native_source_tree(root):
+    manifest, _manifest_path = native_source_contract()
+    for directory in manifest["native_fingerprint_roots"]:
+        (root / directory).mkdir(parents=True, exist_ok=True)
+    for relative in manifest["required_files"]:
+        path = root / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        if not path.exists():
+            path.write_text("synthetic native input", encoding="utf-8")
+
+
+def load_build_backend(monkeypatch):
+    fake_maturin = types.ModuleType("maturin")
+    for name in ("get_requires_for_build_wheel", "get_requires_for_build_sdist",
+                 "get_requires_for_build_editable", "prepare_metadata_for_build_wheel",
+                 "build_wheel", "build_sdist", "prepare_metadata_for_build_editable",
+                 "build_editable"):
+        setattr(fake_maturin, name, lambda *args, **kwargs: [])
+    monkeypatch.setitem(sys.modules, "maturin", fake_maturin)
+    path = Path(__file__).resolve().parents[1] / "build_backend.py"
+    spec = importlib.util.spec_from_file_location("mgbs_test_build_backend", path)
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(module)
+    return module
+
+
 def test_dirty_source_content_and_shapes_change_build_keys(tmp_path):
+    prepare_native_source_tree(tmp_path)
     (tmp_path / "CMakeLists.txt").write_text("project(example)")
     source = tmp_path / "src"
     source.mkdir()
@@ -33,6 +70,7 @@ def test_dirty_source_content_and_shapes_change_build_keys(tmp_path):
 @pytest.mark.parametrize('relative', ['native/beam_native.h', 'native/beam_native.cpp',
     'rust/beam-runtime/src/lib.rs', 'rust/beam-runtime/Cargo.toml', 'Cargo.toml', 'Cargo.lock'])
 def test_abi_and_rust_changes_invalidate_native_cache(tmp_path, relative):
+    prepare_native_source_tree(tmp_path)
     (tmp_path/'CMakeLists.txt').write_text('project(example)')
     path=tmp_path/relative
     path.parent.mkdir(parents=True,exist_ok=True)
@@ -47,15 +85,50 @@ def test_abi_and_rust_changes_invalidate_native_cache(tmp_path, relative):
     "third_party/picosha2/picosha2.h",
 ])
 def test_vendored_headers_invalidate_native_source_fingerprint(tmp_path, relative):
+    prepare_native_source_tree(tmp_path)
     (tmp_path / "CMakeLists.txt").write_text("project(example)")
     header = tmp_path / relative
     header.parent.mkdir(parents=True)
     header.write_text("vendor header version one")
 
-    first = source_digest(tmp_path)
+    configuration = {"shape": shape_contract(contract()), "backend": "mlp", "sm": [86]}
+    first_digest = source_digest(tmp_path)
+    first_key = build_key({**configuration, "source_digest": first_digest})
     header.write_text("vendor header version two")
 
-    assert source_digest(tmp_path) != first
+    second_digest = source_digest(tmp_path)
+    assert second_digest != first_digest
+    assert build_key({**configuration, "source_digest": second_digest}) != first_key
+
+
+def test_native_source_bundle_rejects_header_omitted_from_bundle_manifest(tmp_path, monkeypatch):
+    backend = load_build_backend(monkeypatch)
+    repository = Path(__file__).resolve().parents[3]
+    contract_path = repository / "integrations/cayleypy_native/multigpubeamsearch/native_source_manifest.json"
+    contract_bytes = contract_path.read_bytes()
+    contract = json.loads(contract_bytes)
+    bundle = tmp_path / "bundle"
+    for relative in contract["required_files"]:
+        path = bundle / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b"source")
+    bundle_contract = bundle / "tools/native_source_manifest.json"
+    bundle_contract.parent.mkdir(parents=True, exist_ok=True)
+    bundle_contract.write_bytes(contract_bytes)
+    manifest = {
+        relative: hashlib.sha256((bundle / relative).read_bytes()).hexdigest()
+        for relative in contract["required_files"]
+    }
+    manifest["tools/native_source_manifest.json"] = hashlib.sha256(contract_bytes).hexdigest()
+    (bundle / "source_manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+    backend._verify_bundle(bundle)
+
+    header = "third_party/nlohmann/json.hpp"
+    manifest.pop(header)
+    (bundle / header).unlink()
+    (bundle / "source_manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+    with pytest.raises(RuntimeError, match="third_party/nlohmann/json.hpp"):
+        backend._verify_bundle(bundle)
 
 
 @pytest.mark.parametrize("logical,physical", [(8, 16), (72, 80), (88, 96), (96, 112), (120, 128), (128, 144)])

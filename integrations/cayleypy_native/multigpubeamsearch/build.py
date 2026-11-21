@@ -11,6 +11,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+from pathlib import PurePosixPath
 import shutil
 import subprocess
 import sys
@@ -30,18 +31,46 @@ def file_sha256(path: Path) -> str:
 
 def source_digest(source: Path, *, cutlass: bool = False) -> str:
     """Hash source content, including dirty files; ignore build/output trees."""
-    roots = [source / "include"] if cutlass else [source / p for p in ("src", "cuda", "tools", "cmake", "native", "rust")]
+    source = source.resolve()
+    roots = [source / "include"] if cutlass else []
     if cutlass:
         roots.append(source / "tools" / "util" / "include")
     files = [source / "CMakeLists.txt"] if not cutlass else []
     if not cutlass:
         files.extend(source / name for name in ("Cargo.toml", "Cargo.lock") if (source / name).is_file())
+        contract_path = Path(__file__).with_name("native_source_manifest.json")
+        try:
+            contract = json.loads(contract_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise NativeUnavailable(f"native source manifest is missing or invalid: {contract_path}") from exc
+        if not isinstance(contract, dict) or contract.get("schema_version") != 1:
+            raise NativeUnavailable("native source manifest has an unsupported schema")
+        roots_value = contract.get("native_fingerprint_roots")
+        required_value = contract.get("required_files")
+        if (not isinstance(roots_value, list) or not roots_value
+                or not all(isinstance(value, str) for value in roots_value)
+                or not isinstance(required_value, list)
+                or not all(isinstance(value, str) for value in required_value)):
+            raise NativeUnavailable("native source manifest has invalid fingerprint roots or required files")
+        for value in [*roots_value, *required_value]:
+            relative = PurePosixPath(value)
+            if relative.is_absolute() or ".." in relative.parts or "\\" in value:
+                raise NativeUnavailable(f"native source manifest has an unsafe path: {value}")
+        missing_required = [value for value in required_value if not (source / value).is_file()]
+        if missing_required:
+            raise NativeUnavailable("native source tree is missing required files: "
+                                     + ", ".join(missing_required))
+        roots.extend(source / value for value in roots_value)
+        files.extend(source / value for value in required_value)
     extensions = {".h", ".hpp", ".cuh", ".c", ".cpp", ".cu", ".cmake", ".py", ".in", ".rs", ".toml"}
     for root in roots:
         if root.is_dir():
             files.extend(p for p in root.rglob("*") if p.is_file() and p.suffix in extensions
                          and not any(part in ("target", "__pycache__", ".pytest_cache") for part in p.relative_to(root).parts))
     digest = hashlib.sha256()
+    if not cutlass:
+        digest.update(b"native_source_manifest.json\0")
+        digest.update(bytes.fromhex(file_sha256(contract_path)))
     for path in sorted(set(files)):
         if not path.is_file():
             raise NativeUnavailable(f"native source file is missing: {path}")

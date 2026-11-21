@@ -5,9 +5,17 @@ from __future__ import annotations
 from pathlib import Path
 import tempfile
 import tarfile
+import subprocess
 import unittest
 
-from create_vast_source_archive import ARCHIVE_PATHS, REQUIRED_VENDOR_HEADERS, create_source_archive
+from create_vast_source_archive import (
+    ARCHIVE_PATHS,
+    MANIFEST,
+    MANIFEST_PATH,
+    REQUIRED_SOURCE_FILES,
+    REQUIRED_VENDOR_HEADERS,
+    create_source_archive,
+)
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
@@ -26,7 +34,8 @@ class VastSourceArchiveTests(unittest.TestCase):
                 members = set(archive.getnames())
                 for relative in REQUIRED_VENDOR_HEADERS:
                     self.assertIn(relative.as_posix(), members)
-                archive.extractall(extract_dir)
+                self.assertIn(MANIFEST["manifest_path"], members)
+            subprocess.run(["tar", "-xzf", str(archive_path), "-C", str(extract_dir)], check=True)
 
             for relative in REQUIRED_VENDOR_HEADERS:
                 self.assertEqual(
@@ -48,12 +57,15 @@ class VastSourceArchiveTests(unittest.TestCase):
                         path.write_text("synthetic source", encoding="utf-8")
                     else:
                         path.mkdir(parents=True, exist_ok=True)
-                for relative in REQUIRED_VENDOR_HEADERS:
+                for relative in REQUIRED_SOURCE_FILES:
                     if relative == missing:
                         continue
                     path = source_root / relative
                     path.parent.mkdir(parents=True, exist_ok=True)
-                    path.write_text("synthetic vendored header", encoding="utf-8")
+                    path.write_text("synthetic source", encoding="utf-8")
+                bundle_manifest = source_root / MANIFEST["manifest_path"]
+                bundle_manifest.parent.mkdir(parents=True, exist_ok=True)
+                bundle_manifest.write_bytes(MANIFEST_PATH.read_bytes())
 
                 with self.assertRaisesRegex(ValueError, missing.as_posix()):
                     create_source_archive(source_root, Path(temporary) / "source.tar.gz")

@@ -15,6 +15,7 @@ on:
       - integrations/cayleypy_native/tests/installed_cnot_phase_boundaries.py
       - integrations/cayleypy_native/tests/installed_verify_cnot_gloo_lifecycle.py
       - integrations/cayleypy_native/tests/test_build.py
+      - integrations/cayleypy_native/multigpubeamsearch/native_source_manifest.json
       - tools/cnot_acceptance_events.py
       - tools/test_cnot_acceptance_events.py
       - tools/verify_cnot_gpu_pair.py
@@ -86,7 +87,7 @@ jobs:
           cd "$RUNNER_TEMP/mgbs-wheel-smoke"
           env -u PYTHONPATH python -m pytest -vv \
             "$GITHUB_WORKSPACE/integrations/cayleypy_native/tests/test_build.py" \
-            -k vendored_headers 2>&1 | tee "$GITHUB_WORKSPACE/test_results/refactor_20261121/vast-source-archive/fingerprint-test.log"
+            -k 'vendored_headers or native_source_bundle' 2>&1 | tee "$GITHUB_WORKSPACE/test_results/refactor_20261121/vast-source-archive/fingerprint-test.log"
       - name: Check Rust serde output against the shared CNOT event fixture
         id: event_serde
         run: |

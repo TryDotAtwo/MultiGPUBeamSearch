@@ -3220,11 +3220,10 @@ Main commit `148b2a826a369b7601e904ea409e0cc5301c75c9` also passed the 260-test 
 
 ## 2026-11-21 - Guard vendored native build inputs before Vast dispatch
 
-- Review found that the new-host source archive omitted `third_party/`, even
-  though permutation runner and scorer sources include nlohmann/json and
-  picosha2 headers from that tree. The native source fingerprint also omitted
-  `third_party`, allowing a stale build cache after a header change.
-- Added hosted regression coverage for real archive creation/extraction,
-  missing-header rejection and fingerprint changes for both vendored headers.
-  The source archive packager and fingerprint fix are not yet implemented;
-  hosted RED evidence is pending. No paid run was started.
+- Hosted RED `44914169925` exposed the missing packager; installed-wheel RED
+  `44914169994` showed both vendored headers left the fingerprint unchanged.
+- Added one source contract shared by Vast archive creation, wheel bundle
+  validation, and native fingerprinting. It includes the vendor tree and
+  rejects missing required files even when the generated bundle manifest omits
+  them. Hosted archive, wheel bundle and build-key checks are implemented;
+  their GREEN run is pending. No paid run started.
