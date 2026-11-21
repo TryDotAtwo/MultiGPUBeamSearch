@@ -341,6 +341,31 @@ PyTorch владеет CUDA-буферами, а FFI проверяет тенз
 Rust-контроллер не получает GPU-указатели. Порядок обмена NCCL и исходный
 Python-транспорт сохраняются.
 
+## Приёмка CNOT ABI и фазовых ошибок, 2026-11-21
+
+Строгий acceptance-путь согласует до обмена наличие и идентичность Rust
+контроллера, checkpoint scorer, DeviceDomain, CNOT ABI/capabilities и Stream 5
+на всех рангах. Ошибка ABI, отсутствующая обязательная реализация или разный
+набор возможностей завершаются коллективной ошибкой; обычный совместимый
+fallback сохраняется вне строгого режима. Dtype входа проверяется по
+каноническим объектам `torch.dtype`, включая совместимые `int64`/`uint16`
+пути. Подготовка winner packet и history edge получает ранговое голосование
+до следующего data-plane collective.
+
+На source SHA `78087abe5c1b8e794c9e16aa934f6afe084c0f8b` hosted installed-wheel
+проверки прошли: PyO3 dtype с deprecation warnings как errors, strict admission
+на двух Gloo-рангах, инъекции ошибок winner-packet/history-edge на каждом
+ранге с повторным поиском в той же группе, публичный CNOT search и Actionlint.
+Проверки hosted source harness также прошли. Это CPU/Gloo evidence; физические
+CUDA/NCCL и trained-checkpoint вызовы ещё не подтверждены.
+
+Граница миграции остаётся частичной: Rust задаёт последовательность стадий и
+владеет историей поиска, но `NativeStages` всё ещё удерживает Python `World`,
+scorer и Torch-тензоры, а часть стадий вызывает Python/PyTorch. Полный runtime
+контекст CNOT в `beam-runtime` и самостоятельное владение вычислительным
+провайдером остаются следующими вертикальными срезами. Текущие проверки и
+hardware gate: `test_results/refactor_20261121/rust-cnot-admission/GITHUB_STATUS.md`.
+
 ## Rust-контракт CNOT checkpoint scorer, 2026-11-19
 
 `beam-native-sys::TqpScorer` разбирает metadata scorer при открытии,

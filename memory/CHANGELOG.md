@@ -3032,3 +3032,10 @@ Main commit `148b2a826a369b7601e904ea409e0cc5301c75c9` also passed the 260-test 
   and public CNOT search. Actionlint then found two unused retry-loop counters
   and an unused remote result-directory variable; they are removed before the
   next lint run. No physical GPU test was run.
+- At `78087ab`, the hosted installed-wheel workflow passed all gates including
+  Actionlint; the hosted source-validation workflow also passed its instance,
+  private-input-receipt, fake-SSH retrieval, and embedded-script fixtures. The
+  evidence is CPU/Gloo and harness-only. No physical CUDA/NCCL or trained
+  checkpoint search ran. Receipts are in
+  `test_results/refactor_20261121/rust-cnot-admission/GITHUB_STATUS.md` and
+  Actions artifacts 14701749750 and 14701789289.
