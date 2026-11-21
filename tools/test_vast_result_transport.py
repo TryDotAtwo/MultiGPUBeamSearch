@@ -13,6 +13,7 @@ import sys
 import tarfile
 import tempfile
 import textwrap
+import time
 import unittest
 
 
@@ -98,7 +99,9 @@ raise SystemExit(int(os.environ["FAKE_REMOTE_EXIT"]))
 
 
 class VastResultTransportTests(unittest.TestCase):
-    def run_transport(self, remote_exit: int) -> tuple[subprocess.CompletedProcess[str], Path, list[str]]:
+    def run_transport(
+        self, remote_exit: int, *, deadline_seconds_from_now: int = 7200
+    ) -> tuple[subprocess.CompletedProcess[str], Path, list[str]]:
         temporary = tempfile.TemporaryDirectory(prefix="mgbs-vast-transport-")
         self.addCleanup(temporary.cleanup)
         root = Path(temporary.name)
@@ -133,6 +136,9 @@ class VastResultTransportTests(unittest.TestCase):
             "VAST_REMOTE_ROOT": "/workspace/synthetic-run",
             "VAST_REMOTE_RESULTS_RELATIVE": "test_results/refactor_20261121/gpu-acceptance",
             "VAST_REMOTE_RUNTIME_SECONDS": "1200",
+            "VAST_BUDGET_DEADLINE_EPOCH": str(int(time.time()) + deadline_seconds_from_now),
+            "VAST_STOP_RESERVE_SECONDS": "1200",
+            "VAST_RETRIEVAL_MAX_SECONDS": "300",
             "VAST_REMOTE_KEY_BLOB": "ssh-ed25519 fake-public-key",
             "VAST_REMOTE_ARCHIVE": "/workspace/synthetic-run.tar.gz",
             "VAST_REMOTE_ARCHIVE_SHA": "a" * 64,
@@ -272,6 +278,15 @@ class VastResultTransportTests(unittest.TestCase):
         self.assertIn("synthetic GPU execution log", completed.stdout)
         self.assert_results_archive(archive_path)
         self.assertEqual(events, ["master", "remote", "results", "close"])
+
+    def test_refuses_retrieval_when_the_absolute_deadline_would_consume_stop_reserve(self):
+        completed, archive_path, events = self.run_transport(
+            remote_exit=0, deadline_seconds_from_now=100
+        )
+        self.assertNotEqual(completed.returncode, 0, completed.stdout + completed.stderr)
+        self.assertFalse(archive_path.exists(), "retrieval must not start without the stop reserve")
+        self.assertIn("retrieval cannot start", completed.stderr)
+        self.assertEqual(events, ["master", "remote", "close"])
 
     def test_executes_extracted_remote_payload_with_clean_environment_on_success(self):
         completed, receipt_path, log_path, events = self.run_remote_payload(worker_exit=0)
