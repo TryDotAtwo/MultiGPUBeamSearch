@@ -3126,5 +3126,7 @@ Main commit `148b2a826a369b7601e904ea409e0cc5301c75c9` also passed the 260-test 
   a cleared environment and a stub acceptance worker. It checks that the
   receipt exists before the worker starts, success and controlled failure
   preserve their status, and the completed log and receipt share the supplied
-  `run_root`. The first hosted run is pending; the current payload is expected
-  to expose its runner-only `REMOTE_ROOT` reference before receipt creation.
+  `run_root`. Run `44902996083` reached this new fixture but stopped at a
+  missing `sys` import before executing the payload; the other hosted CPU
+  verifiers passed and the GPU job was skipped. Fix the fixture before
+  interpreting its next run as payload evidence.
