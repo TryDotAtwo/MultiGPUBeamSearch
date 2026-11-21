@@ -61,6 +61,12 @@ class VastCampaignWorkflowTests(unittest.TestCase):
         self.assertNotIn('cat "$remote_log"', workflow)
         self.assertNotIn('cat "$lifecycle"', workflow)
         self.assertIn("Upload redacted operational status", workflow)
+        self.assertIn("Write redacted source validation status", workflow)
+        self.assertIn('--source-outcome "$SOURCE_OUTCOME"', workflow)
+        source_upload = workflow.split("Upload redacted source validation status", 1)[1].split("\n      - name:", 1)[0]
+        self.assertIn("cnot-public-status.json", source_upload)
+        self.assertNotIn("test_results", source_upload)
+        self.assertNotIn("GITHUB_STATUS.md", source_upload)
         upload = workflow.split("Upload redacted operational status", 1)[1].split("\n      - name:", 1)[0]
         self.assertIn("cnot-public-status.json", upload)
         for private_path in (
