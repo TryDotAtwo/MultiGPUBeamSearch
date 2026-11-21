@@ -25,6 +25,16 @@ pub(crate) struct Identity {
     pub evidence_dir: PathBuf,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct GpuObservation {
+    pub rank: u32,
+    pub local_rank: usize,
+    pub device_ordinal: i32,
+    pub gpu_uuid: String,
+    pub context_handle: u64,
+    pub thread_id: u64,
+}
+
 #[derive(Serialize)]
 struct Event<'a> {
     schema: &'static str,
@@ -127,25 +137,22 @@ pub(crate) fn contract_fields(contract: &str) -> PyResult<BTreeMap<String, Strin
     Ok(fields)
 }
 
-fn local_gpu_uuid(identity: &Identity, rank: u32, world: u32) -> Result<String, String> {
-    let local_rank = env::var("LOCAL_RANK")
-        .ok()
-        .and_then(|value| value.parse::<usize>().ok())
-        .unwrap_or(rank as usize);
-    if local_rank >= identity.gpu_uuids.len() || identity.gpu_uuids.len() < world as usize {
-        return Err(format!(
-            "CNOT acceptance has {} GPU UUIDs for rank {rank}/world {world} (local rank {local_rank})",
-            identity.gpu_uuids.len()
-        ));
+fn local_gpu_uuid(
+    identity: &Identity,
+    rank: u32,
+    world: u32,
+    observation: &GpuObservation,
+) -> Result<String, String> {
+    if observation.rank != rank || observation.local_rank >= identity.gpu_uuids.len()
+        || identity.gpu_uuids.len() < world as usize || observation.device_ordinal < 0
+        || observation.context_handle == 0 || observation.thread_id == 0 {
+        return Err(format!("CNOT acceptance rank {rank} has an invalid admission-bound CUDA observation"));
     }
-    let expected = &identity.gpu_uuids[local_rank];
-    let observed = required_environment("MGBS_CNOT_ACCEPTANCE_OBSERVED_GPU_UUID")?;
-    if &observed != expected {
-        return Err(format!(
-            "CNOT acceptance rank {rank} observed GPU {observed}, expected {expected}"
-        ));
+    let expected = &identity.gpu_uuids[observation.local_rank];
+    if &observation.gpu_uuid != expected {
+        return Err(format!("CNOT acceptance rank {rank} observed GPU {}, expected {expected}", observation.gpu_uuid));
     }
-    Ok(observed)
+    Ok(observation.gpu_uuid.clone())
 }
 
 fn encode_event(
@@ -198,12 +205,17 @@ pub(crate) fn emit(
     pid: u32,
     device: &str,
     fields: &BTreeMap<String, String>,
+    observation: Option<&GpuObservation>,
 ) -> PyResult<()> {
     let identity = identity().map_err(PyRuntimeError::new_err)?;
     let Some(identity) = identity else {
         return Ok(());
     };
-    let gpu_uuid = local_gpu_uuid(&identity, rank, world).map_err(PyRuntimeError::new_err)?;
+    let observation = observation.ok_or_else(|| PyRuntimeError::new_err(
+        "CNOT acceptance requires an admission-bound CUDA observation"
+    ))?;
+    let gpu_uuid = local_gpu_uuid(&identity, rank, world, observation)
+        .map_err(PyRuntimeError::new_err)?;
     let payload = encode_event(&identity, kind, rank, world, pid, device, &gpu_uuid, fields)
         .map_err(PyRuntimeError::new_err)?;
 
@@ -242,6 +254,23 @@ mod tests {
             gpu_uuids: vec!["GPU-0001".into()],
             evidence_dir: PathBuf::from("unused"),
         }
+    }
+
+    #[test]
+    fn admission_bound_gpu_observation_must_match_its_rank_and_uuid() {
+        let identity = fixture_identity();
+        let observation = GpuObservation {
+            rank: 0, local_rank: 0, device_ordinal: 1, gpu_uuid: "GPU-0001".into(),
+            context_handle: 0x1234, thread_id: 7,
+        };
+        assert_eq!(local_gpu_uuid(&identity, 0, 1, &observation).unwrap(), "GPU-0001");
+        assert!(local_gpu_uuid(&identity, 1, 1, &observation).is_err());
+        let mut wrong_uuid = observation.clone();
+        wrong_uuid.gpu_uuid = "GPU-OTHER".into();
+        assert!(local_gpu_uuid(&identity, 0, 1, &wrong_uuid).is_err());
+        let mut missing_context = observation;
+        missing_context.context_handle = 0;
+        assert!(local_gpu_uuid(&identity, 0, 1, &missing_context).is_err());
     }
 
     #[test]

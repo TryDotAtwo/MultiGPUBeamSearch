@@ -9,9 +9,9 @@ import re
 import sys
 
 try:
-    from .gpu_identity import observe_current_cuda_uuid
+    from .gpu_identity import CudaDeviceObservation, observe_current_cuda_context
 except ImportError:  # standalone hosted protocol fixture
-    from gpu_identity import observe_current_cuda_uuid
+    from gpu_identity import CudaDeviceObservation, observe_current_cuda_context
 
 
 EVENT_SCHEMA = "org.trydotatwo.multigpubeamsearch.cnot.acceptance"
@@ -20,7 +20,7 @@ EVENT_PREFIX = "CNOT_ACCEPTANCE_EVENT "
 TOKEN_RE = re.compile(r"[A-Za-z0-9_-]+\Z")
 SHA40_RE = re.compile(r"[0-9a-fA-F]{40}\Z")
 SHA64_RE = re.compile(r"[0-9a-fA-F]{64}\Z")
-_OBSERVED_GPU_UUIDS = {}
+_PINNED_GPU_OBSERVATIONS = {}
 
 
 def acceptance_identity():
@@ -53,12 +53,18 @@ def acceptance_identity():
     }
 
 
-def gpu_uuid_for_rank(rank, world_size, *, device=None, torch_module=None, driver=None):
+def gpu_observation_for_rank(
+    rank, world_size, *, device=None, torch_module=None, driver=None,
+    observation_provider=None,
+):
     identity = acceptance_identity()
     if identity is None:
         return None
+    rank, world_size = int(rank), int(world_size)
     local_rank = int(os.environ.get("LOCAL_RANK", rank))
-    if local_rank < 0 or local_rank >= len(identity["gpu_uuids"]) or len(identity["gpu_uuids"]) < world_size:
+    if rank < 0 or rank >= world_size or local_rank < 0 \
+            or local_rank >= len(identity["gpu_uuids"]) \
+            or len(identity["gpu_uuids"]) < world_size:
         raise RuntimeError(
             f"CNOT acceptance has {len(identity['gpu_uuids'])} GPU UUIDs for rank {rank}/{world_size}"
         )
@@ -66,26 +72,33 @@ def gpu_uuid_for_rank(rank, world_size, *, device=None, torch_module=None, drive
     if device is None:
         if torch_module is None:
             import torch as torch_module
-        device = torch_module.device("cuda", torch_module.cuda.current_device())
-    cache_key = (local_rank, str(device), expected_uuid)
-    observed_uuid = _OBSERVED_GPU_UUIDS.get(cache_key)
-    if observed_uuid is None:
-        observed_uuid = observe_current_cuda_uuid(
-            device, torch_module=torch_module, driver=driver
-        )
-        if observed_uuid != expected_uuid:
-            raise RuntimeError(
-                f"CNOT acceptance rank {rank} selected GPU {observed_uuid}, expected {expected_uuid}"
-            )
-        _OBSERVED_GPU_UUIDS[cache_key] = observed_uuid
-        os.environ["MGBS_CNOT_ACCEPTANCE_OBSERVED_GPU_UUID"] = observed_uuid
-    elif observed_uuid != expected_uuid:
+        device = torch_module.device("cuda")
+    provider = observe_current_cuda_context if observation_provider is None else observation_provider
+    observation = provider(device, torch_module=torch_module, driver=driver)
+    required = ("device_ordinal", "gpu_uuid", "context_handle", "thread_id")
+    if not isinstance(observation, CudaDeviceObservation) and any(
+        not hasattr(observation, name) for name in required
+    ):
+        raise RuntimeError("CUDA identity provider returned an invalid typed observation")
+    if observation.context_handle <= 0 or observation.device_ordinal < 0:
+        raise RuntimeError("CUDA identity provider returned an empty active-context observation")
+    if observation.gpu_uuid != expected_uuid:
         raise RuntimeError(
-            f"CNOT acceptance rank {rank} selected GPU {observed_uuid}, expected {expected_uuid}"
+            f"CNOT acceptance rank {rank} observed GPU {observation.gpu_uuid}, expected {expected_uuid}"
         )
-    elif os.environ.get("MGBS_CNOT_ACCEPTANCE_OBSERVED_GPU_UUID") != observed_uuid:
-        raise RuntimeError("CNOT acceptance observed GPU UUID changed during this process")
-    return observed_uuid
+    cache_key = (rank, local_rank)
+    previous = _PINNED_GPU_OBSERVATIONS.get(cache_key)
+    if previous is not None and previous != observation:
+        raise RuntimeError("CUDA context changed after CNOT admission")
+    _PINNED_GPU_OBSERVATIONS[cache_key] = observation
+    return observation
+
+
+def gpu_uuid_for_rank(rank, world_size, *, device=None, torch_module=None, driver=None):
+    observation = gpu_observation_for_rank(
+        rank, world_size, device=device, torch_module=torch_module, driver=driver
+    )
+    return None if observation is None else observation.gpu_uuid
 
 
 def report_sha256(report):

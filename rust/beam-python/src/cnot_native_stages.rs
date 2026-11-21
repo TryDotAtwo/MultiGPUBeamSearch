@@ -19,6 +19,7 @@ use std::{fs, path::PathBuf};
 pub(crate) struct PyCnotBackendAdmission {
     device_domain: Option<beam_native_sys::cnot_device_bridge::DeviceDomain>,
     device_domain_sha256: Option<String>,
+    gpu_observation: Option<crate::cnot_acceptance::GpuObservation>,
     stream5_library_sha256: Option<String>,
     stream5_transport: Option<Py<PyAny>>,
 }
@@ -28,6 +29,41 @@ fn strict_backend_enabled() -> bool {
         std::env::var("MGBS_CNOT_STRICT_BACKEND").as_deref(),
         Ok("1")
     )
+}
+
+fn observe_acceptance_gpu(
+    py: Python<'_>,
+    world: &Bound<'_, PyAny>,
+    device: &Bound<'_, PyAny>,
+) -> PyResult<Option<crate::cnot_acceptance::GpuObservation>> {
+    if crate::cnot_acceptance::identity()
+        .map_err(PyRuntimeError::new_err)?
+        .is_none()
+    {
+        return Ok(None);
+    }
+    let rank: u32 = world.getattr("rank")?.extract()?;
+    let size: u32 = world.getattr("size")?.extract()?;
+    let module = py.import("multigpubeamsearch.cnot_acceptance")?;
+    let kwargs = PyDict::new(py);
+    kwargs.set_item("device", device)?;
+    let observation = module.call_method(
+        "gpu_observation_for_rank",
+        (rank, size),
+        Some(&kwargs),
+    )?;
+    let local_rank = std::env::var("LOCAL_RANK")
+        .ok()
+        .and_then(|value| value.parse::<usize>().ok())
+        .unwrap_or(rank as usize);
+    Ok(Some(crate::cnot_acceptance::GpuObservation {
+        rank,
+        local_rank,
+        device_ordinal: observation.getattr("device_ordinal")?.extract()?,
+        gpu_uuid: observation.getattr("gpu_uuid")?.extract()?,
+        context_handle: observation.getattr("context_handle")?.extract()?,
+        thread_id: observation.getattr("thread_id")?.extract()?,
+    }))
 }
 
 pub(crate) fn strict_backend_mode(world: &Bound<'_, PyAny>) -> PyResult<bool> {
@@ -121,6 +157,7 @@ fn emit_device_dispatch(
     sha256: Option<&str>,
     operation: &str,
     rows: usize,
+    observation: Option<&crate::cnot_acceptance::GpuObservation>,
 ) -> PyResult<()> {
     if !strict {
         return Ok(());
@@ -146,6 +183,7 @@ fn emit_device_dispatch(
         std::process::id(),
         &device,
         &fields,
+        observation,
     )?;
     Ok(())
 }
@@ -251,6 +289,8 @@ pub(crate) fn preflight_strict_backend<'py>(
         let device_contract = format!(
             "strict=1;domain_abi=1;device_abi=1;capabilities=owners,expansion,full_matrix_distinct;domain_sha256={domain_sha256}"
         );
+        let root_device = root.getattr("device")?;
+        let gpu_observation = observe_acceptance_gpu(py, world, &root_device)?;
 
         if !scorer.is_instance_of::<crate::cnot_tqp_scorer::PyTqpScorer>() {
             return Err(PyRuntimeError::new_err(
@@ -334,6 +374,7 @@ pub(crate) fn preflight_strict_backend<'py>(
             PyCnotBackendAdmission {
                 device_domain: Some(device_domain),
                 device_domain_sha256: Some(domain_sha256),
+                gpu_observation: gpu_observation.clone(),
                 stream5_library_sha256: None,
                 stream5_transport: None,
             },
@@ -345,6 +386,7 @@ pub(crate) fn preflight_strict_backend<'py>(
     let admitted = admitted_backend.ok_or_else(|| {
         PyRuntimeError::new_err("strict CNOT admission returned no retained backend handle")
     })?;
+    let gpu_observation = admitted.borrow(py).gpu_observation.clone();
     let consensus_contract = (|| -> PyResult<Bound<'py, PyAny>> {
         let identity = crate::cnot_acceptance::identity().map_err(PyRuntimeError::new_err)?;
         let value = if let Some(identity) = identity {
@@ -371,7 +413,9 @@ pub(crate) fn preflight_strict_backend<'py>(
         let pid = std::process::id();
         let device = world.getattr("device")?.str()?.to_str()?.to_owned();
         let fields = crate::cnot_acceptance::contract_fields(&contract)?;
-        crate::cnot_acceptance::emit("backend_admission", rank, size, pid, &device, &fields)?;
+        crate::cnot_acceptance::emit(
+            "backend_admission", rank, size, pid, &device, &fields, gpu_observation.as_ref()
+        )?;
         let controller_fields = [
             ("implementation".to_owned(), "RustNativeStages".to_owned()),
             ("abi".to_owned(), "1".to_owned()),
@@ -386,6 +430,7 @@ pub(crate) fn preflight_strict_backend<'py>(
             pid,
             &device,
             &controller_fields,
+            gpu_observation.as_ref(),
         )?;
         if std::env::var_os("MGBS_CNOT_ACCEPTANCE_RUN_ID").is_some() && size == 1 {
             let single_rank_fields = [
@@ -401,6 +446,7 @@ pub(crate) fn preflight_strict_backend<'py>(
                 pid,
                 &device,
                 &single_rank_fields,
+                gpu_observation.as_ref(),
             )?;
         }
         Ok(py.None().into_bound(py))
@@ -483,6 +529,7 @@ struct NativeStages<'py> {
     device_domain_path: Option<PathBuf>,
     strict_backend: bool,
     device_domain_sha256: Option<String>,
+    gpu_observation: Option<crate::cnot_acceptance::GpuObservation>,
     stream5_library_sha256: Option<String>,
     device_domain: Option<beam_native_sys::cnot_device_bridge::DeviceDomain>,
     _stream5_transport: Option<Py<PyAny>>,
@@ -505,17 +552,18 @@ impl<'py> NativeStages<'py> {
         let rank = world.getattr("rank")?.extract()?;
         let size = world.getattr("size")?.extract()?;
         let strict_backend = strict_backend_enabled();
-        let (device_domain, device_domain_sha256, stream5_library_sha256, stream5_transport) =
+        let (device_domain, device_domain_sha256, gpu_observation, stream5_library_sha256, stream5_transport) =
             if let Some(admission) = admission {
                 let mut admission = admission.borrow_mut(py);
                 (
                     admission.device_domain.take(),
                     admission.device_domain_sha256.take(),
+                    admission.gpu_observation.take(),
                     admission.stream5_library_sha256.take(),
                     admission.stream5_transport.take(),
                 )
             } else {
-                (None, None, None, None)
+                (None, None, None, None, None)
             };
         if strict_backend && device_domain.is_none() {
             return Err(PyRuntimeError::new_err(
@@ -563,6 +611,7 @@ impl<'py> NativeStages<'py> {
             device_domain_path,
             strict_backend,
             device_domain_sha256,
+            gpu_observation,
             stream5_library_sha256,
             device_domain,
             _stream5_transport: stream5_transport,
@@ -581,7 +630,21 @@ impl<'py> NativeStages<'py> {
         }
     }
 
+    fn validate_current_gpu_observation(&self) -> PyResult<()> {
+        let device = self.world.getattr("device")?;
+        let observed = observe_acceptance_gpu(self.py, &self.world, &device)?;
+        if observed != self.gpu_observation {
+            return Err(PyRuntimeError::new_err(
+                "CUDA context changed after CNOT backend admission",
+            ));
+        }
+        Ok(())
+    }
+
     fn ensure_device_domain(&mut self, tensor: &Bound<'py, PyAny>) -> PyResult<bool> {
+        if self.strict_backend {
+            self.validate_current_gpu_observation()?;
+        }
         if !tensor.getattr("is_cuda")?.extract::<bool>()? {
             if self.strict_backend {
                 return Err(PyRuntimeError::new_err(
@@ -612,6 +675,7 @@ impl<'py> NativeStages<'py> {
     }
 
     fn trace_device_dispatch(&self, operation: &str, rows: usize) -> PyResult<()> {
+        self.validate_current_gpu_observation()?;
         emit_device_dispatch(
             &self.world,
             self.rank,
@@ -620,6 +684,7 @@ impl<'py> NativeStages<'py> {
             self.device_domain_sha256.as_deref(),
             operation,
             rows,
+            self.gpu_observation.as_ref(),
         )
     }
 
@@ -811,6 +876,7 @@ impl<'py> NativeStages<'py> {
                 std::process::id(),
                 &device,
                 &fields,
+                self.gpu_observation.as_ref(),
             )
             .map(|()| self.py.None().into_bound(self.py));
             checked(
@@ -875,7 +941,7 @@ fn probe_cnot_device_stage_vote(world: Bound<'_, PyAny>, fail_rank: i64) -> PyRe
         // Use the exact local-only event helper called by the production
         // owners/expand/distinct stages. The enclosing vote is their sole
         // collective for this rank-local stage.
-        emit_device_dispatch(&world, rank, size, true, Some("fixture"), "expansion", 1)?;
+        emit_device_dispatch(&world, rank, size, true, Some("fixture"), "expansion", 1, None)?;
         Ok(py.None().into_bound(py))
     })();
     checked(py, &world, "rank parent actions and expand", local)?;
