@@ -4,10 +4,14 @@
 from __future__ import annotations
 
 import unittest
+from pathlib import Path
+from types import SimpleNamespace
 
 import cayleypy as cp
+from multigpubeamsearch.build import configure_command
 from multigpubeamsearch.contracts import GraphContract
 from permutation_acceptance import (
+    MT19937_64,
     build_saturated_reference_fixture,
     decode_frontier_snapshot,
     validate_depth_flow_trace,
@@ -16,6 +20,10 @@ from permutation_acceptance import (
 
 def _trace(rank: int, *, pid: int, gpu_uuid: str, run_id="run-42", case_id="permutation-saturated-b3", call_id=2):
     fields = {
+        "source_sha": "a" * 40,
+        "wheel_sha256": "b" * 64,
+        "build_key": "c" * 64,
+        "binary_sha256": "d" * 64,
         "run_id": run_id, "case_id": case_id, "call_id": call_id,
         "rank": rank, "world_size": 2, "depth": 1, "pid": pid,
         "gpu_uuid": gpu_uuid, "shard_count": 64,
@@ -32,6 +40,19 @@ def _trace(rank: int, *, pid: int, gpu_uuid: str, run_id="run-42", case_id="perm
 
 
 class PermutationAcceptanceTests(unittest.TestCase):
+    def test_mt19937_64_matches_std_engine_seed_vector(self):
+        self.assertEqual(MT19937_64(5489).next(), 14514284786278117030)
+
+    def test_trace_build_flag_is_explicit_and_off_by_default(self):
+        contract = SimpleNamespace(state_len=4, move_count=16)
+        programs = {"cmake": "cmake", "cxx": "c++", "nvcc": "nvcc"}
+        off = configure_command(Path("."), Path("build"), Path("cutlass"), contract,
+                                "mlp", (86,), programs)
+        on = configure_command(Path("."), Path("build"), Path("cutlass"), contract,
+                               "mlp", (86,), programs, acceptance_rank_trace=True)
+        self.assertIn("-DBEAM_DEBUG_DEPTH_FLOW_TRACE=OFF", off)
+        self.assertIn("-DBEAM_DEBUG_DEPTH_FLOW_TRACE=ON", on)
+
     @classmethod
     def setUpClass(cls):
         graph = cp.CayleyGraph(cp.PermutationGroups.lrx(4), device="cpu")
@@ -39,6 +60,14 @@ class PermutationAcceptanceTests(unittest.TestCase):
         cls.fixture = build_saturated_reference_fixture(
             contract.center, contract.generators, beam_width=3
         )
+
+    def test_reference_paths_replay_to_each_survivor_independently(self):
+        for world_size in (1, 2):
+            for candidate in self.fixture.worlds[world_size].steps[1].ordered_survivors:
+                state = tuple(self.fixture.start)
+                for move_id in candidate.path:
+                    state = tuple(state[source] for source in self.fixture.generators[move_id])
+                self.assertEqual(state, candidate.state)
 
     def test_lrx4_b3_reference_saturates_and_deduplicates_across_ranks(self):
         fixture = self.fixture
@@ -64,6 +93,8 @@ class PermutationAcceptanceTests(unittest.TestCase):
         rows = validate_depth_flow_trace(
             log, run_id="run-42", case_id="permutation-saturated-b3",
             call_id=2, world_size=2, depth=1, beam_width=3,
+            source_sha="a" * 40, wheel_sha256="b" * 64,
+            build_key="c" * 64, binary_sha256="d" * 64,
         )
         self.assertEqual(tuple(row["rank"] for row in rows), (0, 1))
         self.assertEqual(tuple(row["gpu_uuid"] for row in rows), ("0" * 32, "1" * 32))
