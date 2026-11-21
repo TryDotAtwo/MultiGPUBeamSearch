@@ -1,6 +1,7 @@
 """Hosted CPU tests for the final CNOT 1/2-GPU acceptance verifier."""
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 import sys
@@ -80,13 +81,139 @@ def _build_case(root: Path, case_id: str, world: int, mode: str, width: int, sho
     return report
 
 
+
+def _permutation_report_sha256(report):
+    payload = dict(report)
+    payload.pop("report_sha256", None)
+    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
+
+
+def _build_permutation_report():
+    winners = [
+        {"lo": "0000000000000001", "hi": "1000000000000001"},
+        {"lo": "0000000000000002", "hi": "1000000000000002"},
+        {"lo": "0000000000000003", "hi": "1000000000000003"},
+    ]
+
+    def smoke(world):
+        devices = list(range(world))
+        pids = [5100 + world * 10 + rank for rank in range(world)]
+        return {
+            "world_size": world,
+            "requested_devices": devices,
+            "devices": devices,
+            "gpu_names": ["NVIDIA RTX 3060"] * world,
+            "engine": "rust",
+            "exact_distance": 5,
+            "scramble": [0, 1, 2, 3, 4],
+            "worker_pids": pids,
+            "worker_pids_reused": True,
+            "searches": [
+                {
+                    "call": call,
+                    "path": [0, 1, 2, 3, 4],
+                    "length": 5,
+                    "replay_valid": True,
+                    "backend": "native",
+                    "inference_backend": "mlp",
+                    "devices": devices,
+                    "elapsed_seconds": 0.25,
+                }
+                for call in (1, 2)
+            ],
+        }
+
+    def saturated(world):
+        input_counts = [3] if world == 1 else [2, 1]
+        pids = [5200 + world * 10 + rank for rank in range(world)]
+        uuids = [f"{rank + 1:032x}" for rank in range(world)]
+        next_counts = [3] if world == 1 else [2, 1]
+        candidate_counts = [12] if world == 1 else [7, 5]
+        request_counts = [3] if world == 1 else [2, 1]
+        ranks = [
+            {
+                "rank": rank,
+                "pid": pids[rank],
+                "gpu_uuid": uuids[rank],
+                "frontier_size": input_counts[rank],
+                "generated": input_counts[rank] * 10,
+                "final_global_less": 0,
+                "final_global_equal": 12,
+                "final_total_available": 12,
+                "final_global_keep": 3,
+                "final_candidate_count": candidate_counts[rank],
+                "final_request_count": request_counts[rank],
+                "next_frontier_size": next_counts[rank],
+                "frontier_snapshot": f"frontier-rank-{rank}.bin",
+            }
+            for rank in range(world)
+        ]
+        build_key = ("7" if world == 1 else "8") * 64
+        binary_sha = ("9" if world == 1 else "a") * 64
+        calls = [
+            {
+                "call_id": call,
+                "session_reused": call == 2,
+                "worker_pids": pids,
+                "build_key": build_key,
+                "binary_sha256": binary_sha,
+                "eligible_distinct": 12,
+                "beam_width": 3,
+                "cross_source_duplicates": 1,
+                "rank_evidence": [dict(row) for row in ranks],
+                "ordered_survivor_hashes": list(winners),
+            }
+            for call in (1, 2)
+        ]
+        return {
+            "case_id": f"permutation-saturated-b3-world-{world}",
+            "world_size": world,
+            "devices": list(range(world)),
+            "worker_pids": pids,
+            "gpu_names": ["NVIDIA RTX 3060"] * world,
+            "fixture_start": [0, 1, 2, 3, 4],
+            "scramble": [0, 1, 2],
+            "exact_distance": 3,
+            "input_counts": input_counts,
+            "eligible_distinct": 12,
+            "keep_count": 3,
+            "cross_source_duplicates": 1,
+            "ordered_survivor_hashes": list(winners),
+            "calls": calls,
+            "independent_replay": True,
+        }
+
+    report = {
+        "fixture": "cayleypy.LRX(4)",
+        "saturated_fixture": "cayleypy.LRX(5)",
+        "state_len": 24,
+        "move_count": 10,
+        "model": "known finite FP16 MLP artifact",
+        "source_sha": SOURCE_SHA,
+        "wheel_sha256": WHEEL_SHA,
+        "acceptance_run_id": RUN_ID,
+        "python": "3.11.0",
+        "torch": "2.9.0+cpu",
+        "cuda": None,
+        "runs": [smoke(1), smoke(2)],
+        "saturated_b3": [saturated(1), saturated(2)],
+    }
+    report["report_sha256"] = _permutation_report_sha256(report)
+    return report
+
+
+def _write_permutation_report(root, report):
+    (root / "permutation-1-and-2-gpu.json").write_text(
+        json.dumps(report), encoding="utf-8"
+    )
+
+
 def _build_campaign(root: Path):
     _build_case(root, "cnot-trained-qhat-1-gpu", 1, "qhat", 8, 11)
     left = _build_case(root, "cnot-trained-deep-paired-1-gpu", 1, "proposal", 2, 3)
     right = _build_case(root, "cnot-trained-deep-paired-2-gpu", 2, "proposal", 2, 3)
-    (root / "permutation-1-and-2-gpu.json").write_text(
-        json.dumps({"runs": [{"world_size": 1}, {"world_size": 2}]}), encoding="utf-8"
-    )
+    _write_permutation_report(root, _build_permutation_report())
     return left, right
 
 
@@ -119,6 +246,97 @@ class VerifyCnotGpuPairTests(unittest.TestCase):
                 ],
             )
             self.assertEqual(json.loads((root / "receipt.json").read_text())["gpu_test"], "passed")
+
+
+    def test_receipt_binds_saturated_permutation_report_and_parity(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            _build_campaign(root)
+            result = _validate(root)
+            report = json.loads((root / "permutation-1-and-2-gpu.json").read_text())
+            self.assertEqual(result["permutation_report_sha256"], report["report_sha256"])
+            self.assertEqual(result["permutation_saturated_world_sizes"], [1, 2])
+            self.assertTrue(result["permutation_saturated_survivor_hashes_match"])
+
+    def test_rejects_world_size_only_permutation_report(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            _build_campaign(root)
+            _write_permutation_report(root, {"runs": [{"world_size": 1}, {"world_size": 2}]})
+            with self.assertRaises(ValueError):
+                _validate(root)
+
+    def test_rejects_foreign_or_incomplete_saturated_permutation_evidence(self):
+        mutations = (
+            "source",
+            "wheel",
+            "run",
+            "no_digest",
+            "unsaturated",
+            "missing_rank",
+            "duplicate_pid",
+            "duplicate_uuid",
+            "rank_did_no_work",
+            "session_not_reused",
+            "winner_mismatch",
+            "smoke_not_reused",
+        )
+        for mutation in mutations:
+            with self.subTest(mutation=mutation), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                _build_campaign(root)
+                report_path = root / "permutation-1-and-2-gpu.json"
+                report = json.loads(report_path.read_text(encoding="utf-8"))
+                case = report["saturated_b3"][1]
+                rank = case["calls"][0]["rank_evidence"][0]
+                resign = True
+                if mutation == "source":
+                    report["source_sha"] = "f" * 40
+                elif mutation == "wheel":
+                    report["wheel_sha256"] = "e" * 64
+                elif mutation == "run":
+                    report["acceptance_run_id"] = "foreign-run"
+                elif mutation == "no_digest":
+                    report.pop("report_sha256", None)
+                    resign = False
+                elif mutation == "unsaturated":
+                    for saturated_case in report["saturated_b3"]:
+                        saturated_case["eligible_distinct"] = 3
+                        for call in saturated_case["calls"]:
+                            call["eligible_distinct"] = 3
+                            for evidence in call["rank_evidence"]:
+                                evidence["final_global_equal"] = 3
+                                evidence["final_total_available"] = 3
+                elif mutation == "missing_rank":
+                    case["calls"][0]["rank_evidence"].pop()
+                elif mutation == "duplicate_pid":
+                    case["calls"][0]["rank_evidence"][1]["pid"] = case["calls"][0]["rank_evidence"][0]["pid"]
+                elif mutation == "duplicate_uuid":
+                    case["calls"][0]["rank_evidence"][1]["gpu_uuid"] = case["calls"][0]["rank_evidence"][0]["gpu_uuid"]
+                elif mutation == "rank_did_no_work":
+                    rank["generated"] = 0
+                elif mutation == "session_not_reused":
+                    case["calls"][1]["session_reused"] = False
+                elif mutation == "winner_mismatch":
+                    case["ordered_survivor_hashes"][0]["hi"] = "f" * 16
+                elif mutation == "smoke_not_reused":
+                    report["runs"][1]["worker_pids_reused"] = False
+                if resign:
+                    report["report_sha256"] = _permutation_report_sha256(report)
+                _write_permutation_report(root, report)
+                with self.assertRaises(ValueError):
+                    _validate(root)
+
+    def test_rejects_permutation_report_body_changed_after_digest(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            _build_campaign(root)
+            report_path = root / "permutation-1-and-2-gpu.json"
+            report = json.loads(report_path.read_text(encoding="utf-8"))
+            report["saturated_b3"][0]["fixture_start"][0] ^= 1
+            _write_permutation_report(root, report)
+            with self.assertRaises(ValueError):
+                _validate(root)
 
     def test_rejects_different_pair_survivors_or_foreign_case_identity(self):
         for mutation in ("survivors", "case"):
