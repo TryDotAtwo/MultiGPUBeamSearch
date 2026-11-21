@@ -79,12 +79,10 @@ jobs:
         id: private_transport
         run: python tools/test_vast_result_transport.py -v
       - name: Test allowlisted public status receipt
-        if: always()
         id: public_status
         if: always()
         run: python tools/test_vast_public_status.py -v
       - name: Test redacted public reporting contract
-        if: always()
         id: public_redaction
         if: always()
         run: python tools/test_vast_campaign_workflow.py -v
