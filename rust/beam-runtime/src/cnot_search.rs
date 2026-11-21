@@ -300,7 +300,12 @@ mod tests {
         );
 
         assert_eq!(
-            select_dispatch(RequestedEngine::Auto, true, false, DispatchCapabilities::default()),
+            select_dispatch(
+                RequestedEngine::Auto,
+                true,
+                false,
+                DispatchCapabilities::default()
+            ),
             Ok(DispatchPath::PythonReference)
         );
         assert_eq!(
@@ -308,7 +313,12 @@ mod tests {
             Ok(DispatchPath::PythonReference)
         );
         assert_eq!(
-            select_dispatch(RequestedEngine::Rust, true, false, DispatchCapabilities::default()),
+            select_dispatch(
+                RequestedEngine::Rust,
+                true,
+                false,
+                DispatchCapabilities::default()
+            ),
             Err(DispatchError::RustControllerUnavailable)
         );
     }
