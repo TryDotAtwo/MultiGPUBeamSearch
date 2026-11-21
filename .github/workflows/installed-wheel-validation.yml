@@ -72,27 +72,27 @@ jobs:
         run: |
           set -o pipefail
           mkdir -p test_results/refactor_20261120/installed-wheel
-          python -m pip install --upgrade pip 2>&1 | tee test_results/refactor_20261120/installed-wheel/dependencies.log
-          python -m pip install numpy cayleypy==0.1.0 cmake ninja pytest 2>&1 | tee -a test_results/refactor_20261120/installed-wheel/dependencies.log
-          python -m pip install torch==2.9.0 --index-url https://download.pytorch.org/whl/cpu 2>&1 | tee -a test_results/refactor_20261120/installed-wheel/dependencies.log
+          python -m pip install --upgrade pip > "${RUNNER_TEMP}/mgbs-private-dependencies.log" 2>&1
+          python -m pip install numpy cayleypy==0.1.0 cmake ninja pytest >> "${RUNNER_TEMP}/mgbs-private-dependencies.log" 2>&1
+          python -m pip install torch==2.9.0 --index-url https://download.pytorch.org/whl/cpu >> "${RUNNER_TEMP}/mgbs-private-dependencies.log" 2>&1
       - name: Build the PEP 517 wheel
         id: wheel_build
         working-directory: integrations/cayleypy_native
         run: |
           set -o pipefail
           mkdir -p "$RUNNER_TEMP/mgbs-wheel-dist"
-          python -m pip wheel --verbose --no-deps --wheel-dir "$RUNNER_TEMP/mgbs-wheel-dist" . 2>&1 | tee "$GITHUB_WORKSPACE/test_results/refactor_20261120/installed-wheel/build.log"
+          python -m pip wheel --verbose --no-deps --wheel-dir "$RUNNER_TEMP/mgbs-wheel-dist" . > "${RUNNER_TEMP}/mgbs-private-build.log" 2>&1
       - name: Install wheel and validate from outside the checkout
         id: wheel_smoke
         run: |
           set -o pipefail
           wheel="$(find "$RUNNER_TEMP/mgbs-wheel-dist" -maxdepth 1 -type f -name 'multigpubeamsearch-*.whl' -print -quit)"
           test -n "$wheel"
-          python -m pip install "$wheel" 2>&1 | tee test_results/refactor_20261120/installed-wheel/install.log
-          python -m pip check 2>&1 | tee test_results/refactor_20261120/installed-wheel/pip-check.log
+          python -m pip install "$wheel" > "${RUNNER_TEMP}/mgbs-private-install.log" 2>&1
+          python -m pip check > "${RUNNER_TEMP}/mgbs-private-pip-check.log" 2>&1
           mkdir -p "$RUNNER_TEMP/mgbs-wheel-smoke"
           cd "$RUNNER_TEMP/mgbs-wheel-smoke"
-          env -u PYTHONPATH python "$GITHUB_WORKSPACE/integrations/cayleypy_native/tests/installed_wheel_smoke.py" 2>&1 | tee "$GITHUB_WORKSPACE/test_results/refactor_20261120/installed-wheel/smoke.log"
+          env -u PYTHONPATH python "$GITHUB_WORKSPACE/integrations/cayleypy_native/tests/installed_wheel_smoke.py" > "${RUNNER_TEMP}/mgbs-private-smoke.log" 2>&1
       - name: Verify vendored source headers invalidate the installed native fingerprint
         id: vendor_source_fingerprint
         run: |
@@ -101,14 +101,14 @@ jobs:
           cd "$RUNNER_TEMP/mgbs-wheel-smoke"
           env -u PYTHONPATH python -m pytest -vv \
             "$GITHUB_WORKSPACE/integrations/cayleypy_native/tests/test_build.py" \
-            -k 'vendored_headers or native_source_bundle' 2>&1 | tee "$GITHUB_WORKSPACE/test_results/refactor_20261121/vast-source-archive/fingerprint-test.log"
+            -k 'vendored_headers or native_source_bundle' > "${RUNNER_TEMP}/mgbs-private-fingerprint-test.log" 2>&1
       - name: Check Rust serde output against the shared CNOT event fixture
         id: event_serde
         run: |
           set -o pipefail
           mkdir -p "$GITHUB_WORKSPACE/test_results/refactor_20261121/rust-cnot-admission"
           cargo test --locked -p beam-python --no-default-features cnot_acceptance::tests::rust_serde_record_matches_the_shared_jsonl_producer_fixture -- --exact \
-            2>&1 | tee "$GITHUB_WORKSPACE/test_results/refactor_20261121/rust-cnot-admission/cnot-event-serde.log"
+            > "${RUNNER_TEMP}/mgbs-private-cnot-event-serde.log" 2>&1
       - name: Verify CNOT PyO3 dtype contracts with warnings as errors
         id: dtype
         env:
@@ -116,7 +116,7 @@ jobs:
         run: |
           set -o pipefail
           cd "$RUNNER_TEMP/mgbs-wheel-smoke"
-          env -u PYTHONPATH python "$GITHUB_WORKSPACE/integrations/cayleypy_native/tests/installed_cnot_dtype_contract.py" 2>&1 | tee "$GITHUB_WORKSPACE/test_results/refactor_20261120/installed-wheel/cnot-dtype.log"
+          env -u PYTHONPATH python "$GITHUB_WORKSPACE/integrations/cayleypy_native/tests/installed_cnot_dtype_contract.py" > "${RUNNER_TEMP}/mgbs-private-cnot-dtype.log" 2>&1
       - name: Verify strict CNOT backend admission on CPU Gloo
         id: backend_admission
         env:
@@ -124,7 +124,7 @@ jobs:
         run: |
           set -o pipefail
           cd "$RUNNER_TEMP/mgbs-wheel-smoke"
-          env -u PYTHONPATH python "$GITHUB_WORKSPACE/integrations/cayleypy_native/tests/installed_cnot_backend_admission.py" 2>&1 | tee "$GITHUB_WORKSPACE/test_results/refactor_20261120/installed-wheel/cnot-backend-admission.log"
+          env -u PYTHONPATH python "$GITHUB_WORKSPACE/integrations/cayleypy_native/tests/installed_cnot_backend_admission.py" > "${RUNNER_TEMP}/mgbs-private-cnot-backend-admission.log" 2>&1
       - name: Verify CNOT Gloo phase failures and live-group reuse
         id: phase_boundaries
         env:
@@ -134,24 +134,24 @@ jobs:
           cd "$RUNNER_TEMP/mgbs-wheel-smoke"
           timeout --signal=TERM --kill-after=15s 180s \
             env -u PYTHONPATH python "$GITHUB_WORKSPACE/integrations/cayleypy_native/tests/installed_cnot_phase_boundaries.py" \
-            2>&1 | tee "$GITHUB_WORKSPACE/test_results/refactor_20261120/installed-wheel/cnot-phase-boundaries.log"
+            > "${RUNNER_TEMP}/mgbs-private-cnot-phase-boundaries.log" 2>&1
       - name: Verify run-scoped CNOT backend event receipts
         id: acceptance_events
         run: |
           set -o pipefail
-          python "$GITHUB_WORKSPACE/tools/test_cnot_acceptance_events.py" -v 2>&1 | tee "$GITHUB_WORKSPACE/test_results/refactor_20261121/rust-cnot-admission/cnot-acceptance-events.log"
+          python "$GITHUB_WORKSPACE/tools/test_cnot_acceptance_events.py" -v > "${RUNNER_TEMP}/mgbs-private-cnot-acceptance-events.log" 2>&1
       - name: Verify CNOT reference-score ordering and boundary ties
         id: cnot_reference_order
         run: |
           set -o pipefail
           mkdir -p "$GITHUB_WORKSPACE/test_results/refactor_20261121/rust-cnot-admission"
           python -m py_compile "$GITHUB_WORKSPACE/tools/test_cnot_reference_order.py"
-          env -u PYTHONPATH python "$GITHUB_WORKSPACE/tools/test_cnot_reference_order.py" -v 2>&1 | tee "$GITHUB_WORKSPACE/test_results/refactor_20261121/rust-cnot-admission/cnot-reference-order.log"
+          env -u PYTHONPATH python "$GITHUB_WORKSPACE/tools/test_cnot_reference_order.py" -v > "${RUNNER_TEMP}/mgbs-private-cnot-reference-order.log" 2>&1
       - name: Verify paired CNOT acceptance result binding on CPU
         id: cnot_pair_verifier
         run: |
           set -o pipefail
-          python "$GITHUB_WORKSPACE/tools/test_verify_cnot_gpu_pair.py" -v 2>&1 | tee "$GITHUB_WORKSPACE/test_results/refactor_20261121/rust-cnot-admission/cnot-pair-verifier.log"
+          python "$GITHUB_WORKSPACE/tools/test_verify_cnot_gpu_pair.py" -v > "${RUNNER_TEMP}/mgbs-private-cnot-pair-verifier.log" 2>&1
       - name: Verify saturated permutation acceptance contracts on CPU
         id: permutation_acceptance_cpu
         run: |
@@ -159,7 +159,7 @@ jobs:
           mkdir -p "$GITHUB_WORKSPACE/test_results/refactor_20261121/permutation-acceptance"
           python -m py_compile "$GITHUB_WORKSPACE/tools/permutation_acceptance.py" "$GITHUB_WORKSPACE/tools/test_permutation_acceptance.py" "$GITHUB_WORKSPACE/tools/verify_permutation_cuda.py"
           bash -n "$GITHUB_WORKSPACE/tools/vast_cnot_gpu_acceptance.sh"
-          python "$GITHUB_WORKSPACE/tools/test_permutation_acceptance.py" -v 2>&1 | tee "$GITHUB_WORKSPACE/test_results/refactor_20261121/permutation-acceptance/cpu-contract.log"
+          python "$GITHUB_WORKSPACE/tools/test_permutation_acceptance.py" -v > "${RUNNER_TEMP}/mgbs-private-cpu-contract.log" 2>&1
       - name: Verify the installed wheel packages CUDA identity helper
         id: wheel_gpu_identity
         working-directory: ${{ runner.temp }}
@@ -181,8 +181,8 @@ jobs:
           timeout --signal=TERM --kill-after=15s 180s \
             env -u PYTHONPATH python -m torch.distributed.run --standalone --nproc_per_node=2 \
             "$GITHUB_WORKSPACE/integrations/cayleypy_native/tests/installed_verify_cnot_gloo_lifecycle.py" \
-            2>&1 | tee "$GITHUB_WORKSPACE/test_results/refactor_20261121/rust-cnot-admission/verify-cnot-gloo-lifecycle.log"
-          python - "$RUNNER_TEMP" <<'PY' 2>&1 | tee -a "$GITHUB_WORKSPACE/test_results/refactor_20261121/rust-cnot-admission/verify-cnot-gloo-lifecycle.log"
+            > "${RUNNER_TEMP}/mgbs-private-verify-cnot-gloo-lifecycle.log" 2>&1
+          python - "$RUNNER_TEMP" <<'PY' >> "${RUNNER_TEMP}/mgbs-private-verify-cnot-gloo-lifecycle.log" 2>&1
           import json
           from pathlib import Path
           import sys
@@ -211,7 +211,7 @@ jobs:
           env -u PYTHONPATH python "$GITHUB_WORKSPACE/tools/verify_cnot.py" \
             --case wide --backend gloo --engine rust \
             --output "$GITHUB_WORKSPACE/test_results/refactor_20261120/installed-wheel/cnot-wide-rust.json" \
-            2>&1 | tee "$GITHUB_WORKSPACE/test_results/refactor_20261120/installed-wheel/cnot-wide-rust.log"
+            > "${RUNNER_TEMP}/mgbs-private-cnot-wide-rust.log" 2>&1
       - name: Lint the new-host acceptance workflow
         id: vast_workflow_lint
         if: always()
@@ -221,58 +221,27 @@ jobs:
           go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12 \
             .github/workflows/vast-cnot-control-collectives.yml \
             .github/workflows/vast-campaign-watchdog.yml \
-            2>&1 | tee "$GITHUB_WORKSPACE/test_results/refactor_20261121/rust-cnot-admission/vast-workflow-actionlint.log"
-      - name: Write hosted verification status board
+            > "${RUNNER_TEMP}/mgbs-private-vast-workflow-actionlint.log" 2>&1
+      - name: Write redacted hosted validation status
         if: always()
         env:
-          TOOLCHAIN: ${{ steps.rust_toolchain.outcome }}
-          DEPENDENCIES: ${{ steps.dependencies.outcome }}
-          WHEEL_BUILD: ${{ steps.wheel_build.outcome }}
-          WHEEL_SMOKE: ${{ steps.wheel_smoke.outcome }}
-          DTYPE: ${{ steps.dtype.outcome }}
-          BACKEND_ADMISSION: ${{ steps.backend_admission.outcome }}
-          PHASE_BOUNDARIES: ${{ steps.phase_boundaries.outcome }}
-          PUBLIC_SEARCH: ${{ steps.public_search.outcome }}
-          ACCEPTANCE_EVENTS: ${{ steps.acceptance_events.outcome }}
-          CNOT_REFERENCE_ORDER: ${{ steps.cnot_reference_order.outcome }}
-          CNOT_PAIR_VERIFIER: ${{ steps.cnot_pair_verifier.outcome }}
-          VERIFY_CNOT_LIFECYCLE: ${{ steps.verify_cnot_lifecycle.outcome }}
-          EVENT_SERDE: ${{ steps.event_serde.outcome }}
-          VAST_WORKFLOW_LINT: ${{ steps.vast_workflow_lint.outcome }}
-          PERMUTATION_ACCEPTANCE_CPU: ${{ steps.permutation_acceptance_cpu.outcome }}
+          SOURCE_OUTCOME: ${{ job.status }}
+        shell: bash
         run: |
-          set -euo pipefail
-          mkdir -p test_results/refactor_20261121/rust-cnot-admission
-          cat > test_results/refactor_20261121/rust-cnot-admission/hosted-run.md <<EOF
-          # Hosted CPU and installed-wheel validation
-
-          - Source SHA: ${GITHUB_SHA}
-          - Rust toolchain: ${TOOLCHAIN}
-          - CPU runtime dependencies: ${DEPENDENCIES}
-          - PEP 517 wheel build: ${WHEEL_BUILD}
-          - Installed-wheel public API smoke: ${WHEEL_SMOKE}
-          - CNOT dtype contract with deprecation warnings as errors: ${DTYPE}
-          - Strict backend admission and activation mismatch over two-rank Gloo: ${BACKEND_ADMISSION}
-          - Winner packet/history failure injection and live-group reuse: ${PHASE_BOUNDARIES}
-          - Public CNOT Rust-controller search: ${PUBLIC_SEARCH}
-          - Run-scoped backend event protocol and negative validator fixtures: ${ACCEPTANCE_EVENTS}
-          - CNOT scorer-reference cutoff, exact ties and ambiguous boundary: ${CNOT_REFERENCE_ORDER}
-          - Final paired CNOT campaign verifier and per-rank identity binding: ${CNOT_PAIR_VERIFIER}
-          - Independent saturated permutation CPU oracle, strict trace parser and production source contracts: ${PERMUTATION_ACCEPTANCE_CPU}
-          - Physical saturated permutation 1/2 GPU case: not run by hosted CPU workflow.
-          - Rust serde producer matches the JSONL fixture consumed by the verifier: ${EVENT_SERDE}
-          - Actual verify_cnot entry under two-rank Gloo with rank-local scorer failures and subsequent healthy runs: ${VERIFY_CNOT_LIFECYCLE}
-          - New-host GPU workflow scheduling and expression validation: ${VAST_WORKFLOW_LINT}
-          - CUDA/NCCL physical acceptance: not run by this CPU workflow.
-          EOF
-      - name: Upload wheel validation logs
+          python3 tools/vast_public_status.py \
+            --source-outcome "$SOURCE_OUTCOME" \
+            --inventory-query not_run \
+            --preflight-outcome skipped \
+            --gpu-outcome skipped \
+            --cleanup-outcome skipped \
+            --watchdog-outcome skipped \
+            --output "${RUNNER_TEMP}/cnot-public-status.json" \
+            --summary "$GITHUB_STEP_SUMMARY"
+      - name: Upload redacted hosted validation status
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: installed-python-wheel-validation
-          path: |
-            test_results/refactor_20261120/installed-wheel
-            test_results/refactor_20261121/rust-cnot-admission/hosted-run.md
-            test_results/refactor_20261121/permutation-acceptance
+          name: cnot-installed-wheel-status-${{ github.run_id }}
+          path: ${{ runner.temp }}/cnot-public-status.json
           if-no-files-found: error
-          retention-days: 30
+          retention-days: 7
