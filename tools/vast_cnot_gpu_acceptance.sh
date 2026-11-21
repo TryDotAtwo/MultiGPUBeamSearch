@@ -80,6 +80,38 @@ PY
 "$wheel_python" -m pip check
 cd "${run_root}/wheel-smoke"
 unset PYTHONPATH
+cutlass_dir="$("$wheel_python" - "$source_dir" "${run_root}/permutation-cache" <<'PY'
+import json, sys
+from pathlib import Path
+
+import cayleypy
+import torch
+from multigpubeamsearch.build import discover_nccl
+from multigpubeamsearch.options import NativeOptions
+from multigpubeamsearch.sources import CUTLASS_SOURCE, setup_sources
+
+if not hasattr(cayleypy, "CayleyGraph"):
+    raise SystemExit("the acceptance Python environment lacks the CayleyPy graph API")
+nccl = discover_nccl()
+options = setup_sources(
+    options=NativeOptions(source_dir=Path(sys.argv[1]), cache_dir=Path(sys.argv[2])),
+)
+cutlass = options.cutlass_dir
+if cutlass is None or not (cutlass / "include/cutlass/cutlass.h").is_file():
+    raise SystemExit("the pinned CUTLASS source cache is incomplete")
+print("PERMUTATION_BUILD_INPUTS=" + json.dumps({
+    "cayleypy": getattr(cayleypy, "__version__", "installed"),
+    "torch": str(torch.__version__),
+    "nccl_header_sha256": nccl["header_sha256"],
+    "nccl_library_sha256": nccl["library_sha256"],
+    "cutlass_revision": CUTLASS_SOURCE.revision,
+    "cutlass_archive_sha256": CUTLASS_SOURCE.sha256,
+    "cutlass_source": str(cutlass),
+}, sort_keys=True), file=sys.stderr)
+print(cutlass)
+PY
+)"
+[[ -n "$cutlass_dir" && -s "${cutlass_dir}/include/cutlass/cutlass.h" ]]
 GITHUB_WORKSPACE="$source_dir" "$wheel_python" "$source_dir/integrations/cayleypy_native/tests/installed_wheel_smoke.py"
 
 scorer_build="${run_root}/private-cnot-scorer"
@@ -110,7 +142,7 @@ export TORCH_EXTENSIONS_DIR="${run_root}/torch-extensions"
 export RUST_BACKTRACE=1
 mkdir -p "$CNOT_RUST_EVIDENCE"
 MGBS_TQP_LIBRARY="$scorer_library" MGBS_TQP_MANIFEST="$manifest" "$wheel_python" -m unittest discover -s "$source_dir/integrations/cayleypy_native/tests" -p test_cnot_scorer.py -v
-"$wheel_python" "$source_dir/tools/verify_permutation_cuda.py" --source-dir "$source_dir" --cache-dir "${run_root}/permutation-cache" --output "${result_dir}/permutation-1-and-2-gpu.json"
+"$wheel_python" "$source_dir/tools/verify_permutation_cuda.py" --source-dir "$source_dir" --cache-dir "${run_root}/permutation-cache" --cutlass-dir "$cutlass_dir" --output "${result_dir}/permutation-1-and-2-gpu.json"
 
 expected_checkpoint_sha="$expected_checkpoint"
 # Paired topology gate: same GL4 root/head/checkpoint/mode/B/K/precision.

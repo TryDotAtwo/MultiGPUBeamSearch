@@ -77,10 +77,11 @@ def write_zero_mlp(root, contract):
         (root / f"{name}.fp16").write_bytes(b"\x00\x00" * count)
 
 
-def run_layout(graph, contract, model, source_dir, cache_dir, devices, exact_distance, scramble):
+def run_layout(graph, contract, model, source_dir, cache_dir, cutlass_dir, devices, exact_distance, scramble):
     options = NativeOptions(
         source_dir=source_dir,
         cache_dir=cache_dir,
+        cutlass_dir=cutlass_dir,
         devices=devices,
     )
     with NativeSession(engine="rust") as session:
@@ -157,8 +158,13 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source-dir", type=Path, required=True)
     parser.add_argument("--cache-dir", type=Path, required=True)
+    parser.add_argument("--cutlass-dir", type=Path, required=True,
+                        help="verified, pinned CUTLASS source prepared before the GPU smoke")
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
+
+    if not (args.cutlass_dir / "include/cutlass/cutlass.h").is_file():
+        raise SystemExit(f"verified CUTLASS headers are missing: {args.cutlass_dir}")
 
     if not torch.cuda.is_available() or torch.cuda.device_count() < 2:
         raise SystemExit("the acceptance fixture requires the existing two-GPU CUDA instance")
@@ -174,8 +180,10 @@ def main():
     model = NativeModel(model_dir, contract.graph_hash)
 
     reports = [
-        run_layout(graph, contract, model, args.source_dir.resolve(), args.cache_dir.resolve(), (0,), exact, scramble),
-        run_layout(graph, contract, model, args.source_dir.resolve(), args.cache_dir.resolve(), (0, 1), exact, scramble),
+        run_layout(graph, contract, model, args.source_dir.resolve(), args.cache_dir.resolve(),
+                   args.cutlass_dir.resolve(), (0,), exact, scramble),
+        run_layout(graph, contract, model, args.source_dir.resolve(), args.cache_dir.resolve(),
+                   args.cutlass_dir.resolve(), (0, 1), exact, scramble),
     ]
     report = {
         "fixture": "cayleypy.LRX(4)",

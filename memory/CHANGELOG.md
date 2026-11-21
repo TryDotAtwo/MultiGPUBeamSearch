@@ -3225,5 +3225,12 @@ Main commit `148b2a826a369b7601e904ea409e0cc5301c75c9` also passed the 260-test 
 - Added one source contract shared by Vast archive creation, wheel bundle
   validation, and native fingerprinting. It includes the vendor tree and
   rejects missing required files even when the generated bundle manifest omits
-  them. Hosted archive, wheel bundle and build-key checks are implemented;
-  their GREEN run is pending. No paid run started.
+  them. Hosted source harness `44916537646` passed real archive creation,
+  extraction and missing-header cases. Installed-wheel run `44916537642`
+  passed both fingerprint changes and bundle rejection when a required header
+  is omitted from the generated manifest. Its GPU job was skipped; no paid run
+  started.
+- The remote preflight checks CayleyPy before long builds; the worker validates
+  NCCL header/library and resolves the pinned, SHA-verified CUTLASS cache before
+  GPU compilation, passing that explicit path into the permutation smoke.
+  Hosted verification is pending.

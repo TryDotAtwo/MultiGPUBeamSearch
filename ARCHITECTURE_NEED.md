@@ -32,8 +32,16 @@ Vast packager создаёт source archive из объявленных roots и
 даже если generated file manifest пропустил один из них; native fingerprint
 включает объявленные roots и vendor headers. Hosted RED `44914169925`
 подтвердил отсутствие packager, а `44914169994` — отсутствие vendor headers в
-fingerprint. Реализация теперь в PR-ветке; hosted GREEN ожидается. Платный
-запуск не выполнялся.
+fingerprint. Hosted source harness `44916537646` прошёл упаковку, распаковку и
+negative fixtures для обоих headers. Installed-wheel run `44916537642` прошёл
+проверки двух vendor fingerprint и обязательного bundle header. Их GPU job
+был `skipped`; платный запуск не выполнялся.
+
+Remote preflight также проверяет API CayleyPy до сборок. После установки wheel
+worker проверяет NCCL header/library и готовит pinned CUTLASS через source
+cache с проверкой SHA до нативной GPU-компиляции. Путь CUTLASS передаётся
+permutation smoke явно, поэтому поиск не должен запускать скрытую загрузку
+зависимости. Для этих проверок hosted GREEN ещё не получен.
 
 ## CNOT SIGINT handling across ranks, 2026-11-20
 

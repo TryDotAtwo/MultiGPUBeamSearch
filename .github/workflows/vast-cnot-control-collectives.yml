@@ -130,6 +130,8 @@ jobs:
           verify_cnot_source = Path("tools/verify_cnot.py").read_text(encoding="utf-8")
           if "tools/create_vast_source_archive.py" not in source:
               raise SystemExit("the Vast workflow must use the tested canonical source packager")
+          if '--cutlass-dir "$cutlass_dir"' not in worker_text or "discover_nccl()" not in worker_text:
+              raise SystemExit("permutation build must receive prevalidated CUTLASS and NCCL inputs")
           if "REMOTE_ROOT" in payload_text:
               raise SystemExit("the SSH remote payload must derive result_dir from positional run_root")
           if 'bash "$source_dir/tools/vast_cnot_gpu_acceptance.sh"' not in payload_text:
@@ -403,7 +405,9 @@ jobs:
           PY
           for tool in python3 git cmake ninja cargo rustc cc nvcc; do command -v "$tool" >/dev/null; done
           python3 - <<'PY'
-          import json, re, subprocess, torch
+          import cayleypy, json, re, subprocess, torch
+          if not hasattr(cayleypy, "CayleyGraph"):
+              raise SystemExit("the target Python environment lacks the CayleyPy graph API")
           if torch.__version__.split("+")[0] != "2.9.0":
               raise SystemExit(f"expected PyTorch 2.9.0, found {torch.__version__}")
           if not torch.cuda.is_available() or torch.cuda.device_count() != 2:
