@@ -5,7 +5,8 @@ from __future__ import annotations
 
 import argparse
 from datetime import datetime, timezone
-from decimal import Decimal, InvalidOperation, ROUND_FLOOR
+from decimal import Decimal, InvalidOperation
+from fractions import Fraction
 import ipaddress
 import json
 import re
@@ -125,7 +126,9 @@ def acceptance_plan(
         raise ValueError("Vast API instance start_date is in the future")
     host, port = _ssh_endpoint(row)
 
-    lifetime_budget_seconds = int((spend_cap / rate * Decimal(3600)).to_integral_value(rounding=ROUND_FLOOR))
+    # Divide exact decimal rationals so a repeating quotient such as
+    # $10 / $0.48/hour does not round down from 75,000 to 74,999 seconds.
+    lifetime_budget_seconds = int(Fraction(spend_cap) * 3600 // Fraction(rate))
     elapsed_seconds = max(0, int(now - start))
     remaining_before_reserve = lifetime_budget_seconds - elapsed_seconds
     setup_transfer_reserve = (
