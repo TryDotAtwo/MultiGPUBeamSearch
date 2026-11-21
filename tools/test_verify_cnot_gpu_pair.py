@@ -153,6 +153,57 @@ class VerifyCnotGpuPairTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     _validate(root)
 
+    def test_rejects_report_world_mutated_after_case_validation(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            _build_campaign(root)
+            path = root / "cnot-trained-deep-paired-2-gpu.json"
+            report = json.loads(path.read_text(encoding="utf-8"))
+            report["world"] = 1
+            path.write_text(json.dumps(report), encoding="utf-8")
+            with self.assertRaises(ValueError):
+                _validate(root)
+
+    def test_rejects_missing_report_digest_root_or_survivor_hashes(self):
+        mutations = ("report_sha256", "root_sha256", "winners_sha256")
+        for mutation in mutations:
+            with self.subTest(mutation=mutation), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                _build_campaign(root)
+                names = (
+                    "cnot-trained-qhat-1-gpu.json",
+                    "cnot-trained-deep-paired-1-gpu.json",
+                    "cnot-trained-deep-paired-2-gpu.json",
+                )
+                for name in names:
+                    path = root / name
+                    report = json.loads(path.read_text(encoding="utf-8"))
+                    if mutation == "report_sha256":
+                        report["acceptance"].pop("report_sha256", None)
+                    elif mutation == "root_sha256":
+                        report.pop("root_sha256", None)
+                    else:
+                        for layer in report["layers"]:
+                            layer.pop("winners_sha256", None)
+                    path.write_text(json.dumps(report), encoding="utf-8")
+                with self.assertRaises(ValueError):
+                    _validate(root)
+
+    def test_backend_verdict_carries_and_matches_report_digest(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            _build_campaign(root)
+            report_path = root / "cnot-trained-deep-paired-2-gpu.json"
+            report = json.loads(report_path.read_text(encoding="utf-8"))
+            report_digest = protocol.report_sha256(report)
+            receipt_path = root / "backend-events" / "cnot-trained-deep-paired-2-gpu.json"
+            backend_receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+            self.assertEqual(backend_receipt.get("report_sha256"), report_digest)
+            backend_receipt["report_sha256"] = "9" * 64
+            receipt_path.write_text(json.dumps(backend_receipt), encoding="utf-8")
+            with self.assertRaises(ValueError):
+                _validate(root)
+
     def test_rejects_legacy_or_non_decimal_instance_identity(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
