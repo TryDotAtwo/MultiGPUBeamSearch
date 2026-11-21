@@ -429,12 +429,13 @@ class NativeSession:
                         and self.model_snapshot_cache.needs_fresh_worker_snapshot(model, contract)):
                     model = self.model_snapshot_cache.refresh_for_worker(model, contract, run_dir)
                 artifact_sizes = getattr(model, 'artifact_sizes', ())
+                from .rust_control import options_descriptor
                 session_identity = {
                     'geometry': [getattr(contract, name, None)
                                  for name in ('state_len', 'num_classes', 'move_count')],
                     'artifact_sizes': None if artifact_sizes is None else list(artifact_sizes),
                     'binding_scope': binding_scope,
-                    'options_repr': repr(options),
+                    'options': options_descriptor(options),
                 }
                 self._pending = {
                     'model': model,
