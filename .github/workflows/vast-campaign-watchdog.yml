@@ -43,7 +43,6 @@ jobs:
           set -euo pipefail
           report="test_results/refactor_20261121/vast-campaign-watchdog/watchdog-${GITHUB_RUN_ID}.json"
           python3 tools/vast_campaign_watchdog.py --report "$report"
-          cat "$report"
           python3 - "$report" "$GITHUB_STEP_SUMMARY" <<'PY'
           import json, pathlib, sys
           report = json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))

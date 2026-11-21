@@ -299,7 +299,7 @@ class VastResultTransportTests(unittest.TestCase):
     def test_private_results_stay_on_vast_after_successful_run(self):
         completed, archive_path, events = self.run_transport(remote_exit=0)
         self.assertEqual(completed.returncode, 0, completed.stdout + completed.stderr)
-        self.assertEqual(completed.stdout, "REMOTE_GPU_STATUS=passed\\n")
+        self.assertEqual(completed.stdout, "REMOTE_GPU_STATUS=passed\n")
         self.assertNotIn("synthetic GPU execution log", completed.stdout + completed.stderr)
         self.assertFalse(archive_path.exists(), "private results must stay on Vast")
         self.assertEqual(events, ["master", "remote", "close"])
@@ -307,7 +307,7 @@ class VastResultTransportTests(unittest.TestCase):
     def test_private_failure_details_stay_on_vast(self):
         completed, archive_path, events = self.run_transport(remote_exit=17)
         self.assertEqual(completed.returncode, 17, completed.stdout + completed.stderr)
-        self.assertEqual(completed.stdout, "REMOTE_GPU_STATUS=failed\\n")
+        self.assertEqual(completed.stdout, "REMOTE_GPU_STATUS=failed\n")
         self.assertNotIn("synthetic GPU execution log", completed.stdout + completed.stderr)
         self.assertFalse(archive_path.exists(), "failed private results must stay on Vast")
         self.assertEqual(events, ["master", "remote", "close"])
@@ -317,7 +317,7 @@ class VastResultTransportTests(unittest.TestCase):
             remote_exit=0, deadline_seconds_from_now=100
         )
         self.assertNotEqual(completed.returncode, 0, completed.stdout + completed.stderr)
-        self.assertEqual(completed.stdout, "REMOTE_GPU_STATUS=not_started\\n")
+        self.assertEqual(completed.stdout, "REMOTE_GPU_STATUS=not_started\n")
         self.assertEqual(completed.stderr, "")
         self.assertFalse(archive_path.exists(), "private results must remain on Vast")
         self.assertEqual(events, ["master", "close"])
@@ -327,7 +327,7 @@ class VastResultTransportTests(unittest.TestCase):
             remote_exit=17, fail_deadline_phase="retrieval"
         )
         self.assertEqual(completed.returncode, 17, completed.stdout + completed.stderr)
-        self.assertEqual(completed.stdout, "REMOTE_GPU_STATUS=failed\\n")
+        self.assertEqual(completed.stdout, "REMOTE_GPU_STATUS=failed\n")
         self.assertEqual(completed.stderr, "")
         self.assertFalse(archive_path.exists(), "result retrieval must be disabled")
         self.assertEqual(events, ["master", "remote", "close"])

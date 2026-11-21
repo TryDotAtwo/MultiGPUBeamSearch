@@ -1,3 +1,9 @@
+## 2026-11-22 - Keep watchdog detail reports out of public logs
+
+- Removed raw Vast watchdog report output from the GitHub Actions log. The workflow continues to publish only its allowlisted summary and redacted status artifact.
+- Updated the hosted workflow contract fixture for the current run label and corrected newline expectations in the result-transport tests.
+- Hosted CPU source validation is pending for this change.
+
 ## 2026-11-22 - Compare CNOT cutoff with independent scorer reference
 
 - Extended the CNOT acceptance verifier to record an independent scorer-reference ordering at each layer cutoff. Reports mark underfilled, exact full-path ties, reference-separated cutoffs and boundaries ambiguous within score tolerance; reported-score selection is asserted against the reference only when the boundary is determinate.

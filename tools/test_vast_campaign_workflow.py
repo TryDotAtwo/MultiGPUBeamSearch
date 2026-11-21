@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 class VastCampaignWorkflowTests(unittest.TestCase):
     def test_campaign_marker_and_cleanup_are_bound_to_one_instance(self):
         workflow = (ROOT / ".github/workflows/vast-cnot-control-collectives.yml").read_text(encoding="utf-8")
-        self.assertIn("run-name: CNOT GPU acceptance", workflow)
+        self.assertIn("run-name: mgbs-cnot-acceptance instance=", workflow)
         contract = (ROOT / "tools/vast_instance_contract.py").read_text(encoding="utf-8")
         self.assertNotIn("safe_to_stop", contract)
         self.assertIn("group: vast-cnot-control-acceptance", workflow)
