@@ -1,3 +1,10 @@
+## 2026-11-22 - Resolve CNOT controller choice in beam-runtime
+
+- Moved the `auto/python/rust` decision table from the PyO3 adapter into typed `beam-runtime::cnot_search` policy. The adapter retains public value normalization and delegates the decision; oversized depth still selects the reference path for `auto` and `python`, while explicit Rust fails with the same error.
+- Added Rust unit coverage for all selection branches. The installed-wheel two-rank Gloo verifier now runs its healthy retries with `engine=auto` and fails if the Python reference-loop callback is entered; rank-local scorer failures remain explicitly on Rust.
+- Final same-SHA hosted checks passed at `0606965a210c9cc2417b729433471e3d5ca6988c`: CNOT CPU/Gloo [run 44956473123](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44956473123), installed PEP 517 wheel [run 44956473162](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44956473162), source acceptance harness [run 44956473161](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44956473161). Physical GPU work was skipped.
+- Search kernels, score ordering, precision and public API did not change. Full CNOT context ownership and physical CUDA/NCCL verification remain open.
+
 ## 2026-11-22 - Verify default CNOT Rust controller dispatch
 
 - Extended the installed-wheel `verify_cnot.main` Gloo lifecycle check: explicit `engine=rust` remains on injected scorer failures, while healthy retries use public `engine=auto` with the Python reference-loop callback replaced by a failing sentinel.
