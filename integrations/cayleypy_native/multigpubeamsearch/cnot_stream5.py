@@ -11,6 +11,8 @@ import sys
 import torch
 import torch.distributed as dist
 
+from .cnot_acceptance import emit_event
+
 
 def _build_stream5():
     from torch.utils.cpp_extension import load
@@ -110,15 +112,23 @@ class RustStream5:
     def _trace_dispatch(self, operation, rows=None):
         if os.environ.get("MGBS_CNOT_STRICT_BACKEND") != "1":
             return
-        suffix = "" if rows is None else f" rows={rows}"
-        print(
-            "CNOT_RUST_STREAM5_DISPATCH "
-            f"rank={self.world.rank} world={self.world.size} pid={os.getpid()} device={self.world.device} "
-            f"implementation=RustStream5/NCCL operation={operation} "
-            f"abi=1 library_sha256={self.library_sha256}{suffix}",
-            file=sys.stderr,
-            flush=True,
-        )
+        fields = {
+            "implementation": "RustStream5/NCCL",
+            "operation": operation,
+            "abi": "1",
+            "owned_abi": "1",
+            "exchange_abi": "1",
+            "library_sha256": self.library_sha256,
+        }
+        if rows is not None:
+            fields["rows"] = str(rows)
+        try:
+            emit_event("stream5_dispatch", self.world, fields)
+        except Exception as error:
+            # The collective has already completed. Leave the missing receipt
+            # for the final verifier to reject without splitting the ranks.
+            print(f"CNOT_ACCEPTANCE_RECEIPT_WRITE_ERROR {type(error).__name__}: {error}",
+                  file=sys.stderr, flush=True)
 
     def close(self, *, abort):
         self.comm.close(abort)

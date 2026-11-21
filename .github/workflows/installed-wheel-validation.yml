@@ -13,6 +13,10 @@ on:
       - integrations/cayleypy_native/tests/installed_cnot_dtype_contract.py
       - integrations/cayleypy_native/tests/installed_cnot_backend_admission.py
       - integrations/cayleypy_native/tests/installed_cnot_phase_boundaries.py
+      - integrations/cayleypy_native/tests/installed_verify_cnot_gloo_lifecycle.py
+      - tools/cnot_acceptance_events.py
+      - tools/test_cnot_acceptance_events.py
+      - tools/fixtures/cnot_acceptance_event_v1.jsonl
       - integrations/cayleypy_native/tests/cnot_device_domain_admission_fixture.c
       - tools/verify_cnot.py
       - integrations/cayleypy_native/pyproject.toml
@@ -68,6 +72,13 @@ jobs:
           mkdir -p "$RUNNER_TEMP/mgbs-wheel-smoke"
           cd "$RUNNER_TEMP/mgbs-wheel-smoke"
           env -u PYTHONPATH python "$GITHUB_WORKSPACE/integrations/cayleypy_native/tests/installed_wheel_smoke.py" 2>&1 | tee "$GITHUB_WORKSPACE/test_results/refactor_20261120/installed-wheel/smoke.log"
+      - name: Check Rust serde output against the shared CNOT event fixture
+        id: event_serde
+        run: |
+          set -o pipefail
+          mkdir -p "$GITHUB_WORKSPACE/test_results/refactor_20261121/rust-cnot-admission"
+          cargo test --locked -p beam-python cnot_acceptance::tests::rust_serde_record_matches_the_shared_jsonl_producer_fixture -- --exact \
+            2>&1 | tee "$GITHUB_WORKSPACE/test_results/refactor_20261121/rust-cnot-admission/cnot-event-serde.log"
       - name: Verify CNOT PyO3 dtype contracts with warnings as errors
         id: dtype
         env:
@@ -92,6 +103,43 @@ jobs:
           set -o pipefail
           cd "$RUNNER_TEMP/mgbs-wheel-smoke"
           env -u PYTHONPATH python "$GITHUB_WORKSPACE/integrations/cayleypy_native/tests/installed_cnot_phase_boundaries.py" 2>&1 | tee "$GITHUB_WORKSPACE/test_results/refactor_20261120/installed-wheel/cnot-phase-boundaries.log"
+      - name: Verify run-scoped CNOT backend event receipts
+        id: acceptance_events
+        run: |
+          set -o pipefail
+          python "$GITHUB_WORKSPACE/tools/test_cnot_acceptance_events.py" -v 2>&1 | tee "$GITHUB_WORKSPACE/test_results/refactor_20261121/rust-cnot-admission/cnot-acceptance-events.log"
+      - name: Exercise verify_cnot World lifecycle with two Gloo ranks
+        id: verify_cnot_lifecycle
+        env:
+          GITHUB_WORKSPACE: ${{ github.workspace }}
+          RUNNER_TEMP: ${{ runner.temp }}
+        run: |
+          set -o pipefail
+          cd "$RUNNER_TEMP/mgbs-wheel-smoke"
+          timeout --signal=TERM --kill-after=15s 180s \
+            env -u PYTHONPATH python -m torch.distributed.run --standalone --nproc_per_node=2 \
+            "$GITHUB_WORKSPACE/integrations/cayleypy_native/tests/installed_verify_cnot_gloo_lifecycle.py" \
+            2>&1 | tee "$GITHUB_WORKSPACE/test_results/refactor_20261121/rust-cnot-admission/verify-cnot-gloo-lifecycle.log"
+          python - "$RUNNER_TEMP" <<'PY' 2>&1 | tee -a "$GITHUB_WORKSPACE/test_results/refactor_20261121/rust-cnot-admission/verify-cnot-gloo-lifecycle.log"
+          import json
+          from pathlib import Path
+          import sys
+
+          root = Path(sys.argv[1])
+          rows = [json.loads((root / f"verify-cnot-lifecycle-rank-{rank}.json").read_text()) for rank in range(2)]
+          if rows[0] != rows[1]:
+              raise SystemExit(f"ranks observed different failure phases: {rows}")
+          if [item["failed_rank"] for item in rows[0]] != [0, 1]:
+              raise SystemExit(f"missing rank-local failure scenarios: {rows[0]}")
+          for item in rows[0]:
+              if "load trained scorer failed" not in item["error"]:
+                  raise SystemExit(f"failure escaped the expected common phase: {item}")
+          for index in range(2):
+              report = json.loads((root / f"healthy-after-{index}.json").read_text())
+              if report.get("status") != "solved" or not report.get("bitwise_replay"):
+                  raise SystemExit(f"healthy follow-up search failed: {report}")
+          print("VERIFY_CNOT_GLOO_RANK_FAILURES_AND_REUSE_PASS")
+          PY
       - name: Run public CNOT search through the installed wheel
         id: public_search
         run: |
@@ -122,6 +170,9 @@ jobs:
           BACKEND_ADMISSION: ${{ steps.backend_admission.outcome }}
           PHASE_BOUNDARIES: ${{ steps.phase_boundaries.outcome }}
           PUBLIC_SEARCH: ${{ steps.public_search.outcome }}
+          ACCEPTANCE_EVENTS: ${{ steps.acceptance_events.outcome }}
+          VERIFY_CNOT_LIFECYCLE: ${{ steps.verify_cnot_lifecycle.outcome }}
+          EVENT_SERDE: ${{ steps.event_serde.outcome }}
           VAST_WORKFLOW_LINT: ${{ steps.vast_workflow_lint.outcome }}
         run: |
           set -euo pipefail
@@ -138,6 +189,9 @@ jobs:
           - Strict backend admission and activation mismatch over two-rank Gloo: ${BACKEND_ADMISSION}
           - Winner packet/history failure injection and live-group reuse: ${PHASE_BOUNDARIES}
           - Public CNOT Rust-controller search: ${PUBLIC_SEARCH}
+          - Run-scoped backend event protocol and negative validator fixtures: ${ACCEPTANCE_EVENTS}
+          - Rust serde producer matches the JSONL fixture consumed by the verifier: ${EVENT_SERDE}
+          - Actual verify_cnot entry under two-rank Gloo with rank-local scorer failures and subsequent healthy runs: ${VERIFY_CNOT_LIFECYCLE}
           - New-host GPU workflow scheduling and expression validation: ${VAST_WORKFLOW_LINT}
           - CUDA/NCCL physical acceptance: not run by this CPU workflow.
           EOF

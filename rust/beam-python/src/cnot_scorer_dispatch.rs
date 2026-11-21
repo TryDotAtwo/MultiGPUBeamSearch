@@ -77,8 +77,17 @@ fn trace_native_tqp(
     let checkpoint: String = metadata.get_item("checkpoint_sha256")?.extract()?;
     let manifest: String = metadata.get_item("search_manifest_sha256")?.extract()?;
     let scorer_library: String = metadata.get_item("scorer_library_sha256")?.extract()?;
-    eprintln!(
-        "CNOT_RUST_TQP_SCORER_DISPATCH rank={rank} world={size} pid={pid} device={device} implementation=RustTqpScorer abi=1 scorer_abi=1 operation={operation} rows={rows} checkpoint_sha256={checkpoint} search_manifest_sha256={manifest} scorer_library_sha256={scorer_library}"
-    );
-    Ok(())
+    let fields = [
+        ("implementation".to_owned(), "RustTqpScorer".to_owned()),
+        ("abi".to_owned(), "1".to_owned()),
+        ("scorer_abi".to_owned(), "1".to_owned()),
+        ("operation".to_owned(), operation.to_owned()),
+        ("rows".to_owned(), rows.to_string()),
+        ("checkpoint_sha256".to_owned(), checkpoint),
+        ("search_manifest_sha256".to_owned(), manifest),
+        ("scorer_library_sha256".to_owned(), scorer_library),
+    ]
+    .into_iter()
+    .collect();
+    crate::cnot_acceptance::emit("tqp_scorer_dispatch", rank, size, pid, &device, &fields)
 }

@@ -3453,3 +3453,25 @@ splits, and payload contents are unchanged. The control-flow votes and hosted
 evidence are recorded in
 `test_results/refactor_20261120/cnot-exchange-gloo/GITHUB_STATUS.md`.
 Physical CUDA/NCCL multi-GPU exchange remains unverified.
+
+## CNOT acceptance evidence is invocation-scoped (2026-11-21)
+
+Strict CNOT acceptance records use one versioned JSON schema for Rust and
+Python producers. Every event carries the run and case IDs, source and wheel
+hashes, rank/world, process ID, device, physical GPU UUID, event kind and
+structured fields. The hosted verifier reads only the requested report and
+its matching per-rank JSONL receipts, then compares them with the combined
+trace. It requires one admission/controller/terminal record per rank, required
+DeviceDomain operations, Rust TQP scorer dispatch, and the actual Rust
+Stream 5/NCCL phases on every rank of a two-rank run. Backend ABI and artifact
+hashes must match from admission through dispatch. A single-rank receipt
+declares `single_rank_no_exchange` explicitly.
+
+The installed-wheel CPU workflow exercises the public `verify_cnot.main`
+entry under two Gloo ranks. It coordinates scorer setup failure on rank 0 and
+rank 1, destroys the entered `World` before process-group teardown, then runs
+a healthy verifier search after each failure. The result JSON write is also
+checked across ranks. These hosted checks validate control flow and receipt
+contracts only; they do not prove CUDA/NCCL execution. The physical gate stays
+pending until a matched installed-wheel run on one and two physical RTX 3060s
+passes with per-rank backend evidence and independent replay.

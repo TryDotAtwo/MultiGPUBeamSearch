@@ -307,9 +307,30 @@ pub(crate) fn run_cnot_native_start_transport<'py>(
             let size: u32 = world.getattr("size")?.extract()?;
             let pid = std::process::id();
             let device = world.getattr("device")?.str()?.to_str()?.to_owned();
-            eprintln!(
-                "CNOT_RUST_STREAM5_ADMISSION rank={rank} world={size} pid={pid} device={device} abi=1 owned_abi=1 exchange_abi=1 collectives_abi=1 library_sha256={digest}"
-            );
+            let fields = [
+                ("abi".to_owned(), "1".to_owned()),
+                ("owned_abi".to_owned(), "1".to_owned()),
+                ("exchange_abi".to_owned(), "1".to_owned()),
+                ("collectives_abi".to_owned(), "1".to_owned()),
+                ("library_sha256".to_owned(), digest.to_owned()),
+            ]
+            .into_iter()
+            .collect();
+            let receipt = crate::cnot_acceptance::emit(
+                "stream5_admission",
+                rank,
+                size,
+                pid,
+                &device,
+                &fields,
+            )
+            .map(|()| py.None().into_bound(py));
+            super::cnot_native_checked::checked_v2(
+                py,
+                &world,
+                "write Rust Stream 5 admission receipt",
+                receipt,
+            )?;
         }
         world.setattr("transport", rust_transport.call1((library, world.clone()))?)?;
         if strict {
@@ -318,9 +339,28 @@ pub(crate) fn run_cnot_native_start_transport<'py>(
             let pid = std::process::id();
             let device = world.getattr("device")?.str()?.to_str()?.to_owned();
             let digest = digest_ref.unwrap_or("unknown");
-            eprintln!(
-                "CNOT_RUST_STREAM5_ACTIVE rank={rank} world={size} pid={pid} device={device} implementation=RustStream5/NCCL abi=1 library_sha256={digest}"
-            );
+            let fields = [
+                ("implementation".to_owned(), "RustStream5/NCCL".to_owned()),
+                ("abi".to_owned(), "1".to_owned()),
+                ("library_sha256".to_owned(), digest.to_owned()),
+            ]
+            .into_iter()
+            .collect();
+            let receipt = crate::cnot_acceptance::emit(
+                "stream5_active",
+                rank,
+                size,
+                pid,
+                &device,
+                &fields,
+            )
+            .map(|()| py.None().into_bound(py));
+            super::cnot_native_checked::checked_v2(
+                py,
+                &world,
+                "write Rust Stream 5 active receipt",
+                receipt,
+            )?;
         }
     } else {
         let (native_library, _, python_transport, _, _) = local?;

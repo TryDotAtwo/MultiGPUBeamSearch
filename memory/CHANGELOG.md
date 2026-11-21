@@ -3039,3 +3039,27 @@ Main commit `148b2a826a369b7601e904ea409e0cc5301c75c9` also passed the 260-test 
   checkpoint search ran. Receipts are in
   `test_results/refactor_20261121/rust-cnot-admission/GITHUB_STATUS.md` and
   Actions artifacts 14701749750 and 14701789289.
+
+## 2026-11-21 - Bind CNOT acceptance to one invocation
+
+- Replaced loose strict-backend marker parsing with a versioned JSON event
+  schema shared by Rust and Python. Per-rank JSONL receipts, trace events, the
+  result report, source SHA, installed-wheel SHA, process ID and physical GPU
+  UUID are checked as one `(run, case)` invocation. Admission ABI and library
+  hashes are matched against actual DeviceDomain, TQP scorer and Stream 5
+  dispatches; one-rank runs explicitly state that no exchange occurred.
+- Added hosted CPU negative fixtures for missing ranks and operations,
+  duplicate admission/terminal events, foreign invocation identity, invalid
+  ABI/hash, unsupported world size, duplicate GPU UUID and report/trace/receipt
+  disagreement. Rust and Python producer serialization are compared with the
+  same fixture consumed by the Python verifier.
+- `verify_cnot.main` now enters its diagnostic `World` before checked scorer
+  setup and leaves it before destroying the process group. The installed-wheel
+  workflow invokes that entry under two Gloo ranks, injects a scorer-load
+  failure on each rank in turn, and follows each failure with a healthy search
+  whose written result is checked. The lifecycle job has a bounded timeout.
+- The unpaired duplicate two-GPU trained-deep case was removed. The matched
+  one-/two-GPU pair remains in the manual hardware workflow.
+- These checks are pending on the current source SHA until hosted Actions
+  reports them. No Vast instance was started; physical CUDA/NCCL acceptance is
+  still pending.

@@ -46,6 +46,7 @@ dependencies = [
  "beam-native-sys",
  "beam-runtime",
  "pyo3",
+ "serde",
  "serde_json",
  "sha2",
 ]

@@ -241,17 +241,67 @@ pub(crate) fn preflight_strict_backend<'py>(
     })();
     let contract = checked(py, world, "admit strict CNOT backends", local)?;
     let contract: String = contract.extract()?;
-    require_backend_consensus(world, &contract)?;
+    let consensus_contract = (|| -> PyResult<Bound<'py, PyAny>> {
+        let identity = crate::cnot_acceptance::identity().map_err(PyRuntimeError::new_err)?;
+        let value = if let Some(identity) = identity {
+            format!(
+                "{contract};acceptance_run_id={};acceptance_case={};acceptance_source_sha={};acceptance_wheel_sha256={}",
+                identity.run_id, identity.case_id, identity.source_sha, identity.wheel_sha256
+            )
+        } else {
+            contract.clone()
+        };
+        Ok(pyo3::types::PyString::new(py, &value).into_any())
+    })();
+    let consensus_contract = checked(
+        py,
+        world,
+        "prepare strict CNOT acceptance identity",
+        consensus_contract,
+    )?;
+    let consensus_contract: String = consensus_contract.extract()?;
+    require_backend_consensus(world, &consensus_contract)?;
     let rank: u32 = world.getattr("rank")?.extract()?;
     let size: u32 = world.getattr("size")?.extract()?;
     let pid = std::process::id();
     let device = world.getattr("device")?.str()?.to_str()?.to_owned();
-    eprintln!(
-        "CNOT_BACKEND_ADMISSION rank={rank} world={size} pid={pid} device={device} {contract}"
-    );
-    eprintln!(
-        "CNOT_RUST_CONTROLLER rank={rank} world={size} pid={pid} device={device} implementation=RustNativeStages abi=1 active=1"
-    );
+    let receipt_write = (|| -> PyResult<Bound<'py, PyAny>> {
+        let fields = crate::cnot_acceptance::contract_fields(&contract)?;
+        crate::cnot_acceptance::emit("backend_admission", rank, size, pid, &device, &fields)?;
+        let controller_fields = [
+            ("implementation".to_owned(), "RustNativeStages".to_owned()),
+            ("abi".to_owned(), "1".to_owned()),
+            ("active".to_owned(), "1".to_owned()),
+        ]
+        .into_iter()
+        .collect();
+        crate::cnot_acceptance::emit(
+            "rust_controller",
+            rank,
+            size,
+            pid,
+            &device,
+            &controller_fields,
+        )?;
+        if std::env::var_os("MGBS_CNOT_ACCEPTANCE_RUN_ID").is_some() && size == 1 {
+            let single_rank_fields = [
+                ("reason".to_owned(), "single_rank".to_owned()),
+                ("exchange".to_owned(), "not_applicable".to_owned()),
+            ]
+            .into_iter()
+            .collect();
+            crate::cnot_acceptance::emit(
+                "stream5_absent",
+                rank,
+                size,
+                pid,
+                &device,
+                &single_rank_fields,
+            )?;
+        }
+        Ok(py.None().into_bound(py))
+    })();
+    checked(py, world, "write CNOT admission receipts", receipt_write)?;
     Ok(())
 }
 
@@ -432,9 +482,30 @@ impl<'py> NativeStages<'py> {
         let world = self.size;
         let pid = std::process::id();
         let sha = self.device_domain_sha256.as_deref().unwrap_or("unknown");
-        eprintln!(
-            "CNOT_DEVICE_DOMAIN_DISPATCH rank={rank} world={world} pid={pid} device={device} implementation=DeviceDomain operation={operation} rows={rows} abi=1 device_abi=1 library_sha256={sha}"
+        let fields = [
+            ("implementation".to_owned(), "DeviceDomain".to_owned()),
+            ("operation".to_owned(), operation.to_owned()),
+            ("rows".to_owned(), rows.to_string()),
+            ("abi".to_owned(), "1".to_owned()),
+            ("device_abi".to_owned(), "1".to_owned()),
+            ("library_sha256".to_owned(), sha.to_owned()),
+        ]
+        .into_iter()
+        .collect();
+        let receipt = crate::cnot_acceptance::emit(
+            "device_domain_dispatch",
+            rank,
+            world,
+            pid,
+            &device,
+            &fields,
         );
+        checked(
+            self.py,
+            &self.world,
+            "write DeviceDomain dispatch receipt",
+            receipt.map(|()| self.py.None().into_bound(self.py)),
+        )?;
         Ok(())
     }
 
@@ -608,15 +679,32 @@ impl<'py> NativeStages<'py> {
         if self.strict_backend && self.size > 1 {
             let device = self.world.getattr("device")?.str()?.to_str()?.to_owned();
             let sha = self.stream5_library_sha256.as_deref().unwrap_or("unknown");
-            eprintln!(
-                "CNOT_RUST_STREAM5_DISPATCH rank={} world={} pid={} device={} implementation=RustStream5/NCCL operation=exchange abi=1 owned_abi=1 exchange_abi=1 library_sha256={} rows={}",
+            let fields = [
+                ("implementation".to_owned(), "RustStream5/NCCL".to_owned()),
+                ("operation".to_owned(), "exchange".to_owned()),
+                ("abi".to_owned(), "1".to_owned()),
+                ("owned_abi".to_owned(), "1".to_owned()),
+                ("exchange_abi".to_owned(), "1".to_owned()),
+                ("library_sha256".to_owned(), sha.to_owned()),
+                ("rows".to_owned(), rows.len()?.to_string()),
+            ]
+            .into_iter()
+            .collect();
+            let receipt = crate::cnot_acceptance::emit(
+                "stream5_dispatch",
                 self.rank,
                 self.size,
                 std::process::id(),
-                device,
-                sha,
-                rows.len()?
-            );
+                &device,
+                &fields,
+            )
+            .map(|()| self.py.None().into_bound(self.py));
+            checked(
+                self.py,
+                &self.world,
+                "write Rust Stream 5 exchange receipt",
+                receipt,
+            )?;
         }
         Ok(received)
     }
