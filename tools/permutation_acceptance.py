@@ -289,20 +289,19 @@ def _world_reference(
     beam_width: int,
     shard_count: int,
 ) -> WorldReference:
-    empty_candidate = tuple()
     if world_size == 1:
         frontier: tuple[tuple[Candidate, ...], ...] = ((start,),)
     else:
         frontier = ((start,),) + tuple(() for _ in range(world_size - 1))
     steps = []
-    for _depth in range(2):
+    for depth in range(2):
         step = _step(
             frontier,
             generators,
             world_size=world_size,
             beam_width=beam_width,
             shard_count=shard_count,
-            initial=True,
+            initial=(depth == 0),
         )
         steps.append(step)
         frontier = step.frontier_by_rank
