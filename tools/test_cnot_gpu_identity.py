@@ -15,6 +15,7 @@ ROOT = Path(__file__).resolve().parent
 IDENTITY_PATH = ROOT.parent / "integrations" / "cayleypy_native" / "multigpubeamsearch" / "gpu_identity.py"
 SPEC = importlib.util.spec_from_file_location("mgbs_gpu_identity_fixture", IDENTITY_PATH)
 GPU_IDENTITY = importlib.util.module_from_spec(SPEC)
+sys.modules[SPEC.name] = GPU_IDENTITY
 SPEC.loader.exec_module(GPU_IDENTITY)
 
 
