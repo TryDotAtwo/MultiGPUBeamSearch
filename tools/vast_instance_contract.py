@@ -18,6 +18,10 @@ MAX_SPEND_CAP_USD = Decimal("10")
 MAX_REMOTE_RUNTIME_SECONDS = 5400
 RESERVE_SECONDS = 1200
 MIN_REMOTE_RUNTIME_SECONDS = 1200
+PRIVATE_PREFLIGHT_RESERVE_SECONDS = 300
+SOURCE_STAGING_RESERVE_SECONDS = 60
+UPLOAD_RESERVE_SECONDS = 900
+RETRIEVAL_RESERVE_SECONDS = 300
 
 
 def validate_instance_id(value: str) -> str:
@@ -66,7 +70,19 @@ def find_owned_target(payload: object, instance_id: str) -> dict:
 
 
 def _ssh_endpoint(row: dict) -> tuple[str, int]:
-    host = row.get("public_ipaddr") or row.get("ssh_host")
+    direct_host, direct_port = row.get("ssh_host"), row.get("ssh_port")
+    mapped_host = row.get("public_ipaddr")
+    mappings = (row.get("ports") or {}).get("22/tcp") or []
+    mapped_port = mappings[0].get("HostPort") if mappings and isinstance(mappings[0], dict) else None
+
+    if direct_host is not None and direct_port is not None:
+        host, port = direct_host, direct_port
+    elif mapped_host is not None and mapped_port is not None:
+        host, port = mapped_host, mapped_port
+    elif direct_host is not None or mapped_host is not None:
+        raise ValueError("Vast API did not provide an SSH port and complete endpoint pair")
+    else:
+        raise ValueError("Vast API did not provide an SSH host")
     if not isinstance(host, str) or not host.strip():
         raise ValueError("Vast API did not provide an SSH host")
     host = host.strip()
@@ -75,14 +91,12 @@ def _ssh_endpoint(row: dict) -> tuple[str, int]:
     except ValueError:
         if re.fullmatch(r"[A-Za-z0-9.-]+", host) is None:
             raise ValueError("Vast API returned an invalid SSH host") from None
-    port = row.get("ssh_port")
-    if port is None:
-        mappings = (row.get("ports") or {}).get("22/tcp") or []
-        if mappings and isinstance(mappings[0], dict):
-            port = mappings[0].get("HostPort")
     try:
-        port = int(port)
-    except (TypeError, ValueError):
+        numeric_port = Decimal(str(port))
+        if not numeric_port.is_finite() or numeric_port != numeric_port.to_integral_value():
+            raise ValueError
+        port = int(numeric_port)
+    except (InvalidOperation, TypeError, ValueError):
         raise ValueError("Vast API did not provide an SSH port") from None
     if not 1 <= port <= 65535:
         raise ValueError("Vast API returned an invalid SSH port")
@@ -114,9 +128,17 @@ def acceptance_plan(
     lifetime_budget_seconds = int((spend_cap / rate * Decimal(3600)).to_integral_value(rounding=ROUND_FLOOR))
     elapsed_seconds = max(0, int(now - start))
     remaining_before_reserve = lifetime_budget_seconds - elapsed_seconds
+    setup_transfer_reserve = (
+        PRIVATE_PREFLIGHT_RESERVE_SECONDS
+        + SOURCE_STAGING_RESERVE_SECONDS
+        + UPLOAD_RESERVE_SECONDS
+    )
     runtime_seconds = min(
         MAX_REMOTE_RUNTIME_SECONDS,
-        remaining_before_reserve - RESERVE_SECONDS,
+        remaining_before_reserve
+        - RESERVE_SECONDS
+        - RETRIEVAL_RESERVE_SECONDS
+        - setup_transfer_reserve,
     )
     if runtime_seconds < MIN_REMOTE_RUNTIME_SECONDS:
         raise ValueError(
@@ -134,6 +156,9 @@ def acceptance_plan(
         "estimated_cost_before_dispatch_usd": str(rate * Decimal(elapsed_seconds) / Decimal(3600)),
         "allowed_remote_runtime_seconds": runtime_seconds,
         "budget_deadline_epoch": float(start + Decimal(lifetime_budget_seconds)),
+        "stop_reserve_seconds": RESERVE_SECONDS,
+        "retrieval_reserve_seconds": RETRIEVAL_RESERVE_SECONDS,
+        "setup_transfer_reserve_seconds": setup_transfer_reserve,
         "ssh_host": host,
         "ssh_port": port,
     }
@@ -178,6 +203,9 @@ def main() -> int:
         with args.github_output.open("a", encoding="utf-8") as output:
             output.write("instance_running=true\n")
             output.write(f"allowed_runtime_seconds={report['allowed_remote_runtime_seconds']}\n")
+            output.write(f"budget_deadline_epoch={report['budget_deadline_epoch']}\n")
+            output.write(f"stop_reserve_seconds={report['stop_reserve_seconds']}\n")
+            output.write(f"retrieval_reserve_seconds={report['retrieval_reserve_seconds']}\n")
             output.write(f"ssh_host={report['ssh_host']}\n")
             output.write(f"ssh_port={report['ssh_port']}\n")
         print(json.dumps(report, sort_keys=True))

@@ -3196,5 +3196,21 @@ Main commit `148b2a826a369b7601e904ea409e0cc5301c75c9` also passed the 260-test 
   Rust receipts compare that observed value with the expected rank mapping;
   Gloo carries rank metadata. A CPU fake-driver fixture covers reordered
   visible ordinals, selected-device mismatch, and duplicate expected UUIDs.
-- Hosted source/wheel checks for this change are pending. No Vast instance was
-  started and no physical GPU identity has been observed in this step.
+- Hosted source harness `44911121921`, installed-wheel check `44911121957`,
+  and CNOT CPU compatibility run `44911121931` passed. The GPU job was
+  skipped; no physical GPU identity has been observed.
+
+## 2026-11-21 - Bound each Vast phase by the billing deadline
+
+- Vast SSH discovery now selects a complete direct or mapped host/port pair;
+  it does not combine fields from different API routes. The absolute deadline
+  starts at the API-reported instance start time and deducts the $10 cap using
+  the observed hourly rate.
+- Private preflight, source staging, upload, remote build/search and retrieval
+  each recompute their available timeout from that same deadline. Every phase
+  leaves the reserved stop time intact; remote execution also preserves the
+  result retrieval window. Private SSH retries share one phase deadline.
+- Hosted RED `44912127310` confirmed that the previous transport retrieved
+  results despite a synthetic deadline failure. The fix is being verified by
+  hosted CPU/Gloo and installed-wheel workflows. No Vast dispatch or physical
+  GPU run was started.

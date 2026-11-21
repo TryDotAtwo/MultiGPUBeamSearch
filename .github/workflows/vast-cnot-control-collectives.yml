@@ -26,6 +26,8 @@ on:
       - tools/fixtures/cnot_acceptance_event_v1.jsonl
       - tools/vast_instance_contract.py
       - tools/test_vast_instance_contract.py
+      - tools/vast_budget_deadline.py
+      - tools/test_vast_budget_deadline.py
       - tools/vast_private_preflight.py
       - tools/test_vast_private_preflight.py
       - tools/vast_result_transport.sh
@@ -59,7 +61,7 @@ jobs:
           python-version: "3.11"
       - name: Compile source-only acceptance helpers
         id: compile_source
-        run: python -m py_compile tools/verify_permutation_cuda.py tools/verify_cnot.py tools/cnot_acceptance_events.py tools/test_cnot_acceptance_events.py tools/test_cnot_gpu_identity.py tools/verify_cnot_gpu_pair.py tools/test_verify_cnot_gpu_pair.py tools/test_vast_result_transport.py tools/vast_instance_contract.py tools/test_vast_instance_contract.py tools/vast_private_preflight.py tools/test_vast_private_preflight.py integrations/cayleypy_native/tests/installed_verify_cnot_gloo_lifecycle.py integrations/cayleypy_native/multigpubeamsearch/gpu_identity.py
+        run: python -m py_compile tools/verify_permutation_cuda.py tools/verify_cnot.py tools/cnot_acceptance_events.py tools/test_cnot_acceptance_events.py tools/test_cnot_gpu_identity.py tools/verify_cnot_gpu_pair.py tools/test_verify_cnot_gpu_pair.py tools/test_vast_result_transport.py tools/vast_instance_contract.py tools/test_vast_instance_contract.py tools/vast_budget_deadline.py tools/test_vast_budget_deadline.py tools/vast_private_preflight.py tools/test_vast_private_preflight.py integrations/cayleypy_native/tests/installed_verify_cnot_gloo_lifecycle.py integrations/cayleypy_native/multigpubeamsearch/gpu_identity.py
       - name: Test the versioned per-invocation CNOT event verifier
         id: cnot_event_verifier
         run: python tools/test_cnot_acceptance_events.py -v
@@ -72,6 +74,9 @@ jobs:
       - name: Test target identity, hardware and lifetime budget with API fixtures
         id: instance_contract
         run: python tools/test_vast_instance_contract.py -v
+      - name: Test per-phase timeouts against the absolute billing deadline
+        id: budget_deadline
+        run: python tools/test_vast_budget_deadline.py -v
       - name: Test private manifest and checkpoint receipt parsing
         id: private_receipt_test
         run: python tools/test_vast_private_preflight.py -v
@@ -201,6 +206,7 @@ jobs:
           CNOT_PAIR_VERIFIER_OUTCOME: ${{ steps.cnot_pair_verifier.outcome }}
           CNOT_GPU_IDENTITY_OUTCOME: ${{ steps.cnot_gpu_identity.outcome }}
           INSTANCE_CONTRACT_OUTCOME: ${{ steps.instance_contract.outcome }}
+          BUDGET_DEADLINE_OUTCOME: ${{ steps.budget_deadline.outcome }}
           PRIVATE_RECEIPT_OUTCOME: ${{ steps.private_receipt_test.outcome }}
           TRANSPORT_OUTCOME: ${{ steps.transport_test.outcome }}
           SYNTAX_OUTCOME: ${{ steps.syntax_check.outcome }}
@@ -217,6 +223,7 @@ jobs:
           - Final CNOT paired campaign report/per-rank identity verifier: ${CNOT_PAIR_VERIFIER_OUTCOME}
           - Current CUDA-context UUID selection and matching receipts: ${CNOT_GPU_IDENTITY_OUTCOME}
           - New 2x RTX 3060 target and elapsed-cost contract: ${INSTANCE_CONTRACT_OUTCOME}
+          - Absolute per-phase deadline and stop-reserve checks: ${BUDGET_DEADLINE_OUTCOME}
           - Pinned private manifest/checkpoint receipt parser: ${PRIVATE_RECEIPT_OUTCOME}
           - Extracted remote payload success/failure plus SSH result retrieval after key revocation: ${TRANSPORT_OUTCOME}
           - Remote Bash and embedded Python syntax: ${SYNTAX_OUTCOME}
@@ -236,7 +243,7 @@ jobs:
     needs: validate-source
     name: Build installed wheel and run Rust permutation plus CNOT acceptance
     runs-on: ubuntu-latest
-    timeout-minutes: 105
+    timeout-minutes: 135
     env:
       VAST_INSTANCE_ID: ${{ inputs.instance_id }}
       SOURCE_SHA: ${{ github.sha }}
@@ -291,23 +298,44 @@ jobs:
         env:
           SSH_HOST: ${{ steps.preflight.outputs.ssh_host }}
           SSH_PORT: ${{ steps.preflight.outputs.ssh_port }}
+          BUDGET_DEADLINE_EPOCH: ${{ steps.preflight.outputs.budget_deadline_epoch }}
+          STOP_RESERVE_SECONDS: ${{ steps.preflight.outputs.stop_reserve_seconds }}
+          RETRIEVAL_RESERVE_SECONDS: ${{ steps.preflight.outputs.retrieval_reserve_seconds }}
         shell: bash
         run: |
           set -euo pipefail
+          private_timeout="$(python3 tools/vast_budget_deadline.py \
+            --deadline-epoch "$BUDGET_DEADLINE_EPOCH" \
+            --stop-reserve-seconds "$STOP_RESERVE_SECONDS" \
+            --future-reserve-seconds "$((60 + 900 + 1200 + RETRIEVAL_RESERVE_SECONDS))" \
+            --max-seconds 300 --min-seconds 240 --phase private-preflight)"
+          preflight_deadline=$((SECONDS + private_timeout))
           key_file="${RUNNER_TEMP}/vast_cnot_ed25519"
           known_hosts="${RUNNER_TEMP}/vast_cnot_known_hosts"
           remote_log="${RUNNER_TEMP}/vast-private-preflight.log"
-          ssh_opts=(-i "$key_file" -p "$SSH_PORT" -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$known_hosts" -o ConnectTimeout=15 -o ServerAliveInterval=10 -o ServerAliveCountMax=2)
+          ssh_opts=(-i "$key_file" -p "$SSH_PORT" -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$known_hosts" -o ServerAliveInterval=10 -o ServerAliveCountMax=2)
           ready=false
           for _ in {1..12}; do
-            if ssh "${ssh_opts[@]}" "root@${SSH_HOST}" true >/dev/null 2>"${RUNNER_TEMP}/vast-cnot-ssh.err"; then
+            remaining=$((preflight_deadline - SECONDS))
+            (( remaining > 0 )) || break
+            attempt_timeout=$((remaining < 20 ? remaining : 20))
+            connect_timeout=$((attempt_timeout < 15 ? attempt_timeout : 15))
+            if timeout --signal=TERM --kill-after=5s "${attempt_timeout}s" \
+              ssh "${ssh_opts[@]}" -o "ConnectTimeout=${connect_timeout}" \
+              "root@${SSH_HOST}" true >/dev/null 2>"${RUNNER_TEMP}/vast-cnot-ssh.err"; then
               ready=true
               break
             fi
-            sleep 5
+            remaining=$((preflight_deadline - SECONDS))
+            (( remaining > 0 )) || break
+            sleep "$((remaining < 5 ? remaining : 5))"
           done
           [[ "$ready" == true ]] || { echo "SSH did not become ready on validated target ${VAST_INSTANCE_ID}." >&2; exit 1; }
-          timeout 180 ssh "${ssh_opts[@]}" "root@${SSH_HOST}" 'bash -s' <<'REMOTE_PREFLIGHT' 2>&1 | tee "$remote_log"
+          preflight_remaining=$((preflight_deadline - SECONDS))
+          (( preflight_remaining > 0 )) || { echo "Private preflight deadline expired before remote checks." >&2; exit 1; }
+          timeout --signal=TERM --kill-after=10s "${preflight_remaining}s" \
+            ssh "${ssh_opts[@]}" -o ConnectTimeout=15 "root@${SSH_HOST}" 'bash -s' \
+            <<'REMOTE_PREFLIGHT' 2>&1 | tee "$remote_log"
           set -euo pipefail
           upstream=/private/TheQuantumProject
           gl4=/private/gl4
@@ -398,24 +426,36 @@ jobs:
       - name: Create the code-only source archive after private preflight passes
         id: archive
         if: steps.preflight.outputs.instance_running == 'true'
+        env:
+          BUDGET_DEADLINE_EPOCH: ${{ steps.preflight.outputs.budget_deadline_epoch }}
+          STOP_RESERVE_SECONDS: ${{ steps.preflight.outputs.stop_reserve_seconds }}
+          RETRIEVAL_RESERVE_SECONDS: ${{ steps.preflight.outputs.retrieval_reserve_seconds }}
         shell: bash
         run: |
           set -euo pipefail
+          stage_timeout="$(python3 tools/vast_budget_deadline.py \
+            --deadline-epoch "$BUDGET_DEADLINE_EPOCH" \
+            --stop-reserve-seconds "$STOP_RESERVE_SECONDS" \
+            --future-reserve-seconds "$((900 + 1200 + RETRIEVAL_RESERVE_SECONDS))" \
+            --max-seconds 60 --min-seconds 30 --phase source-staging)"
           [[ "$(git rev-parse HEAD)" == "$SOURCE_SHA" ]]
           archive="${RUNNER_TEMP}/beam-gpu-acceptance-${SOURCE_SHA}.tar.gz"
-          tar -czf "$archive" CMakeLists.txt Cargo.toml Cargo.lock cmake cuda integrations/cayleypy_native integrations/cnot_scorer native rust src tools tests
+          timeout --signal=TERM --kill-after=15s "${stage_timeout}s" \
+            tar -czf "$archive" CMakeLists.txt Cargo.toml Cargo.lock cmake cuda integrations/cayleypy_native integrations/cnot_scorer native rust src tools tests
           echo "path=$archive" >> "$GITHUB_OUTPUT"
           echo "sha256=$(sha256sum "$archive" | awk '{print $1}')" >> "$GITHUB_OUTPUT"
       - name: Build installed wheel and run bounded CUDA/NCCL acceptance
         id: remote
         if: steps.preflight.outputs.instance_running == 'true'
-        timeout-minutes: 95
+        timeout-minutes: 115
         env:
           ARCHIVE_PATH: ${{ steps.archive.outputs.path }}
           ARCHIVE_SHA: ${{ steps.archive.outputs.sha256 }}
           SSH_HOST: ${{ steps.preflight.outputs.ssh_host }}
           SSH_PORT: ${{ steps.preflight.outputs.ssh_port }}
-          ALLOWED_RUNTIME_SECONDS: ${{ steps.preflight.outputs.allowed_runtime_seconds }}
+          BUDGET_DEADLINE_EPOCH: ${{ steps.preflight.outputs.budget_deadline_epoch }}
+          STOP_RESERVE_SECONDS: ${{ steps.preflight.outputs.stop_reserve_seconds }}
+          RETRIEVAL_RESERVE_SECONDS: ${{ steps.preflight.outputs.retrieval_reserve_seconds }}
           MANIFEST_SHA256: ${{ steps.privatepreflight.outputs.manifest_sha256 }}
           CHECKPOINT_SHA256: ${{ steps.privatepreflight.outputs.checkpoint_sha256 }}
         shell: bash
@@ -427,7 +467,13 @@ jobs:
           result_archive="${RUNNER_TEMP}/beam-gpu-acceptance-test-results.tar.gz"
           ssh_opts=(-i "$key_file" -p "$SSH_PORT" -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$known_hosts" -o ConnectTimeout=15 -o ServerAliveInterval=10 -o ServerAliveCountMax=2)
           remote_archive="${REMOTE_ROOT}.tar.gz"
-          timeout 900 ssh "${ssh_opts[@]}" "root@${SSH_HOST}" "cat > '${remote_archive}'" < "$ARCHIVE_PATH"
+          upload_timeout="$(python3 tools/vast_budget_deadline.py \
+            --deadline-epoch "$BUDGET_DEADLINE_EPOCH" \
+            --stop-reserve-seconds "$STOP_RESERVE_SECONDS" \
+            --future-reserve-seconds "$((1200 + RETRIEVAL_RESERVE_SECONDS))" \
+            --max-seconds 900 --min-seconds 60 --phase source-upload)"
+          timeout --signal=TERM --kill-after=30s "${upload_timeout}s" \
+            ssh "${ssh_opts[@]}" "root@${SSH_HOST}" "cat > '${remote_archive}'" < "$ARCHIVE_PATH"
           cat > "${RUNNER_TEMP}/run-cnot-control.sh" <<'REMOTE'
           set -euo pipefail
           source_dir="$1"
@@ -553,7 +599,11 @@ jobs:
           VAST_SSH_RESULTS="$result_archive" \
           VAST_SSH_SCRIPT="${RUNNER_TEMP}/run-cnot-control.sh" \
           VAST_REMOTE_ROOT="$REMOTE_ROOT" \
-          VAST_REMOTE_RUNTIME_SECONDS="$ALLOWED_RUNTIME_SECONDS" \
+          VAST_REMOTE_RUNTIME_MAX_SECONDS="5400" \
+          VAST_BUDGET_DEADLINE_EPOCH="$BUDGET_DEADLINE_EPOCH" \
+          VAST_STOP_RESERVE_SECONDS="$STOP_RESERVE_SECONDS" \
+          VAST_RETRIEVAL_RESERVE_SECONDS="$RETRIEVAL_RESERVE_SECONDS" \
+          VAST_RETRIEVAL_MAX_SECONDS="300" \
           VAST_REMOTE_KEY_BLOB="$(awk '{print $2}' "${key_file}.pub")" \
           VAST_REMOTE_ARCHIVE="$remote_archive" \
           VAST_REMOTE_ARCHIVE_SHA="$ARCHIVE_SHA" \

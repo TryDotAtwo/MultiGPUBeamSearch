@@ -97,10 +97,33 @@ print("synthetic GPU execution log", flush=True)
 raise SystemExit(int(os.environ["FAKE_REMOTE_EXIT"]))
 """
 
+FAKE_PYTHON = r"""#!/bin/sh
+exec "$SYSTEM_PYTHON" - "$@" <<'PY'
+import os
+import sys
+
+args = sys.argv[1:]
+phase = None
+for index, value in enumerate(args[:-1]):
+    if value == "--phase":
+        phase = args[index + 1]
+        break
+if phase and phase == os.environ.get("FAKE_DEADLINE_PHASE_FAILURE"):
+    print(f"{phase} cannot start: synthetic deadline exhaustion", file=sys.stderr)
+    raise SystemExit(2)
+python = os.environ["SYSTEM_PYTHON"]
+os.execv(python, [python, *args])
+PY
+"""
+
 
 class VastResultTransportTests(unittest.TestCase):
     def run_transport(
-        self, remote_exit: int, *, deadline_seconds_from_now: int = 7200
+        self,
+        remote_exit: int,
+        *,
+        deadline_seconds_from_now: int = 7200,
+        fail_deadline_phase: str = "",
     ) -> tuple[subprocess.CompletedProcess[str], Path, list[str]]:
         temporary = tempfile.TemporaryDirectory(prefix="mgbs-vast-transport-")
         self.addCleanup(temporary.cleanup)
@@ -110,6 +133,9 @@ class VastResultTransportTests(unittest.TestCase):
         fake_ssh = bin_dir / "ssh"
         fake_ssh.write_text(FAKE_SSH, encoding="utf-8")
         fake_ssh.chmod(0o755)
+        fake_python = bin_dir / "python3"
+        fake_python.write_text(FAKE_PYTHON, encoding="utf-8")
+        fake_python.chmod(0o755)
 
         key_file = root / "ssh-key"
         key_file.write_text("fake-private-key", encoding="utf-8")
@@ -139,6 +165,8 @@ class VastResultTransportTests(unittest.TestCase):
             "VAST_BUDGET_DEADLINE_EPOCH": str(int(time.time()) + deadline_seconds_from_now),
             "VAST_STOP_RESERVE_SECONDS": "1200",
             "VAST_RETRIEVAL_MAX_SECONDS": "300",
+            "SYSTEM_PYTHON": sys.executable,
+            "FAKE_DEADLINE_PHASE_FAILURE": fail_deadline_phase,
             "VAST_REMOTE_KEY_BLOB": "ssh-ed25519 fake-public-key",
             "VAST_REMOTE_ARCHIVE": "/workspace/synthetic-run.tar.gz",
             "VAST_REMOTE_ARCHIVE_SHA": "a" * 64,
@@ -279,13 +307,23 @@ class VastResultTransportTests(unittest.TestCase):
         self.assert_results_archive(archive_path)
         self.assertEqual(events, ["master", "remote", "results", "close"])
 
-    def test_refuses_retrieval_when_the_absolute_deadline_would_consume_stop_reserve(self):
+    def test_refuses_remote_build_when_the_absolute_deadline_cannot_preserve_stop_reserve(self):
         completed, archive_path, events = self.run_transport(
             remote_exit=0, deadline_seconds_from_now=100
         )
         self.assertNotEqual(completed.returncode, 0, completed.stdout + completed.stderr)
         self.assertFalse(archive_path.exists(), "retrieval must not start without the stop reserve")
+        self.assertIn("remote-build-and-run cannot start", completed.stderr)
+        self.assertEqual(events, ["master", "close"])
+
+    def test_skips_result_retrieval_when_deadline_helper_rejects_that_phase(self):
+        completed, archive_path, events = self.run_transport(
+            remote_exit=0, fail_deadline_phase="retrieval"
+        )
+        self.assertNotEqual(completed.returncode, 0, completed.stdout + completed.stderr)
+        self.assertFalse(archive_path.exists(), "a rejected retrieval must leave no partial archive")
         self.assertIn("retrieval cannot start", completed.stderr)
+        self.assertIn("synthetic GPU execution log", completed.stdout)
         self.assertEqual(events, ["master", "remote", "close"])
 
     def test_executes_extracted_remote_payload_with_clean_environment_on_success(self):

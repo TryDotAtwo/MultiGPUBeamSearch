@@ -58,12 +58,44 @@ class VastInstanceContractTests(unittest.TestCase):
     def test_runtime_uses_instance_age_rate_and_shutdown_reserve(self):
         row = instance()
         plan = acceptance_plan(row, Decimal("10"), now_epoch=1_800_001_800)
-        # 30 minutes have already elapsed at $0.48/hour; reserve another
-        # 20 minutes of the $10 lifetime allowance for setup and stopping.
+        # Thirty minutes have elapsed at $0.48/hour. The remaining lifetime
+        # deadline includes staging, transfer, retrieval and stop reserves.
         self.assertEqual(plan["elapsed_before_dispatch_seconds"], 1800)
         self.assertEqual(plan["allowed_remote_runtime_seconds"], 5400)
+        self.assertEqual(plan["budget_deadline_epoch"], 1_800_075_000.0)
+        self.assertEqual(plan["stop_reserve_seconds"], 1200)
+        self.assertEqual(plan["retrieval_reserve_seconds"], 300)
+        self.assertEqual(plan["setup_transfer_reserve_seconds"], 1260)
         self.assertEqual(plan["ssh_host"], "192.0.2.40")
         self.assertEqual(plan["ssh_port"], 22440)
+
+    def test_ssh_host_and_port_are_selected_from_one_complete_api_pair(self):
+        direct = acceptance_plan(
+            instance(ssh_host="proxy.vast.example", ssh_port=30222),
+            Decimal("10"),
+            now_epoch=1_800_000_000,
+        )
+        self.assertEqual((direct["ssh_host"], direct["ssh_port"]), ("proxy.vast.example", 30222))
+        mapped = acceptance_plan(
+            instance(ssh_host=None, ssh_port=None),
+            Decimal("10"),
+            now_epoch=1_800_000_000,
+        )
+        self.assertEqual((mapped["ssh_host"], mapped["ssh_port"]), ("192.0.2.40", 22440))
+
+    def test_incomplete_ssh_route_is_not_mixed_across_api_fields(self):
+        with self.assertRaisesRegex(ValueError, "SSH port"):
+            acceptance_plan(
+                instance(ssh_host="proxy.vast.example", ssh_port=None, public_ipaddr="192.0.2.40", ports={}),
+                Decimal("10"),
+                now_epoch=1_800_000_000,
+            )
+        with self.assertRaisesRegex(ValueError, "SSH port"):
+            acceptance_plan(
+                instance(ssh_host=None, ssh_port=None, public_ipaddr="192.0.2.40", ports={"22/tcp": [{"HostPort": 22.5}]}),
+                Decimal("10"),
+                now_epoch=1_800_000_000,
+            )
 
     def test_stale_instance_and_missing_ssh_or_rate_fail_closed(self):
         for changes, message in (
