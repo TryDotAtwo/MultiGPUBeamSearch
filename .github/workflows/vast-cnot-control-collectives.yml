@@ -262,62 +262,29 @@ jobs:
           if worker_heredoc_count < 4:
               raise SystemExit(f"expected embedded worker Python checks, found {worker_heredoc_count}")
           PY
-      - name: Write source validation receipt
+      - name: Write redacted source validation status
         if: always()
         env:
-          COMPILE_OUTCOME: ${{ steps.compile_source.outcome }}
-          CNOT_EVENT_VERIFIER_OUTCOME: ${{ steps.cnot_event_verifier.outcome }}
-          CNOT_PAIR_VERIFIER_OUTCOME: ${{ steps.cnot_pair_verifier.outcome }}
-          CNOT_GPU_IDENTITY_OUTCOME: ${{ steps.cnot_gpu_identity.outcome }}
-          INSTANCE_CONTRACT_OUTCOME: ${{ steps.instance_contract.outcome }}
-          BUDGET_DEADLINE_OUTCOME: ${{ steps.budget_deadline.outcome }}
-          PRIVATE_RECEIPT_OUTCOME: ${{ steps.private_receipt_test.outcome }}
-          CAMPAIGN_GUARD_OUTCOME: ${{ steps.campaign_guard_test.outcome }}
-          CAMPAIGN_WATCHDOG_OUTCOME: ${{ steps.campaign_watchdog_test.outcome }}
-          CAMPAIGN_WORKFLOW_OUTCOME: ${{ steps.campaign_workflow_test.outcome }}
-          TRANSPORT_OUTCOME: ${{ steps.transport_test.outcome }}
-          PRIVATE_TRANSPORT_OUTCOME: ${{ steps.private_transport.outcome }}
-          PUBLIC_STATUS_OUTCOME: ${{ steps.public_status.outcome }}
-          PUBLIC_REDACTION_OUTCOME: ${{ steps.public_redaction.outcome }}
-          SOURCE_ARCHIVE_OUTCOME: ${{ steps.source_archive_test.outcome }}
-          SYNTAX_OUTCOME: ${{ steps.syntax_check.outcome }}
+          SOURCE_OUTCOME: ${{ job.status }}
         shell: bash
         run: |
-          set -euo pipefail
-          mkdir -p "${RUNNER_TEMP}/gpu-acceptance-source"
-          cat > "${RUNNER_TEMP}/gpu-acceptance-source/GITHUB_STATUS.md" <<EOF
-          # Hosted CPU source validation
-
-          - Commit: ${GITHUB_SHA}
-          - Python source compile: ${COMPILE_OUTCOME}
-          - Versioned CNOT event serialization and negative verifier fixtures: ${CNOT_EVENT_VERIFIER_OUTCOME}
-          - Final CNOT paired campaign report/per-rank identity verifier: ${CNOT_PAIR_VERIFIER_OUTCOME}
-          - Current CUDA-context UUID selection and matching receipts: ${CNOT_GPU_IDENTITY_OUTCOME}
-          - New 2x RTX 3060 target and elapsed-cost contract: ${INSTANCE_CONTRACT_OUTCOME}
-          - Absolute per-phase deadline and stop-reserve checks: ${BUDGET_DEADLINE_OUTCOME}
-          - Instance-bound campaign marker and stop decisions: ${CAMPAIGN_GUARD_OUTCOME}
-          - Independent watchdog, bounded stop readback and prior-label restoration: ${CAMPAIGN_WATCHDOG_OUTCOME}
-          - Marker-before-stop and workflow trigger ordering: ${CAMPAIGN_WORKFLOW_OUTCOME}
-          - Pinned private-input and offline CUTLASS preflight receipt parser: ${PRIVATE_RECEIPT_OUTCOME}
-          - Extracted remote payload success/failure with logs retained on Vast: ${TRANSPORT_OUTCOME}
-          - SSH result transport returns only status: ${PRIVATE_TRANSPORT_OUTCOME}
-          - Allowlisted public status writer and summary: ${PUBLIC_STATUS_OUTCOME}
-          - Public workflow redaction regression: ${PUBLIC_REDACTION_OUTCOME}
-          - Source archive contains and extracts the vendored build headers: ${SOURCE_ARCHIVE_OUTCOME}
-          - Remote Bash and embedded Python syntax: ${SYNTAX_OUTCOME}
-          - This receipt does not claim CUDA, NCCL, or private-checkpoint acceptance.
-          EOF
-      - name: Upload source validation receipt
+          python3 tools/vast_public_status.py \
+            --source-outcome "$SOURCE_OUTCOME" \
+            --inventory-query not_run \
+            --preflight-outcome skipped \
+            --gpu-outcome skipped \
+            --cleanup-outcome skipped \
+            --watchdog-outcome skipped \
+            --output "${RUNNER_TEMP}/cnot-public-status.json" \
+            --summary "$GITHUB_STEP_SUMMARY"
+      - name: Upload redacted source validation status
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: gpu-acceptance-source-${{ github.run_id }}
-          path: |
-            ${{ runner.temp }}/gpu-acceptance-source/GITHUB_STATUS.md
-            test_results/refactor_20261121/vast-source-archive/archive-test.log
-            test_results/refactor_20261121/vast-campaign-watchdog/
+          name: cnot-source-status-${{ github.run_id }}
+          path: ${{ runner.temp }}/cnot-public-status.json
           if-no-files-found: error
-          retention-days: 30
+          retention-days: 7
 
   gpu-acceptance:
     if: github.event_name == 'workflow_dispatch'
