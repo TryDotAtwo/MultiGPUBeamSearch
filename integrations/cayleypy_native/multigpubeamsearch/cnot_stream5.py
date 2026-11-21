@@ -79,6 +79,10 @@ class RustStream5:
 
     def __init__(self, library, world):
         self.world = world
+        source = getattr(world._stream5_library, "_name", None)
+        self.library_sha256 = (
+            hashlib.sha256(Path(source).read_bytes()).hexdigest() if source else "unknown"
+        )
         identity = [bytes(library.id_size)]
 
         def create_id():
@@ -86,21 +90,50 @@ class RustStream5:
                 identity[0] = library.unique_id()
 
         world.checked("create NCCL unique ID", create_id)
-        payload = torch.tensor(list(identity[0]), dtype=torch.uint8, device=world.device)
-        dist.broadcast(payload, 0)
-        self.comm = library.init(bytes(payload.tolist()), world.rank, world.size)
+        payload = world.checked(
+            "prepare NCCL unique ID broadcast payload",
+            lambda: torch.tensor(list(identity[0]), dtype=torch.uint8, device=world.device),
+        )
+        world.checked(
+            "broadcast NCCL unique ID",
+            lambda: dist.broadcast(payload, 0),
+        )
+        identity_bytes = world.checked(
+            "materialize NCCL unique ID",
+            lambda: bytes(payload.tolist()),
+        )
+        self.comm = world.checked(
+            "initialize Rust Stream 5 communicator",
+            lambda: library.init(identity_bytes, world.rank, world.size),
+        )
+
+    def _trace_dispatch(self, operation, rows=None):
+        if os.environ.get("MGBS_CNOT_STRICT_BACKEND") != "1":
+            return
+        suffix = "" if rows is None else f" rows={rows}"
+        print(
+            "CNOT_RUST_STREAM5_DISPATCH "
+            f"rank={self.world.rank} world={self.world.size} pid={os.getpid()} device={self.world.device} "
+            f"implementation=RustStream5/NCCL operation={operation} "
+            f"abi=1 library_sha256={self.library_sha256}{suffix}",
+            file=sys.stderr,
+            flush=True,
+        )
 
     def close(self, *, abort):
         self.comm.close(abort)
 
     def sum(self, tensor):
         self.comm.all_reduce_i64(tensor)
+        self._trace_dispatch("all_reduce_i64", rows=tensor.numel())
         return tensor
 
     def gather_fixed(self, tensor):
         if not all(hasattr(self.comm, name) for name in
                    ("validate_all_gather_i64_into", "all_gather_i64_into")):
-            return self.comm.all_gather_i64(tensor)
+            result = self.comm.all_gather_i64(tensor)
+            self._trace_dispatch("all_gather_i64", rows=tensor.numel())
+            return result
 
         def prepare():
             work = tensor.contiguous()
@@ -115,19 +148,24 @@ class RustStream5:
             "validate Rust Stream 5 fixed gather",
             lambda: self.comm.validate_all_gather_i64_into(tensor, work, output),
         )
-        return self.world.checked(
+        result = self.world.checked(
             "gather Rust Stream 5 fixed values",
             lambda: self.comm.all_gather_i64_into(tensor, work, output),
         )
+        self._trace_dispatch("all_gather_i64_into", rows=tensor.numel())
+        return result
 
     def broadcast(self, tensor, source):
         self.comm.broadcast_i64(tensor, source)
+        self._trace_dispatch(f"broadcast_i64:source={source}", rows=tensor.numel())
         return tensor
 
     def exchange(self, send, counts):
         self.world.checked("validate Rust Stream 5 exchange",
                            lambda: self.comm.validate(send, counts, self.world))
-        return self.comm.exchange(send, counts, self.world)
+        result = self.comm.exchange(send, counts, self.world)
+        self._trace_dispatch("exchange", rows=len(send))
+        return result
 
 
 class Stream5:

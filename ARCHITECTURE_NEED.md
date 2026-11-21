@@ -3337,6 +3337,36 @@ collective, frontier payload, or CUDA execution. Evidence:
 `test_results/refactor_20261120/rust-rank-frontier-quotas/GITHUB_STATUS.md`.
 Physical multi-GPU runtime remains unverified.
 
+
+## Строгая приёмка CNOT-бэкендов и границ стадий, 2026-11-21
+
+Обычный публичный режим сохраняет совместимый выбор CNOT engine и транспорта.
+Только профиль `MGBS_CNOT_STRICT_BACKEND=1` запрещает fallback и требует Rust
+controller, Rust TQP checkpoint scorer, CUDA DeviceDomain ABI 1 с возможностями
+owners/expansion/full-matrix distinct и Rust Stream 5 для мног GPU запуска.
+Все ранги сначала согласуют сам флаг strict через существующую CPU/Gloo группу;
+при разном включении они завершаются общей ошибкой до NCCL обмена. Затем каждая
+ранговая конфигурация сравнивает ABI, возможности и SHA-256 библиотек, scorer,
+checkpoint и search manifest до поиска. Strict diagnostics записывают реальные
+вызовы стадий после успешного вызова и не копируют CUDA тензоры для трассировки.
+
+Проверки входных CNOT тензоров сравнивают dtype с каноническими
+`torch.int64`/`torch.uint16`; это сохраняет отдельный маршрут для 16-битных
+направленных ID. Подготовка winner packet и history edge голосуется через Gloo
+до соответствующего exchange/broadcast. Следующая глубина и closed frontier
+фиксируются только после успешного построения буферов. Эти votes покрывают
+ранговые ошибки подготовки, но не восстановление после потери процесса или
+ошибки внутри зависшего NCCL collective.
+
+Приёмочный Vast workflow принимает только явный десятичный ID уже запущенного
+нового 2× desktop RTX 3060, сверяет владельца/состояние/тариф и считает общий
+срок от API `start_date` под лимитом $10 с резервом для подготовки и остановки.
+До передачи кода он требует pinned приватный checkout, manifest и checkpoint.
+После выполнения JSON receipt связывает source/wheel/scorer/checkpoint/manifest
+hashes, события rank/device и readback состояния ресурса. Workflow не создаёт и
+не арендует инстанс. Физический прогон остаётся pending до появления доступного
+предложения и приватного источника данных.
+
 ## Rust validation for calibration rank plans (2026-11-20)
 
 The calibration-side `validate_rank_plans` delegates ordinary typed rank records

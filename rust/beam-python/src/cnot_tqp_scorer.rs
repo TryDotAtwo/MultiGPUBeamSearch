@@ -5,6 +5,7 @@ use pyo3::{
     prelude::*,
     types::{PyDict, PyTuple},
 };
+use sha2::{Digest, Sha256};
 use std::path::PathBuf;
 
 #[pyclass(name = "TQPScorer", unsendable)]
@@ -46,6 +47,14 @@ impl PyTqpScorer {
                 "the pinned tch 0.22.0 binding requires CUDA PyTorch 2.9.0",
             ));
         }
+        let manifest_bytes = std::fs::read(&manifest).map_err(|error| {
+            PyRuntimeError::new_err(format!("cannot read CNOT search manifest: {error}"))
+        })?;
+        let search_manifest_sha256 = format!("{:x}", Sha256::digest(manifest_bytes));
+        let scorer_library_bytes = std::fs::read(&library).map_err(|error| {
+            PyRuntimeError::new_err(format!("cannot read CNOT scorer library: {error}"))
+        })?;
+        let scorer_library_sha256 = format!("{:x}", Sha256::digest(scorer_library_bytes));
         let device_object = torch.getattr("device")?.call1((&device,))?;
         let device_type: String = device_object.getattr("type")?.extract()?;
         let device_index: Option<u32> = device_object.getattr("index")?.extract()?;
@@ -79,6 +88,14 @@ impl PyTqpScorer {
         let metadata = py
             .import("json")?
             .call_method1("loads", (scorer.metadata(),))?;
+        metadata.call_method1(
+            "__setitem__",
+            ("search_manifest_sha256", search_manifest_sha256),
+        )?;
+        metadata.call_method1(
+            "__setitem__",
+            ("scorer_library_sha256", scorer_library_sha256),
+        )?;
 
         Ok(Self {
             scorer: Some(scorer),

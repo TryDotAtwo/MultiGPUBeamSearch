@@ -133,6 +133,7 @@ impl ResidentWorkers {
 fn _beam_runtime(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<ResidentWorkers>()?;
     cnot::register(module)?;
+    cnot_native_batch::register(module)?;
     cnot_native_checked::register(module)?;
     cnot_native_exchange::register(module)?;
     cnot_native_goal::register(module)?;

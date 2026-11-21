@@ -147,6 +147,12 @@ def validate_case(rows, scorer, mode, width, k, depth, device, require_cross_ran
             report = dict(n=len(rows), width=width, shortlist=k, mode=mode, world=world.size,
                           scorer=type(scorer).__name__,
                           scorer_runtime=f"{type(scorer).__module__}.{type(scorer).__qualname__}",
+                          root_sha256=hashlib.sha256(
+                              json.dumps(rows, separators=(",", ":")).encode("utf-8")
+                          ).hexdigest(),
+                          precision_contract={"scorer_output_dtype": getattr(
+                              getattr(scorer, "metadata", {}), "get", lambda _key, _default=None: None
+                          )("scorer_output_dtype", "unspecified"), "selection_dtype": "float64"},
                           engine=engine, model=getattr(scorer, "metadata", None),
                           layers=layers, physical_ids=list(result.gates), directed_gates=[pairs[i] for i in result.gates],
                           length=result.length, bitwise_replay=True, routes=result.path_routes)

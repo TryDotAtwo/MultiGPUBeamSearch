@@ -9,6 +9,10 @@ on:
     paths:
       - .github/workflows/installed-wheel-validation.yml
       - integrations/cayleypy_native/tests/installed_wheel_smoke.py
+      - integrations/cayleypy_native/tests/installed_cnot_dtype_contract.py
+      - integrations/cayleypy_native/tests/installed_cnot_backend_admission.py
+      - integrations/cayleypy_native/tests/installed_cnot_phase_boundaries.py
+      - integrations/cayleypy_native/tests/cnot_device_domain_admission_fixture.c
       - tools/verify_cnot.py
       - integrations/cayleypy_native/pyproject.toml
       - integrations/cayleypy_native/build_backend.py
@@ -33,10 +37,12 @@ jobs:
         with:
           python-version: "3.11"
       - name: Install Rust toolchain
+        id: rust_toolchain
         run: |
           rustup toolchain install stable --profile minimal
           rustup default stable
       - name: Install CPU runtime dependencies
+        id: dependencies
         run: |
           set -o pipefail
           mkdir -p test_results/refactor_20261120/installed-wheel
@@ -44,12 +50,14 @@ jobs:
           python -m pip install numpy cayleypy==0.1.0 cmake ninja 2>&1 | tee -a test_results/refactor_20261120/installed-wheel/dependencies.log
           python -m pip install torch==2.9.0 --index-url https://download.pytorch.org/whl/cpu 2>&1 | tee -a test_results/refactor_20261120/installed-wheel/dependencies.log
       - name: Build the PEP 517 wheel
+        id: wheel_build
         working-directory: integrations/cayleypy_native
         run: |
           set -o pipefail
           mkdir -p "$RUNNER_TEMP/mgbs-wheel-dist"
           python -m pip wheel --verbose --no-deps --wheel-dir "$RUNNER_TEMP/mgbs-wheel-dist" . 2>&1 | tee "$GITHUB_WORKSPACE/test_results/refactor_20261120/installed-wheel/build.log"
       - name: Install wheel and validate from outside the checkout
+        id: wheel_smoke
         run: |
           set -o pipefail
           wheel="$(find "$RUNNER_TEMP/mgbs-wheel-dist" -maxdepth 1 -type f -name 'multigpubeamsearch-*.whl' -print -quit)"
@@ -59,7 +67,32 @@ jobs:
           mkdir -p "$RUNNER_TEMP/mgbs-wheel-smoke"
           cd "$RUNNER_TEMP/mgbs-wheel-smoke"
           env -u PYTHONPATH python "$GITHUB_WORKSPACE/integrations/cayleypy_native/tests/installed_wheel_smoke.py" 2>&1 | tee "$GITHUB_WORKSPACE/test_results/refactor_20261120/installed-wheel/smoke.log"
+      - name: Verify CNOT PyO3 dtype contracts with warnings as errors
+        id: dtype
+        env:
+          PYTHONWARNINGS: error::DeprecationWarning
+        run: |
+          set -o pipefail
+          cd "$RUNNER_TEMP/mgbs-wheel-smoke"
+          env -u PYTHONPATH python "$GITHUB_WORKSPACE/integrations/cayleypy_native/tests/installed_cnot_dtype_contract.py" 2>&1 | tee "$GITHUB_WORKSPACE/test_results/refactor_20261120/installed-wheel/cnot-dtype.log"
+      - name: Verify strict CNOT backend admission on CPU Gloo
+        id: backend_admission
+        env:
+          PYTHONWARNINGS: error::DeprecationWarning
+        run: |
+          set -o pipefail
+          cd "$RUNNER_TEMP/mgbs-wheel-smoke"
+          env -u PYTHONPATH python "$GITHUB_WORKSPACE/integrations/cayleypy_native/tests/installed_cnot_backend_admission.py" 2>&1 | tee "$GITHUB_WORKSPACE/test_results/refactor_20261120/installed-wheel/cnot-backend-admission.log"
+      - name: Verify CNOT Gloo phase failures and live-group reuse
+        id: phase_boundaries
+        env:
+          PYTHONWARNINGS: error::DeprecationWarning
+        run: |
+          set -o pipefail
+          cd "$RUNNER_TEMP/mgbs-wheel-smoke"
+          env -u PYTHONPATH python "$GITHUB_WORKSPACE/integrations/cayleypy_native/tests/installed_cnot_phase_boundaries.py" 2>&1 | tee "$GITHUB_WORKSPACE/test_results/refactor_20261120/installed-wheel/cnot-phase-boundaries.log"
       - name: Run public CNOT search through the installed wheel
+        id: public_search
         run: |
           set -o pipefail
           mkdir -p "$RUNNER_TEMP/mgbs-wheel-smoke"
@@ -68,11 +101,41 @@ jobs:
             --case wide --backend gloo --engine rust \
             --output "$GITHUB_WORKSPACE/test_results/refactor_20261120/installed-wheel/cnot-wide-rust.json" \
             2>&1 | tee "$GITHUB_WORKSPACE/test_results/refactor_20261120/installed-wheel/cnot-wide-rust.log"
+      - name: Write hosted verification status board
+        if: always()
+        env:
+          TOOLCHAIN: ${{ steps.rust_toolchain.outcome }}
+          DEPENDENCIES: ${{ steps.dependencies.outcome }}
+          WHEEL_BUILD: ${{ steps.wheel_build.outcome }}
+          WHEEL_SMOKE: ${{ steps.wheel_smoke.outcome }}
+          DTYPE: ${{ steps.dtype.outcome }}
+          BACKEND_ADMISSION: ${{ steps.backend_admission.outcome }}
+          PHASE_BOUNDARIES: ${{ steps.phase_boundaries.outcome }}
+          PUBLIC_SEARCH: ${{ steps.public_search.outcome }}
+        run: |
+          set -euo pipefail
+          mkdir -p test_results/refactor_20261121/rust-cnot-admission
+          cat > test_results/refactor_20261121/rust-cnot-admission/hosted-run.md <<EOF
+          # Hosted CPU and installed-wheel validation
+
+          - Source SHA: ${GITHUB_SHA}
+          - Rust toolchain: ${TOOLCHAIN}
+          - CPU runtime dependencies: ${DEPENDENCIES}
+          - PEP 517 wheel build: ${WHEEL_BUILD}
+          - Installed-wheel public API smoke: ${WHEEL_SMOKE}
+          - CNOT dtype contract with deprecation warnings as errors: ${DTYPE}
+          - Strict backend admission and activation mismatch over two-rank Gloo: ${BACKEND_ADMISSION}
+          - Winner packet/history failure injection and live-group reuse: ${PHASE_BOUNDARIES}
+          - Public CNOT Rust-controller search: ${PUBLIC_SEARCH}
+          - CUDA/NCCL physical acceptance: not run by this CPU workflow.
+          EOF
       - name: Upload wheel validation logs
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: installed-python-wheel-validation
-          path: test_results/refactor_20261120/installed-wheel
+          path: |
+            test_results/refactor_20261120/installed-wheel
+            test_results/refactor_20261121/rust-cnot-admission/hosted-run.md
           if-no-files-found: error
           retention-days: 30

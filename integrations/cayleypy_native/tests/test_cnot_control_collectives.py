@@ -868,6 +868,7 @@ def test_search_controller_falls_back_when_native_runner_is_not_universal(monkey
         size=2,
         checked=lambda _stage, callback: callback(),
         all_ranks_support=lambda _local: False,
+        require_engine_consensus=lambda _digest: None,
         native_method=lambda _name: lambda: None,
         supports_native=lambda _name: False,
     )

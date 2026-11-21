@@ -2972,3 +2972,25 @@ Main commit `148b2a826a369b7601e904ea409e0cc5301c75c9` also passed the 260-test 
 - Hosted source validation passed in [Actions run 44831036050](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44831036050); artifact [14675264978](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44831036050/artifacts/14675264978), SHA-256 `66fb835caa5cc9e1a897bb97777c18cccdffd9cb3092c3ec2e7908ae9181bfad`.
 - That push-triggered run validated Python/Bash syntax and packaging guards only. The physical GPU job was skipped; CUDA/NCCL search and checkpoint-scored CNOT remain unverified pending a supplied spend cap and an already-running instance.
 - Source-controlled evidence: `test_results/refactor_20261121/gpu-acceptance/GITHUB_STATUS.md`.
+
+## 2026-11-21 - Require strict CNOT backends and coordinated preparation
+
+- CNOT strict acceptance now compares activation across every rank before
+  transport selection. It fails collectively on absent or inconsistent
+  DeviceDomain activation, ABI/capability mismatch, wrong scorer/checkpoint/
+  manifest/library hashes, and unsupported Stream 5 ABI. The ordinary
+  compatibility fallback remains available outside strict acceptance.
+- The Rust TQP scorer reports its binary and search-manifest SHA-256 alongside
+  the checkpoint metadata. DeviceDomain and Stream 5 dispatch events identify
+  the actual implementation, ABI, library hash, rank, world, and device after
+  the corresponding operation succeeds.
+- CNOT dtype validation uses canonical Torch dtype identity for state/index
+  int64 and move int64/uint16 inputs. Winner packet construction and history
+  edge allocation/copy are coordinated before exchange/broadcast, keeping the
+  live Gloo group usable after rank-local failures.
+- Vast source validation now covers private preflight receipt parsing and
+  manifest/checkpoint propagation. The explicit GPU workflow accepts only a
+  validated 2x desktop RTX 3060 ID and combines wheel/model/backend/lifecycle,
+  elapsed-time, and estimated-cost receipts. It does not rent hardware.
+- Current changes await hosted Actions validation. No local builds, logs,
+  result archives, paid compute, CUDA, or NCCL runs were produced.

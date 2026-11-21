@@ -78,6 +78,11 @@ if command.startswith("tar -C "):
     raise SystemExit(0)
 
 event("remote")
+if ("987654321" not in command
+        or "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc" not in command
+        or "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd" not in command):
+    print("the selected Vast instance ID or private manifest/checkpoint hash was not passed into the remote receipt", file=sys.stderr)
+    raise SystemExit(94)
 if not authorized_key.exists():
     print("the key was revoked before remote work", file=sys.stderr)
     raise SystemExit(93)
@@ -125,7 +130,10 @@ class VastResultTransportTests(unittest.TestCase):
             "VAST_REMOTE_KEY_BLOB": "ssh-ed25519 fake-public-key",
             "VAST_REMOTE_ARCHIVE": "/workspace/synthetic-run.tar.gz",
             "VAST_REMOTE_ARCHIVE_SHA": "a" * 64,
+            "VAST_REMOTE_MANIFEST_SHA": "c" * 64,
+            "VAST_REMOTE_CHECKPOINT_SHA": "d" * 64,
             "VAST_SOURCE_SHA": "b" * 40,
+            "VAST_INSTANCE_ID": "987654321",
             "FAKE_SSH_EVENTS": str(events_file),
             "FAKE_AUTHORIZED_KEY": str(authorized_key),
             "FAKE_REMOTE_EXIT": str(remote_exit),
