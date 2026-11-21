@@ -3126,7 +3126,8 @@ Main commit `148b2a826a369b7601e904ea409e0cc5301c75c9` also passed the 260-test 
   a cleared environment and a stub acceptance worker. It checks that the
   receipt exists before the worker starts, success and controlled failure
   preserve their status, and the completed log and receipt share the supplied
-  `run_root`. Run `44902996083` reached this new fixture but stopped at a
-  missing `sys` import before executing the payload; the other hosted CPU
-  verifiers passed and the GPU job was skipped. Fix the fixture before
-  interpreting its next run as payload evidence.
+  `run_root`. Runs `44902996083` and `44903453687` stopped in fixture setup
+  (first missing `sys`, then `bash` absent from the intentionally clean PATH)
+  before executing the payload. Other hosted CPU verifiers passed; the GPU
+  jobs were skipped. Correct the launcher to use `/bin/bash` before counting
+  the next run as payload evidence.

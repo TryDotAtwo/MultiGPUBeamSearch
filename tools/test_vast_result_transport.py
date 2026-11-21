@@ -181,7 +181,7 @@ class VastResultTransportTests(unittest.TestCase):
 
         worker = worker_dir / "vast_cnot_gpu_acceptance.sh"
         worker.write_text(textwrap.dedent("""\
-            #!/usr/bin/env bash
+            #!/bin/bash
             set -euo pipefail
             receipt="$EXPECTED_RECEIPT_PATH"
             [[ -s "$receipt" ]]
@@ -240,7 +240,7 @@ class VastResultTransportTests(unittest.TestCase):
         self.assertNotIn("REMOTE_ROOT", environment)
         completed = subprocess.run(
             [
-                "bash", str(payload_path), str(source_dir), str(run_root),
+                "/bin/bash", str(payload_path), str(source_dir), str(run_root),
                 "ssh-ed25519 synthetic", str(root / "source.tar.gz"), "a" * 64,
                 "b" * 40, "987654321", "c" * 64,
                 "92f3ec8e6a6ef831916a9d3ba9bbdae9307c9850d61334916a2b3e690c0020c4",
@@ -251,7 +251,11 @@ class VastResultTransportTests(unittest.TestCase):
             capture_output=True,
             check=False,
         )
-        events = [json.loads(line) for line in worker_events_path.read_text(encoding="utf-8").splitlines()]
+        events = (
+            [json.loads(line) for line in worker_events_path.read_text(encoding="utf-8").splitlines()]
+            if worker_events_path.is_file()
+            else []
+        )
         return completed, receipt_path, result_dir / "cuda-nccl.log", events
 
     def test_retrieves_results_after_successful_remote_key_revocation(self):
