@@ -126,6 +126,13 @@ class PermutationAcceptanceTests(unittest.TestCase):
             "B=3 tie-break must return the same ordered full Hash128 winners on one and two GPUs",
         )
 
+    def test_cuda_verifier_uses_topology_parity_saturated_lrx5_fixture(self):
+        source = Path(__file__).with_name("verify_permutation_cuda.py").read_text(encoding="utf-8")
+        self.assertIn("cp.PermutationGroups.lrx(4)", source)  # retain public smoke
+        self.assertIn("cp.PermutationGroups.lrx(5)", source)  # saturated parity fixture
+        self.assertIn("saturated_model_dir", source)
+        self.assertIn('"saturated_fixture": "cayleypy.LRX(5)"', source)
+
     def test_trace_binds_call_case_and_both_observed_rank_devices(self):
         log = "\n".join((
             _trace(0, pid=1001, gpu_uuid="0" * 32),
