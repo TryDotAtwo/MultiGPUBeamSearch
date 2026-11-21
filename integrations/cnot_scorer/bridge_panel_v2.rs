@@ -1,7 +1,8 @@
 //! Rank-local C ABI for a pinned CNOT panel-v2 checkpoint. Built inside
 //! run_config::execution by build.py. Tensor storage belongs to the Python caller.
 use super::evaluation::load_panel_checkpoint_on;
-use super::super::panel::validate_frozen_panel;
+use super::super::panel::{frozen_panel_digest, validate_frozen_panel};
+use std::collections::BTreeSet;
 use crate::device_feature_plan::DeviceFeaturePlan;
 use crate::device_search::{ActionHead, BeamConfig};
 use crate::device_state::DeviceStateBatch;
@@ -32,6 +33,23 @@ struct Manifest {
     _head: ActionHead,
 }
 
+fn validate_manifest_identity(spec: &Manifest) -> Result<(), String> {
+    if spec.schema != "cnot103_panel_search_v2"
+        || !matches!(spec.panel.as_str(), "dev" | "test")
+        || spec.panel_indices.is_empty()
+        || spec.panel_indices.len() != spec.panel_ids.len()
+        || spec.panel_indices.iter().collect::<BTreeSet<_>>().len() != spec.panel_indices.len()
+        || spec.panel_ids.iter().any(|id| id.trim().is_empty())
+        || spec.panel_ids.iter().collect::<BTreeSet<_>>().len() != spec.panel_ids.len()
+        || frozen_panel_digest(&spec.panel, &spec.panel_indices, &spec.panel_ids)
+            != spec.panel_digest
+    {
+        return Err("panel-v2 manifest identity is invalid".into());
+    }
+    Ok(())
+}
+
+
 struct Scorer {
     plan: DeviceFeaturePlan,
     model: FusionDistanceField,
@@ -46,9 +64,7 @@ impl Scorer {
     fn open(path: &Path, n: u32, device: usize) -> Result<Self, String> {
         let bytes = fs::read(path).map_err(|e| e.to_string())?;
         let spec: Manifest = serde_json::from_slice(&bytes).map_err(|e| e.to_string())?;
-        if spec.schema != "cnot103_panel_search_v2" {
-            return Err("expected a pinned cnot103_panel_search_v2 manifest".into());
-        }
+        validate_manifest_identity(&spec)?;
         let mut restored = load_panel_checkpoint_on(
             path,
             &spec.training_manifest,
@@ -296,5 +312,72 @@ pub unsafe extern "C" fn mgbs_tqp_score_many(
 pub unsafe extern "C" fn mgbs_tqp_close(handle: *mut c_void) {
     if !handle.is_null() {
         drop(unsafe { Box::from_raw(handle.cast::<Scorer>()) });
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    fn valid_manifest() -> Manifest {
+        let panel = "dev".to_string();
+        let panel_indices = vec![2usize, 5usize];
+        let panel_ids = vec!["case-a".to_string(), "case-b".to_string()];
+        let panel_digest = frozen_panel_digest(&panel, &panel_indices, &panel_ids);
+        serde_json::from_value(json!({
+            "schema": "cnot103_panel_search_v2",
+            "training_manifest": {"path": "run.json", "sha256": "a".repeat(64)},
+            "training_result": {"path": "training-result.json", "sha256": "b".repeat(64)},
+            "panel": panel,
+            "panel_indices": panel_indices,
+            "panel_ids": panel_ids,
+            "panel_digest": panel_digest,
+            "search": {
+                "beam_width": 36,
+                "shortlist": 4,
+                "max_depth": 8,
+                "max_expanded": 201,
+                "inference_batch": 32
+            },
+            "head": "qhat"
+        }))
+        .expect("synthetic panel-v2 manifest parses")
+    }
+
+    #[test]
+    fn accepts_a_digest_bound_ordered_panel_manifest() {
+        let spec = valid_manifest();
+        validate_manifest_identity(&spec).expect("valid panel manifest");
+    }
+
+    #[test]
+    fn rejects_legacy_schema() {
+        let mut spec = valid_manifest();
+        spec.schema = "cnot103_dev_search_v1".into();
+        assert!(validate_manifest_identity(&spec).is_err());
+    }
+
+    #[test]
+    fn rejects_duplicate_indices_and_ids() {
+        let mut spec = valid_manifest();
+        spec.panel_indices[1] = spec.panel_indices[0];
+        assert!(validate_manifest_identity(&spec).is_err());
+
+        let mut spec = valid_manifest();
+        spec.panel_ids[1] = spec.panel_ids[0].clone();
+        assert!(validate_manifest_identity(&spec).is_err());
+    }
+
+    #[test]
+    fn rejects_reordered_or_wrong_digest() {
+        let mut spec = valid_manifest();
+        spec.panel_indices.reverse();
+        spec.panel_ids.reverse();
+        assert!(validate_manifest_identity(&spec).is_err());
+
+        let mut spec = valid_manifest();
+        spec.panel_digest = "0".repeat(64);
+        assert!(validate_manifest_identity(&spec).is_err());
     }
 }
