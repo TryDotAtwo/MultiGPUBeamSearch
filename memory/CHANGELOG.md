@@ -1,3 +1,7 @@
+## 2026-11-21 - Add saturated permutation acceptance contracts
+
+- Added a hosted CPU gate for a width-3 LRX(4) reference case, rank/run-boundary validation and bounded frontier snapshot decoding. This test-first commit intentionally precedes the oracle and runtime trace implementation.
+
 ## 2026-11-21 - Bind campaign shutdown to the selected Vast instance
 
 - The campaign marker now records the exact instance ID, Actions run and attempt, spend cap, and prior Vast label. The main workflow verifies a fresh account listing before enabling cleanup.
