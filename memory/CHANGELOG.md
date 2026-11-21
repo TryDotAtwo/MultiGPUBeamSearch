@@ -3119,3 +3119,12 @@ Main commit `148b2a826a369b7601e904ea409e0cc5301c75c9` also passed the 260-test 
 - The test currently references the planned `_probe_cnot_device_domain_vote`
   and `_probe_cnot_device_stage_vote` boundaries and is awaiting hosted RED
   evidence before the runtime changes. No GPU execution has occurred.
+
+## 2026-11-21 - Execute the remote Vast payload on hosted CPU
+
+- Added a fixture that extracts and executes the exact SSH remote payload with
+  a cleared environment and a stub acceptance worker. It checks that the
+  receipt exists before the worker starts, success and controlled failure
+  preserve their status, and the completed log and receipt share the supplied
+  `run_root`. The first hosted run is pending; the current payload is expected
+  to expose its runner-only `REMOTE_ROOT` reference before receipt creation.
