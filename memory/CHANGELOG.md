@@ -3012,5 +3012,9 @@ Main commit `148b2a826a369b7601e904ea409e0cc5301c75c9` also passed the 260-test 
   admission run found a real variable-length collective contract: different
   strict activation values produced differently sized Gloo tensors. The
   admission contract is now SHA-256-normalized before collective comparison;
-  hosted wheel rerun and phase-boundary tests are pending. Full logs are in
-  Actions artifacts; no local tests or GPU run were produced.
+  hosted rerun passed the ABI/capability mismatch probes and the normalized
+  contract activation mismatch. It then exposed a test assertion expecting
+  RuntimeError where the public Python setting-consensus API correctly raises
+  ValueError. The assertion is corrected; installed-wheel admission and the
+  phase-boundary gate are pending. Full logs are in Actions artifacts; no local
+  tests or GPU run were produced.

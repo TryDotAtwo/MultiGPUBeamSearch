@@ -126,7 +126,7 @@ def public_activation_worker(rank, rendezvous, output_dir):
                     FlatScorer(),
                     width=6, shortlist=6, max_depth=3, validation="python", engine="rust",
                 )
-            except RuntimeError as error:
+            except ValueError as error:
                 result = {"error": str(error)}
             else:
                 raise AssertionError("public CNOT search accepted rank-dependent strict activation")
