@@ -78,6 +78,18 @@ class VastCampaignWorkflowTests(unittest.TestCase):
         ):
             self.assertNotIn(private_path, upload)
 
+    def test_installed_wheel_ci_publishes_only_redacted_status(self):
+        workflow = (ROOT / ".github/workflows/installed-wheel-validation.yml").read_text(encoding="utf-8")
+        self.assertIn("Write redacted hosted validation status", workflow)
+        self.assertIn("Upload redacted hosted validation status", workflow)
+        self.assertIn('--source-outcome "$SOURCE_OUTCOME"', workflow)
+        self.assertNotIn("| tee ", workflow)
+        upload = workflow.split("Upload redacted hosted validation status", 1)[1].split("\n      - name:", 1)[0]
+        self.assertIn("cnot-public-status.json", upload)
+        self.assertNotIn("test_results/", upload)
+        self.assertNotIn(".log", upload)
+        self.assertNotIn("hosted-run.md", upload)
+
     def test_result_transport_never_downloads_or_prints_private_results(self):
         transport = (ROOT / "tools/vast_result_transport.sh").read_text(encoding="utf-8")
         self.assertNotIn("VAST_SSH_RESULTS", transport)
