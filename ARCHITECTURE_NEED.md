@@ -1,5 +1,13 @@
 # Конфиг
 
+## Typed options in both Rust session identities, 2026-11-21
+
+The v2 preparation identity already carries options as JSON. The nested identity used by the Rust resident worker now does the same: Python places options_descriptor(options) inside python_session_identity.options instead of storing repr(options). Rust therefore compares the same structured option values in both preparation invalidation and worker reuse.
+
+Hosted RED `97441f6` failed the existing reuse test on world sizes 1 and 2 because the nested object had options_repr but no options. After the fix, Python-owner passed on source SHA `9e6863387861c0a643f0a043acfdbe6892126c13` in [run 44947770658](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44947770658), artifact [14724530178](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44947770658/artifacts/14724530178), SHA-256 `74681e4acf1d526dead977f441b6b9d1cc69722819b70cfb185b59c59bf535b3`. The installed wheel passed in [run 44947770665](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44947770665), artifact [14724367144](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44947770665/artifacts/14724367144), SHA-256 `9a2cd384509198463d78cc99df2ea0ee5ac7e834fc2aee404be8c4ebe42c27af`.
+
+No search, scoring, precision, or rank behavior changed. This is hosted CPU evidence only; physical CUDA/NCCL acceptance is pending.
+
 ## Rust session preparation identity v2, 2026-11-21
 
 The resident permutation session now receives a typed preparation identity from the Rust extension. Schema v2 stores NativeOptions as a JSON object and compares it structurally; it no longer relies on Python repr output. The Rust builder validates that the options value is an object. The requested beam width retains both the numeric form and the public max form.

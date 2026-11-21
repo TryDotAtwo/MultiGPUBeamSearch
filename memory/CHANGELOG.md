@@ -1,3 +1,9 @@
+## 2026-11-21 - Use typed options in resident Rust session identity
+
+- Removed Python repr from the nested identity passed to Rust resident workers. The nested Python session identity now carries the same structured options descriptor as the Rust preparation identity.
+- Hosted RED on `97441f6` demonstrated the missing field for world sizes 1 and 2. On `9e6863387861c0a643f0a043acfdbe6892126c13`, Python-owner passed [run 44947770658](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44947770658), artifact [14724530178](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44947770658/artifacts/14724530178); the installed wheel and CPU acceptance passed [run 44947770665](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44947770665), artifact [14724367144](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44947770665/artifacts/14724367144).
+- CUDA/NCCL and physical multi-GPU acceptance were not run.
+
 ## 2026-11-21 - Store Rust preparation options as typed JSON
 
 - Preparation identity schema v2 carries NativeOptions as a JSON object. Rust validates the object and compares preparation identities structurally; the max beam-width form remains typed alongside numeric widths.
