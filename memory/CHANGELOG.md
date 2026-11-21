@@ -2999,3 +2999,10 @@ Main commit `148b2a826a369b7601e904ea409e0cc5301c75c9` also passed the 260-test 
   pending until the wheel builds.
 - No local build, test, logs, result archives, paid compute, CUDA, or NCCL runs
   were produced. Full hosted logs remain in Actions artifacts.
+- Follow-up hosted runs at `01443ef` confirmed the wheel build, installed-wheel
+  smoke test, and dtype contract, then exposed two test-harness regressions:
+  the admission script executed its multiprocessing body during spawn imports,
+  and CPU mocks did not model the new strict-mode agreement votes. The CPU job
+  also showed that single-rank compatibility fixtures need no distributed
+  agreement method. These are corrected in the next source revision; hosted
+  reruns are pending. The physical 2x RTX 3060 gate remains unrun.

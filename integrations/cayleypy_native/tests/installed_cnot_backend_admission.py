@@ -137,60 +137,65 @@ def public_activation_worker(rank, rendezvous, output_dir):
         dist.destroy_process_group()
 
 
-with tempfile.TemporaryDirectory(prefix="mgbs-cnot-admission-") as temporary:
-    root = Path(temporary)
-    valid = build_library(root, "valid")
-    wrong_base = build_library(root, "wrong_base", "-DMGBS_TEST_DOMAIN_ABI=9")
-    wrong_device = build_library(root, "wrong_device", "-DMGBS_TEST_DEVICE_ABI=9")
-    missing_unseen = build_library(root, "missing_unseen", "-DMGBS_TEST_MISSING_UNSEEN=1")
+def main():
+    with tempfile.TemporaryDirectory(prefix="mgbs-cnot-admission-") as temporary:
+        root = Path(temporary)
+        valid = build_library(root, "valid")
+        wrong_base = build_library(root, "wrong_base", "-DMGBS_TEST_DOMAIN_ABI=9")
+        wrong_device = build_library(root, "wrong_device", "-DMGBS_TEST_DEVICE_ABI=9")
+        missing_unseen = build_library(root, "missing_unseen", "-DMGBS_TEST_MISSING_UNSEEN=1")
 
-    assert RUNTIME._probe_cnot_backend_admission(False, None, False, 0, 4, 1) == "strict=0"
-    try:
-        RUNTIME._probe_cnot_backend_admission(True, None, True, 0, 4, 1)
-    except RuntimeError as error:
-        assert "MGBS_CNOT_OWNED_LIBRARY" in str(error)
-    else:
-        raise AssertionError("strict admission accepted a missing required DeviceDomain path")
-
-    for library, message in ((wrong_base, "CNOT domain ABI mismatch"),
-                             (wrong_device, "CNOT device ABI mismatch"),
-                             (missing_unseen, "borrowed-device selection")):
+        assert RUNTIME._probe_cnot_backend_admission(False, None, False, 0, 4, 1) == "strict=0"
         try:
-            RUNTIME._probe_cnot_backend_admission(True, library, True, 0, 4, 1)
+            RUNTIME._probe_cnot_backend_admission(True, None, True, 0, 4, 1)
         except RuntimeError as error:
-            assert message in str(error), (library, error)
+            assert "MGBS_CNOT_OWNED_LIBRARY" in str(error)
         else:
-            raise AssertionError(f"strict admission accepted unsupported library {library}")
+            raise AssertionError("strict admission accepted a missing required DeviceDomain path")
 
-    contract = RUNTIME._probe_cnot_backend_admission(True, valid, True, 0, 4, 1)
-    assert "capabilities=owners,expansion,full_matrix_distinct" in contract
+        for library, message in ((wrong_base, "CNOT domain ABI mismatch"),
+                                 (wrong_device, "CNOT device ABI mismatch"),
+                                 (missing_unseen, "borrowed-device selection")):
+            try:
+                RUNTIME._probe_cnot_backend_admission(True, library, True, 0, 4, 1)
+            except RuntimeError as error:
+                assert message in str(error), (library, error)
+            else:
+                raise AssertionError(f"strict admission accepted unsupported library {library}")
 
-    mismatch_dir = root / "rank-mismatch"
-    mismatch_dir.mkdir()
-    assert_rank_pair(mismatch_dir, "rendezvous", valid, missing_unseen,
-                     "admit strict CNOT backends failed")
+        contract = RUNTIME._probe_cnot_backend_admission(True, valid, True, 0, 4, 1)
+        assert "capabilities=owners,expansion,full_matrix_distinct" in contract
 
-    activation_dir = root / "activation-mismatch"
-    activation_dir.mkdir()
-    # Here both local probes succeed; only the strict activation differs.
-    activation_rendezvous = (activation_dir / "rendezvous").resolve().as_uri()
-    mp.spawn(activation_worker, args=(activation_rendezvous, str(activation_dir), valid),
-             nprocs=2, join=True)
-    activation_results = [json.loads((activation_dir / f"rank-{rank}.json").read_text())
-                          for rank in range(2)]
-    assert activation_results[0] == activation_results[1], activation_results
-    assert "settings differ between ranks" in activation_results[0]["error"]
+        mismatch_dir = root / "rank-mismatch"
+        mismatch_dir.mkdir()
+        assert_rank_pair(mismatch_dir, "rendezvous", valid, missing_unseen,
+                         "admit strict CNOT backends failed")
 
-    public_activation_dir = root / "public-activation-mismatch"
-    public_activation_dir.mkdir()
-    public_rendezvous = (public_activation_dir / "rendezvous").resolve().as_uri()
-    mp.spawn(public_activation_worker,
-             args=(public_rendezvous, str(public_activation_dir)), nprocs=2, join=True)
-    public_activation_results = [
-        json.loads((public_activation_dir / f"public-rank-{rank}.json").read_text())
-        for rank in range(2)
-    ]
-    assert public_activation_results[0] == public_activation_results[1], public_activation_results
-    assert "CNOT search engine settings differ between ranks" in public_activation_results[0]["error"]
+        activation_dir = root / "activation-mismatch"
+        activation_dir.mkdir()
+        # Here both local probes succeed; only the strict activation differs.
+        activation_rendezvous = (activation_dir / "rendezvous").resolve().as_uri()
+        mp.spawn(activation_worker, args=(activation_rendezvous, str(activation_dir), valid),
+                 nprocs=2, join=True)
+        activation_results = [json.loads((activation_dir / f"rank-{rank}.json").read_text())
+                              for rank in range(2)]
+        assert activation_results[0] == activation_results[1], activation_results
+        assert "settings differ between ranks" in activation_results[0]["error"]
 
-print("CNOT_BACKEND_ADMISSION_CPU_OK")
+        public_activation_dir = root / "public-activation-mismatch"
+        public_activation_dir.mkdir()
+        public_rendezvous = (public_activation_dir / "rendezvous").resolve().as_uri()
+        mp.spawn(public_activation_worker,
+                 args=(public_rendezvous, str(public_activation_dir)), nprocs=2, join=True)
+        public_activation_results = [
+            json.loads((public_activation_dir / f"public-rank-{rank}.json").read_text())
+            for rank in range(2)
+        ]
+        assert public_activation_results[0] == public_activation_results[1], public_activation_results
+        assert "CNOT search engine settings differ between ranks" in public_activation_results[0]["error"]
+
+    print("CNOT_BACKEND_ADMISSION_CPU_OK")
+
+
+if __name__ == "__main__":
+    main()

@@ -588,17 +588,18 @@ def test_world_start_transport_keeps_python_path_for_older_extensions(monkeypatc
     assert world.transport is selected
 
 
-def test_rust_start_transport_preserves_rank_consensus_and_fallback(monkeypatch):
+def test_rust_start_transport_preserves_rank_consensus_and_fallback(monkeypatch, tmp_path):
     native = rust_control.extension()
     start = getattr(native, "run_cnot_native_start_transport", None)
     assert callable(start)
 
     world = _two_rank_world()
-    native_library = object()
+    native_path = tmp_path / "libstream5-test.so"
+    native_path.write_bytes(b"stream5 fixture")
+    native_library = SimpleNamespace(_name=str(native_path))
     world._stream5_library = native_library
     library_by_rank = [None]
-    consensus = [1]
-    collectives = []
+    support_votes = []
     selected = []
 
     class FakeRustStream5:
@@ -617,36 +618,33 @@ def test_rust_start_transport_preserves_rank_consensus_and_fallback(monkeypatch)
             selected.append(("python", library, actual_world, transport))
             return transport
 
-    def longs(values):
-        collectives.append(("longs", list(values)))
-        return torch.tensor(values, dtype=torch.int64)
+    original_support = world.all_ranks_support
 
-    def sum(tensor):
-        collectives.append(("sum", tensor.tolist()))
-        return torch.tensor([consensus[0]], dtype=torch.int64)
+    def all_ranks_support(local_support):
+        support_votes.append(bool(local_support))
+        return original_support(local_support)
 
     monkeypatch.setattr(cnot_stream5, "RustStream5", FakeRustStream5)
     monkeypatch.setattr(cnot_stream5, "Stream5", FakeStream5)
-    monkeypatch.setattr(world, "longs", longs)
-    monkeypatch.setattr(world, "sum", sum)
+    monkeypatch.setattr(world, "all_ranks_support", all_ranks_support)
+    monkeypatch.delenv("MGBS_CNOT_STRICT_BACKEND", raising=False)
 
     start(world, True)
     assert selected[-1][0] == "python"
     assert world.transport is selected[-1][3]
-    assert collectives == [("longs", [0]), ("sum", [0])]
+    assert support_votes == [False, True, False]
 
     library_by_rank[0] = object()
-    consensus[0] = 2
     start(world, True)
     assert selected[-1][0] == "rust"
     assert selected[-1][1] is library_by_rank[0]
     assert world.transport is selected[-1][3]
+    assert support_votes == [False, True, False, False, True, True]
 
-    before = len(collectives)
     start(world, False)
     assert selected[-1][0] == "python"
     assert world.transport is selected[-1][3]
-    assert len(collectives) == before
+    assert support_votes[-3:] == [False, True, False]
 
 def test_rust_checked_stage_gathers_error_messages_without_object_collective(monkeypatch):
     world = _two_rank_world()

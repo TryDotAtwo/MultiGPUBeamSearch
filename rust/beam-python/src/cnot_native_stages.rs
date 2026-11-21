@@ -24,6 +24,9 @@ fn strict_backend_enabled() -> bool {
 
 pub(crate) fn strict_backend_mode(world: &Bound<'_, PyAny>) -> PyResult<bool> {
     let requested = strict_backend_enabled();
+    if world.getattr("size")?.extract::<usize>()? == 1 {
+        return Ok(requested);
+    }
     let all_strict: bool = world
         .call_method1("all_ranks_support", (requested,))?
         .extract()?;
