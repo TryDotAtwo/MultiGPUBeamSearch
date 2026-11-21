@@ -396,9 +396,8 @@ pub(crate) fn run_cnot_native_start_transport<'py>(
                 .into_iter()
                 .collect();
                 let active_device = world.getattr("device")?;
-                let observation = super::cnot_native_stages::observe_acceptance_gpu(
-                    py, &world, &active_device
-                )?;
+                let observation =
+                    super::cnot_native_stages::observe_acceptance_gpu(py, &world, &active_device)?;
                 crate::cnot_acceptance::emit(
                     "stream5_active",
                     rank,
