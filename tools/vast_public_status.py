@@ -13,6 +13,7 @@ ALLOWED = {
     "gpu_acceptance": {"not_run", "passed", "failed"},
     "cleanup": {"not_run", "confirmed", "unverified"},
     "watchdog": {"not_run", "completed", "failed"},
+    "source_validation": {"not_run", "passed", "failed"},
 }
 PUBLIC_FIELDS = {"checked_at_utc", *ALLOWED}
 
@@ -37,6 +38,7 @@ def make_public_status(
     gpu_acceptance: str,
     cleanup: str,
     watchdog: str,
+    source_validation: str = "not_run",
 ) -> dict[str, str]:
     timestamp = checked_at_utc or datetime.now(timezone.utc).isoformat()
     report = {
@@ -46,6 +48,7 @@ def make_public_status(
         "gpu_acceptance": gpu_acceptance,
         "cleanup": cleanup,
         "watchdog": watchdog,
+        "source_validation": source_validation,
     }
     for field, allowed in ALLOWED.items():
         if report[field] not in allowed:
@@ -86,6 +89,7 @@ def write_public_status(
         f"- GPU acceptance: {report['gpu_acceptance']}",
         f"- Cleanup confirmation: {report['cleanup']}",
         f"- Watchdog: {report['watchdog']}",
+        f"- Source validation: {report['source_validation']}",
         "",
     ]
     with summary_path.open("a", encoding="utf-8") as output:
@@ -99,6 +103,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--gpu-outcome", choices=("success", "failure", "cancelled", "skipped"), default="skipped")
     parser.add_argument("--cleanup-outcome", choices=("success", "failure", "cancelled", "skipped"), default="skipped")
     parser.add_argument("--watchdog-outcome", choices=("success", "failure", "cancelled", "skipped"), default="skipped")
+    parser.add_argument("--source-outcome", choices=("success", "failure", "cancelled", "skipped"), default="skipped")
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--summary", type=Path, required=True)
     args = parser.parse_args(argv)
@@ -109,6 +114,7 @@ def main(argv: list[str] | None = None) -> int:
         gpu_acceptance=_mapped_outcome(args.gpu_outcome, passed="passed", failed="failed"),
         cleanup=_mapped_outcome(args.cleanup_outcome, passed="confirmed", failed="unverified"),
         watchdog=_mapped_outcome(args.watchdog_outcome, passed="completed", failed="failed"),
+        source_validation=_mapped_outcome(args.source_outcome, passed="passed", failed="failed"),
     )
     write_public_status(report, args.output, args.summary)
     return 0
