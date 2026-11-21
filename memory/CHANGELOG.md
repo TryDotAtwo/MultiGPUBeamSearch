@@ -3131,3 +3131,19 @@ Main commit `148b2a826a369b7601e904ea409e0cc5301c75c9` also passed the 260-test 
   before executing the payload. Other hosted CPU verifiers passed; the GPU
   jobs were skipped. Correct the launcher to use `/bin/bash` before counting
   the next run as payload evidence.
+
+## 2026-11-21 - Derive remote results from the transport contract
+
+- Hosted RED `44903569577` executed the extracted remote payload with an empty
+  environment and failed before receipt creation on the unbound runner-only
+  `REMOTE_ROOT` variable. Fake SSH result retrieval passed on both success and
+  failure.
+- Split the GPU acceptance body into the archived
+  `tools/vast_cnot_gpu_acceptance.sh`; the SSH wrapper now creates one
+  `result_dir` from positional `run_root` and the same validated relative path
+  passed by the transport helper for result retrieval. It seeds a receipt
+  before archive verification/build and finalizes it on every shell exit,
+  including controlled errors and timeout signals. The terminal receipt
+  records worker and `tee` exit codes. CNOT event validation reads closed
+  per-case logs instead of the concurrently written outer tee log. Hosted
+  GREEN and worker syntax checks are pending; no GPU run was made.
