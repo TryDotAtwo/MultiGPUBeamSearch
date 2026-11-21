@@ -53,6 +53,41 @@ wheel_dir="${run_root}/wheel-dist"
 venv="${run_root}/venv"
 mkdir -p "$wheel_dir" "${run_root}/wheel-smoke" "$result_dir"
 cd "$source_dir/integrations/cayleypy_native"
+cutlass_cache="/private/cache/cayleypy-native"
+cutlass_dir="$("$python_bin" - "$source_dir" "$cutlass_cache" <<'PY'
+import json, sys
+from pathlib import Path
+
+import cayleypy
+import torch
+from multigpubeamsearch.build import discover_nccl
+from multigpubeamsearch.options import NativeOptions
+from multigpubeamsearch.sources import CUTLASS_SOURCE, setup_sources
+
+if not hasattr(cayleypy, "CayleyGraph"):
+    raise SystemExit("the acceptance Python environment lacks the CayleyPy graph API")
+nccl = discover_nccl()
+options = setup_sources(
+    options=NativeOptions(source_dir=Path(sys.argv[1]), cache_dir=Path(sys.argv[2])),
+    offline=True,
+)
+cutlass = options.cutlass_dir
+if cutlass != Path(sys.argv[2]) / "sources" / f"cutlass-{CUTLASS_SOURCE.revision}" / "tree":
+    raise SystemExit(f"the CUTLASS source is not the expected pre-staged cache: {cutlass}")
+print("REMOTE_BUILD_INPUT_PREFLIGHT=" + json.dumps({
+    "cayleypy": getattr(cayleypy, "__version__", "installed"),
+    "torch": str(torch.__version__),
+    "nccl_header_sha256": nccl["header_sha256"],
+    "nccl_library_sha256": nccl["library_sha256"],
+    "cutlass_revision": CUTLASS_SOURCE.revision,
+    "cutlass_archive_sha256": CUTLASS_SOURCE.sha256,
+    "cutlass_source": str(cutlass),
+    "source_cache_mode": "offline",
+}, sort_keys=True), file=sys.stderr)
+print(cutlass)
+PY
+)"
+[[ -s "${cutlass_dir}/include/cutlass/cutlass.h" ]]
 "$python_bin" -m pip wheel --verbose --no-deps --wheel-dir "$wheel_dir" .
 "$python_bin" -m venv --system-site-packages "$venv"
 wheel="$(find "$wheel_dir" -maxdepth 1 -type f -name 'multigpubeamsearch-*.whl' -print -quit)"
@@ -80,38 +115,21 @@ PY
 "$wheel_python" -m pip check
 cd "${run_root}/wheel-smoke"
 unset PYTHONPATH
-cutlass_dir="$("$wheel_python" - "$source_dir" "${run_root}/permutation-cache" <<'PY'
-import json, sys
+"$wheel_python" - "$source_dir" "$cutlass_cache" "$cutlass_dir" <<'PY'
+import sys
 from pathlib import Path
 
-import cayleypy
-import torch
-from multigpubeamsearch.build import discover_nccl
 from multigpubeamsearch.options import NativeOptions
-from multigpubeamsearch.sources import CUTLASS_SOURCE, setup_sources
+from multigpubeamsearch.sources import setup_sources
 
-if not hasattr(cayleypy, "CayleyGraph"):
-    raise SystemExit("the acceptance Python environment lacks the CayleyPy graph API")
-nccl = discover_nccl()
 options = setup_sources(
     options=NativeOptions(source_dir=Path(sys.argv[1]), cache_dir=Path(sys.argv[2])),
+    offline=True,
 )
-cutlass = options.cutlass_dir
-if cutlass is None or not (cutlass / "include/cutlass/cutlass.h").is_file():
-    raise SystemExit("the pinned CUTLASS source cache is incomplete")
-print("PERMUTATION_BUILD_INPUTS=" + json.dumps({
-    "cayleypy": getattr(cayleypy, "__version__", "installed"),
-    "torch": str(torch.__version__),
-    "nccl_header_sha256": nccl["header_sha256"],
-    "nccl_library_sha256": nccl["library_sha256"],
-    "cutlass_revision": CUTLASS_SOURCE.revision,
-    "cutlass_archive_sha256": CUTLASS_SOURCE.sha256,
-    "cutlass_source": str(cutlass),
-}, sort_keys=True), file=sys.stderr)
-print(cutlass)
+if options.cutlass_dir != Path(sys.argv[3]):
+    raise SystemExit("installed wheel resolved a different CUTLASS cache than pre-build admission")
+print("INSTALLED_WHEEL_CUTLASS_OFFLINE_RECHECK=" + str(options.cutlass_dir))
 PY
-)"
-[[ -n "$cutlass_dir" && -s "${cutlass_dir}/include/cutlass/cutlass.h" ]]
 GITHUB_WORKSPACE="$source_dir" "$wheel_python" "$source_dir/integrations/cayleypy_native/tests/installed_wheel_smoke.py"
 
 scorer_build="${run_root}/private-cnot-scorer"

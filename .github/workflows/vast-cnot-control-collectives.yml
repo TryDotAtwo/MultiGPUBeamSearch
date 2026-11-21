@@ -132,6 +132,12 @@ jobs:
               raise SystemExit("the Vast workflow must use the tested canonical source packager")
           if '--cutlass-dir "$cutlass_dir"' not in worker_text or "discover_nccl()" not in worker_text:
               raise SystemExit("permutation build must receive prevalidated CUTLASS and NCCL inputs")
+          wheel_build_index = worker_text.index("-m pip wheel")
+          source_preflight_index = worker_text.index("setup_sources(")
+          if source_preflight_index > wheel_build_index or "offline=True" not in worker_text:
+              raise SystemExit("CayleyPy, NCCL headers/library and pinned CUTLASS must be checked offline before wheel build")
+          if "/private/cache/cayleypy-native" not in worker_text:
+              raise SystemExit("the GPU worker must use the pre-staged pinned CUTLASS cache")
           if "REMOTE_ROOT" in payload_text:
               raise SystemExit("the SSH remote payload must derive result_dir from positional run_root")
           if 'bash "$source_dir/tools/vast_cnot_gpu_acceptance.sh"' not in payload_text:
@@ -239,7 +245,7 @@ jobs:
           - Current CUDA-context UUID selection and matching receipts: ${CNOT_GPU_IDENTITY_OUTCOME}
           - New 2x RTX 3060 target and elapsed-cost contract: ${INSTANCE_CONTRACT_OUTCOME}
           - Absolute per-phase deadline and stop-reserve checks: ${BUDGET_DEADLINE_OUTCOME}
-          - Pinned private manifest/checkpoint receipt parser: ${PRIVATE_RECEIPT_OUTCOME}
+          - Pinned private-input and offline CUTLASS preflight receipt parser: ${PRIVATE_RECEIPT_OUTCOME}
           - Extracted remote payload success/failure plus SSH result retrieval after key revocation: ${TRANSPORT_OUTCOME}
           - Source archive contains and extracts the vendored build headers: ${SOURCE_ARCHIVE_OUTCOME}
           - Remote Bash and embedded Python syntax: ${SYNTAX_OUTCOME}
@@ -361,6 +367,11 @@ jobs:
           manifest="$gl4/search-qhat.json"
           expected_upstream=c5b3e3f93b45aa7e533fd2c06209c28ce516ffeb
           expected_checkpoint=92f3ec8e6a6ef831916a9d3ba9bbdae9307c9850d61334916a2b3e690c0020c4
+          expected_cutlass_revision=afa1772203677c5118fcd82537a9c8fefbcc7008
+          expected_cutlass_sha256=e62fb320c2b61e7e0c7a1163c9c5a58f6dd86025adf7df4d124933152482997f
+          cutlass_root="/private/cache/cayleypy-native/sources/cutlass-${expected_cutlass_revision}"
+          cutlass_archive="${cutlass_root}/source.tar.gz"
+          cutlass_tree="${cutlass_root}/tree"
           [[ -d "$upstream/.git" ]]
           [[ "$(git -C "$upstream" rev-parse HEAD)" == "$expected_upstream" ]]
           for path in "$manifest" "$gl4/run.json" "$gl4/training-result.json" \
@@ -376,6 +387,10 @@ jobs:
             [[ "$hash" == "$expected_checkpoint" ]] && matches+=("$checkpoint")
           done
           [[ "${#matches[@]}" == 1 ]] || { echo "Expected exactly one checkpoint with the pinned SHA-256." >&2; exit 1; }
+          [[ -d "$cutlass_root" && ! -L "$cutlass_root" && ! -L "$cutlass_archive" && ! -L "$cutlass_tree" ]]
+          [[ -s "$cutlass_archive" && -s "$cutlass_tree/include/cutlass/cutlass.h" ]]
+          actual_cutlass_sha256="$(sha256sum "$cutlass_archive" | awk '{print $1}')"
+          [[ "$actual_cutlass_sha256" == "$expected_cutlass_sha256" ]] || { echo "The pre-staged CUTLASS archive does not match its pinned SHA-256." >&2; exit 1; }
           python3 - "$manifest" "$gl4/training-result.json" "${matches[0]}" <<'PY'
           import json, pathlib, sys
           manifest = json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))
@@ -441,6 +456,8 @@ jobs:
           [[ "$free_kib" =~ ^[0-9]+$ && "$free_kib" -ge 15728640 ]] || { echo "At least 15 GiB must be free in /workspace before build." >&2; exit 1; }
           printf 'REMOTE_PRIVATE_PREFLIGHT_OK upstream=%s manifest_sha256=%s checkpoint_sha256=%s\n' \
             "$expected_upstream" "$(sha256sum "$manifest" | awk '{print $1}')" "$expected_checkpoint"
+          printf 'REMOTE_CUTLASS_PREFLIGHT_OK revision=%s archive_sha256=%s\n' \
+            "$expected_cutlass_revision" "$actual_cutlass_sha256"
           REMOTE_PREFLIGHT
           python3 tools/vast_private_preflight.py --log "$remote_log" \
             --github-output "$GITHUB_OUTPUT" --report "${RUNNER_TEMP}/vast-status.json"

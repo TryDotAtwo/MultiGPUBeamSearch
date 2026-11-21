@@ -1,3 +1,9 @@
+## 2026-11-21 - Preflight CayleyPy, NCCL and pinned CUTLASS before build
+
+- The private GPU-host preflight now requires the trusted CUTLASS archive and extracted header under the pin used by `sources.py`, and emits a separately verified revision/SHA receipt.
+- The actual GPU acceptance worker checks the CayleyPy API, NCCL header/library and pinned CUTLASS cache with `setup_sources(offline=True)` before starting the installed-wheel build. It rechecks the same cache through the installed package, so the smoke cannot download CUTLASS lazily.
+- Hosted tests cover missing, duplicate and wrong CUTLASS receipts; source and workflow checks validate receipt parsing and pre-build ordering. Physical cache availability and GPU build remain unverified until a 2x RTX 3060 run.
+
 ## 2026-11-21 - Reserve the full Vast campaign budget
 
 - The instance contract now requires the fresh storage and bandwidth rates, bounds both source and result archives, subtracts their cost plus 24 hours of stopped storage, and reserves phase wall time, SSH setup, TERM/KILL grace, retrieval and stop time before computing a runtime deadline.
