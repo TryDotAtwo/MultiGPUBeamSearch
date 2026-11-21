@@ -1,3 +1,10 @@
+## 2026-11-22 - Compare CNOT cutoff with independent scorer reference
+
+- Extended the CNOT acceptance verifier to record an independent scorer-reference ordering at each layer cutoff. Reports mark underfilled, exact full-path ties, reference-separated cutoffs and boundaries ambiguous within score tolerance; reported-score selection is asserted against the reference only when the boundary is determinate.
+- Search order, scorer, precision, kernels and product numerical policy are unchanged.
+- On source SHA `77cc69c421a640dc0ec32ee2ce68564b1ded67d3`, the installed PEP 517 wheel passed all three exact-tie, ambiguous-boundary and separated-boundary fixtures in [run 44950126048](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44950126048), [artifact 14724934157](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44950126048/artifacts/14724934157), SHA-256 `58f8024b1df53370a5d5292cad9980c34c99e34e88dd8086043612d332e271d9`. Hosted source harness passed [run 44950126040](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44950126040). The physical CUDA/NCCL job was skipped.
+- CNOT CPU/Gloo suite passed 312 tests with 2 skipped on the same source in [run 44950126166](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44950126166).
+
 ## 2026-11-21 - Use typed options in resident Rust session identity
 
 - Removed Python repr from the nested identity passed to Rust resident workers. The nested Python session identity now carries the same structured options descriptor as the Rust preparation identity.

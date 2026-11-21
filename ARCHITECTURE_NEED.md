@@ -1,5 +1,11 @@
 # Конфиг
 
+## Независимая проверка reference cutoff CNOT, 2026-11-22
+
+CPU acceptance теперь сравнивает порядок выбранных состояний с независимыми оценками scorer. Отчёт сохраняет, был ли cutoff underfilled, точно равным с полным сравнением path word, отделённым от границы погрешности или неоднозначным внутри допуска. Для неоднозначной границы проверка явно не утверждает устойчивый выбор по эталонным оценкам; для точных ties проверяется прежний полный tie-break по path word.
+
+Проверка относится к acceptance verifier `tools/verify_cnot.py`. Она не меняет порядок поиска, scorer, precision или продуктовую численную политику. На SHA `77cc69c421a640dc0ec32ee2ce68564b1ded67d3` все три новые fixtures прошли в установленном wheel: точная ничья, неоднозначная граница и отделённая граница. [Installed-wheel run 44950126048](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44950126048), [artifact 14724934157](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44950126048/artifacts/14724934157), SHA-256 `58f8024b1df53370a5d5292cad9980c34c99e34e88dd8086043612d332e271d9`. Source harness [run 44950126040](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44950126040) также прошёл. Обе проверки hosted CPU; CUDA/NCCL физический job пропущен.
+
 ## Typed options in both Rust session identities, 2026-11-21
 
 The v2 preparation identity already carries options as JSON. The nested identity used by the Rust resident worker now does the same: Python places options_descriptor(options) inside python_session_identity.options instead of storing repr(options). Rust therefore compares the same structured option values in both preparation invalidation and worker reuse.

@@ -234,6 +234,7 @@ jobs:
           PHASE_BOUNDARIES: ${{ steps.phase_boundaries.outcome }}
           PUBLIC_SEARCH: ${{ steps.public_search.outcome }}
           ACCEPTANCE_EVENTS: ${{ steps.acceptance_events.outcome }}
+          CNOT_REFERENCE_ORDER: ${{ steps.cnot_reference_order.outcome }}
           CNOT_PAIR_VERIFIER: ${{ steps.cnot_pair_verifier.outcome }}
           VERIFY_CNOT_LIFECYCLE: ${{ steps.verify_cnot_lifecycle.outcome }}
           EVENT_SERDE: ${{ steps.event_serde.outcome }}
@@ -255,6 +256,7 @@ jobs:
           - Winner packet/history failure injection and live-group reuse: ${PHASE_BOUNDARIES}
           - Public CNOT Rust-controller search: ${PUBLIC_SEARCH}
           - Run-scoped backend event protocol and negative validator fixtures: ${ACCEPTANCE_EVENTS}
+          - CNOT scorer-reference cutoff, exact ties and ambiguous boundary: ${CNOT_REFERENCE_ORDER}
           - Final paired CNOT campaign verifier and per-rank identity binding: ${CNOT_PAIR_VERIFIER}
           - Independent saturated permutation CPU oracle, strict trace parser and production source contracts: ${PERMUTATION_ACCEPTANCE_CPU}
           - Physical saturated permutation 1/2 GPU case: not run by hosted CPU workflow.
