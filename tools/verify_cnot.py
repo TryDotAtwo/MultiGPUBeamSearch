@@ -51,6 +51,30 @@ def require(condition, message):
         raise AssertionError(message)
 
 
+def reference_cutoff(eligible, reported_scores, reference_scores, width):
+    """Order the CPU child oracle and classify uncertainty at the global cutoff."""
+    ordered = sorted(eligible, key=lambda rows: (reference_scores[rows], eligible[rows][1]))
+    selected = ordered[:width]
+    if len(ordered) <= width:
+        return selected, "underfilled", None
+
+    kept, excluded = ordered[width - 1], ordered[width]
+    kept_score, excluded_score = reference_scores[kept], reference_scores[excluded]
+    gap = excluded_score - kept_score
+    if gap == 0:
+        tied = [rows for rows in ordered if reference_scores[rows] == kept_score]
+        exact = all(reported_scores[rows] == reference_scores[rows] for rows in tied)
+        status = "exact_tie_full_word" if exact else "ambiguous_within_score_tolerance"
+        return selected, status, gap
+
+    # Match assert_close(rtol=1e-6, atol=1e-7) conservatively for each side.
+    kept_tolerance = 1e-7 + 1e-6 * max(abs(kept_score), abs(reported_scores[kept]))
+    excluded_tolerance = 1e-7 + 1e-6 * max(abs(excluded_score), abs(reported_scores[excluded]))
+    status = ("reference_separated" if gap > kept_tolerance + excluded_tolerance
+              else "ambiguous_within_score_tolerance")
+    return selected, status, gap
+
+
 def small_exact_distance(target, pairs, bound):
     start = tuple(1 << i for i in range(len(target)))
     frontier, seen = {start}, {start}
@@ -91,17 +115,34 @@ def verify_layers(root, scorer, mode, width, k, layers, device):
             require(parent == i and (route & 65535) == word[-1], "wrong stable representative")
             measured[child] = float_value(bits)
         require(set(measured) == set(eligible), "candidate missing from the global union")
+        reference_scores = {}
         if measured:
             children = torch.cat([pack_rows(rows, device=device) for rows in measured])
             actual = scorer.child_values(children).double().cpu()
             torch.testing.assert_close(actual, torch.tensor(list(measured.values()), dtype=torch.float64),
                                        rtol=1e-6, atol=1e-7)
+            reference_scores = dict(zip(measured, (float(value) for value in actual.tolist())))
         expected = sorted(eligible, key=lambda rows: (measured[rows], eligible[rows][1]))[:width]
+        expected_reference, reference_status, boundary_gap = reference_cutoff(
+            eligible, measured, reference_scores, width
+        )
+        if reference_status in ("reference_separated", "exact_tie_full_word"):
+            require(expected == expected_reference,
+                    "reported-score order differs from the independent reference cutoff")
         winners = [rows_of(item[5:], n) for item in layer["winners"]]
         require(winners == expected, "global top B differs")
         digest = hashlib.sha256(json.dumps(winners, separators=(",", ":")).encode()).hexdigest()
-        reports.append(dict(depth=layer["depth"], distinct=len(eligible), retained=len(winners),
-                            winners_sha256=digest, by_rank=layer["by_rank"]))
+        reference_digest = hashlib.sha256(
+            json.dumps(expected_reference, separators=(",", ":")).encode()
+        ).hexdigest()
+        reports.append(dict(
+            depth=layer["depth"], distinct=len(eligible), retained=len(winners),
+            winners_sha256=digest, by_rank=layer["by_rank"],
+            selection_oracle="reported_scores",
+            reference_order_status=reference_status,
+            reference_boundary_gap=boundary_gap,
+            reference_ordered_winners_sha256=reference_digest,
+        ))
         parents = [(rows, eligible[rows][1]) for rows in expected]
         closed.update(winners)
     return reports
