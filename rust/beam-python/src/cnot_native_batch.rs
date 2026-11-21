@@ -17,6 +17,59 @@ fn slice<'py>(
     py.import("builtins")?.getattr("slice")?.call1((begin, end))
 }
 
+fn dtype_is(value: &Bound<'_, PyAny>, expected: &Bound<'_, PyAny>) -> PyResult<bool> {
+    Ok(value.getattr("dtype")?.is(expected))
+}
+
+fn validate_cpu_batch_dtypes(
+    py: Python<'_>,
+    parents: &Bound<'_, PyAny>,
+    parent_indices: &Bound<'_, PyAny>,
+    moves: &Bound<'_, PyAny>,
+) -> PyResult<()> {
+    let torch = py.import("torch")?;
+    let int64 = torch.getattr("int64")?;
+    let uint16 = torch.getattr("uint16")?;
+    if !dtype_is(parents, &int64)?
+        || !dtype_is(parent_indices, &int64)?
+        || !(dtype_is(moves, &int64)? || dtype_is(moves, &uint16)?)
+    {
+        return Err(PyValueError::new_err(
+            "expected int64 CNOT states and indices, and int64/uint16 moves",
+        ));
+    }
+    Ok(())
+}
+
+// Keep a narrow PyO3 probe so installed-wheel validation can exercise the same
+// dtype contract used by the private CPU batch path without a CUDA device.
+#[pyfunction(name = "_validate_cnot_batch_dtypes")]
+fn validate_cnot_batch_dtypes(
+    py: Python<'_>,
+    parents: &Bound<'_, PyAny>,
+    parent_indices: &Bound<'_, PyAny>,
+    moves: &Bound<'_, PyAny>,
+) -> PyResult<()> {
+    validate_cpu_batch_dtypes(py, parents, parent_indices, moves)
+}
+
+#[pyfunction(name = "_cnot_cpu_children")]
+fn cnot_cpu_children_probe<'py>(
+    py: Python<'py>,
+    parents: &Bound<'py, PyAny>,
+    parent_indices: &Bound<'py, PyAny>,
+    moves: &Bound<'py, PyAny>,
+    n: i64,
+    words: i64,
+) -> PyResult<Bound<'py, PyAny>> {
+    cpu_children(py, parents, parent_indices, moves, n, words)
+}
+
+pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
+    module.add_function(wrap_pyfunction!(validate_cnot_batch_dtypes, module)?)?;
+    module.add_function(wrap_pyfunction!(cnot_cpu_children_probe, module)?)
+}
+
 fn pack_route<'py>(
     py: Python<'py>,
     source_rank: u32,
@@ -26,11 +79,10 @@ fn pack_route<'py>(
         return Err(PyValueError::new_err("CNOT source rank must fit uint16"));
     }
     let torch = py.import("torch")?;
-    let dtype = moves.getattr("dtype")?;
     let int64 = torch.getattr("int64")?;
     let uint16 = torch.getattr("uint16")?;
-    let is_int64 = dtype.call_method1("__eq__", (&int64,))?.is_truthy()?;
-    let is_uint16 = dtype.call_method1("__eq__", (&uint16,))?.is_truthy()?;
+    let is_int64 = dtype_is(moves, &int64)?;
+    let is_uint16 = dtype_is(moves, &uint16)?;
     if !is_int64 && !is_uint16 {
         return Err(PyValueError::new_err("CNOT moves must be uint16 or int64"));
     }
@@ -109,28 +161,7 @@ fn cpu_children<'py>(
 
     let torch = py.import("torch")?;
     let int64 = torch.getattr("int64")?;
-    let uint16 = torch.getattr("uint16")?;
-    let parents_are_int64 = parents
-        .getattr("dtype")?
-        .call_method1("__eq__", (&int64,))?
-        .is_truthy()?;
-    let indices_are_int64 = parent_indices
-        .getattr("dtype")?
-        .call_method1("__eq__", (&int64,))?
-        .is_truthy()?;
-    let moves_are_int64 = moves
-        .getattr("dtype")?
-        .call_method1("__eq__", (&int64,))?
-        .is_truthy()?;
-    let moves_are_uint16 = moves
-        .getattr("dtype")?
-        .call_method1("__eq__", (&uint16,))?
-        .is_truthy()?;
-    if !parents_are_int64 || !indices_are_int64 || !(moves_are_int64 || moves_are_uint16) {
-        return Err(PyValueError::new_err(
-            "expected int64 CNOT states and indices, and int64/uint16 moves",
-        ));
-    }
+    validate_cpu_batch_dtypes(py, parents, parent_indices, moves)?;
     let parent_device = parents.getattr("device")?;
     for descriptor in [parent_indices, moves] {
         if descriptor
@@ -235,7 +266,7 @@ pub(crate) fn expand<'py>(
     arange_kwargs.set_item("device", &device)?;
     let all_ids = torch.call_method("arange", (alphabet,), Some(&arange_kwargs))?;
     let moves = if count > 0 && i64::from(k) < alphabet {
-        let raw = cnot_scorer_dispatch::parent_scores(py, scorer, parents, mode)?;
+        let raw = cnot_scorer_dispatch::parent_scores(py, world, scorer, parents, mode)?;
         let valid = scores(py, raw, &[count as i64, alphabet], &device)?;
         let kwargs = PyDict::new(py);
         kwargs.set_item("dim", 1)?;
@@ -308,12 +339,7 @@ pub(crate) fn cpu_owners<'py>(
 
     let torch = py.import("torch")?;
     let int64 = torch.getattr("int64")?;
-    if !packed
-        .getattr("dtype")?
-        .call_method1("__eq__", (&int64,))?
-        .is_truthy()?
-        || packed.getattr("ndim")?.extract::<usize>()? != 3
-    {
+    if !dtype_is(packed, &int64)? || packed.getattr("ndim")?.extract::<usize>()? != 3 {
         return Err(PyValueError::new_err(
             "packed CNOT matrices require int64 [batch,n,ceil(n/64)]",
         ));
@@ -375,10 +401,7 @@ fn cpu_first_unseen<'py>(
     let torch = py.import("torch")?;
     let int64 = torch.getattr("int64")?;
     for tensor in [closed, children] {
-        if !tensor
-            .getattr("dtype")?
-            .call_method1("__eq__", (&int64,))?
-            .is_truthy()?
+        if !dtype_is(tensor, &int64)?
             || tensor
                 .getattr("device")?
                 .getattr("type")?
@@ -455,7 +478,7 @@ pub(crate) fn distinct<'py>(
     let meta = incoming.get_item((&first, slice(py, None, Some(4))?))?;
     let device = world.getattr("device")?;
     let values = if children.len()? > 0 {
-        let raw = cnot_scorer_dispatch::child_values(py, scorer, &children)?;
+        let raw = cnot_scorer_dispatch::child_values(py, world, scorer, &children)?;
         scores(py, raw, &[children.len()? as i64], &device)?
     } else {
         let empty_kwargs = PyDict::new(py);

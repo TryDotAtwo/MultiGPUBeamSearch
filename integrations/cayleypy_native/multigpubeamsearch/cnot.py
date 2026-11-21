@@ -4,6 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import hashlib
 import json
+import os
 
 import torch
 import torch.distributed as dist
@@ -350,11 +351,34 @@ def search_cnot(root, scorer, *, width, shortlist, max_depth, mode="qhat", audit
     Tensor operations, scorer callbacks and collectives are unchanged.
     """
     with World(root.device) as world:
+        strict_backend = os.environ.get("MGBS_CNOT_STRICT_BACKEND") == "1"
+        world.require_engine_consensus(bytes((int(strict_backend),)))
         native_runner = world.checked(
             "resolve CNOT search controller", _native_search_runner
         )
         common_search = world.supports_native("run_cnot_native_search")
         common_checker = world.supports_native("run_cnot_native_checked_control")
+        if strict_backend:
+            common_transport = world.supports_native("run_cnot_native_start_transport")
+            common_exchange = world.supports_native("run_cnot_native_world_exchange")
+            common_fixed_gather = world.supports_native("run_cnot_native_gather_fixed")
+            common_row_gather = world.supports_native("run_cnot_native_gather_rows")
+            common_broadcast = world.supports_native("run_cnot_native_broadcast")
+            def require_rust_controller():
+                required = (
+                    common_search,
+                    common_checker,
+                    common_transport,
+                    common_exchange,
+                    common_fixed_gather,
+                    common_row_gather,
+                    common_broadcast,
+                )
+                if engine == "python" or not callable(native_runner) or not all(required):
+                    raise RuntimeError(
+                        "strict CNOT acceptance requires matching Rust controller, stage, transport, and Gloo ABIs on every rank"
+                    )
+            world.checked("admit strict Rust CNOT controller", require_rust_controller)
         if callable(native_runner) and common_search and common_checker:
             options = (width, shortlist, max_depth, mode, audit, validation, engine)
             callbacks = (_input, native.cnot_identity, _native_stages_runner,

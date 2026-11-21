@@ -3,6 +3,7 @@ import argparse
 from contextlib import nullcontext
 import hashlib
 import json
+import os
 from pathlib import Path
 import socket
 import struct
@@ -11,6 +12,14 @@ import torch
 import torch.distributed as dist
 
 from multigpubeamsearch.cnot import pack_rows, replay_cnot, search_cnot
+from multigpubeamsearch.cnot_acceptance import (
+    EVENT_SCHEMA,
+    EVENT_VERSION,
+    acceptance_identity,
+    emit_event,
+    gpu_uuid_for_rank,
+    report_sha256,
+)
 from multigpubeamsearch.cnot_cli import initialize_world
 from multigpubeamsearch.cnot_collectives import World
 from multigpubeamsearch.cnot_scorer import TQPScorer
@@ -147,8 +156,15 @@ def validate_case(rows, scorer, mode, width, k, depth, device, require_cross_ran
             report = dict(n=len(rows), width=width, shortlist=k, mode=mode, world=world.size,
                           scorer=type(scorer).__name__,
                           scorer_runtime=f"{type(scorer).__module__}.{type(scorer).__qualname__}",
-                          engine=engine, model=getattr(scorer, "metadata", None),
-                          layers=layers, physical_ids=list(result.gates), directed_gates=[pairs[i] for i in result.gates],
+                          root_sha256=hashlib.sha256(
+                              json.dumps(rows, separators=(",", ":")).encode("utf-8")
+                          ).hexdigest(),
+                          precision_contract={"scorer_output_dtype": getattr(
+                              getattr(scorer, "metadata", {}), "get", lambda _key, _default=None: None
+                          )("scorer_output_dtype", "unspecified"), "selection_dtype": "float64"},
+            engine=engine, model=getattr(scorer, "metadata", None),
+            layers=layers, status=result.status,
+            physical_ids=list(result.gates), directed_gates=[pairs[i] for i in result.gates],
                           length=result.length, bitwise_replay=True, routes=result.path_routes)
             if len(rows) == 4 and result.length <= 3:
                 report["exact_distance_bfs"] = small_exact_distance(rows, pairs, result.length)
@@ -182,7 +198,7 @@ def validate_distribution(device, engine="auto"):
         return world.checked("all-rank validation", inspect)
 
 
-def main():
+def main(argv=None, *, scorer_factory=None, manage_process_group=True):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--case", choices=("trained", "trained-deep", "wide", "topology"), required=True)
     parser.add_argument("--backend", choices=("nccl", "gloo"), default="nccl")
@@ -195,57 +211,141 @@ def main():
     parser.add_argument("--require-rust-scorer", action="store_true",
                         help="require the Rust-owned checkpoint scorer and Rust controller")
     parser.add_argument("--output", required=True, type=Path)
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     if args.require_rust_scorer:
         if args.case not in ("trained", "trained-deep"):
             parser.error("--require-rust-scorer requires a trained checkpoint case")
         if args.engine == "python":
             parser.error("--require-rust-scorer cannot be combined with --engine python")
         args.engine = "rust"
-    device = initialize_world(args.backend)
-    world = World(device)
-    try:
-        if args.case in ("trained", "trained-deep"):
-            rows, k, default_width = ((1, 7, 4, 10), 3, 2) if args.case == "trained-deep" else ((1, 2, 7, 8), 11, 8)
-            width = default_width if args.width is None else args.width
-            context = world.checked("load trained scorer", lambda:
-                TQPScorer(args.library, args.manifest, n=len(rows), device=device, inference_batch=4))
-        elif args.case == "wide":
-            rows, scorer = wide_case()
-            context, k, width = nullcontext(scorer), 3, 1 if args.width is None else args.width
-        else:
-            context = nullcontext()
-        with context as scorer:
-            if args.require_rust_scorer:
-                def require_native_scorer():
-                    from multigpubeamsearch.cnot_scorer import _rust_tqp_scorer
-                    native_type = _rust_tqp_scorer()
-                    require(native_type is not None and type(scorer) is native_type,
-                            "Rust-owned checkpoint scorer is required")
-                world.checked("verify Rust-owned checkpoint scorer", require_native_scorer)
-            output = (validate_distribution(device, args.engine) if args.case == "topology" else
-                      validate_case(rows, scorer, args.mode, width, k, 3, device,
-                                    args.case == "wide", engine=args.engine))
-            if args.case == "trained-deep" and world.size == 2:
-                def check_participation():
-                    if world.rank == 0:
-                        require(any(all(rank[0] and rank[3] and rank[4] for rank in layer["by_rank"])
-                                    and layer["distinct"] > layer["retained"] == width for layer in output["layers"]),
-                                "both GPUs must expand, score and retain in the same saturated layer")
-                world.checked("trained layer participation", check_participation)
-            hardware = dict(rank=world.rank, host=socket.gethostname(), device=str(device),
-                            gpu=torch.cuda.get_device_name(device) if device.type == "cuda" else None)
-            devices = [None] * world.size
-            if world.size > 1:
-                dist.all_gather_object(devices, hardware)
-            else:
-                devices[0] = hardware
-            if world.rank == 0:
-                output.update(devices=devices, torch=str(torch.__version__), backend=args.backend)
-                args.output.write_text(json.dumps(output, indent=2) + "\n", encoding="utf-8")
-                print(json.dumps(output), flush=True)
-    finally:
+    if manage_process_group:
         if dist.is_initialized():
+            parser.error("verify_cnot.main owns process-group initialization when manage_process_group is true")
+        device = initialize_world(args.backend)
+    else:
+        if not dist.is_initialized():
+            parser.error("verify_cnot.main requires an initialized process group when manage_process_group is false")
+        initialized_backend = str(dist.get_backend()).lower()
+        if args.backend not in initialized_backend:
+            parser.error(
+                f"requested backend {args.backend!r} differs from initialized process group {initialized_backend!r}"
+            )
+        device = torch.device("cuda", torch.cuda.current_device()) if "nccl" in initialized_backend else torch.device("cpu")
+    try:
+        with World(device) as world:
+            if args.case in ("trained", "trained-deep"):
+                rows, k, default_width = ((1, 7, 4, 10), 3, 2) if args.case == "trained-deep" else ((1, 2, 7, 8), 11, 8)
+                width = default_width if args.width is None else args.width
+                construct_scorer = TQPScorer if scorer_factory is None else scorer_factory
+                context = world.checked("load trained scorer", lambda:
+                    construct_scorer(args.library, args.manifest, n=len(rows), device=device, inference_batch=4))
+            elif args.case == "wide":
+                rows, scorer = wide_case()
+                context, k, width = nullcontext(scorer), 3, 1 if args.width is None else args.width
+            else:
+                context = nullcontext()
+            with context as scorer:
+                if args.require_rust_scorer:
+                    def require_native_scorer():
+                        from multigpubeamsearch.cnot_scorer import _rust_tqp_scorer
+                        native_type = _rust_tqp_scorer()
+                        require(native_type is not None and type(scorer) is native_type,
+                                "Rust-owned checkpoint scorer is required")
+                    world.checked("verify Rust-owned checkpoint scorer", require_native_scorer)
+                output = (validate_distribution(device, args.engine) if args.case == "topology" else
+                          validate_case(rows, scorer, args.mode, width, k, 3, device,
+                                        args.case == "wide", engine=args.engine))
+                if args.case == "trained-deep" and world.size == 2:
+                    def check_participation():
+                        if world.rank == 0:
+                            require(any(all(rank[0] and rank[3] and rank[4] for rank in layer["by_rank"])
+                                        and layer["distinct"] > layer["retained"] == width for layer in output["layers"]),
+                                    "both GPUs must expand, score and retain in the same saturated layer")
+                    world.checked("trained layer participation", check_participation)
+                identity = world.checked("prepare CNOT acceptance identity", acceptance_identity)
+                identity_contract = None if identity is None else {
+                    "run_id": identity["run_id"],
+                    "case_id": identity["case_id"],
+                    "source_sha": identity["source_sha"],
+                    "wheel_sha256": identity["wheel_sha256"],
+                    "gpu_uuids": identity["gpu_uuids"],
+                    "evidence_dir": str(identity["evidence_dir"]),
+                }
+                identity_digest = hashlib.sha256(json.dumps(
+                    identity_contract, sort_keys=True, separators=(",", ":")
+                ).encode("utf-8")).digest()
+                world.require_engine_consensus(list(identity_digest))
+                if identity is not None:
+
+                    def prepare_hardware_identity():
+                        return dict(
+                            rank=world.rank,
+                            pid=os.getpid(),
+                            host=socket.gethostname(),
+                            device=str(device),
+                            gpu=torch.cuda.get_device_name(device) if device.type == "cuda" else None,
+                            gpu_uuid=gpu_uuid_for_rank(world.rank, world.size),
+                        )
+
+                    hardware = world.checked("prepare CNOT rank/device receipt", prepare_hardware_identity)
+                else:
+                    hardware = dict(
+                        rank=world.rank,
+                        pid=os.getpid(),
+                        host=socket.gethostname(),
+                        device=str(device),
+                        gpu=torch.cuda.get_device_name(device) if device.type == "cuda" else None,
+                        gpu_uuid=None,
+                    )
+                devices = [None] * world.size
+                if world.size > 1:
+                    dist.all_gather_object(devices, hardware)
+                else:
+                    devices[0] = hardware
+
+                if identity is not None:
+                    def hash_result():
+                        if world.rank == 0:
+                            if not isinstance(output, dict):
+                                raise RuntimeError("rank zero has no CNOT result report to bind")
+                            summary = dict(output, devices=devices, torch=str(torch.__version__), backend=args.backend)
+                            return report_sha256(summary), str(output.get("status", "completed"))
+                        return None
+
+                    summary = world.checked("hash CNOT acceptance result", hash_result)
+                    summaries = [summary if world.rank == 0 else None]
+                    if world.size > 1:
+                        dist.broadcast_object_list(summaries, src=0, group=world._control_group)
+                    report_digest, terminal_status = summaries[0]
+                    if not isinstance(report_digest, str) or len(report_digest) != 64:
+                        raise RuntimeError("CNOT acceptance result hash was not broadcast to every rank")
+                    if world.rank == 0:
+                        output.update(devices=devices, torch=str(torch.__version__), backend=args.backend)
+                        output["acceptance"] = {
+                            "schema": EVENT_SCHEMA,
+                            "version": EVENT_VERSION,
+                            "run_id": identity["run_id"],
+                            "case_id": identity["case_id"],
+                            "source_sha": identity["source_sha"],
+                            "wheel_sha256": identity["wheel_sha256"],
+                            "world": world.size,
+                            "transport": "single_rank_no_exchange" if world.size == 1 else "rust_stream5_nccl",
+                            "report_sha256": report_digest,
+                        }
+                    world.checked("write CNOT terminal acceptance receipts", lambda: emit_event(
+                        "search_terminal", world,
+                        {"status": terminal_status,
+                         "report_sha256": report_digest},
+                    ))
+                def write_result():
+                    if world.rank == 0:
+                        output.update(devices=devices, torch=str(torch.__version__), backend=args.backend)
+                        args.output.write_text(json.dumps(output, indent=2) + "\n", encoding="utf-8")
+                        print(json.dumps(output), flush=True)
+
+                world.checked("write CNOT result JSON", write_result)
+    finally:
+        if manage_process_group and dist.is_initialized():
             dist.destroy_process_group()
 
 

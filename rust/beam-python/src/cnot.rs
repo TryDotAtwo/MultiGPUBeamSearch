@@ -71,10 +71,8 @@ fn prepare_cnot_input<'py>(
     let invalid_shape =
         || PyValueError::new_err("expected one packed int64 matrix [1,n,ceil(n/64)]");
     let torch = py.import("torch")?;
-    let dtype_matches = root
-        .getattr("dtype")?
-        .call_method1("__eq__", (torch.getattr("int64")?,))?
-        .is_truthy()?;
+    let expected_dtype = torch.getattr("int64")?;
+    let dtype_matches = root.getattr("dtype")?.is(&expected_dtype);
     if !dtype_matches {
         return Err(invalid_shape());
     }
@@ -115,7 +113,7 @@ fn prepare_cnot_input<'py>(
 
     // Retain the exact public snapshot semantics: validation, raw hashing and
     // replay all refer to this owned contiguous tensor after the caller returns.
-    let mut clone_kwargs = PyDict::new(py);
+    let clone_kwargs = PyDict::new(py);
     clone_kwargs.set_item("memory_format", torch.getattr("contiguous_format")?)?;
     let snapshot = root
         .call_method0("detach")?
@@ -747,6 +745,14 @@ fn run_cnot_native_search<'py>(
     let selected_engine: String = admitted.get_item(2)?.extract()?;
     let use_rust = selected_engine == "rust";
 
+    crate::cnot_native_stages::preflight_strict_backend(
+        py,
+        &world,
+        &input_matrix.getattr("root")?,
+        &scorer,
+        use_rust,
+    )?;
+
     run_cnot_native_require_consensus(world.clone(), digest)?;
     crate::cnot_stream5::run_cnot_native_start_transport(py, world.clone(), use_rust)?;
 
@@ -770,6 +776,15 @@ fn run_cnot_native_search<'py>(
             world.clone(),
             !native_stages.is_none(),
         )?;
+        if matches!(
+            std::env::var("MGBS_CNOT_STRICT_BACKEND").as_deref(),
+            Ok("1")
+        ) && !supports_native
+        {
+            return Err(PyRuntimeError::new_err(
+                "strict CNOT acceptance requires the Rust native stage runner on every rank",
+            ));
+        }
         let rank: u32 = world.getattr("rank")?.extract()?;
         let world_size: u32 = world.getattr("size")?.extract()?;
         let width: u64 = width.extract()?;

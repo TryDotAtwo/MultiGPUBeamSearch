@@ -78,6 +78,7 @@ impl Scorer {
             "feature_registry_sha256": restored.field.registry.contract_sha256(),
             "training_manifest_sha256": spec.training_manifest.sha256,
             "training_result_sha256": spec.training_result.sha256,
+            "scorer_output_dtype": "float32",
             "dimension": n, "cuda_device": device, "feature_model_inputs": feature_ids.len(),
             "feature_ids": feature_ids, "max_packet_rows": capacity,
         });

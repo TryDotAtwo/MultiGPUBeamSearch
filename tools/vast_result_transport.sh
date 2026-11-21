@@ -13,7 +13,13 @@ set -euo pipefail
 : "$VAST_REMOTE_KEY_BLOB"
 : "$VAST_REMOTE_ARCHIVE"
 : "$VAST_REMOTE_ARCHIVE_SHA"
+: "$VAST_REMOTE_MANIFEST_SHA"
+: "$VAST_REMOTE_CHECKPOINT_SHA"
 : "$VAST_SOURCE_SHA"
+: "$VAST_INSTANCE_ID"
+: "$VAST_GITHUB_RUN_ID"
+: "$VAST_GITHUB_RUN_ATTEMPT"
+[[ "$VAST_GITHUB_RUN_ID" =~ ^[0-9]+$ && "$VAST_GITHUB_RUN_ATTEMPT" =~ ^[0-9]+$ ]]
 
 ssh_opts=(
   -i "$VAST_SSH_PRIVATE_KEY"
@@ -48,7 +54,9 @@ ssh "${ssh_opts[@]}" -o ControlMaster=yes -MNf "root@$VAST_SSH_HOST"
 printf -v remote_command '%q ' timeout --signal=TERM --kill-after=60s \
   "${VAST_REMOTE_RUNTIME_SECONDS}s" bash -s -- \
   "$VAST_REMOTE_ROOT/source" "$VAST_REMOTE_ROOT" "$VAST_REMOTE_KEY_BLOB" \
-  "$VAST_REMOTE_ARCHIVE" "$VAST_REMOTE_ARCHIVE_SHA" "$VAST_SOURCE_SHA"
+  "$VAST_REMOTE_ARCHIVE" "$VAST_REMOTE_ARCHIVE_SHA" "$VAST_SOURCE_SHA" \
+  "$VAST_INSTANCE_ID" "$VAST_REMOTE_MANIFEST_SHA" "$VAST_REMOTE_CHECKPOINT_SHA" \
+  "$VAST_GITHUB_RUN_ID" "$VAST_GITHUB_RUN_ATTEMPT"
 remote_exit=0
 if ssh "${ssh_opts[@]}" "root@$VAST_SSH_HOST" "$remote_command" \
   < "$VAST_SSH_SCRIPT" > "$VAST_SSH_LOG" 2>&1; then
@@ -60,7 +68,7 @@ fi
 printf -v results_command 'tar -C %q -czf - %q' \
   "$VAST_REMOTE_ROOT" "test_results/refactor_20261121/gpu-acceptance"
 result_exit=0
-if ssh "${ssh_opts[@]}" "root@$VAST_SSH_HOST" "$results_command" > "$VAST_SSH_RESULTS"; then
+if timeout 300 ssh "${ssh_opts[@]}" "root@$VAST_SSH_HOST" "$results_command" > "$VAST_SSH_RESULTS"; then
   result_exit=0
 else
   result_exit=$?

@@ -341,6 +341,31 @@ PyTorch владеет CUDA-буферами, а FFI проверяет тенз
 Rust-контроллер не получает GPU-указатели. Порядок обмена NCCL и исходный
 Python-транспорт сохраняются.
 
+## Приёмка CNOT ABI и фазовых ошибок, 2026-11-21
+
+Строгий acceptance-путь согласует до обмена наличие и идентичность Rust
+контроллера, checkpoint scorer, DeviceDomain, CNOT ABI/capabilities и Stream 5
+на всех рангах. Ошибка ABI, отсутствующая обязательная реализация или разный
+набор возможностей завершаются коллективной ошибкой; обычный совместимый
+fallback сохраняется вне строгого режима. Dtype входа проверяется по
+каноническим объектам `torch.dtype`, включая совместимые `int64`/`uint16`
+пути. Подготовка winner packet и history edge получает ранговое голосование
+до следующего data-plane collective.
+
+На source SHA `78087abe5c1b8e794c9e16aa934f6afe084c0f8b` hosted installed-wheel
+проверки прошли: PyO3 dtype с deprecation warnings как errors, strict admission
+на двух Gloo-рангах, инъекции ошибок winner-packet/history-edge на каждом
+ранге с повторным поиском в той же группе, публичный CNOT search и Actionlint.
+Проверки hosted source harness также прошли. Это CPU/Gloo evidence; физические
+CUDA/NCCL и trained-checkpoint вызовы ещё не подтверждены.
+
+Граница миграции остаётся частичной: Rust задаёт последовательность стадий и
+владеет историей поиска, но `NativeStages` всё ещё удерживает Python `World`,
+scorer и Torch-тензоры, а часть стадий вызывает Python/PyTorch. Полный runtime
+контекст CNOT в `beam-runtime` и самостоятельное владение вычислительным
+провайдером остаются следующими вертикальными срезами. Текущие проверки и
+hardware gate: `test_results/refactor_20261121/rust-cnot-admission/GITHUB_STATUS.md`.
+
 ## Rust-контракт CNOT checkpoint scorer, 2026-11-19
 
 `beam-native-sys::TqpScorer` разбирает metadata scorer при открытии,
@@ -3337,6 +3362,36 @@ collective, frontier payload, or CUDA execution. Evidence:
 `test_results/refactor_20261120/rust-rank-frontier-quotas/GITHUB_STATUS.md`.
 Physical multi-GPU runtime remains unverified.
 
+
+## Строгая приёмка CNOT-бэкендов и границ стадий, 2026-11-21
+
+Обычный публичный режим сохраняет совместимый выбор CNOT engine и транспорта.
+Только профиль `MGBS_CNOT_STRICT_BACKEND=1` запрещает fallback и требует Rust
+controller, Rust TQP checkpoint scorer, CUDA DeviceDomain ABI 1 с возможностями
+owners/expansion/full-matrix distinct и Rust Stream 5 для мног GPU запуска.
+Все ранги сначала согласуют сам флаг strict через существующую CPU/Gloo группу;
+при разном включении они завершаются общей ошибкой до NCCL обмена. Затем каждая
+ранговая конфигурация сравнивает ABI, возможности и SHA-256 библиотек, scorer,
+checkpoint и search manifest до поиска. Strict diagnostics записывают реальные
+вызовы стадий после успешного вызова и не копируют CUDA тензоры для трассировки.
+
+Проверки входных CNOT тензоров сравнивают dtype с каноническими
+`torch.int64`/`torch.uint16`; это сохраняет отдельный маршрут для 16-битных
+направленных ID. Подготовка winner packet и history edge голосуется через Gloo
+до соответствующего exchange/broadcast. Следующая глубина и closed frontier
+фиксируются только после успешного построения буферов. Эти votes покрывают
+ранговые ошибки подготовки, но не восстановление после потери процесса или
+ошибки внутри зависшего NCCL collective.
+
+Приёмочный Vast workflow принимает только явный десятичный ID уже запущенного
+нового 2× desktop RTX 3060, сверяет владельца/состояние/тариф и считает общий
+срок от API `start_date` под лимитом $10 с резервом для подготовки и остановки.
+До передачи кода он требует pinned приватный checkout, manifest и checkpoint.
+После выполнения JSON receipt связывает source/wheel/scorer/checkpoint/manifest
+hashes, события rank/device и readback состояния ресурса. Workflow не создаёт и
+не арендует инстанс. Физический прогон остаётся pending до появления доступного
+предложения и приватного источника данных.
+
 ## Rust validation for calibration rank plans (2026-11-20)
 
 The calibration-side `validate_rank_plans` delegates ordinary typed rank records
@@ -3398,3 +3453,25 @@ splits, and payload contents are unchanged. The control-flow votes and hosted
 evidence are recorded in
 `test_results/refactor_20261120/cnot-exchange-gloo/GITHUB_STATUS.md`.
 Physical CUDA/NCCL multi-GPU exchange remains unverified.
+
+## CNOT acceptance evidence is invocation-scoped (2026-11-21)
+
+Strict CNOT acceptance records use one versioned JSON schema for Rust and
+Python producers. Every event carries the run and case IDs, source and wheel
+hashes, rank/world, process ID, device, physical GPU UUID, event kind and
+structured fields. The hosted verifier reads only the requested report and
+its matching per-rank JSONL receipts, then compares them with the combined
+trace. It requires one admission/controller/terminal record per rank, required
+DeviceDomain operations, Rust TQP scorer dispatch, and the actual Rust
+Stream 5/NCCL phases on every rank of a two-rank run. Backend ABI and artifact
+hashes must match from admission through dispatch. A single-rank receipt
+declares `single_rank_no_exchange` explicitly.
+
+The installed-wheel CPU workflow exercises the public `verify_cnot.main`
+entry under two Gloo ranks. It coordinates scorer setup failure on rank 0 and
+rank 1, destroys the entered `World` before process-group teardown, then runs
+a healthy verifier search after each failure. The result JSON write is also
+checked across ranks. These hosted checks validate control flow and receipt
+contracts only; they do not prove CUDA/NCCL execution. The physical gate stays
+pending until a matched installed-wheel run on one and two physical RTX 3060s
+passes with per-rank backend evidence and independent replay.

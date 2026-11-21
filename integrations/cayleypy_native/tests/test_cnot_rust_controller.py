@@ -291,7 +291,7 @@ def test_rust_compatibility_backend_owns_cnot_initialization_dispatch(monkeypatc
 
 
 
-def test_rust_top_level_controller_preserves_compatibility_stage_fallback():
+def test_rust_top_level_controller_preserves_compatibility_stage_fallback(monkeypatch):
     require_controller()
     controller = getattr(rust_control.extension(), "run_cnot_native_search", None)
     assert callable(controller), "matching Rust CNOT top-level controller is required"
@@ -323,11 +323,13 @@ def test_rust_top_level_controller_preserves_compatibility_stage_fallback():
 
         def all_ranks_support(self, local_support):
             events.append(("all-ranks-support", bool(local_support)))
-            return False
+            return next(support_votes)
 
         _stream5_library = None
 
     world = World()
+    support_votes = iter((False, True, False, True, False, False))
+    monkeypatch.delenv("MGBS_CNOT_STRICT_BACKEND", raising=False)
 
     def prepare_input(*args):
         events.append(("prepare-input", *args))
@@ -369,7 +371,15 @@ def test_rust_top_level_controller_preserves_compatibility_stage_fallback():
     expected_digest = hashlib.sha256(b"packed-root")
     expected_digest.update(json.dumps(config).encode())
     digest_values = list(expected_digest.digest())
-    assert events == [
+    assert [event for event in events if event[0] == "all-ranks-support"] == [
+        ("all-ranks-support", False),
+        ("all-ranks-support", True),
+        ("all-ranks-support", False),
+        ("all-ranks-support", True),
+        ("all-ranks-support", False),
+        ("all-ranks-support", True),
+    ]
+    assert [event for event in events if event[0] != "all-ranks-support"] == [
         ("prepare-input", caller_root, 7, 12, 8, "proposal", "python"),
         ("gloo-any-rank-failed", False),
         ("longs", digest_values),
@@ -378,7 +388,6 @@ def test_rust_top_level_controller_preserves_compatibility_stage_fallback():
         ("gloo-any-rank-failed", False),
         ("native-runner",),
         ("gloo-any-rank-failed", False),
-        ("all-ranks-support", True),
         ("make-stages", world, admitted_root, identity, input_matrix, scorer,
          "proposal", False),
         ("gloo-any-rank-failed", False),

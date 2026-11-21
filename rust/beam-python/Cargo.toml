@@ -3,6 +3,9 @@ name = "beam-python"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+[features]
+default = ["extension-module"]
+extension-module = ["pyo3/extension-module"]
 [lib]
 name = "_beam_runtime"
 crate-type = ["cdylib"]
@@ -11,5 +14,6 @@ beam-core.workspace = true
 beam-native-sys = { workspace = true, features = ["python"] }
 beam-runtime.workspace = true
 pyo3.workspace = true
+serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true

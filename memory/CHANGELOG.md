@@ -1,3 +1,44 @@
+## 2026-11-21 - Bind paired CNOT receipts to rank identities
+
+- `cnot_acceptance_events.validate_case` now returns the observed per-rank PID,
+  process device and physical GPU UUID identities. The paired campaign verifier
+  checks those identities against each result report, enforces a distinct UUID
+  for the two-rank case, and rejects the legacy Vast instance ID.
+- Added a standalone hosted CPU fixture for 1/2-GPU reports, shared invocation
+  binding, ordered survivors, missing rank identity, duplicate GPU UUID and
+  foreign case/instance inputs. Wired it into both source and installed-wheel
+  acceptance workflows. Hosted result is pending.
+
+## 2026-11-21 - Separate PyO3 extension linking from Rust fixture tests
+
+- `beam-python` keeps `extension-module` as its default feature so wheel builds
+  preserve the existing PyO3 module behavior. The Rust event serialization
+  fixture test disables that feature so its executable links against Python
+  instead of leaving extension-module symbols unresolved.
+- RED: installed-wheel workflow run
+  [44897715956](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44897715956)
+  built and installed the wheel, then the Rust serializer test failed at link
+  time with unresolved `PyBytes_*`/`PyErr_*` symbols under `extension-module`.
+- On source SHA `85e6ac1ed76505caf91a172ac45d7cba99a6bdc9`, the Rust serializer,
+  dtype checks, backend admission and phase-boundary checks passed in the
+  installed-wheel job. Its actual `verify_cnot.main` lifecycle test then failed
+  when it tried to reinitialize torchrun's Gloo rendezvous store after each
+  invocation. The test now holds one process group live across rank-local
+  scorer failures and healthy retries.
+- CNOT CPU compatibility passed on the same SHA:
+  [run 44898116700](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44898116700).
+- GREEN on `98a2025c1fcb8efb942ce70570c7992a15f0df5c`: installed-wheel run
+  [44898482925](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44898482925)
+  passed wheel build/install, Rust/Python JSONL serialization, dtype checks,
+  strict backend admission, Gloo phase-failure recovery, the actual two-rank
+  `verify_cnot.main` scorer-failure/retry scenarios, public CNOT search and
+  workflow lint. CNOT CPU compatibility passed in
+  [run 44898482934](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44898482934).
+  The acceptance source harness passed in
+  [run 44898482922](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44898482922);
+  its GPU job was skipped. These results do not establish CUDA/NCCL hardware
+  acceptance. The paired campaign verifier's new standalone CPU gate is pending.
+
 ## 2026-11-21 - Make CNOT runtime acceptance select Rust explicitly
 
 - `tools/verify_cnot.py` accepts `--engine`, reports the selected engine and scorer runtime type, and `--require-rust-scorer` requires both the Rust controller and the PyO3 Rust-owned TQP scorer for trained checkpoint cases. The search algorithm and scorer numerics are unchanged.
@@ -2972,3 +3013,109 @@ Main commit `148b2a826a369b7601e904ea409e0cc5301c75c9` also passed the 260-test 
 - Hosted source validation passed in [Actions run 44831036050](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44831036050); artifact [14675264978](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44831036050/artifacts/14675264978), SHA-256 `66fb835caa5cc9e1a897bb97777c18cccdffd9cb3092c3ec2e7908ae9181bfad`.
 - That push-triggered run validated Python/Bash syntax and packaging guards only. The physical GPU job was skipped; CUDA/NCCL search and checkpoint-scored CNOT remain unverified pending a supplied spend cap and an already-running instance.
 - Source-controlled evidence: `test_results/refactor_20261121/gpu-acceptance/GITHUB_STATUS.md`.
+
+## 2026-11-21 - Require strict CNOT backends and coordinated preparation
+
+- CNOT strict acceptance now compares activation across every rank before
+  transport selection. It fails collectively on absent or inconsistent
+  DeviceDomain activation, ABI/capability mismatch, wrong scorer/checkpoint/
+  manifest/library hashes, and unsupported Stream 5 ABI. The ordinary
+  compatibility fallback remains available outside strict acceptance.
+- The Rust TQP scorer reports its binary and search-manifest SHA-256 alongside
+  the checkpoint metadata. DeviceDomain and Stream 5 dispatch events identify
+  the actual implementation, ABI, library hash, rank, world, and device after
+  the corresponding operation succeeds.
+- CNOT dtype validation uses canonical Torch dtype identity for state/index
+  int64 and move int64/uint16 inputs. Winner packet construction and history
+  edge allocation/copy are coordinated before exchange/broadcast, keeping the
+  live Gloo group usable after rank-local failures.
+- Vast source validation now covers private preflight receipt parsing and
+  manifest/checkpoint propagation. The explicit GPU workflow accepts only a
+  validated 2x desktop RTX 3060 ID and combines wheel/model/backend/lifecycle,
+  elapsed-time, and estimated-cost receipts. It does not rent hardware.
+- Initial hosted run for `ce74de3` exposed formatting and compile blockers before
+  the installed-wheel tests: `cargo fmt --check`, two missing `int64` bindings,
+  and an invalid PyO3 extraction of Python `None` into Rust `()`. The next
+  revision fixes these source issues; dtype, admission, and Gloo tests remain
+  pending until the wheel builds.
+- No local build, test, logs, result archives, paid compute, CUDA, or NCCL runs
+  were produced. Full hosted logs remain in Actions artifacts.
+- Follow-up hosted runs at `01443ef` confirmed the wheel build, installed-wheel
+  smoke test, and dtype contract, then exposed two test-harness regressions:
+  the admission script executed its multiprocessing body during spawn imports,
+  and CPU mocks did not model the new strict-mode agreement votes. The CPU job
+  also showed that single-rank compatibility fixtures need no distributed
+  agreement method. These are corrected in the next source revision; hosted
+  reruns are pending. The physical 2x RTX 3060 gate remains unrun.
+- At `d6e1bc2`, hosted CPU/Gloo validation passed Rust checks, PyO3 build, 306
+  compatibility tests (2 skipped), and NCCL-probe syntax. Installed-wheel
+  build, smoke, and warning-as-error dtype tests passed, then its backend
+  admission run found a real variable-length collective contract: different
+  strict activation values produced differently sized Gloo tensors. The
+  admission contract is now SHA-256-normalized before collective comparison;
+  hosted rerun passed the ABI/capability mismatch probes and the normalized
+  contract activation mismatch. It then exposed a test assertion expecting
+  RuntimeError where the public Python setting-consensus API correctly raises
+  ValueError. The assertion is corrected; installed-wheel admission and the
+  phase-boundary script then exposed the same multiprocessing main-guard issue;
+  it is corrected. Actionlint identified malformed YAML at the skipped-run
+  summary line in the new-host workflow; that command is now a block scalar.
+  Final hosted admission/phase-boundary/YAML lint checks are pending. Full logs
+  remain in Actions artifacts; no local tests or GPU run were produced.
+- Follow-up review of the hosted phase-boundary RED showed the fixture used a
+  one-gate state that returned before winner redistribution and history-edge
+  reconstruction. The fixture now uses a two-gate state and checks recovery by
+  replaying the returned sequence. Removed an unused `known_hosts` assignment
+  from SSH key attachment after Actionlint flagged it. Hosted rerun is pending;
+  no local tests or GPU run were produced.
+- The rerun passed installed-wheel build/smoke, dtype warning-as-error, strict
+  backend admission, two-rank Gloo failure injection with same-group recovery,
+  and public CNOT search. Actionlint then found two unused retry-loop counters
+  and an unused remote result-directory variable; they are removed before the
+  next lint run. No physical GPU test was run.
+- At `78087ab`, the hosted installed-wheel workflow passed all gates including
+  Actionlint; the hosted source-validation workflow also passed its instance,
+  private-input-receipt, fake-SSH retrieval, and embedded-script fixtures. The
+  evidence is CPU/Gloo and harness-only. No physical CUDA/NCCL or trained
+  checkpoint search ran. Receipts are in
+  `test_results/refactor_20261121/rust-cnot-admission/GITHUB_STATUS.md` and
+  Actions artifacts 14701749750 and 14701789289.
+
+## 2026-11-21 - Bind CNOT acceptance to one invocation
+
+- Replaced loose strict-backend marker parsing with a versioned JSON event
+  schema shared by Rust and Python. Per-rank JSONL receipts, trace events, the
+  result report, source SHA, installed-wheel SHA, process ID and physical GPU
+  UUID are checked as one `(run, case)` invocation. Admission ABI and library
+  hashes are matched against actual DeviceDomain, TQP scorer and Stream 5
+  dispatches; one-rank runs explicitly state that no exchange occurred.
+- Added hosted CPU negative fixtures for missing ranks and operations,
+  duplicate admission/terminal events, foreign invocation identity, invalid
+  ABI/hash, unsupported world size, duplicate GPU UUID and report/trace/receipt
+  disagreement. Rust and Python producer serialization are compared with the
+  same fixture consumed by the Python verifier.
+- `verify_cnot.main` now enters its diagnostic `World` before checked scorer
+  setup and leaves it before destroying the process group. The installed-wheel
+  workflow invokes that entry under two Gloo ranks, injects a scorer-load
+  failure on each rank in turn, and follows each failure with a healthy search
+  whose written result is checked. The lifecycle job has a bounded timeout.
+- The unpaired duplicate two-GPU trained-deep case was removed. The matched
+  one-/two-GPU pair remains in the manual hardware workflow.
+- At `fe520518`, hosted source validation `44899191042` and installed-wheel
+  validation `44899191012` passed, including the paired-result verifier,
+  `verify_cnot.main` lifecycle, public CNOT search and workflow lint. The GPU
+  job was skipped; no CUDA/NCCL or trained-checkpoint execution was established.
+
+## 2026-11-21 - Vote rank-local backend preparation
+
+- Added an installed-wheel two-rank Gloo regression scenario for DeviceDomain
+  preparation failures after local ABI admission. It injects one failure on
+  rank 0 and then rank 1, requires a common phase error, and makes a healthy
+  admission/collective on the same process group after each failure.
+- Extended the phase-boundary test with failures immediately before the local
+  DeviceDomain dispatch trace on each rank, followed by a bounded same-group
+  public search and replay. This is intended to catch nested Gloo votes inside
+  a local trace callback.
+- The test currently references the planned `_probe_cnot_device_domain_vote`
+  and `_probe_cnot_device_stage_vote` boundaries and is awaiting hosted RED
+  evidence before the runtime changes. No GPU execution has occurred.
