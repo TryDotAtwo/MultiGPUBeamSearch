@@ -1,3 +1,9 @@
+## 2026-11-22 - Verify default CNOT Rust controller dispatch
+
+- Extended the installed-wheel `verify_cnot.main` Gloo lifecycle check: explicit `engine=rust` remains on injected scorer failures, while healthy retries use public `engine=auto` with the Python reference-loop callback replaced by a failing sentinel.
+- This verifies the installed wheel's default controller selection across rank-0 and rank-1 failures and two subsequent healthy searches in the same two-rank Gloo group. Search, scorer, kernels, precision and numerical policy are unchanged.
+- Hosted installed-wheel run [44955518273](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44955518273) passed on tested source SHA `a517f8afec9de82ad3fe1958fe8b83ba5df2fafa`; redacted status artifact [14726534470](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44955518273/artifacts/14726534470). Hosted source harness [44955518309](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44955518309) passed; its physical GPU job was skipped. This does not establish CUDA/NCCL execution.
+
 ## 2026-11-22 - Keep watchdog detail reports out of public logs
 
 - Removed raw Vast watchdog report output from the GitHub Actions log. The workflow continues to publish only its allowlisted summary and redacted status artifact.
