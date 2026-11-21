@@ -1,3 +1,10 @@
+## 2026-11-21 - Store Rust preparation options as typed JSON
+
+- Preparation identity schema v2 carries NativeOptions as a JSON object. Rust validates the object and compares preparation identities structurally; the max beam-width form remains typed alongside numeric widths.
+- The Python adapter sends the new schema only to an extension that declares v2. An older extension stays on the compatibility path. Preparation changes continue to invalidate resident state; matching requests can reuse the worker group.
+- Hosted validation passed on source SHA 4cad49f3c98fe1bc37895af98bfffd5827a0829f: source harness [44946584217](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44946584217), artifact [14723403934](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44946584217/artifacts/14723403934); installed wheel [44946584220](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44946584220), artifact [14724077257](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44946584220/artifacts/14724077257); CNOT CPU/Gloo, 312 passed and 2 skipped [44946584249](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44946584249), artifact [14723688156](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44946584249/artifacts/14723688156); Python session-owner gate [44946584203](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44946584203), artifact [14723997251](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44946584203/artifacts/14723997251).
+- No physical GPU job ran. This change does not complete migration of all search control into Rust.
+
 ## 2026-11-21 - Add acceptance-only saturated permutation GPU evidence
 
 - Added an opt-in native build identity for the permutation acceptance trace. The trace binds run/case/call, source and installed-wheel hashes, native build and binary hashes, rank/PID, CUDA UUID observed from the active context, shard count, and a bounded post-cutoff frontier snapshot.

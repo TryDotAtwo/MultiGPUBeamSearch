@@ -1,5 +1,15 @@
 # Конфиг
 
+## Rust session preparation identity v2, 2026-11-21
+
+The resident permutation session now receives a typed preparation identity from the Rust extension. Schema v2 stores NativeOptions as a JSON object and compares it structurally; it no longer relies on Python repr output. The Rust builder validates that the options value is an object. The requested beam width retains both the numeric form and the public max form.
+
+The identity includes graph and geometry, model artifact hash and sizes, model backend, device list, binding scope, beam width, depth, options, CUDA device visibility/order, and the native runtime build. Matching identities reuse the resident worker group. A change in model or preparation fields invalidates the match. Python uses the typed schema only when the installed extension declares schema v2; an older extension does not receive the new arguments and keeps the compatibility path.
+
+On source SHA 4cad49f3c98fe1bc37895af98bfffd5827a0829f, the hosted source harness passed in [run 44946584217](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44946584217), artifact [14723403934](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44946584217/artifacts/14723403934), SHA-256 68a7692500d325d01b683a79564f7ad820ee1ca12178475953eface51998c911. The installed wheel and smoke passed in [run 44946584220](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44946584220), artifact [14724077257](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44946584220/artifacts/14724077257), SHA-256 58ec47161cfb381e009412e12b116378b5e277fcb54d7ad29e981d0ecf0c9f93. The CNOT CPU/Gloo suite passed 312 tests with 2 skipped in [run 44946584249](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44946584249), artifact [14723688156](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44946584249/artifacts/14723688156), SHA-256 e1fb89a51013395b43b947a9996f8d68dfbb63311d9b1affe7f52a6beb8868b5. The Python session-owner suite passed in [run 44946584203](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44946584203), artifact [14723997251](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44946584203/artifacts/14723997251), SHA-256 18ab19696753ad16767ba8fef0cb388b28941d48e9b8724cffbc1e50171a1cea.
+
+These hosted results establish the current source and installed CPU behavior. The physical CUDA/NCCL job was skipped; the Rust migration and physical 1/2-GPU gate remain open.
+
 ## Saturated permutation acceptance, 2026-11-21
 
 The installed-wheel acceptance keeps the public LRX(4), B=64 smoke and adds a
