@@ -47,11 +47,8 @@ pub(crate) fn observe_acceptance_gpu(
     let module = py.import("multigpubeamsearch.cnot_acceptance")?;
     let kwargs = PyDict::new(py);
     kwargs.set_item("device", device)?;
-    let observation = module.call_method(
-        "gpu_observation_for_rank",
-        (rank, size),
-        Some(&kwargs),
-    )?;
+    let observation =
+        module.call_method("gpu_observation_for_rank", (rank, size), Some(&kwargs))?;
     let local_rank = std::env::var("LOCAL_RANK")
         .ok()
         .and_then(|value| value.parse::<usize>().ok())
@@ -414,7 +411,13 @@ pub(crate) fn preflight_strict_backend<'py>(
         let device = world.getattr("device")?.str()?.to_str()?.to_owned();
         let fields = crate::cnot_acceptance::contract_fields(&contract)?;
         crate::cnot_acceptance::emit(
-            "backend_admission", rank, size, pid, &device, &fields, gpu_observation.as_ref()
+            "backend_admission",
+            rank,
+            size,
+            pid,
+            &device,
+            &fields,
+            gpu_observation.as_ref(),
         )?;
         let controller_fields = [
             ("implementation".to_owned(), "RustNativeStages".to_owned()),
@@ -552,19 +555,24 @@ impl<'py> NativeStages<'py> {
         let rank = world.getattr("rank")?.extract()?;
         let size = world.getattr("size")?.extract()?;
         let strict_backend = strict_backend_enabled();
-        let (device_domain, device_domain_sha256, gpu_observation, stream5_library_sha256, stream5_transport) =
-            if let Some(admission) = admission {
-                let mut admission = admission.borrow_mut(py);
-                (
-                    admission.device_domain.take(),
-                    admission.device_domain_sha256.take(),
-                    admission.gpu_observation.take(),
-                    admission.stream5_library_sha256.take(),
-                    admission.stream5_transport.take(),
-                )
-            } else {
-                (None, None, None, None, None)
-            };
+        let (
+            device_domain,
+            device_domain_sha256,
+            gpu_observation,
+            stream5_library_sha256,
+            stream5_transport,
+        ) = if let Some(admission) = admission {
+            let mut admission = admission.borrow_mut(py);
+            (
+                admission.device_domain.take(),
+                admission.device_domain_sha256.take(),
+                admission.gpu_observation.take(),
+                admission.stream5_library_sha256.take(),
+                admission.stream5_transport.take(),
+            )
+        } else {
+            (None, None, None, None, None)
+        };
         if strict_backend && device_domain.is_none() {
             return Err(PyRuntimeError::new_err(
                 "strict CNOT acceptance requires its admitted DeviceDomain handle",
@@ -941,7 +949,16 @@ fn probe_cnot_device_stage_vote(world: Bound<'_, PyAny>, fail_rank: i64) -> PyRe
         // Use the exact local-only event helper called by the production
         // owners/expand/distinct stages. The enclosing vote is their sole
         // collective for this rank-local stage.
-        emit_device_dispatch(&world, rank, size, true, Some("fixture"), "expansion", 1, None)?;
+        emit_device_dispatch(
+            &world,
+            rank,
+            size,
+            true,
+            Some("fixture"),
+            "expansion",
+            1,
+            None,
+        )?;
         Ok(py.None().into_bound(py))
     })();
     checked(py, &world, "rank parent actions and expand", local)?;
