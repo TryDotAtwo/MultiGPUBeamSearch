@@ -1,6 +1,7 @@
 """Inject rank-local failures inside real Rust CNOT phases over CPU Gloo."""
 from datetime import timedelta
 import json
+import os
 from pathlib import Path
 import tempfile
 
@@ -141,6 +142,51 @@ def worker(rank, rendezvous, output_dir, phase, fail_rank):
             World.longs = original
         dist.destroy_process_group()
 
+
+
+def admitted_backend_mode_worker(rank, rendezvous, output_dir):
+    """Keep the rank-agreed compatibility mode if process env changes afterward."""
+    torch.set_num_threads(1)
+    dist.init_process_group(
+        "gloo",
+        init_method=rendezvous,
+        rank=rank,
+        world_size=2,
+        timeout=timedelta(seconds=30),
+    )
+    old_value = os.environ.pop("MGBS_CNOT_STRICT_BACKEND", None)
+    original_runner = cnot_module._native_stages_runner
+
+    def flip_after_admission():
+        if rank == 0:
+            os.environ["MGBS_CNOT_STRICT_BACKEND"] = "1"
+        return original_runner()
+
+    cnot_module._native_stages_runner = flip_after_admission
+    try:
+        with World("cpu"):
+            result = public_search()
+            if (
+                result.status != "solved"
+                or replay_cnot(3, result.gates) != replay_cnot(3, (0, 1))
+            ):
+                raise AssertionError(
+                    f"admitted compatibility mode changed during search: {result!r}"
+                )
+            Path(output_dir, f"rank-{rank}.json").write_text(
+                json.dumps(
+                    {"rank": rank, "status": result.status, "gates": list(result.gates)},
+                    sort_keys=True,
+                ),
+                encoding="utf-8",
+            )
+    finally:
+        cnot_module._native_stages_runner = original_runner
+        if old_value is None:
+            os.environ.pop("MGBS_CNOT_STRICT_BACKEND", None)
+        else:
+            os.environ["MGBS_CNOT_STRICT_BACKEND"] = old_value
+        dist.destroy_process_group()
 
 def trace_boundary_worker(rank, rendezvous, output_dir, fail_rank):
     torch.set_num_threads(1)
@@ -287,6 +333,28 @@ def main():
                 for row in reports
             ):
                 raise AssertionError(f"the live process group did not recover: {reports!r}")
+
+        mode_dir = root / "admitted-backend-mode"
+        mode_dir.mkdir()
+        mode_rendezvous = (mode_dir / "rendezvous").resolve().as_uri()
+        mp.spawn(
+            admitted_backend_mode_worker,
+            args=(mode_rendezvous, str(mode_dir)),
+            nprocs=2,
+            join=True,
+        )
+        mode_reports = [
+            json.loads((mode_dir / f"rank-{rank}.json").read_text())
+            for rank in range(2)
+        ]
+        if any(
+            row["status"] != "solved"
+            or replay_cnot(3, tuple(row["gates"])) != replay_cnot(3, (0, 1))
+            for row in mode_reports
+        ):
+            raise AssertionError(
+                f"rank-agreed compatibility mode was not pinned: {mode_reports!r}"
+            )
 
         for fail_rank in (0, 1):
             trace_dir = root / f"trace-stage-rank-{fail_rank}"
