@@ -1,4 +1,4 @@
-use beam_runtime::inference_backend::{resolve, Backend, DeviceObservation, Request};
+use beam_runtime::inference_backend::{resolve, resolve_plan, Backend, DeviceObservation, Request};
 
 fn device(sm: u32, name: &str) -> DeviceObservation {
     DeviceObservation {
@@ -156,4 +156,31 @@ fn malformed_requests_are_rejected() {
         .unwrap_err()
         .to_string()
         .contains("inference_backend must be"));
+}
+
+#[test]
+fn selected_backend_carries_its_existing_inference_profile() {
+    let cutlass = resolve_plan(&request(
+        "auto",
+        "mlp",
+        Some("fp16"),
+        8,
+        vec![device(86, "NVIDIA GeForce RTX 3060")],
+    ))
+    .unwrap();
+    assert_eq!(cutlass.backend, Backend::Cutlass);
+    assert_eq!(cutlass.policy, "cutlass-default-v1");
+    assert_eq!(cutlass.inference_row_limit, 8192);
+
+    let libtorch = resolve_plan(&request(
+        "auto",
+        "mlp",
+        Some("fp16"),
+        8,
+        vec![device(75, "Tesla T4")],
+    ))
+    .unwrap();
+    assert_eq!(libtorch.backend, Backend::LibTorch);
+    assert_eq!(libtorch.policy, "libtorch-conservative-v1");
+    assert_eq!(libtorch.inference_row_limit, 2048);
 }

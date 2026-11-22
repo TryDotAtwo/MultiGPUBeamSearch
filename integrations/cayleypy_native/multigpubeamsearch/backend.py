@@ -202,6 +202,23 @@ def _resolve_inference_backend(request):
     return _resolve_inference_backend_python(request)
 
 
+def _resolve_inference_plan(request):
+    """Return the selected route and unchanged profile, with old-wheel fallback."""
+    from .rust_control import resolve_inference_plan
+
+    plan = resolve_inference_plan(request)
+    if plan is not None:
+        return plan
+    executor = _resolve_inference_backend(request)
+    if executor == "libtorch":
+        policy, row_limit = "libtorch-conservative-v1", 2048
+    elif executor == "cutlass":
+        policy, row_limit = "cutlass-default-v1", 8192
+    else:
+        raise NativeUnavailable("inference backend resolver returned an invalid selection")
+    return {"backend": executor, "policy": policy, "inference_row_limit": row_limit}
+
+
 def prepare_runtime(contract, model, options, run_dir, devices, *,
                     touch_bfs_radius: int | None = None, nccl_digest_cache=None) -> PreparedRuntime:
     """Resolve/build before dispatch closes its capability fallback window."""
@@ -240,7 +257,8 @@ def prepare_runtime(contract, model, options, run_dir, devices, *,
             for index, sm in enumerate(device_sms)
         ],
     }
-    executor = _resolve_inference_backend(request)
+    inference_plan = _resolve_inference_plan(request)
+    executor = inference_plan["backend"]
     options = replace(options, inference_backend=executor)
     from .build import ensure_runner
     run_dir = Path(run_dir).resolve()
@@ -252,8 +270,9 @@ def prepare_runtime(contract, model, options, run_dir, devices, *,
                                          nccl_digest_cache=nccl_digest_cache)
     if device_names is None:
         device_names = tuple(torch.cuda.get_device_name(d) for d in devices)
-    profile = {"policy": "libtorch-conservative-v1" if executor == "libtorch" else "cutlass-default-v1",
-               "inference_backend": executor, "inference_row_limit": 2048 if executor == "libtorch" else 8192,
+    profile = {"policy": inference_plan["policy"],
+               "inference_backend": executor,
+               "inference_row_limit": inference_plan["inference_row_limit"],
                "cuda_architectures": list(architectures), "gpu_names": list(device_names),
                "memory_planning": "native_auto", "autotuned": False}
     return PreparedRuntime(runner, metadata, architectures, profile)

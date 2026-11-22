@@ -3759,3 +3759,8 @@ The Vast panel acceptance resolves the private producer receipt and sealed datas
 The CPU read-count regression models the 1-rank plus 2-rank invocation pattern and requires exactly one full sealed-dataset read across preflight plus all three rank-local snapshot loads. The installed-wheel endpoint test exercises the same snapshot CLI path used by Vast. Physical acceptance remains pending.
 
 The producer compatibility fixture now changes the baseline Hamming manifest's source revision and digest before constructing its comparison when it simulates a different producer source pin. This keeps producer source, baseline manifest, comparison receipt pins and emitter ABI aligned; runtime source/ABI admission remains strict.
+
+
+## Rust-owned inference profile resolution (2026-11-22)
+
+The installed-wheel acceptance check exposed that the Rust extension exported backend selection but not the typed profile plan consumed by the preparation path. Rust now returns the selected backend together with the existing profile name and inference row limit. The Python adapter uses that single plan for runner construction and the prepared profile. Older extensions retain the existing backend-selection fallback and the same fixed profile mapping. No inference kernel, numerical policy, or beam-search behavior changes. CPU/PyO3 verification is pending; physical CUDA/NCCL verification remains pending.

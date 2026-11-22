@@ -137,3 +137,6 @@ Keep an active goal until the migration and required verification are complete.
 - 2026-11-22: In the Vast CNOT panel path, resolve and hash the sealed producer dataset once at preflight, then pass selected roots, search settings and pins through a SHA-bound compact snapshot to world-size 1/2 workers. Include a CPU read-count check. Keep source-to-emitter ABI admission strict, and update the baseline Hamming manifest digest and comparison pins in producer revision fixtures.
 
 2026-11-22 acceptance review follow-up: Build the panel-v2 verifier arguments through one shared shell helper used by the physical launcher and a hosted CPU check. Feed those exact arguments to the installed verifier's parser-only path before any process group; require `--run-root` and `--output`. Keep unrelated CHANGELOG edits from triggering the Vast acceptance workflow.
+
+
+- 2026-11-22: Resolve the permutation inference route and its existing policy name/row limit together in Rust; have preparation use that single plan. Preserve backend, profile and microbatch values, plus the explicit fallback for older installed extensions. Verify through the installed-wheel public preparation path; do not alter kernels, precision, or search semantics.

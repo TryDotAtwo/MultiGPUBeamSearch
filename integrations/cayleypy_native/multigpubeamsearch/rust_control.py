@@ -213,6 +213,45 @@ def resolve_inference_backend(request):
     return selected
 
 
+def resolve_inference_plan(request):
+    """Resolve the backend and its existing profile in the Rust runtime when available."""
+    if type(request) is not dict:
+        raise NativeUnavailable("inference backend request must be an object")
+    try:
+        payload = json.dumps(request, sort_keys=True, allow_nan=False)
+    except (TypeError, ValueError, OverflowError) as error:
+        raise NativeUnavailable("inference backend request is not JSON-compatible") from error
+    try:
+        native = extension()
+    except (NativeUnavailable, ImportError):
+        return None
+    resolver = getattr(native, "resolve_inference_plan", None)
+    if not callable(resolver):
+        return None
+    try:
+        encoded = resolver(payload)
+    except (RuntimeError, ValueError) as error:
+        raise NativeUnavailable(str(error)) from error
+    if not isinstance(encoded, str):
+        raise NativeUnavailable("Rust runtime returned an invalid inference plan")
+    try:
+        plan = json.loads(encoded)
+    except (TypeError, ValueError) as error:
+        raise NativeUnavailable("Rust runtime returned malformed inference-plan JSON") from error
+    if (
+        not isinstance(plan, dict)
+        or set(plan) != {"backend", "policy", "inference_row_limit"}
+        or plan.get("backend") not in ("libtorch", "cutlass")
+        or not isinstance(plan.get("policy"), str)
+        or not plan["policy"]
+        or len(plan["policy"]) > 128
+        or type(plan.get("inference_row_limit")) is not int
+        or not 1 <= plan["inference_row_limit"] <= 8192
+    ):
+        raise NativeUnavailable("Rust runtime returned an invalid inference plan")
+    return plan
+
+
 def validate_options(options):
     """Validate public options in beam-core when the matching API is present."""
     if not _native_options_supported(options):

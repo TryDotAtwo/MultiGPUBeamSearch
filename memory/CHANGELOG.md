@@ -3487,3 +3487,6 @@ Main commit `148b2a826a369b7601e904ea409e0cc5301c75c9` also passed the 260-test 
   and pinned panel-v2 CPU compatibility passed in
   [45002806710](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45002806710).
   GPU/NCCL jobs were skipped.
+
+
+- The installed-wheel policy gate revealed that the new Rust backend selector was missing the profile-plan API expected by the preparation acceptance test. This change adds Rust-owned backend/profile resolution and preserves the existing libtorch/CUTLASS profile values, with fallback for older wheels. CUDA kernels and numerical policy are unchanged; hosted verification is pending.

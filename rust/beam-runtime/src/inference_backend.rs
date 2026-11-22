@@ -108,3 +108,24 @@ pub fn resolve(request: &Request) -> Result<Backend> {
     }
     Ok(selected)
 }
+
+/// Backend choice and its existing conservative inference profile.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct InferencePlan {
+    pub backend: Backend,
+    pub policy: &'static str,
+    pub inference_row_limit: u64,
+}
+
+pub fn resolve_plan(request: &Request) -> Result<InferencePlan> {
+    let backend = resolve(request)?;
+    let (policy, inference_row_limit) = match backend {
+        Backend::LibTorch => ("libtorch-conservative-v1", 2048),
+        Backend::Cutlass => ("cutlass-default-v1", 8192),
+    };
+    Ok(InferencePlan {
+        backend,
+        policy,
+        inference_row_limit,
+    })
+}
