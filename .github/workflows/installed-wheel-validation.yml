@@ -10,6 +10,8 @@ on:
       - .github/workflows/installed-wheel-validation.yml
       - .github/workflows/vast-cnot-control-collectives.yml
       - integrations/cayleypy_native/tests/installed_wheel_smoke.py
+      - integrations/cayleypy_native/tests/test_cluster_rust.py
+      - integrations/cayleypy_native/tests/test_cluster_worker.py
       - integrations/cayleypy_native/tests/installed_cnot_handoff_endpoint.py
       - integrations/cnot_scorer/handoff.py
       - integrations/cnot_scorer/test_handoff.py
@@ -99,6 +101,26 @@ jobs:
           mkdir -p "$RUNNER_TEMP/mgbs-wheel-smoke"
           cd "$RUNNER_TEMP/mgbs-wheel-smoke"
           env -u PYTHONPATH python "$GITHUB_WORKSPACE/integrations/cayleypy_native/tests/installed_wheel_smoke.py" > "${RUNNER_TEMP}/mgbs-private-smoke.log" 2>&1
+      - name: Verify installed scheduler worker and Rust rank supervisor
+        id: cluster_worker_installed
+        env:
+          REQUIRE_RUST_CLUSTER: "1"
+        run: |
+          set -o pipefail
+          mkdir -p "$GITHUB_WORKSPACE/test_results/refactor_20261122/cluster-worker"
+          cd "$RUNNER_TEMP/mgbs-wheel-smoke"
+          env -u PYTHONPATH REQUIRE_RUST_CLUSTER=1 python -m pytest -vv \
+            "$GITHUB_WORKSPACE/integrations/cayleypy_native/tests/test_cluster_worker.py" \
+            "$GITHUB_WORKSPACE/integrations/cayleypy_native/tests/test_cluster_rust.py" \
+            2>&1 | tee "$GITHUB_WORKSPACE/test_results/refactor_20261122/cluster-worker/installed-wheel.log"
+      - name: Upload installed scheduler worker validation log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cluster-worker-installed-wheel-${{ github.run_id }}
+          path: test_results/refactor_20261122/cluster-worker/installed-wheel.log
+          if-no-files-found: error
+          retention-days: 7
       - name: Verify rank-consistent CNOT dispatch on installed wheel
         id: cnot_dispatch_consensus
         env:
