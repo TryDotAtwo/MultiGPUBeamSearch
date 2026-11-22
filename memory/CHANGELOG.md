@@ -1,3 +1,9 @@
+## 2026-11-22 - Require panel-v2 Rust unit tests to execute
+
+- Removed the over-specific Cargo test-name filter that returned success with zero tests (48 filtered out) on the pinned producer crate.
+- The adapter gate now runs the library test suite and requires all four panel-v2 scorer manifest cases to appear in successful output before it can save the native build cache. A zero-test or missing-case run fails with a concise marker.
+- Producer routing, cache keys, and inference-policy behavior are unchanged.
+
 ## 2026-11-22 - Keep installed CNOT dispatch diagnostics redacted
 
 - The two-rank installed-wheel job keeps the complete diagnostic log in the runner's private temporary directory. On success it emits only three fixed PASS markers; on failure it emits only the fixed phase and exception type from the test's structured marker.

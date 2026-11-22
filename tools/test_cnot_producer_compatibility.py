@@ -156,6 +156,23 @@ class ProducerBuildCacheWorkflowTests(unittest.TestCase):
         self.assertNotIn(".venv-cnot-panel", native_save)
         self.assertNotIn("cnot-panel-v2-build", native_save)
 
+    def test_native_gate_runs_panel_scorer_cases_and_rejects_zero_tests(self):
+        workflow = WORKFLOW.read_text(encoding="utf-8")
+        cargo = workflow.split(
+            "- name: Run the pinned panel-v2 adapter tests", 1
+        )[1].split("\n      - name:", 1)[0]
+        self.assertNotIn("mgbs_scorer_panel_v2::tests", cargo)
+        for case in (
+            "accepts_a_digest_bound_ordered_panel_manifest",
+            "rejects_legacy_schema",
+            "rejects_duplicate_indices_and_ids",
+            "rejects_reordered_or_wrong_digest",
+        ):
+            with self.subTest(case=case):
+                self.assertIn(f"::{case}", cargo)
+        self.assertIn("PANEL_V2_CARGO_TESTS_PASS count=4", cargo)
+        self.assertIn("PANEL_V2_CARGO_TESTS_FAILED missing_case=%s", cargo)
+
     def test_emitter_route_has_no_torch_or_cargo_and_skips_native_steps(self):
         workflow = WORKFLOW.read_text(encoding="utf-8")
         self.assertIn("steps.scope.outputs.run_handoff == 'true'", workflow)

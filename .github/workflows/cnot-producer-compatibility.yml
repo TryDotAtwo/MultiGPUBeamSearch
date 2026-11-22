@@ -206,9 +206,21 @@ jobs:
           export LD_LIBRARY_PATH="$torch_lib"
           native="$RUNNER_TEMP/cnot-panel-v2-build/native"
           mkdir -p "$CARGO_TARGET_DIR"
-          if cargo test --locked --features torch --lib mgbs_scorer_panel_v2::tests \
+          if cargo test --locked --features torch --lib \
               --manifest-path "$native/Cargo.toml" \
               > "$RUNNER_TEMP/producer-adapter-tests.log" 2>&1; then
+            for test_name in \
+              accepts_a_digest_bound_ordered_panel_manifest \
+              rejects_legacy_schema \
+              rejects_duplicate_indices_and_ids \
+              rejects_reordered_or_wrong_digest; do
+              if ! grep -F "::$test_name" "$RUNNER_TEMP/producer-adapter-tests.log" >/dev/null; then
+                printf 'PANEL_V2_CARGO_TESTS_FAILED missing_case=%s\n' "$test_name"
+                tail -n 100 "$RUNNER_TEMP/producer-adapter-tests.log"
+                exit 1
+              fi
+            done
+            printf 'PANEL_V2_CARGO_TESTS_PASS count=4\n'
             cat "$RUNNER_TEMP/producer-adapter-tests.log"
           else
             status=$?
