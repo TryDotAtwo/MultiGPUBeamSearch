@@ -443,6 +443,14 @@ mod tests {
         assert_eq!(request.validation, CnotValidation::Auto);
         assert_eq!(request.requested_engine, RequestedEngine::Auto);
         assert_eq!(request.selected_engine(), SelectedEngine::Rust);
+
+        let options = request.search_options(1, 2);
+        assert_eq!(options.rank, 1);
+        assert_eq!(options.world, 2);
+        assert_eq!(options.width, 9);
+        assert_eq!(options.shortlist, 12);
+        assert_eq!(options.alphabet, 12);
+        assert_eq!(options.max_depth, 7);
     }
 
     #[test]
