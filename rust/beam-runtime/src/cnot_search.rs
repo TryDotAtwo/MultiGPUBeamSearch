@@ -363,12 +363,9 @@ impl Edge {
         if row.len() != 3 {
             return Err("invalid CNOT history edge");
         }
-        let parent =
-            u64::try_from(row[0]).map_err(|_| "invalid CNOT history parent")?;
-        let route =
-            u32::try_from(row[1]).map_err(|_| "invalid CNOT history route")?;
-        let owner =
-            u32::try_from(row[2]).map_err(|_| "invalid CNOT history owner")?;
+        let parent = u64::try_from(row[0]).map_err(|_| "invalid CNOT history parent")?;
+        let route = u32::try_from(row[1]).map_err(|_| "invalid CNOT history route")?;
+        let owner = u32::try_from(row[2]).map_err(|_| "invalid CNOT history owner")?;
         Ok(Self {
             parent,
             route,
@@ -570,7 +567,10 @@ mod tests {
                 owner: 3,
             }
         );
-        assert_eq!(Edge::from_i64_row(&[1, 2]), Err("invalid CNOT history edge"));
+        assert_eq!(
+            Edge::from_i64_row(&[1, 2]),
+            Err("invalid CNOT history edge")
+        );
         assert_eq!(
             Edge::from_i64_row(&[-1, 2, 3]),
             Err("invalid CNOT history parent")
