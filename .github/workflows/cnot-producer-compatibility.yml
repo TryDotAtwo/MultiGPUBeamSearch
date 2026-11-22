@@ -83,23 +83,53 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if ! python -m unittest discover -s integrations/cnot_scorer -p 'test_handoff.py' -v > "${RUNNER_TEMP}/producer-handoff-test.log" 2>&1; then
-            cat "${RUNNER_TEMP}/producer-handoff-test.log"
-            echo "handoff_tests=failed" >> "$GITHUB_OUTPUT"
-            exit 1
-          fi
-          echo "handoff_tests=passed" >> "$GITHUB_OUTPUT"
+          python3 - <<'PY'
+          import os
+          import sys
+          import unittest
+
+          suite = unittest.defaultTestLoader.discover(
+              "integrations/cnot_scorer", pattern="test_handoff.py"
+          )
+
+          def flatten(value):
+              for item in value:
+                  if isinstance(item, unittest.TestSuite):
+                      yield from flatten(item)
+                  else:
+                      yield item
+
+          ordered = sorted(flatten(suite), key=lambda test: test.id())
+          numbers = {test.id(): index + 1 for index, test in enumerate(ordered)}
+          log_path = os.path.join(os.environ["RUNNER_TEMP"], "producer-handoff-test.log")
+          with open(log_path, "w", encoding="utf-8") as stream:
+              result = unittest.TextTestRunner(stream=stream, verbosity=2).run(suite)
+          failed = [test for test, _ in result.failures + result.errors]
+          if result.wasSuccessful():
+              status = "passed"
+          else:
+              case = numbers.get(failed[0].id()) if failed else None
+              status = f"failed_case_{case:02d}" if case is not None else "failed_unknown"
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
+              output.write(f"handoff_tests={status}\\n")
+          print(f"handoff_tests={status}")
+          sys.exit(0 if result.wasSuccessful() else 1)
+          PY
       - name: Publish redacted source status
         if: always()
         env:
           OUTCOME: ${{ steps.cpu_compile.outcome }}
-          HANDOFF_OUTCOME: ${{ steps.handoff_tests.outcome }}
+          HANDOFF_OUTCOME: ${{ steps.handoff_tests.outputs.handoff_tests }}
         shell: bash
         run: |
           if [[ "$OUTCOME" != "success" ]]; then
             echo "CNOT producer adapter: failed (CPU source compile or panel-manifest tests; GPU runtime not run)." >> "$GITHUB_STEP_SUMMARY"
-          elif [[ "$HANDOFF_OUTCOME" == "success" ]]; then
+          elif [[ "$HANDOFF_OUTCOME" == "passed" ]]; then
             echo "CNOT producer adapter: passed (CPU source compile, panel-manifest and synthetic handoff tests; GPU runtime not run)." >> "$GITHUB_STEP_SUMMARY"
           else
-            echo "CNOT producer adapter: failed (CPU source compile passed; synthetic handoff tests failed; GPU runtime not run)." >> "$GITHUB_STEP_SUMMARY"
+            case "$HANDOFF_OUTCOME" in
+              failed_case_[0-9][0-9]|failed_unknown) result="$HANDOFF_OUTCOME" ;;
+              *) result="failed_unknown" ;;
+            esac
+            echo "CNOT producer adapter: failed ($result; CPU source compile passed; GPU runtime not run)." >> "$GITHUB_STEP_SUMMARY"
           fi
