@@ -168,3 +168,6 @@ Continue moving public permutation and CNOT search control to Rust + CUDA/C++ wh
 
 
 2026-11-22: Перенести существующее правило ScheduledRank.cuda_ordinal в beam-runtime через отдельный версионированный PyO3 API. Сохранить Python API, правило single-visible-device, local rank mapping, ошибки и fallback старых wheel; не менять реальное device binding и NCCL. Проверить Rust unit tests и установленный wheel.
+
+
+2026-11-22: Перенести mapping выбранных логических CUDA индексов через унаследованный CUDA_VISIBLE_DEVICES из Python в beam-runtime. Сохранить child_environment, порядок и дубликаты, trim токенов, фильтрацию переменных, ошибки и fallback старых wheel. Проверить через установленное расширение на hosted CPU; физическое device binding и NCCL не менять.

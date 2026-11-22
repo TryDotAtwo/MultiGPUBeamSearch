@@ -95,3 +95,10 @@
 - Routed `ScheduledRank.cuda_ordinal` through the installed extension; kept the same Python method, exact validation behavior, and fallback when an older wheel lacks the function.
 - Added Rust runtime contract tests and installed-wheel checks for a single visible device, local ordinal mapping, insufficient visibility, error propagation, and legacy fallback. No device binding or NCCL behavior changed.
 - Rust CPU/Gloo passed in [run 45054019605](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45054019605), installed-wheel validation passed in [run 45054019597](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45054019597), and the hosted acceptance harness passed in [run 45054020205](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45054020205); the physical GPU job was skipped.
+
+
+## 2026-11-22 - Resolve child CUDA visibility in beam-runtime
+
+- Moved logical CUDA-index mapping through inherited `CUDA_VISIBLE_DEVICES` into a typed Rust runtime function and exposed it through the existing versioned device-binding PyO3 API.
+- The public `child_environment` path now uses the installed resolver; it preserves input order, duplicate indices, token trimming, exact invalid-token errors, and compatibility fallback for older wheels.
+- Added a hosted installed-wheel test through child environment construction and Rust runtime contract cases. Device selection, physical binding, CUDA kernels and NCCL setup are unchanged.

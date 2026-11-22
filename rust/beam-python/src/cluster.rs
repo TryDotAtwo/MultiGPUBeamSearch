@@ -38,6 +38,12 @@ fn resolve_scheduler_rank(environment: BTreeMap<String, String>) -> PyResult<Str
 }
 
 #[pyfunction]
+fn resolve_cuda_visibility(devices: Vec<u32>, inherited: Option<String>) -> PyResult<String> {
+    beam_runtime::cluster::cuda_visibility(&devices, inherited.as_deref())
+        .map_err(|error| PyValueError::new_err(error.to_string()))
+}
+
+#[pyfunction]
 fn resolve_cuda_ordinal(local_rank: i64, visible_devices: u64) -> PyResult<i64> {
     beam_runtime::cluster::cuda_ordinal(local_rank, visible_devices)
         .map_err(|error| PyValueError::new_err(error.to_string()))
@@ -78,6 +84,7 @@ pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(validate_cluster_rank, module)?)?;
     module.add_function(wrap_pyfunction!(resolve_scheduler_rank, module)?)?;
     module.add_function(wrap_pyfunction!(resolve_cuda_ordinal, module)?)?;
+    module.add_function(wrap_pyfunction!(resolve_cuda_visibility, module)?)?;
     module.add_function(wrap_pyfunction!(resolve_cluster_plan, module)?)?;
     Ok(())
 }

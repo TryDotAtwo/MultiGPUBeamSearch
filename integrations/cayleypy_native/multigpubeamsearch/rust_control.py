@@ -250,6 +250,33 @@ def resolve_runtime_devices(visible_device_count, explicit_devices, num_gpus, gr
     return tuple(selected)
 
 
+def resolve_cuda_visibility(devices, inherited):
+    """Map selected logical CUDA indices through the inherited visibility list."""
+    if type(devices) not in (tuple, list) or any(
+        type(device) is not int or not 0 <= device <= 0xFFFFFFFF
+        for device in devices
+    ):
+        return None
+    if inherited is not None and type(inherited) is not str:
+        return None
+    try:
+        native = extension()
+    except (NativeUnavailable, ImportError):
+        return None
+    resolver = getattr(native, "resolve_cuda_visibility", None)
+    if not callable(resolver):
+        return None
+    if getattr(native, "CLUSTER_DEVICE_BINDING_VERSION", None) != 1:
+        raise NativeUnavailable("Rust CUDA visibility API version is incompatible")
+    try:
+        result = resolver(list(devices), inherited)
+    except (RuntimeError, ValueError, TypeError, OverflowError) as error:
+        raise NativeUnavailable(str(error)) from error
+    if type(result) is not str:
+        raise NativeUnavailable("Rust runtime returned an invalid CUDA visibility mapping")
+    return result
+
+
 def resolve_cuda_ordinal(local_rank, visible_devices):
     """Resolve a scheduler rank in the process-local CUDA namespace when supported."""
     if type(visible_devices) is not int or visible_devices <= 0:

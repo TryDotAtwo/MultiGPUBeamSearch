@@ -3844,3 +3844,8 @@ The public `cluster.scheduler_rank` path uses the typed `beam-runtime` resolver 
 
 
 The scheduler-to-CUDA ordinal transfer was validated on code SHA `935016b513a742067f3be11315b7013a322dbefc`: Rust CPU/Gloo passed in [run 45054019605](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45054019605), the installed PEP 517 wheel passed in [run 45054019597](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45054019597), and hosted acceptance passed in [run 45054020205](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45054020205). The physical GPU job was skipped.
+
+
+## Rust-owned CUDA visibility translation
+
+`backend.child_environment` obtains the child process's `CUDA_VISIBLE_DEVICES` mapping from a versioned `beam-runtime` function. The Rust rule preserves selected-index order, token trimming, duplicate selections, inherited `CUDA_DEVICE_ORDER`, and the previous rejection of out-of-range, empty, or disabled tokens. The Python API and child environment isolation remain unchanged; older extensions without the resolver use the existing Python rule. This translates the scheduler-provided visibility mask and does not select or bind physical devices.

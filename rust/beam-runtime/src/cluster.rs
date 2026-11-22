@@ -247,6 +247,33 @@ pub fn cuda_ordinal(local_rank: i64, visible_devices: u64) -> Result<i64> {
     Ok(local_rank)
 }
 
+/// Map selected logical CUDA indices through a scheduler-provided visibility list.
+pub fn cuda_visibility(devices: &[u32], inherited: Option<&str>) -> Result<String> {
+    let Some(inherited) = inherited else {
+        return Ok(devices
+            .iter()
+            .map(|device| device.to_string())
+            .collect::<Vec<_>>()
+            .join(","));
+    };
+    let tokens: Vec<&str> = inherited.split(',').map(str::trim).collect();
+    let mut mapped = Vec::with_capacity(devices.len());
+    for &device in devices {
+        let index = usize::try_from(device)
+            .map_err(|_| ClusterError::Invalid(
+                "cannot map selected devices through inherited CUDA_VISIBLE_DEVICES".into(),
+            ))?;
+        let token = tokens.get(index).copied().unwrap_or("");
+        if token.is_empty() || token == "-1" {
+            return Err(ClusterError::Invalid(
+                "cannot map selected devices through inherited CUDA_VISIBLE_DEVICES".into(),
+            ));
+        }
+        mapped.push(token);
+    }
+    Ok(mapped.join(","))
+}
+
 pub struct Request {
     pub command: Vec<String>,
     /// Executable lookup and Python pathlib resolution preserve existing Python semantics.

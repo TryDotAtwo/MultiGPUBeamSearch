@@ -345,7 +345,8 @@ def runtime_devices(graph, options) -> tuple[int, ...]:
         options.num_gpus,
         graph_devices,
     )
-def cuda_visibility(devices: tuple[int, ...], environ: dict[str, str]) -> str:
+def _cuda_visibility_python(devices, environ):
+    """Compatibility rule for older runtime extensions."""
     inherited = environ.get("CUDA_VISIBLE_DEVICES")
     if inherited is None:
         return ",".join(map(str, devices))
@@ -353,6 +354,16 @@ def cuda_visibility(devices: tuple[int, ...], environ: dict[str, str]) -> str:
     if any(d >= len(tokens) or not tokens[d] or tokens[d] == "-1" for d in devices):
         raise NativeUnavailable("cannot map selected devices through inherited CUDA_VISIBLE_DEVICES")
     return ",".join(tokens[d] for d in devices)
+
+
+def cuda_visibility(devices: tuple[int, ...], environ: dict[str, str]) -> str:
+    from .rust_control import resolve_cuda_visibility
+
+    inherited = environ.get("CUDA_VISIBLE_DEVICES")
+    resolved = resolve_cuda_visibility(devices, inherited)
+    if resolved is not None:
+        return resolved
+    return _cuda_visibility_python(devices, environ)
 
 
 def child_environment(devices: tuple[int, ...], run_dir: Path, environ=None) -> dict[str, str]:

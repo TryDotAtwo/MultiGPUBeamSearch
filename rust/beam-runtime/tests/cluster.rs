@@ -204,3 +204,33 @@ fn scheduled_cuda_ordinal_rejects_missing_or_insufficient_visibility() {
         Err(ClusterError::Invalid(message)) if message == "LOCAL_RANK exceeds the visible CUDA devices"
     ));
 }
+
+
+#[test]
+fn cuda_visibility_preserves_inherited_token_order_and_whitespace_rules() {
+    use beam_runtime::cluster::cuda_visibility;
+
+    assert_eq!(cuda_visibility(&[2, 0], None).unwrap(), "2,0");
+    assert_eq!(
+        cuda_visibility(&[2, 0], Some(" GPU-a, GPU-b ,GPU-c ")).unwrap(),
+        "GPU-c,GPU-a"
+    );
+    assert_eq!(cuda_visibility(&[1, 1], Some("GPU-a,GPU-b")).unwrap(), "GPU-b,GPU-b");
+    assert_eq!(cuda_visibility(&[], Some("")).unwrap(), "");
+}
+
+#[test]
+fn cuda_visibility_rejects_missing_indices_empty_tokens_and_disabled_devices() {
+    use beam_runtime::cluster::cuda_visibility;
+
+    for selected in [
+        cuda_visibility(&[2], Some("GPU-a,GPU-b")),
+        cuda_visibility(&[1], Some("GPU-a, ")),
+        cuda_visibility(&[1], Some("GPU-a,-1")),
+    ] {
+        assert_eq!(
+            selected.unwrap_err().to_string(),
+            "cannot map selected devices through inherited CUDA_VISIBLE_DEVICES"
+        );
+    }
+}
