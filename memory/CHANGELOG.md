@@ -3343,3 +3343,5 @@ Main commit `148b2a826a369b7601e904ea409e0cc5301c75c9` also passed the 260-test 
 - Preserve explicit `engine="rust"` capability errors as `NativeUnavailable`; move the mixed-engine Gloo regression through the public `search_cnot` entry and keep compatibility mocks aligned with the selected-route contract.
 
 - Print the synthetic installed-wheel panel endpoint traceback on failure, and the panel handoff unittest log on the producer CPU gate, so CI failures retain the actual assertion rather than only an exit code.
+
+- Keep panel handoff diagnostics specific: distinguish receipt/source revision disagreement, selected checkpoint disagreement and accepted-update mismatch; correct the installed endpoint oracle for the input tensor's batch dimension.

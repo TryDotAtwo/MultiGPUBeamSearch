@@ -111,3 +111,5 @@ Keep an active goal until the migration and required verification are complete.
 - 2026-11-22: Keep installed CNOT Gloo lifecycle receipts rank-local for request inputs and shared for phase outcomes; validate only rank-zero healthy reports, with CPU negative cases for missing phase, wrong rank, missing report, and missing replay.
 
 - 2026-11-22: Resolve CNOT controller selection from one fixed snapshot of actual callable bindings voted across ranks; pass the selected typed route into compatibility execution. Verify mismatched public engine requests through `search_cnot`, hidden per-rank callables, strict fail-before-transport and healthy retry. Keep explicit Rust-unavailable errors compatible with the Python API.
+
+- 2026-11-22: Keep the installed panel-v2 handoff endpoint tests aligned with the actual packed CNOT tensor shape, and report specific source-revision and selected-checkpoint failures from the receipt resolver.

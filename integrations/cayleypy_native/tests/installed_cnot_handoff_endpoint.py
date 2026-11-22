@@ -142,7 +142,7 @@ class InstalledHandoffEndpointTests(unittest.TestCase):
             and call["engine"] == "rust"
             for call in self.search_calls
         ))
-        self.assertEqual([call["root"] for call in self.search_calls], [[[1], [3]], [[3], [2]]])
+        self.assertEqual([call["root"] for call in self.search_calls], [[[[1], [3]]], [[[3], [2]]]])
 
     def test_bad_receipt_fails_before_scorer_or_search(self):
         self.fixture.receipt_source_revision = "f" * 40

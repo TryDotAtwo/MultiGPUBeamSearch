@@ -363,9 +363,10 @@ def resolve_panel_v2_handoff(
     dataset_sha = handoff.get("dataset_sha256")
     search = handoff.get("search")
     model = handoff.get("model")
+    if receipt.get("source_revision") != source_revision:
+        raise HandoffError("learning-curve receipt source revision differs from the handoff")
     if (
-        receipt.get("source_revision") != source_revision
-        or handoff.get("schema") != _HANDOFF_SCHEMA
+        handoff.get("schema") != _HANDOFF_SCHEMA
         or handoff.get("consumer") != "MultiGPUBeamSearch"
         or not isinstance(source_revision, str)
         or _SHA1.fullmatch(source_revision) is None
@@ -395,12 +396,10 @@ def resolve_panel_v2_handoff(
     ):
         raise HandoffError("top-level receipt dataset or search identity differs from the handoff")
     selected = receipt.get("selected")
-    if (
-        not isinstance(selected, dict)
-        or selected.get("accepted_updates") != accepted_updates
-        or selected.get("checkpoint_sha256") != checkpoint_sha
-    ):
-        raise HandoffError("selected learning-curve checkpoint differs from the handoff")
+    if not isinstance(selected, dict) or selected.get("accepted_updates") != accepted_updates:
+        raise HandoffError("selected accepted-update identity differs from the handoff")
+    if selected.get("checkpoint_sha256") != checkpoint_sha:
+        raise HandoffError("selected checkpoint differs from the handoff")
 
     result = _json_object(train_result_path, "training result")
     progress = result.get("end_progress")
