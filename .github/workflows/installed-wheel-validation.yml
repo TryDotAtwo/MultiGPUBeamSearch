@@ -10,6 +10,7 @@ on:
       - .github/workflows/installed-wheel-validation.yml
       - .github/workflows/vast-cnot-control-collectives.yml
       - integrations/cayleypy_native/tests/installed_wheel_smoke.py
+      - integrations/cayleypy_native/tests/installed_inference_backend_policy.py
       - integrations/cayleypy_native/tests/test_cluster_rust.py
       - integrations/cayleypy_native/tests/test_cluster_worker.py
       - integrations/cayleypy_native/tests/installed_cnot_handoff_endpoint.py
@@ -101,6 +102,13 @@ jobs:
           mkdir -p "$RUNNER_TEMP/mgbs-wheel-smoke"
           cd "$RUNNER_TEMP/mgbs-wheel-smoke"
           env -u PYTHONPATH python "$GITHUB_WORKSPACE/integrations/cayleypy_native/tests/installed_wheel_smoke.py" > "${RUNNER_TEMP}/mgbs-private-smoke.log" 2>&1
+      - name: Verify inference backend policy in the installed wheel
+        id: inference_backend_policy
+        run: |
+          set -o pipefail
+          cd "$RUNNER_TEMP/mgbs-wheel-smoke"
+          env -u PYTHONPATH python "$GITHUB_WORKSPACE/integrations/cayleypy_native/tests/installed_inference_backend_policy.py" \
+            > "${RUNNER_TEMP}/mgbs-private-inference-backend-policy.log" 2>&1
       - name: Verify installed scheduler worker and Rust rank supervisor
         id: cluster_worker_installed
         env:
