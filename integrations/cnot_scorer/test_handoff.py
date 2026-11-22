@@ -241,7 +241,6 @@ class PanelV2HandoffTests(unittest.TestCase):
             [root["start_packed_rows"] for root in resolved.panel_roots],
             [[1, 3], [3, 2]],
         )
-        )
 
     def test_supported_search_geometry_has_exact_v13_frontier_bound(self):
         self.assertEqual(validate_search_contract(self.search), 201)
