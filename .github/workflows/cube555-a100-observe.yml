@@ -18,11 +18,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          id=61941521
+          id=61944743
           endpoint=https://console.vast.ai/api/v0/instances
           authorization="Authorization: Bearer ${VAST_API_KEY}"
           row="$(curl --fail --silent --show-error --max-time 20 -H "$authorization" "$endpoint/" \
-            | jq -cer --argjson id "$id" '.instances[] | select(.id==$id and .label=="cube555-a100-fast-20261122" and .actual_status=="running")')"
+            | jq -cer --argjson id "$id" '.instances[] | select(.id==$id and .label=="cube555-a100-profile-grid-20261122" and .actual_status=="running")')"
           key="$RUNNER_TEMP/observe-key"
           ssh-keygen -q -t ed25519 -N "" -C "cube555-observe-$GITHUB_RUN_ID" -f "$key"
           request="$(jq -cn --arg ssh_key "$(cat "$key.pub")" '{ssh_key:$ssh_key}')"
@@ -50,7 +50,8 @@ jobs:
           if [[ -d cube555-standalone/beam_run ]]; then
             find cube555-standalone/beam_run -name verification-budget.json -exec cat {} \;
             find cube555-standalone/beam_run -name cmake-build.log -exec tail -n 3 {} \;
-            find cube555-standalone/beam_run -name maximum-beam.json \
+            find cube555-standalone/beam_run -path '*/profile-grids/*.json' -printf "%p\n"
+  find cube555-standalone/beam_run -name maximum-beam.json \
               -exec grep -E "effective_beam|full_step_verified|capacity_scope|working_capacity_failure" {} \; | tail -n 20
           fi'
           for attempt in 1 2 3; do

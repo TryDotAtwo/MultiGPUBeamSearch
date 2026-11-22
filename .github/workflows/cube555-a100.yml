@@ -12,7 +12,7 @@ permissions:
   actions: read
 
 concurrency:
-  group: cube555-standalone-vast-61941521
+  group: cube555-standalone-vast-61944743
   cancel-in-progress: false
 
 jobs:
@@ -20,9 +20,9 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 250
     env:
-      CUBE555_BUNDLE_RUN: '45004373348'
-      CUBE555_LEASE_LABEL: cube555-a100-fast-20261122
-      CUBE555_EXISTING_INSTANCE_ID: '61941521'
+      CUBE555_BUNDLE_RUN: '45006414821'
+      CUBE555_LEASE_LABEL: cube555-a100-profile-grid-20261122
+      CUBE555_EXISTING_INSTANCE_ID: '61944743'
     steps:
       - uses: actions/checkout@v4
         with:
