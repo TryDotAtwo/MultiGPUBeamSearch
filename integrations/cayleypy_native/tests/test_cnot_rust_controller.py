@@ -134,7 +134,9 @@ def test_rust_top_level_controller_owns_cnot_admission_and_stage_dispatch(monkey
         "qhat", True, 5, 6, 6, 4,
     )
     assert stage_event[-2].strict is False
-    assert stage_event[-1] == {"admitted_topology": (0, 1)}
+    assert stage_event[-1]["admitted_topology"] == (0, 1)
+    ranked_request = stage_event[-1]["ranked_request"]
+    assert type(ranked_request).__name__ == "_CnotRankedRequest"
 
 
 def test_rust_controller_prepares_typed_input_without_python_builder(monkeypatch):
