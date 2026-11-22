@@ -114,6 +114,101 @@ finally:
         else:
             os.environ.pop(key, None)
 
+
+# Exercise the existing microbatch resource policy through the installed Rust
+# runtime. A failing Python fallback proves the public helper consumed the plan.
+microbatch_resolver = getattr(runtime, "resolve_microbatch_plan", None)
+if not callable(microbatch_resolver):
+    raise AssertionError("the installed Rust runtime does not own microbatch planning")
+
+microbatch_cases = (
+    (
+        {"beam_width": 1, "world_size": 2, "move_count": 12,
+         "output_dim": 1, "model_backend": "mlp", "row_limit": 8192},
+        {"native_default_row_budget": 8192, "configured_row_budget": 2040,
+         "derived_parent_batch": 170, "derived_candidates_per_slot": 2040,
+         "reference_logical_shard": 1024, "reference_shard_storage": 2048,
+         "adjusted_for_small_beam": True},
+    ),
+    (
+        {"beam_width": 20000, "world_size": 1, "move_count": 4,
+         "output_dim": 1, "model_backend": "ensemble", "row_limit": 1234},
+        {"native_default_row_budget": 1234, "configured_row_budget": 1234,
+         "derived_parent_batch": 1234, "derived_candidates_per_slot": 4936,
+         "reference_logical_shard": 5120, "reference_shard_storage": 7168,
+         "adjusted_for_small_beam": True},
+    ),
+    (
+        {"beam_width": 100000, "world_size": 1, "move_count": 4,
+         "output_dim": 4, "model_backend": "mlp", "row_limit": 8192},
+        {"native_default_row_budget": 8192, "configured_row_budget": 8192,
+         "derived_parent_batch": 8192, "derived_candidates_per_slot": 32768,
+         "reference_logical_shard": 25600, "reference_shard_storage": 32768,
+         "adjusted_for_small_beam": False},
+    ),
+)
+microbatch_plans = []
+for plan_request, expected_plan in microbatch_cases:
+    actual_plan = json.loads(
+        microbatch_resolver(json.dumps(plan_request, sort_keys=True))
+    )
+    if actual_plan != expected_plan:
+        raise AssertionError(
+            f"Rust microbatch plan mismatch: request={plan_request}, "
+            f"expected={expected_plan}, actual={actual_plan}"
+        )
+    microbatch_plans.append(actual_plan)
+
+from multigpubeamsearch import rust_control as microbatch_rust_control
+
+_python_plan = device_backend._resolve_microbatch_plan_python
+device_backend._resolve_microbatch_plan_python = lambda *args, **kwargs: (_ for _ in ()).throw(
+    AssertionError("public microbatch planning used the Python policy")
+)
+try:
+    for (plan_request, expected_plan), plan in zip(microbatch_cases, microbatch_plans):
+        contract = SimpleNamespace(move_count=plan_request["move_count"])
+        model = SimpleNamespace(
+            backend=plan_request["model_backend"],
+            manifest={"output_dim": plan_request["output_dim"]},
+        )
+        environment, metadata = device_backend.microbatch_environment(
+            contract, model, plan_request["beam_width"], plan_request["world_size"],
+            row_limit=plan_request["row_limit"],
+        )
+        expected_environment = (
+            {} if plan["configured_row_budget"] == 8192
+            else {"BEAM_B_MICRO": str(plan["configured_row_budget"])}
+        )
+        if environment != expected_environment or metadata != expected_plan:
+            raise AssertionError(
+                f"public microbatch preparation ignored the Rust plan: "
+                f"expected={expected_environment, expected_plan}, actual={environment, metadata}"
+            )
+finally:
+    device_backend._resolve_microbatch_plan_python = _python_plan
+
+class OlderMicrobatchRuntime:
+    pass
+
+_python_environment, _python_metadata = device_backend.microbatch_environment(
+    SimpleNamespace(move_count=12),
+    SimpleNamespace(backend="mlp", manifest={"output_dim": 1}),
+    1, 2, row_limit=8192,
+)
+with __import__("unittest").mock.patch.object(
+    microbatch_rust_control, "extension", return_value=OlderMicrobatchRuntime()
+):
+    device_backend._resolve_microbatch_plan_python = _python_plan
+    legacy_environment, legacy_metadata = device_backend.microbatch_environment(
+        SimpleNamespace(move_count=12),
+        SimpleNamespace(backend="mlp", manifest={"output_dim": 1}),
+        1, 2, row_limit=8192,
+    )
+if legacy_environment != _python_environment or legacy_metadata != _python_metadata:
+    raise AssertionError("old-wheel microbatch fallback changed behavior")
+print("INSTALLED_RUST_MICROBATCH_PLAN_PASS", flush=True)
+
 module = importlib.import_module("multigpubeamsearch._beam_runtime")
 module_path = assert_installed(module.__file__, "Rust extension")
 package_path = assert_installed(package.__file__, "multigpubeamsearch")
