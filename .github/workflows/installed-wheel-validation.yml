@@ -205,9 +205,9 @@ jobs:
       - name: Summarize synthetic CNOT Gloo lifecycle diagnostic
         if: always()
         env:
-          RUNNER_TEMP: \${{ runner.temp }}
+          RUNNER_TEMP: ${{ runner.temp }}
         run: |
-          python - "\${RUNNER_TEMP}" <<'PY'
+          python - "${RUNNER_TEMP}" <<'PY'
           import json
           from pathlib import Path
           import sys
