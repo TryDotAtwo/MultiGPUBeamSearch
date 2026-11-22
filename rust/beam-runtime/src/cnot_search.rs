@@ -437,7 +437,7 @@ mod tests {
         assert!(request.audit);
         assert_eq!(request.validation, CnotValidation::Auto);
         assert_eq!(request.requested_engine, RequestedEngine::Auto);
-        assert_eq!(request.selected_engine(), Ok(SelectedEngine::Rust));
+        assert_eq!(request.selected_engine(), SelectedEngine::Rust);
     }
 
     #[test]
