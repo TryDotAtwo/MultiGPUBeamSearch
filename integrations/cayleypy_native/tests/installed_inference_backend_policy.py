@@ -7,7 +7,6 @@ import tempfile
 from types import SimpleNamespace
 from unittest.mock import patch
 
-
 from multigpubeamsearch.errors import NativeUnavailable
 from multigpubeamsearch.rust_control import extension
 
@@ -70,11 +69,17 @@ reject(request("auto", "mlp", "fp16", 8, []),
        "inference backend selection requires at least one GPU")
 
 
-# Exercise the normal preparation path with mocked CUDA observations and runner
-# construction. The installed Rust resolver must select libtorch for the T4.
-import torch
 from multigpubeamsearch import backend, build, rust_control
-from multigpubeamsearch.options import NativeOptions
+import torch
+
+unsupported = request("auto", "mlp", "bf16", 8, [(79, "NVIDIA test GPU")])
+try:
+    backend._resolve_inference_backend(unsupported)
+except NativeUnavailable as error:
+    if "native BF16 Stream1 requires SM80+" not in str(error):
+        raise AssertionError(f"Rust policy error did not reach the public capability boundary: {error}") from error
+else:
+    raise AssertionError("unsupported backend capabilities did not raise NativeUnavailable")
 
 
 class FakeContract:
@@ -94,6 +99,19 @@ if legacy_route != "libtorch":
     raise AssertionError("the compatibility resolver changed behavior for an older wheel")
 
 
+class PolicyProbe:
+    ABI_VERSION = 1
+    InferenceCalibration = object()
+
+    def __init__(self):
+        self.requests = []
+
+    def resolve_inference_backend(self, payload):
+        self.requests.append(json.loads(payload))
+        return "libtorch"
+
+
+policy_probe = PolicyProbe()
 selected = []
 
 
@@ -108,15 +126,20 @@ with tempfile.TemporaryDirectory(prefix="beam-inference-policy-") as temporary:
         backend="mlp",
         manifest={"dtype": "fp16", "output_dim": 8},
     )
-    options = NativeOptions(cache_dir=root / "cache", inference_backend="auto")
+    options = backend.NativeOptions(cache_dir=root / "cache", inference_backend="auto")
     with (
-        patch.object(torch.cuda, "get_device_capability", return_value=(7, 5)),
-        patch.object(torch.cuda, "get_device_name", return_value="Tesla T4"),
+        patch.object(rust_control, "extension", return_value=policy_probe),
+        patch.object(torch.cuda, "get_device_capability", return_value=(8, 0)),
+        patch.object(torch.cuda, "get_device_name", return_value="NVIDIA A100"),
         patch.object(build, "ensure_runner", side_effect=fake_ensure_runner),
     ):
         prepared = backend.prepare_runtime(
             FakeContract(), model, options, root / "run", (0,)
         )
+    if len(policy_probe.requests) != 1:
+        raise AssertionError(f"prepare_runtime did not call the Rust policy exactly once: {policy_probe.requests}")
+    if policy_probe.requests[0]["devices"] != [{"sm": 80, "name": "NVIDIA A100"}]:
+        raise AssertionError(f"Rust policy received the wrong device observation: {policy_probe.requests[0]}")
     if selected != ["libtorch"]:
         raise AssertionError(f"prepare_runtime did not use the Rust policy result: {selected}")
     if prepared.profile.get("inference_backend") != "libtorch":

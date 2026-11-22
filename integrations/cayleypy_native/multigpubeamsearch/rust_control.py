@@ -185,6 +185,34 @@ def _native_options_supported(options):
     return True
 
 
+def resolve_inference_backend(request):
+    """Resolve the prepared permutation runner in Rust when the wheel supports it.
+
+    Return None only for a missing/older extension so the public adapter can
+    preserve the historical Python policy on previously installed wheels.
+    """
+    if type(request) is not dict:
+        raise NativeUnavailable("inference backend request must be an object")
+    try:
+        payload = json.dumps(request, sort_keys=True, allow_nan=False)
+    except (TypeError, ValueError, OverflowError) as error:
+        raise NativeUnavailable("inference backend request is not JSON-compatible") from error
+    try:
+        native = extension()
+    except (NativeUnavailable, ImportError):
+        return None
+    resolver = getattr(native, "resolve_inference_backend", None)
+    if not callable(resolver):
+        return None
+    try:
+        selected = resolver(payload)
+    except (RuntimeError, ValueError) as error:
+        raise NativeUnavailable(str(error)) from error
+    if selected not in ("libtorch", "cutlass"):
+        raise NativeUnavailable("Rust runtime returned an invalid inference backend")
+    return selected
+
+
 def validate_options(options):
     """Validate public options in beam-core when the matching API is present."""
     if not _native_options_supported(options):

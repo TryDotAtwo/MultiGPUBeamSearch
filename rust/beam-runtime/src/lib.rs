@@ -15,6 +15,7 @@ pub mod frontier_job;
 mod frontier_native;
 pub mod history;
 pub mod inference;
+pub mod inference_backend;
 pub mod inference_admission;
 pub mod inference_job;
 pub mod inference_tuning;

@@ -109,6 +109,22 @@ jobs:
           cd "$RUNNER_TEMP/mgbs-wheel-smoke"
           env -u PYTHONPATH python "$GITHUB_WORKSPACE/integrations/cayleypy_native/tests/installed_inference_backend_policy.py" \
             > "${RUNNER_TEMP}/mgbs-private-inference-backend-policy.log" 2>&1
+      - name: Verify Rust inference backend policy
+        id: rust_inference_backend_runtime
+        run: |
+          set -o pipefail
+          cargo test --locked -p beam-runtime --test inference_backend_policy \
+            > "${RUNNER_TEMP}/mgbs-private-inference-backend-rust.log" 2>&1
+      - name: Upload inference backend policy logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: inference-backend-policy-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/mgbs-private-inference-backend-policy.log
+            ${{ runner.temp }}/mgbs-private-inference-backend-rust.log
+          if-no-files-found: warn
+          retention-days: 7
       - name: Verify installed scheduler worker and Rust rank supervisor
         id: cluster_worker_installed
         env:

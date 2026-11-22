@@ -164,6 +164,44 @@ def validate_touch_bfs_contract(contract, radius: int, max_entries: int) -> int:
     return touch_bfs_worst_case_entries(contract.move_count, radius, max_entries)
 
 
+def _resolve_inference_backend_python(request):
+    """Compatibility policy for extensions built before Rust owns this choice."""
+    requested = request["requested"]
+    model_backend = request["model_backend"]
+    output_dim = request["output_dim"]
+    devices = request["devices"]
+    if requested not in ("auto", "libtorch", "cutlass"):
+        raise NativeUnavailable("inference_backend must be auto, libtorch, or cutlass")
+    if requested == "cutlass" and model_backend == "mlp" and output_dim != 1 and output_dim % 8:
+        raise NativeUnavailable("native MLP Q-head output_dim must be a multiple of 8 for CUTLASS row alignment; scalar output_dim=1 is supported")
+    if not devices:
+        raise NativeUnavailable("inference backend selection requires at least one GPU")
+    if request.get("dtype") == "bf16" and any(device["sm"] < 80 for device in devices):
+        raise NativeUnavailable("native BF16 Stream1 requires SM80+ on every selected GPU; use FP16 on SM75")
+    if request.get("dtype") == "fp16" and any(device["sm"] < 75 for device in devices):
+        raise NativeUnavailable("this native FP16 MLP backend uses SM75+ TensorOp kernels; older GPU executors need a separate adapter")
+    executor = requested
+    if executor == "auto":
+        older_ensemble = model_backend == "ensemble" and any(device["sm"] < 80 for device in devices)
+        has_t4 = any("T4" in device["name"].split() for device in devices)
+        executor = "libtorch" if older_ensemble or has_t4 else "cutlass"
+    if model_backend == "ensemble" and executor == "cutlass" and any(device["sm"] < 80 for device in devices):
+        raise NativeUnavailable("ensemble CUTLASS requires SM80+ on every selected GPU")
+    if executor == "cutlass" and model_backend == "mlp" and output_dim != 1 and output_dim % 8:
+        raise NativeUnavailable("native MLP Q-head output_dim must be a multiple of 8 for CUTLASS row alignment; scalar output_dim=1 is supported")
+    return executor
+
+
+def _resolve_inference_backend(request):
+    """Use the Rust runtime policy; retain a Python policy only for old wheels."""
+    from .rust_control import resolve_inference_backend
+
+    selected = resolve_inference_backend(request)
+    if selected is not None:
+        return selected
+    return _resolve_inference_backend_python(request)
+
+
 def prepare_runtime(contract, model, options, run_dir, devices, *,
                     touch_bfs_radius: int | None = None, nccl_digest_cache=None) -> PreparedRuntime:
     """Resolve/build before dispatch closes its capability fallback window."""
@@ -179,25 +217,31 @@ def prepare_runtime(contract, model, options, run_dir, devices, *,
         raise NativeUnavailable("native MLP Q-head output_dim must be a multiple of 8 for CUTLASS row alignment; scalar output_dim=1 is supported")
     import torch
     try:
-        architectures = tuple(sorted({major * 10 + minor for major, minor in
-                                      (torch.cuda.get_device_capability(d) for d in devices)}))
+        device_sms = tuple(
+            major * 10 + minor
+            for major, minor in (torch.cuda.get_device_capability(d) for d in devices)
+        )
     except (RuntimeError, AssertionError) as exc:
         raise NativeUnavailable(f"cannot inspect requested native CUDA architecture: {exc}") from exc
-    if model.manifest.get("dtype") == "bf16" and any(sm < 80 for sm in architectures):
-        raise NativeUnavailable("native BF16 Stream1 requires SM80+ on every selected GPU; use FP16 on SM75")
-    if model.manifest.get("dtype") == "fp16" and any(sm < 75 for sm in architectures):
-        raise NativeUnavailable("this native FP16 MLP backend uses SM75+ TensorOp kernels; older GPU executors need a separate adapter")
-    executor = options.inference_backend
-    if executor == "auto":
-        # One runner implementation per job. A mixed T4/newer set uses
-        # LibTorch on all ranks; never send a T4 to the newer-only route.
-        older_ensemble = model.backend == "ensemble" and any(sm < 80 for sm in architectures)
-        executor = "libtorch" if older_ensemble or any("T4" in torch.cuda.get_device_name(d).split() for d in devices) else "cutlass"
-    if model.backend == "ensemble" and executor == "cutlass" and any(sm < 80 for sm in architectures):
-        raise NativeUnavailable("ensemble CUTLASS requires SM80+ on every selected GPU")
+    architectures = tuple(sorted(set(device_sms)))
+    device_names = None
+    if options.inference_backend == "auto":
+        device_names = tuple(torch.cuda.get_device_name(d) for d in devices)
+    request = {
+        "requested": options.inference_backend,
+        "model_backend": model.backend,
+        "dtype": model.manifest.get("dtype"),
+        "output_dim": model.manifest["output_dim"],
+        "devices": [
+            {
+                "sm": sm,
+                "name": "" if device_names is None else device_names[index],
+            }
+            for index, sm in enumerate(device_sms)
+        ],
+    }
+    executor = _resolve_inference_backend(request)
     options = replace(options, inference_backend=executor)
-    if executor == "cutlass" and model.backend == "mlp" and model.manifest["output_dim"] != 1 and model.manifest["output_dim"] % 8:
-        raise NativeUnavailable("native MLP Q-head output_dim must be a multiple of 8 for CUTLASS row alignment; scalar output_dim=1 is supported")
     from .build import ensure_runner
     run_dir = Path(run_dir).resolve()
     run_dir.mkdir(parents=True, exist_ok=True)
@@ -206,9 +250,11 @@ def prepare_runtime(contract, model, options, run_dir, devices, *,
     else:
         runner, metadata = ensure_runner(contract, model, options, architectures, run_dir,
                                          nccl_digest_cache=nccl_digest_cache)
+    if device_names is None:
+        device_names = tuple(torch.cuda.get_device_name(d) for d in devices)
     profile = {"policy": "libtorch-conservative-v1" if executor == "libtorch" else "cutlass-default-v1",
                "inference_backend": executor, "inference_row_limit": 2048 if executor == "libtorch" else 8192,
-               "cuda_architectures": list(architectures), "gpu_names": [torch.cuda.get_device_name(d) for d in devices],
+               "cuda_architectures": list(architectures), "gpu_names": list(device_names),
                "memory_planning": "native_auto", "autotuned": False}
     return PreparedRuntime(runner, metadata, architectures, profile)
 

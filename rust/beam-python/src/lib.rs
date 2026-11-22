@@ -17,6 +17,7 @@ mod cnot_tqp_scorer;
 mod cnot_stream5;
 mod configuration;
 mod inference;
+mod inference_backend;
 mod interrupt;
 mod mlp_snapshot;
 mod pipeline;
@@ -148,6 +149,7 @@ fn _beam_runtime(module: &Bound<'_, PyModule>) -> PyResult<()> {
     planning::register(module)?;
     pipeline::register(module)?;
     inference::register(module)?;
+    inference_backend::register(module)?;
     search_session::register(module)?;
     shared_profiles::register(module)?;
     configuration::register(module)?;
