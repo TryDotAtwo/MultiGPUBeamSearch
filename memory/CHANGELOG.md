@@ -1,11 +1,11 @@
 ## 2026-11-22 - Reuse panel-v2 producer checks by exact inputs
 
-- The required producer-compatibility status runs on every PR update. Cheap CPU contract checks run first; docs, logs and unrelated components do not reinstall Torch or rebuild the pinned producer adapter when the exact adapter/fixture/pin fingerprint already passed.
+- The required producer-compatibility status runs on every PR update. It reuses the latest full check for the same adapter, fixture, producer pins and runner environment on this PR or its own branch. A fresh build runs the cheap CPU contracts before installing Torch and compiling the adapter.
 - A prior failure for the same fingerprint remains a failure; missing or changed inputs run the complete pinned producer check. Manual dispatch always runs the full check.
 - The consumer accepts producer source revisions 42ed72f587ab70fc74a85cf0a25001efb29cb994 and legacy 7310b1eb5ec07c76c131ba8c60b105ff4aad7a9c through a source-to-emitter-ABI pin map; unsupported revisions and mismatched ABI hashes fail closed. The pinned emitter function hash is unchanged across these two revisions.
 - The installed public verifier now uses the resolved frontier expansion bound instead of reloading the resolver. Its CPU wheel regression exercises two distinguishable panels, including a receipt emitted by the current producer, and checks actual roots, scorer manifest, pinned B/K/D passed to search, and independent replay.
 - Removed the redundant shell-level manifest rehash. The preflight pins are compared at runtime by the public verifier, and the native scorer still validates the manifest against its expected SHA.
-- The workflow uploads the small redacted input/status record and CPU test logs as separate Actions artifacts. The installed-wheel workflow uploads the synthetic endpoint output. No GPU or paid compute was used.
+- Each full check records its outcome once. A cache hit creates no entry or artifact. A failed full check uploads native diagnostics when available. The installed-wheel workflow uploads the synthetic endpoint output. No GPU or paid compute was used.
 
 ## 2026-11-22 - Correct CNOT test fixture expectations
 
