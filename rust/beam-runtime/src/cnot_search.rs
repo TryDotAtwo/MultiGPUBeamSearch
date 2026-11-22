@@ -43,6 +43,8 @@ pub enum CnotRequestError {
     Engine,
     #[error("CNOT validation must be auto, python, or rust")]
     Validation,
+    #[error("invalid CNOT search geometry")]
+    Geometry,
     #[error(transparent)]
     Controls(#[from] beam_core::cnot::SearchControlsError),
 }
@@ -127,11 +129,42 @@ impl CnotRequest {
         }
     }
 
+    /// Bind the validated task controls to the rank topology before any
+    /// backend admission or stage allocation starts.
+    pub fn bind_rank(self, rank: u32, world: u32) -> Result<RankedCnotRequest, CnotRequestError> {
+        if world == 0 || rank >= world || world > 65536 {
+            return Err(CnotRequestError::Geometry);
+        }
+        Ok(RankedCnotRequest {
+            task: self,
+            rank,
+            world,
+        })
+    }
+
     pub fn selected_engine(self) -> SelectedEngine {
         match self.requested_engine {
             RequestedEngine::Python => SelectedEngine::Python,
             RequestedEngine::Auto | RequestedEngine::Rust => SelectedEngine::Rust,
         }
+    }
+}
+
+/// One validated task bound to its rank in the active distributed world.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RankedCnotRequest {
+    pub task: CnotRequest,
+    pub rank: u32,
+    pub world: u32,
+}
+
+impl RankedCnotRequest {
+    pub fn search_options(self) -> Options {
+        self.task.search_options(self.rank, self.world)
+    }
+
+    pub fn selected_engine(self) -> SelectedEngine {
+        self.task.selected_engine()
     }
 }
 
