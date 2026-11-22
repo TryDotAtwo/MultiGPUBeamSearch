@@ -558,3 +558,67 @@ def test_installed_rust_model_environment_controls_public_permutation_launch_and
         backend.search_model_environment(
             ensemble, runtime, graph_hash="b" * 64, mlp_host_binding=False
         )
+
+
+def test_installed_rust_search_policy_environment_controls_public_launch_and_fallback(monkeypatch):
+    from types import SimpleNamespace
+    from multigpubeamsearch import backend, rust_control
+    from multigpubeamsearch.errors import NativeUnavailable
+
+    native_resolver = rust_control.resolve_search_policy_environment
+    python_fallback = backend._search_policy_environment_python
+    observed = []
+
+    def observe(request):
+        observed.append(dict(request))
+        return native_resolver(request)
+
+    def forbidden(*_args, **_kwargs):
+        pytest.fail("installed Rust search policy path fell back to Python")
+
+    monkeypatch.setattr(rust_control, "resolve_search_policy_environment", observe)
+    monkeypatch.setattr(backend, "_search_policy_environment_python", forbidden)
+    collect = SimpleNamespace(
+        solution_mode="collect",
+        collect_extra_depths=4,
+        max_collected_solutions=123,
+    )
+    assert backend.search_policy_environment(collect) == {
+        "BEAM_SOLVE_BUCKET_MODE": "1",
+        "BEAM_SOLVE_BUCKET_EXTRA_DEPTHS": "4",
+        "BEAM_SOLVE_BUCKET_MAX_SOLUTIONS": "123",
+        "BEAM_SOLVE_BUCKET_RESULT_TSV": "collected-solutions.tsv",
+    }
+    assert observed == [{
+        "solution_mode": "collect",
+        "collect_extra_depths": 4,
+        "max_collected_solutions": 123,
+    }]
+    with pytest.raises(NativeUnavailable, match="solution_mode must be first or collect"):
+        rust_control.resolve_search_policy_environment({
+            "solution_mode": "invalid",
+            "collect_extra_depths": 4,
+            "max_collected_solutions": 123,
+        })
+
+    first = SimpleNamespace(
+        solution_mode="first",
+        collect_extra_depths=1,
+        max_collected_solutions=2000,
+    )
+    monkeypatch.setattr(rust_control, "resolve_search_policy_environment", lambda _request: None)
+    monkeypatch.setattr(backend, "_search_policy_environment_python", python_fallback)
+    assert backend.search_policy_environment(first) == {
+        "BEAM_SOLVE_BUCKET_MODE": "0",
+        "BEAM_SOLVE_BUCKET_EXTRA_DEPTHS": "1",
+        "BEAM_SOLVE_BUCKET_MAX_SOLUTIONS": "2000",
+        "BEAM_SOLVE_BUCKET_RESULT_TSV": "collected-solutions.tsv",
+    }
+
+    def rejected(_request):
+        raise NativeUnavailable("incompatible Rust search policy environment")
+
+    monkeypatch.setattr(rust_control, "resolve_search_policy_environment", rejected)
+    with pytest.raises(NativeUnavailable, match="incompatible Rust search policy environment"):
+        backend.search_policy_environment(first)
+

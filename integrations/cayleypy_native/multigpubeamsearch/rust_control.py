@@ -403,6 +403,47 @@ def resolve_search_model_environment(request):
     return result
 
 
+def resolve_search_policy_environment(request):
+    """Resolve fixed solution collection variables through beam-runtime."""
+    if type(request) is not dict:
+        return None
+    try:
+        payload = json.dumps(request, sort_keys=True, allow_nan=False)
+    except (TypeError, ValueError, OverflowError):
+        return None
+    try:
+        native = extension()
+    except (NativeUnavailable, ImportError):
+        return None
+    resolver = getattr(native, "resolve_search_policy_environment", None)
+    if not callable(resolver):
+        return None
+    if getattr(native, "CLUSTER_SEARCH_POLICY_ENVIRONMENT_VERSION", None) != 1:
+        raise NativeUnavailable("Rust search policy environment API version is incompatible")
+    try:
+        encoded = resolver(payload)
+    except (RuntimeError, ValueError, TypeError, OverflowError) as error:
+        raise NativeUnavailable(str(error)) from error
+    if type(encoded) is not str:
+        raise NativeUnavailable("Rust runtime returned an invalid search policy environment")
+    try:
+        result = json.loads(encoded)
+    except (TypeError, ValueError) as error:
+        raise NativeUnavailable("Rust runtime returned malformed search policy environment JSON") from error
+    allowed = {
+        "BEAM_SOLVE_BUCKET_MODE",
+        "BEAM_SOLVE_BUCKET_EXTRA_DEPTHS",
+        "BEAM_SOLVE_BUCKET_MAX_SOLUTIONS",
+        "BEAM_SOLVE_BUCKET_RESULT_TSV",
+    }
+    if not isinstance(result, dict) or any(
+        type(name) is not str or type(value) is not str or name not in allowed
+        for name, value in result.items()
+    ) or set(result) != allowed:
+        raise NativeUnavailable("Rust runtime returned an invalid search policy environment")
+    return result
+
+
 def resolve_child_environment(environment, devices, nccl_id_file):
     """Build the filtered native child environment in beam-runtime when supported."""
     if type(environment) is not dict or any(

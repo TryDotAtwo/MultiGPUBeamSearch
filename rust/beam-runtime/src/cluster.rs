@@ -473,6 +473,53 @@ pub fn search_model_environment(
     Ok(environment)
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SearchPolicyEnvironmentRequest {
+    pub solution_mode: String,
+    pub collect_extra_depths: u32,
+    pub max_collected_solutions: u64,
+}
+
+/// Build the fixed solution collection policy passed to the permutation runner.
+pub fn search_policy_environment(
+    request: &SearchPolicyEnvironmentRequest,
+) -> Result<BTreeMap<String, String>> {
+    let solve_bucket_mode = match request.solution_mode.as_str() {
+        "first" => "0",
+        "collect" => "1",
+        _ => {
+            return Err(ClusterError::Invalid(
+                "solution_mode must be first or collect".into(),
+            ))
+        }
+    };
+    if !(1..=1_000_000).contains(&request.max_collected_solutions) {
+        return Err(ClusterError::Invalid(
+            "max_collected_solutions must be between 1 and 1000000".into(),
+        ));
+    }
+
+    Ok([
+        ("BEAM_SOLVE_BUCKET_MODE", solve_bucket_mode.to_string()),
+        (
+            "BEAM_SOLVE_BUCKET_EXTRA_DEPTHS",
+            request.collect_extra_depths.to_string(),
+        ),
+        (
+            "BEAM_SOLVE_BUCKET_MAX_SOLUTIONS",
+            request.max_collected_solutions.to_string(),
+        ),
+        (
+            "BEAM_SOLVE_BUCKET_RESULT_TSV",
+            "collected-solutions.tsv".into(),
+        ),
+    ]
+    .into_iter()
+    .map(|(key, value)| (key.into(), value))
+    .collect())
+}
+
 pub struct Request {
     pub command: Vec<String>,
     /// Executable lookup and Python pathlib resolution preserve existing Python semantics.

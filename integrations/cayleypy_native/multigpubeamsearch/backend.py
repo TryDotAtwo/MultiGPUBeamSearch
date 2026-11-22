@@ -776,6 +776,31 @@ def run_native(contract, model, options, beam_width, max_steps, run_dir, devices
     return _run_native_once(contract,model,options,beam_width,max_steps,run_dir,devices,runtime=runtime)
 
 
+def _search_policy_environment_python(options):
+    """Compatibility policy for extensions built before Rust owned these values."""
+    return {
+        "BEAM_SOLVE_BUCKET_MODE": str(int(options.solution_mode == "collect")),
+        "BEAM_SOLVE_BUCKET_EXTRA_DEPTHS": str(options.collect_extra_depths),
+        "BEAM_SOLVE_BUCKET_MAX_SOLUTIONS": str(options.max_collected_solutions),
+        "BEAM_SOLVE_BUCKET_RESULT_TSV": "collected-solutions.tsv",
+    }
+
+
+def search_policy_environment(options):
+    """Resolve fixed solution collection controls through the installed Rust runtime."""
+    request = {
+        "solution_mode": options.solution_mode,
+        "collect_extra_depths": options.collect_extra_depths,
+        "max_collected_solutions": options.max_collected_solutions,
+    }
+    from .rust_control import resolve_search_policy_environment
+
+    native = resolve_search_policy_environment(request)
+    if native is not None:
+        return native
+    return _search_policy_environment_python(options)
+
+
 def _verify_mlp_host_binding(run_dir, artifact_hash, world):
     """Require one receipt from each worker's own startup log."""
     expected = f"BEAM_MLP_ARTIFACT_VERIFIED={artifact_hash}"
@@ -1037,10 +1062,7 @@ def _run_native_once(contract, model, options, beam_width, max_steps, run_dir, d
         })
     args = [str(runner), "0", str(forward_depth_limit), str(beam_width)]
     # Apply search policy only after calibration: probes must not collect solutions.
-    env.update(BEAM_SOLVE_BUCKET_MODE=str(int(options.solution_mode == 'collect')),
-               BEAM_SOLVE_BUCKET_EXTRA_DEPTHS=str(options.collect_extra_depths),
-               BEAM_SOLVE_BUCKET_MAX_SOLUTIONS=str(options.max_collected_solutions),
-               BEAM_SOLVE_BUCKET_RESULT_TSV='collected-solutions.tsv')
+    env.update(search_policy_environment(options))
     if calibrate:env['BEAM_RUNTIME_DEPTH_TIMING']='1'
     log = run_dir / "native.log"
     process_log = log
