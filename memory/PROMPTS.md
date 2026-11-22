@@ -1,3 +1,5 @@
+2026-11-22: Prioritize completing the public permutation beam-search Rust + CUDA/C++ path, including preparation and launch. Preserve multi-GPU, Python/Kaggle, CLI, torchrun/Slurm, current kernels, algorithm and numerical policy. Keep existing CNOT code and compatibility, but defer CNOT changes, checkpoint preparation and CNOT acceptance; require a separate physical 1/2-GPU CUDA/NCCL permutation check under current resource limits.
+
 2026-11-22: Продолжить Rust-перенос permutation без оптимизаций: перенести существующую формулу inference microbatch в beam-runtime, подключить её к публичному helper, оставить Python fallback только для старых wheel и проверить фактический installed-wheel путь на CPU; физические/платные запуски запрещены.
 
 2026-11-22: Иван поручил закрыть producer→consumer panel-v2 несовпадение: принимать receipt source revision `eafc0f82f088603a525f428a8fa3d00e9e702fa8` только с точным emitter ABI, сохранить старые закреплённые receipts и проверить реальный producer serializer через consumer resolver на hosted CPU. Без платных запусков и GPU.

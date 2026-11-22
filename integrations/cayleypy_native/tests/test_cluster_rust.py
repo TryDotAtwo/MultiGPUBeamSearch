@@ -294,7 +294,7 @@ def test_public_cuda_ordinal_uses_rust_and_preserves_legacy_fallback(monkeypatch
         cluster.ScheduledRank(1, 0, 1, 2, 2).cuda_ordinal(2)
 
 
-def test_installed_rust_cuda_visibility_drives_child_environment_and_fallback(monkeypatch):
+def test_installed_rust_cuda_visibility_drives_public_mapping_and_fallback(monkeypatch):
     from multigpubeamsearch import backend, rust_control
 
     native_resolver = rust_control.resolve_cuda_visibility
@@ -317,20 +317,18 @@ def test_installed_rust_cuda_visibility_drives_child_environment_and_fallback(mo
         "RANK": "3",
         "NCCL_DEBUG": "TRACE",
     }
-    env = backend.child_environment((2, 0), Path("/rank"), source)
-    assert env["CUDA_VISIBLE_DEVICES"] == "GPU-c,GPU-a"
-    assert env["CUDA_DEVICE_ORDER"] == "PCI_BUS_ID"
-    assert "RANK" not in env and "NCCL_DEBUG" not in env
+    mapped = backend.cuda_visibility((2, 0), source)
+    assert mapped == "GPU-c,GPU-a"
     assert observed == [((2, 0), source["CUDA_VISIBLE_DEVICES"])]
 
     monkeypatch.setattr(rust_control, "resolve_cuda_visibility", lambda *_args: None)
     monkeypatch.setattr(backend, "_cuda_visibility_python", python_fallback)
-    legacy = backend.child_environment((1, 1), Path("/legacy"), source)
-    assert legacy["CUDA_VISIBLE_DEVICES"] == "GPU-b,GPU-b"
+    legacy = backend.cuda_visibility((1, 1), source)
+    assert legacy == "GPU-b,GPU-b"
 
     monkeypatch.setattr(rust_control, "resolve_cuda_visibility", native_resolver)
     with pytest.raises(NativeUnavailable, match="cannot map selected devices"):
-        backend.child_environment((1,), Path("/invalid"), {
+        backend.cuda_visibility((1,), {
             "CUDA_VISIBLE_DEVICES": "GPU-a,-1",
         })
 

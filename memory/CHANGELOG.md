@@ -1,3 +1,9 @@
+## 2026-11-22 - Test child CUDA mapping at its public boundary
+
+- Kept the installed-wheel CUDA visibility test focused on the direct mapping helper now that the public child launcher uses the combined Rust child-environment plan.
+- The end-to-end child environment test continues to verify the installed Rust resolver, filtering, selected CUDA mask, NCCL path, legacy fallback and error behavior.
+- The current migration phase prioritizes permutation search; CNOT code and compatibility remain preserved while CNOT-specific development and acceptance are deferred.
+
 ## 2026-11-22 - Move public cluster planning into beam-runtime
 
 - The public multi-node `plan_cluster` adapter now delegates block rank placement, exact beam capacity and aligned shard geometry to a typed Rust plan.

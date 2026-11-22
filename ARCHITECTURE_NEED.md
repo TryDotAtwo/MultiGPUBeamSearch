@@ -1,3 +1,7 @@
+## Current migration priority — 2026-11-22
+
+The active implementation phase prioritizes the public permutation beam-search path through Rust preparation and launch while preserving the existing CUDA/C++ kernels, multi-GPU execution, numerical policy, Python/Kaggle interfaces, CLI, torchrun and Slurm. CNOT implementation and compatibility remain in the branch; further CNOT changes, private checkpoint preparation and CNOT-specific physical acceptance are deferred at the user's request. Permutation CUDA/NCCL acceptance on one and two physical GPUs remains its own required gate.
+
 ## Rust-owned public cluster planning — 2026-11-22
 
 The public `plan_cluster` adapter now sends the validated per-node GPU counts, global beam width, shard count and batch alignment to `beam-runtime`. Rust returns the same ordered global/node/local rank mapping, exact global beam, per-rank frontier capacity and alignment. Python preserves the public dataclasses and validation errors, and uses the existing calculation only when an older extension does not export the resolver.
