@@ -142,6 +142,8 @@ jobs:
           with open(log_path, "w", encoding="utf-8") as stream:
               result = unittest.TextTestRunner(stream=stream, verbosity=2).run(suite)
           failed = [test for test, _ in result.failures + result.errors]
+          for test in failed:
+              print(f"cnot_handoff_endpoint_failed_test={test.id()}")
           if result.wasSuccessful():
               status = "passed"
           else:
