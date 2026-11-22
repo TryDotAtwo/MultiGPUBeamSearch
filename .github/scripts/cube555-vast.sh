@@ -80,20 +80,6 @@ printf 'Vast lease %s (%s)\n' "$id" "$label"
 jq -n --argjson id "$id" --arg label "$label" '{instance_id:$id,label:$label}' \
     > "$evidence/lease.json"
 
-if [[ -n "${CUBE555_STALLED_RUN:-}" ]]; then
-    gh_run="repos/$GITHUB_REPOSITORY/actions/runs/$CUBE555_STALLED_RUN"
-    status="$(gh api "$gh_run" --jq .status)"
-    if [[ "$status" != completed ]]; then
-        gh api --method POST "$gh_run/cancel" >/dev/null || true
-        for attempt in {1..15}; do
-            status="$(gh api "$gh_run" --jq .status)"
-            [[ "$status" == completed ]] && break
-            sleep 8
-        done
-    fi
-    [[ "$status" == completed ]] || { echo 'Previous transfer is still running.' >&2; exit 1; }
-fi
-
 request="$(jq -cn --arg ssh_key "$(cat "$key.pub")" '{ssh_key:$ssh_key}')"
 curl --fail --silent --show-error --max-time 25 --retry 3 --retry-all-errors \
     --retry-delay 5 -X POST -H "Authorization: Bearer ${VAST_API_KEY}" \
@@ -106,7 +92,7 @@ while (( $(date +%s) < deadline )); do
     if row="$(list_instances | find_lease)" &&
         jq -e --argjson id "$id" '.id == $id and .actual_status == "running"' \
             >/dev/null <<< "$row"; then
-        for transport in proxy direct; do
+        for transport in direct proxy; do
             if [[ "$transport" == proxy ]]; then
                 host="$(jq -r '.ssh_host // empty' <<< "$row")"
                 port="$(jq -r '.ssh_port // empty' <<< "$row")"
@@ -140,10 +126,24 @@ remote nvidia-smi topo -m | tee "$evidence/topology.txt"
 remote_dir=/root/cube555-egress
 remote "mkdir -p $remote_dir; if ! command -v unzip >/dev/null || ! command -v curl >/dev/null; then
     apt-get -qq update && apt-get -qq install -y --no-install-recommends unzip curl ca-certificates; fi"
+artifacts_path="repos/$GITHUB_REPOSITORY/actions/runs/$CUBE555_BUNDLE_RUN/artifacts"
+artifact=""
+for attempt in {1..60}; do
+    query='.artifacts[] | select(.name == "cube555-standalone-max-linux-x86_64-py311" and (.expired | not)) | .id'
+    artifact="$(gh api "$artifacts_path" --jq "$query")"
+    [[ "$artifact" =~ ^[0-9]+$ ]] && break
+    build_status="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$CUBE555_BUNDLE_RUN" --jq .status)"
+    if [[ "$build_status" == completed ]]; then
+        echo "The pinned build finished without a usable archive." >&2
+        exit 1
+    fi
+    sleep 10
+done
+[[ "$artifact" =~ ^[0-9]+$ ]]
 echo "Downloading the checked offline archive on the GPU node"
 location="$(curl --fail --silent --show-error --max-time 25 --dump-header - --output /dev/null \
     -H "Authorization: Bearer ${GH_TOKEN:?}" -H 'Accept: application/vnd.github+json' \
-    "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/artifacts/$CUBE555_BUNDLE_ARTIFACT/zip" \
+    "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/artifacts/$artifact/zip" \
     | awk 'tolower($1) == "location:" { sub(/\r$/, "", $2); print $2; exit }')"
 [[ "$location" == https://* && "$location" != *'"'* && "$location" != *\\* ]] || {
     echo 'GitHub did not issue an HTTPS download URL.' >&2

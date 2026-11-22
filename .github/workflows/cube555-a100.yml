@@ -9,10 +9,10 @@ on:
 
 permissions:
   contents: read
-  actions: write
+  actions: read
 
 concurrency:
-  group: cube555-standalone-vast-egress-61937382
+  group: cube555-standalone-vast-61941521
   cancel-in-progress: false
 
 jobs:
@@ -20,10 +20,9 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 250
     env:
-      CUBE555_BUNDLE_ARTIFACT: '14745697843'
-      CUBE555_LEASE_LABEL: cube555-a100-61937382-egress
-      CUBE555_EXISTING_INSTANCE_ID: '61937382'
-      CUBE555_STALLED_RUN: '45002634635'
+      CUBE555_BUNDLE_RUN: '45004373348'
+      CUBE555_LEASE_LABEL: cube555-a100-fast-20261122
+      CUBE555_EXISTING_INSTANCE_ID: '61941521'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -33,7 +32,7 @@ jobs:
         run: |
           bash -n .github/scripts/cube555-vast.sh
           bash -n .github/scripts/cube555-a100-host.sh
-      - name: Test cold and warm startup on the existing A100 lease
+      - name: Download from GitHub on the node and test cold and warm startup
         timeout-minutes: 215
         env:
           VAST_API_KEY: ${{ secrets.VAST_API_KEY }}
