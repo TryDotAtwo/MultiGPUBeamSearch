@@ -16,7 +16,9 @@ from typing import Any
 
 _SHA1 = re.compile(r"[0-9a-f]{40}\Z")
 _SHA256 = re.compile(r"[0-9a-f]{64}\Z")
-_HANDOFF_SCHEMA = "cnot103_multigpu_beam_handoff_v2"
+_HANDOFF_SCHEMA = "cnot103_multigpu_beam_handoff_v3"
+EXPECTED_PRODUCER_SOURCE_REVISION = "01eb7c8f85b89ec6814f7f326c3612c64d5d96d9"
+EXPECTED_PRODUCER_EMITTER_SHA256 = "2a6f579be0b1426a451aadf06709fa027b17eb7170f7b694d945acf81e070bf1"
 _RECEIPT_SCHEMA = "cnot103_learning_curve_campaign_v1"
 _SEARCH_SCHEMA = "cnot103_panel_search_v2"
 _RESULT_SCHEMA = "cnot103_training_result_v1"
@@ -45,6 +47,8 @@ class ResolvedPanelV2Handoff:
     training_manifest: Path
     training_result: Path
     search_manifest_sha256: str
+    baseline_search_manifest: Path
+    baseline_search_manifest_sha256: str
     training_manifest_sha256: str
     training_result_sha256: str
     producer_source_revision: str
@@ -278,6 +282,7 @@ def _validate_locked_comparison(
     dataset_sha: str,
     source_revision: str,
     search_sha: str,
+    baseline_search_sha: str,
     training_manifest_sha: str,
     training_result_sha: str,
     checkpoint_sha: str,
@@ -312,8 +317,7 @@ def _validate_locked_comparison(
                 or pins.get("training_manifest_sha256") is not None
                 or pins.get("training_result_sha256") is not None
                 or pins.get("checkpoint_sha256") is not None
-                or not isinstance(pins.get("search_manifest_sha256"), str)
-                or _SHA256.fullmatch(pins["search_manifest_sha256"]) is None
+                or pins.get("search_manifest_sha256") != baseline_search_sha
             ):
                 raise HandoffError("locked-test Hamming baseline pins differ from the producer run")
         elif (
@@ -371,6 +375,10 @@ def resolve_panel_v2_handoff(
         raise HandoffError("learning-curve receipt source revision differs from the handoff")
     if receipt.get("producer_emitter_sha256") != producer_emitter_sha256:
         raise HandoffError("learning-curve receipt producer emitter pin differs from the handoff")
+    if source_revision != EXPECTED_PRODUCER_SOURCE_REVISION:
+        raise HandoffError("producer source revision differs from the consumer pin")
+    if producer_emitter_sha256 != EXPECTED_PRODUCER_EMITTER_SHA256:
+        raise HandoffError("producer emitter differs from the consumer pin")
     if (
         handoff.get("schema") != _HANDOFF_SCHEMA
         or handoff.get("consumer") != "MultiGPUBeamSearch"
@@ -396,6 +404,9 @@ def resolve_panel_v2_handoff(
     )
     search_path, search_sha = _artifact(
         root, handoff.get("search_manifest"), "panel search manifest"
+    )
+    baseline_search_path, baseline_search_sha = _artifact(
+        root, handoff.get("baseline_search_manifest"), "baseline Hamming search manifest"
     )
 
     if (
@@ -484,6 +495,39 @@ def resolve_panel_v2_handoff(
         ids,
         panel_digest,
     )
+    baseline_manifest = _json_object(
+        baseline_search_path, "baseline Hamming search manifest"
+    )
+    baseline_dataset = baseline_manifest.get("dataset")
+    baseline_dataset_path = None
+    if isinstance(baseline_dataset, dict) and isinstance(baseline_dataset.get("path"), str):
+        candidate = Path(baseline_dataset["path"])
+        if not candidate.is_absolute():
+            candidate = baseline_search_path.parent / candidate
+        baseline_dataset_path = _inside_root(candidate, root, "baseline sealed dataset")
+    baseline_root_keys = (
+        "panel_index", "case_id", "dimension", "alphabet_id", "start_packed_rows"
+    )
+    expected_baseline_roots = [
+        {key: root_record[key] for key in baseline_root_keys}
+        for root_record in panel_roots
+    ]
+    if (
+        baseline_manifest.get("schema") != "cnot103_hamming_search_v1"
+        or baseline_manifest.get("source_revision") != source_revision
+        or baseline_dataset_path != dataset_path
+        or not isinstance(baseline_dataset, dict)
+        or baseline_dataset.get("sha256") != dataset_sha
+        or baseline_manifest.get("panel") != panel
+        or baseline_manifest.get("panel_indices") != indices
+        or baseline_manifest.get("panel_ids") != ids
+        or baseline_manifest.get("panel_digest") != panel_digest
+        or baseline_manifest.get("runtime_contract") != "native_device_search_v13"
+        or baseline_manifest.get("search") != search
+        or baseline_manifest.get("panel_roots") != expected_baseline_roots
+    ):
+        raise HandoffError("baseline Hamming manifest differs from the pinned locked-test panel")
+
     comparison = locked_test.get("comparison")
     status = handoff.get("locked_test_status")
     comparison_sha = handoff.get("locked_test_comparison_sha256")
@@ -507,6 +551,7 @@ def resolve_panel_v2_handoff(
         dataset_sha=dataset_sha,
         source_revision=source_revision,
         search_sha=search_sha,
+        baseline_search_sha=baseline_search_sha,
         training_manifest_sha=train_manifest_sha,
         training_result_sha=train_result_sha,
         checkpoint_sha=checkpoint_sha,
@@ -514,9 +559,11 @@ def resolve_panel_v2_handoff(
 
     return ResolvedPanelV2Handoff(
         search_manifest=search_path,
+        baseline_search_manifest=baseline_search_path,
         training_manifest=train_manifest_path,
         training_result=train_result_path,
         search_manifest_sha256=search_sha,
+        baseline_search_manifest_sha256=baseline_search_sha,
         training_manifest_sha256=train_manifest_sha,
         training_result_sha256=train_result_sha,
         producer_source_revision=source_revision,

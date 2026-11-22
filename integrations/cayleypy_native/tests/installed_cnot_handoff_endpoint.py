@@ -113,6 +113,10 @@ class InstalledHandoffEndpointTests(unittest.TestCase):
         self.assertEqual(report["panel_indices"], [3, 9])
         self.assertEqual(report["panel_ids"], ["locked-case-a", "locked-case-b"])
         self.assertEqual(report["panel_digest"], self.fixture.panel_digest)
+        self.assertEqual(
+            report["baseline_search_manifest_sha256"],
+            self.fixture.handoff["baseline_search_manifest"]["sha256"],
+        )
         self.assertEqual(report["head"], "qhat")
         self.assertEqual(report["search"], self.fixture.search)
         self.assertEqual(report["expansion_upper_bound"], 201)
@@ -231,6 +235,12 @@ class InstalledHandoffEndpointTests(unittest.TestCase):
                 handoff["locked_test_comparison_sha256"] = digest
             write_receipt(value)
 
+        def change_baseline_manifest_pin():
+            value = receipt_value()
+            for handoff in handoffs(value):
+                handoff["baseline_search_manifest"]["sha256"] = "f" * 64
+            write_receipt(value)
+
         def change_pinned_root():
             dataset = json.loads(self.fixture.dataset_path.read_text(encoding="utf-8"))
             dataset["panels"]["test"][3]["state"]["packed_rows"] = [1, 2]
@@ -246,6 +256,7 @@ class InstalledHandoffEndpointTests(unittest.TestCase):
             ("panel_order", permute_panel_ids),
             ("search_budget", change_budget_semantics),
             ("mixed_comparison", mix_locked_comparison),
+            ("baseline_manifest_pin", change_baseline_manifest_pin),
             ("pinned_root", change_pinned_root),
         )
         for name, mutate in cases:

@@ -41,7 +41,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: TryDotAtwo/cnot-neural-synth-frontier6
-          ref: 3a067abc608444dd1dfcf6522d523acf41968798
+          ref: 01eb7c8f85b89ec6814f7f326c3612c64d5d96d9
           path: cnot-emitter
           fetch-depth: 1
           persist-credentials: false
@@ -90,7 +90,7 @@ jobs:
         shell: bash
         env:
           CNOT103_PRODUCER_CHECKOUT: ${{ github.workspace }}/cnot-emitter
-          CNOT103_PRODUCER_SOURCE_SHA: 3a067abc608444dd1dfcf6522d523acf41968798
+          CNOT103_PRODUCER_SOURCE_SHA: 01eb7c8f85b89ec6814f7f326c3612c64d5d96d9
         run: |
           set -euo pipefail
           python3 - <<'PY'

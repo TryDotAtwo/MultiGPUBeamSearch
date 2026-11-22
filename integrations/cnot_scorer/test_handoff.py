@@ -10,7 +10,13 @@ import sys
 import tempfile
 import unittest
 
-from handoff import HandoffError, resolve_panel_v2_handoff, validate_search_contract
+from handoff import (
+    EXPECTED_PRODUCER_EMITTER_SHA256,
+    EXPECTED_PRODUCER_SOURCE_REVISION,
+    HandoffError,
+    resolve_panel_v2_handoff,
+    validate_search_contract,
+)
 
 
 def digest_bytes(data):
@@ -39,7 +45,7 @@ class PanelV2HandoffTests(unittest.TestCase):
 
         self.accepted_updates = 64
         self.checkpoint_sha = "c" * 64
-        self.producer_emitter_sha256 = "d" * 64
+        self.producer_emitter_sha256 = EXPECTED_PRODUCER_EMITTER_SHA256
         self.indices = [3, 9]
         self.case_ids = ["locked-case-a", "locked-case-b"]
         self.panel_digest = canonical_digest({
@@ -97,9 +103,9 @@ class PanelV2HandoffTests(unittest.TestCase):
             "paired_cost_delta": -1,
         }
         self.handoff = {
-            "schema": "cnot103_multigpu_beam_handoff_v2",
+            "schema": "cnot103_multigpu_beam_handoff_v3",
             "consumer": "MultiGPUBeamSearch",
-            "producer_source_revision": "e" * 40,
+            "producer_source_revision": EXPECTED_PRODUCER_SOURCE_REVISION,
             "producer_emitter_sha256": self.producer_emitter_sha256,
             "accepted_updates": self.accepted_updates,
             "checkpoint_sha256": self.checkpoint_sha,
@@ -259,6 +265,11 @@ class PanelV2HandoffTests(unittest.TestCase):
     def test_resolves_a_fully_pinned_locked_test_handoff(self):
         resolved = resolve_panel_v2_handoff(self.root, self.receipt)
         self.assertEqual(resolved.search_manifest, self.search_manifest.resolve())
+        self.assertEqual(resolved.baseline_search_manifest, self.baseline_search_manifest.resolve())
+        self.assertEqual(
+            resolved.baseline_search_manifest_sha256,
+            self.handoff["baseline_search_manifest"]["sha256"],
+        )
         self.assertEqual(resolved.training_manifest, self.training_manifest.resolve())
         self.assertEqual(resolved.training_result, self.training_result.resolve())
         self.assertEqual(resolved.checkpoint_sha256, self.checkpoint_sha)
@@ -334,6 +345,13 @@ class PanelV2HandoffTests(unittest.TestCase):
         )
         self.write_receipt()
         with self.assertRaises(HandoffError):
+            resolve_panel_v2_handoff(self.root, self.receipt)
+
+    def test_rejects_an_unpinned_producer_source_revision(self):
+        self.handoff["producer_source_revision"] = "f" * 40
+        self.receipt_source_revision = "f" * 40
+        self.write_receipt()
+        with self.assertRaisesRegex(HandoffError, "producer source revision"):
             resolve_panel_v2_handoff(self.root, self.receipt)
 
     def test_rejects_baseline_manifest_panel_swap_after_receipt_repin(self):
@@ -456,6 +474,7 @@ class PanelV2HandoffTests(unittest.TestCase):
             training_manifest_path=self.training_manifest,
             training_result_path=self.training_result,
             search_manifest_path=self.search_manifest,
+            baseline_search_manifest_path=self.baseline_search_manifest,
             expected_panel="test",
             expected_panel_indices=list(self.indices),
             expected_panel_ids=list(self.case_ids),
@@ -463,7 +482,7 @@ class PanelV2HandoffTests(unittest.TestCase):
             expected_search=dict(self.search),
             locked_test_comparison=comparison,
         )
-        self.assertEqual(emitted["schema"], "cnot103_multigpu_beam_handoff_v2")
+        self.assertEqual(emitted["schema"], "cnot103_multigpu_beam_handoff_v3")
         self.assertEqual(
             emitted["producer_emitter_sha256"],
             producer.multigpu_handoff_emitter_sha256(),
