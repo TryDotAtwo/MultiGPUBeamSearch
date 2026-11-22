@@ -3466,3 +3466,15 @@ Main commit `148b2a826a369b7601e904ea409e0cc5301c75c9` also passed the 260-test 
   and the pinned panel-v2 CPU compatibility gate passed in
   [run 45002249209](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45002249209).
   The physical GPU acceptance jobs were skipped; CUDA/NCCL behavior is unverified.
+
+- Defensive follow-up code SHA `402e655eff1ee25118c7fb1d2033d9dff5298674`
+  removes an unreachable panic branch from the new PyO3-callable selector.
+  The exact-source installed-wheel run
+  [45002801408](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45002801408)
+  passed all 33 job steps; Rust/Python CNOT CPU/Gloo passed in
+  [45002801489](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45002801489);
+  the source harness passed in
+  [45002801790](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45002801790),
+  and pinned panel-v2 CPU compatibility passed in
+  [45002806710](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45002806710).
+  GPU/NCCL jobs were skipped.
