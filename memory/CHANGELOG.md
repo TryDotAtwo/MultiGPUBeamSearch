@@ -102,3 +102,4 @@
 - Moved logical CUDA-index mapping through inherited `CUDA_VISIBLE_DEVICES` into a typed Rust runtime function and exposed it through the existing versioned device-binding PyO3 API.
 - The public `child_environment` path now uses the installed resolver; it preserves input order, duplicate indices, token trimming, exact invalid-token errors, and compatibility fallback for older wheels.
 - Added a hosted installed-wheel test through child environment construction and Rust runtime contract cases. Device selection, physical binding, CUDA kernels and NCCL setup are unchanged.
+- Rust CPU/Gloo, installed-wheel, and hosted source acceptance passed on `db3e1be`: [45055128201](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45055128201), [45055128252](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45055128252), [45055128570](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45055128570). Physical CUDA/NCCL was skipped.

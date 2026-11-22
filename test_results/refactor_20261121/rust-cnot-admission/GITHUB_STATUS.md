@@ -1,21 +1,28 @@
 # Rust + CUDA/C++ migration acceptance status
 
 Source branch: `codex/beam-3060-preflight-20261121`
-Latest tested code SHA: `935016b513a742067f3be11315b7013a322dbefc`
+Latest tested code SHA: `db3e1beb0027b4c4ef42c80b87468fdf3630a07f`
 Base main SHA: `e6c41b6dc6bb3a839f6338f3cfe9eaadf8608d5a`
 
 | Gate | Status | Evidence |
 |---|---|---|
-| Rust CNOT CPU/Gloo suite | PASS | [run 45054019605](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45054019605) passed on `935016b`, including Rust cluster rank and CUDA ordinal contracts. |
-| Installed PEP 517 wheel outside checkout | PASS | [run 45054019597](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45054019597) passed with the real installed extension and public `ScheduledRank.cuda_ordinal` path. |
-| Panel-v2 producer compatibility | PASS | The actual producer emitter at `eafc0f82f088603a525f428a8fa3d00e9e702fa8` was accepted by the consumer in [run 45051759583](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45051759583); producer/handoff inputs are unchanged. |
-| Hosted acceptance harness | PASS | [run 45054020205](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45054020205) passed on hosted CPU; physical and private producer jobs were skipped. |
+| Rust CNOT CPU/Gloo suite | PASS | [run 45055128201](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45055128201) passed on `db3e1be`, including runtime CUDA visibility mapping tests. |
+| Installed PEP 517 wheel outside checkout | PASS | [run 45055128252](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45055128252) passed with public child environment construction calling the installed Rust extension. |
+| Panel-v2 producer compatibility | PASS | Consumer compatibility passed on current tested source in [run 45055132495](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45055132495). The actual producer emitter source `eafc0f82f088603a525f428a8fa3d00e9e702fa8` was accepted in [run 45051759583](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45051759583). |
+| Hosted acceptance harness | PASS | [run 45055128570](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45055128570) passed on hosted CPU; physical and private producer jobs were skipped. |
 | Permutation CPU acceptance | PASS on CPU | Installed-wheel replay/reuse and saturated LRX(5), B=3 oracle cases remain covered. No physical permutation parity is claimed. |
 | CUDA/NCCL permutation and trained CNOT on physical 1/2 GPUs | PENDING | No physical CUDA/NCCL execution, trained checkpoint replay, physical rank participation, exact hardware replay, or 1-/2-GPU parity has been run. |
 | Vast campaign staging and total storage cost | BLOCKED | Trusted private GL4 manifest/checkpoint staging and complete storage-cost disposition remain unresolved. No paid instance was started. |
-| Full Rust ownership migration | IN PROGRESS | Rust owns permutation device selection, inference profile/microbatch planning, cluster geometry and scheduler parsing, typed session identity, and CUDA ordinal policy. Python still prepares some model/world inputs; PR #10 remains draft. |
+| Full Rust ownership migration | IN PROGRESS | Rust owns permutation device selection, inference profile/microbatch planning, cluster geometry and scheduler parsing, session identity, CUDA ordinal selection and child visibility translation. Python still prepares some model/world inputs; PR #10 remains draft. |
 
 Hosted CPU and installed-wheel evidence does not establish physical CUDA/NCCL execution or complete the Rust migration.
+
+## Rust-owned child CUDA visibility translation — 2026-11-22
+
+- `backend.child_environment` now delegates logical selected-index translation through inherited `CUDA_VISIBLE_DEVICES` to the versioned Rust runtime API. It preserves token order, duplicate selections, whitespace trimming, empty/device-disabled/out-of-range errors, `CUDA_DEVICE_ORDER`, environment filtering, and old-wheel fallback.
+- Rust CNOT CPU/Gloo passed on SHA `db3e1beb0027b4c4ef42c80b87468fdf3630a07f`: [run 45055128201](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45055128201).
+- Installed PEP 517 wheel passed: [run 45055128252](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45055128252). The test ran outside the checkout and exercised the installed PyO3 function through `child_environment`, plus the compatibility fallback and error path.
+- Hosted acceptance passed in [run 45055128570](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45055128570); physical and private producer jobs were skipped. An intermediate CPU run caught rustfmt-only differences; they were fixed before the tested SHA.
 
 ## Rust-owned scheduler-to-CUDA ordinal mapping — 2026-11-22
 

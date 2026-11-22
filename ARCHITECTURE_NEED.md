@@ -3849,3 +3849,6 @@ The scheduler-to-CUDA ordinal transfer was validated on code SHA `935016b513a742
 ## Rust-owned CUDA visibility translation
 
 `backend.child_environment` obtains the child process's `CUDA_VISIBLE_DEVICES` mapping from a versioned `beam-runtime` function. The Rust rule preserves selected-index order, token trimming, duplicate selections, inherited `CUDA_DEVICE_ORDER`, and the previous rejection of out-of-range, empty, or disabled tokens. The Python API and child environment isolation remain unchanged; older extensions without the resolver use the existing Python rule. This translates the scheduler-provided visibility mask and does not select or bind physical devices.
+
+
+The Rust-owned child CUDA visibility translation passed Rust CPU/Gloo in [run 45055128201](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45055128201), installed-wheel validation in [run 45055128252](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45055128252), and the hosted acceptance harness in [run 45055128570](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45055128570) on source SHA `db3e1beb0027b4c4ef42c80b87468fdf3630a07f`. The physical GPU and private producer jobs were skipped.
