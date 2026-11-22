@@ -1,53 +1,42 @@
-"""CPU tests for selecting real builds across PR and manual-dispatch cache scopes."""
-import json
-import os
+"""Hosted CPU checks for the producer adapter build cache contract."""
 from pathlib import Path
-import tempfile
 import unittest
-from unittest.mock import patch
-from cnot_producer_compatibility import cache_refs, last_result, main
 
 
-class BuildSelectionTest(unittest.TestCase):
-    def test_trust_only_the_current_pr_and_its_same_repository_branch(self):
-        event = {"repository": {"id": 7}, "pull_request": {"head": {"repo": {"id": 7}, "ref": "topic"}}}
-        self.assertEqual(cache_refs(event, "refs/pull/10/merge"), ["refs/pull/10/merge", "refs/heads/topic"])
-        event["pull_request"]["head"]["repo"]["id"] = 9
-        self.assertEqual(cache_refs(event, "refs/pull/10/merge"), ["refs/pull/10/merge"])
+ROOT = Path(__file__).resolve().parents[1]
+WORKFLOW = ROOT / ".github" / "workflows" / "cnot-producer-compatibility.yml"
 
-    def test_newer_manual_failure_wins_until_a_real_retry_passes(self):
-        prefix = "input-"
-        pr, branch = "refs/pull/10/merge", "refs/heads/topic"
-        entries = {}
-        def record(ref, seq, verdict):
-            entries[ref] = [{"ref": ref, "created_at": "2026-01-01T12:00:00Z",
-                             "id": seq, "key": f"{prefix}{seq}-1-{verdict}"}]
-        def lookup(key, ref):
-            self.assertEqual(key, prefix)
-            return entries.get(ref, [])
-        self.assertEqual(last_result(prefix, [pr, branch], lookup), "run")
-        record(pr, 1, "success")
-        record(branch, 2, "failure")
-        self.assertEqual(last_result(prefix, [pr, branch], lookup), "failure")
-        record(pr, 3, "success")
-        self.assertEqual(last_result(prefix, [pr, branch], lookup), "success")
-        self.assertEqual(last_result("other-", [pr], lambda *_: entries[pr]), "run")
 
-    def test_dispatch_and_retry_build_even_after_a_pass(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            event, output = Path(tmp) / "event", Path(tmp) / "output"
-            event.write_text(json.dumps({"repository": {"id": 7}}))
-            env = {"GITHUB_EVENT_PATH": str(event), "GITHUB_OUTPUT": str(output),
-                   "PANEL_INPUTS": "abc", "ImageOS": "ubuntu", "ImageVersion": "1",
-                   "PYTHON_VERSION_USED": "3.11", "GITHUB_REF": "refs/heads/topic", "GITHUB_REF_NAME": "topic"}
-            for name, attempt, expected in (("pull_request", "1", "success"),
-                                            ("workflow_dispatch", "1", "run"), ("pull_request", "2", "run")):
-                with self.subTest(name=name, attempt=attempt), patch.dict(os.environ, {
-                    **env, "GITHUB_EVENT_NAME": name, "GITHUB_RUN_ATTEMPT": attempt
-                }), patch("cnot_producer_compatibility.last_result", return_value="success"):
-                    main()
-                    self.assertEqual(output.read_text().splitlines()[-1], f"verdict={expected}")
+class ProducerBuildCacheWorkflowTests(unittest.TestCase):
+    def test_only_successful_native_build_artifacts_are_reused_for_matching_inputs(self):
+        workflow = WORKFLOW.read_text(encoding="utf-8")
+
+        # A prior negative result must never become a new PR failure by itself.
+        self.assertNotIn("Carry the last failed build", workflow)
+        self.assertNotIn("verdict == 'failure'", workflow)
+        self.assertNotIn("actions/caches", workflow)
+
+        # Reuse is backed by a real cache of successful adapter build outputs,
+        # with a key tied to the adapter source and both pinned producer inputs.
+        self.assertIn("actions/cache/restore@v4", workflow)
+        self.assertIn("actions/cache/save@v4", workflow)
+        self.assertIn("integrations/cnot_scorer/build.py", workflow)
+        self.assertIn("integrations/cnot_scorer/bridge_panel_v2.rs", workflow)
+        self.assertIn("e17953891a36e3e3ae8b038695bfac8548ab784f", workflow)
+        self.assertIn("42ed72f587ab70fc74a85cf0a25001efb29cb994", workflow)
+        self.assertIn("steps.build_cache.outputs.cache-hit", workflow)
+
+        save = workflow.split("uses: actions/cache/save@v4", 1)[1]
+        self.assertIn("if: success()", save)
+        self.assertIn("cnot-panel-v2-target", save)
+        self.assertIn("cnot-panel-v2-build", save)
+        self.assertIn(".venv-cnot-panel", save)
+
+        # cargo test builds and exercises the library; a second cargo check
+        # would compile the same crate without an independent check target.
+        self.assertNotIn("cargo check ", workflow)
+        self.assertIn("cargo test --locked --features torch --lib", workflow)
 
 
 if __name__ == "__main__":
-    unittest.main()
+    unittest.main(verbosity=2)
