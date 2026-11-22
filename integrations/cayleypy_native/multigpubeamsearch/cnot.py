@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from enum import Enum
 import hashlib
 import json
 import os
@@ -12,6 +13,27 @@ import torch.distributed as dist
 from .cnot_collectives import World
 from . import cnot_native as native
 from .cnot_selection import global_winners
+
+
+class _DispatchPath(Enum):
+    RUST_CONTROLLER = "rust_controller"
+    RUST_COMPATIBILITY = "rust_compatibility"
+    PYTHON_REFERENCE = "python_reference"
+
+
+_ADMIT_RUNNER_UNSET = object()
+_CNOT_DISPATCH_OPERATIONS = (
+    "_select_cnot_dispatch",
+    "run_cnot_native_search",
+    "run_cnot_native_checked_control",
+    "run_cnot_native",
+    "run_cnot_native_start_transport",
+    "run_cnot_native_world_exchange",
+    "run_cnot_native_gather_fixed",
+    "run_cnot_native_gather_rows",
+    "run_cnot_native_broadcast",
+    "run_cnot",
+)
 
 
 @dataclass
@@ -294,9 +316,14 @@ def _native_public_dispatch_selector():
         return None
 
 
-def _admit(root, scorer, width, shortlist, max_depth, mode, audit, validation, engine):
+def _admit(root, scorer, width, shortlist, max_depth, mode, audit, validation, engine,
+          *, dispatch_runner=_ADMIT_RUNNER_UNSET):
     input_matrix = _input(root, width, shortlist, max_depth, mode, validation)
-    engine, runner = _search_engine(engine, max_depth)
+    if dispatch_runner is _ADMIT_RUNNER_UNSET:
+        engine, runner = _search_engine(engine, max_depth)
+    else:
+        runner = dispatch_runner
+        engine = "rust" if runner is not None else "python"
     metadata = getattr(scorer, "metadata", {})
     fingerprints = ("upstream_commit", "checkpoint_sha256", "feature_registry_sha256",
                     "training_manifest_sha256", "training_result_sha256")
@@ -314,46 +341,93 @@ def _make_compat_stages(world, root, identity, input_matrix, scorer, mode, audit
 
 
 def _search_cnot_compat(world, root, scorer, width, shortlist, max_depth,
-                        mode, audit, validation, engine):
-    """Compatibility orchestration for older PyO3 extensions."""
-    engine_digest = world.checked(
-        "validate CNOT search engine",
-        lambda: _requested_engine_digest(engine),
-    )
-    world.require_engine_consensus(engine_digest)
-    if engine == "auto":
-        local_rust = world.checked(
-            "select CNOT search engine",
-            lambda: _search_engine("auto", max_depth)[0] == "rust",
-        )
-        if not world.all_ranks_support(local_rust):
-            engine = "python"
+                        mode, audit, validation, dispatch_path, bindings):
+    """Execute the already-admitted Rust compatibility or Python reference route."""
+    if dispatch_path is _DispatchPath.RUST_COMPATIBILITY:
+        runner = bindings["run_cnot"]
+        selected_engine = "rust"
+    elif dispatch_path is _DispatchPath.PYTHON_REFERENCE:
+        runner = None
+        selected_engine = "python"
+    else:
+        raise RuntimeError(f"invalid compatibility dispatch path: {dispatch_path!r}")
 
-    input_matrix, digest, runner = world.checked("validate CNOT input", lambda: _admit(
-        root, scorer, width, shortlist, max_depth, mode, audit, validation, engine))
+    input_matrix, digest, _ = world.checked(
+        "validate CNOT input",
+        lambda: _admit(
+            root, scorer, width, shortlist, max_depth, mode, audit, validation,
+            selected_engine, dispatch_runner=runner,
+        ),
+    )
     root = input_matrix.root
     world.require_consensus(digest)
     world.start_transport(prefer_rust=runner is not None)
     identity = native.cnot_identity(input_matrix.n, device=world.device)
     if runner is not None:
-        native_runner = world.checked(
-            "resolve CNOT native stage runner", _native_stages_runner
-        )
+        native_stage_runner = bindings["run_cnot_native"]
         use_native = (
-            world.supports_native("run_cnot_native") and callable(native_runner)
+            world.supports_native("run_cnot_native")
+            and callable(native_stage_runner)
         )
         alphabet = input_matrix.n * (input_matrix.n - 1)
         if use_native:
-            return native_runner(world, root, identity, input_matrix, scorer, mode, audit,
-                                 width, min(shortlist, alphabet), alphabet, max_depth)
+            return native_stage_runner(
+                world, root, identity, input_matrix, scorer, mode, audit,
+                width, min(shortlist, alphabet), alphabet, max_depth,
+            )
         stages = world.checked(
             "construct CNOT compatibility stages",
-            lambda: _make_compat_stages(world, root, identity, input_matrix, scorer, mode, audit),
+            lambda: _make_compat_stages(
+                world, root, identity, input_matrix, scorer, mode, audit,
+            ),
         )
-        return runner(stages, world.rank, world.size, width, min(shortlist, alphabet), alphabet, max_depth)
+        return runner(
+            stages, world.rank, world.size, width,
+            min(shortlist, alphabet), alphabet, max_depth,
+        )
     if torch.equal(root, identity):
         return CnotResult("solved", (), [], [])
-    return _search(world, root, identity, input_matrix, scorer, width, shortlist, max_depth, mode, audit)
+    return _search(
+        world, root, identity, input_matrix, scorer, width, shortlist,
+        max_depth, mode, audit,
+    )
+
+
+def _runtime_dispatch_capabilities(common):
+    return {
+        "native_controller": common["run_cnot_native_search"],
+        "checked_control": common["run_cnot_native_checked_control"],
+        "native_stages": common["run_cnot_native"],
+        "stream5_start": common["run_cnot_native_start_transport"],
+        "world_exchange": common["run_cnot_native_world_exchange"],
+        "fixed_gather": common["run_cnot_native_gather_fixed"],
+        "row_gather": common["run_cnot_native_gather_rows"],
+        "broadcast": common["run_cnot_native_broadcast"],
+        "compatibility_controller": common["run_cnot"],
+    }
+
+
+def _typed_dispatch_path(value):
+    try:
+        return _DispatchPath(value)
+    except (TypeError, ValueError) as error:
+        raise RuntimeError(f"Rust CNOT runtime returned an unknown path: {value!r}") from error
+
+
+def _select_legacy_dispatch_path(engine, max_depth, capabilities):
+    if engine == "python":
+        return _DispatchPath.PYTHON_REFERENCE
+    if max_depth > 2**64 - 1:
+        if engine == "auto":
+            return _DispatchPath.PYTHON_REFERENCE
+        raise ValueError("CNOT Rust engine depth exceeds u64")
+    if capabilities["native_controller"] and capabilities["checked_control"]:
+        return _DispatchPath.RUST_CONTROLLER
+    if capabilities["compatibility_controller"]:
+        return _DispatchPath.RUST_COMPATIBILITY
+    if engine == "auto":
+        return _DispatchPath.PYTHON_REFERENCE
+    raise RuntimeError("Rust CNOT controller is unavailable on every rank")
 
 def search_cnot(root, scorer, *, width, shortlist, max_depth, mode="qhat", audit=False,
                 validation="auto", engine="auto"):
@@ -376,59 +450,52 @@ def search_cnot(root, scorer, *, width, shortlist, max_depth, mode="qhat", audit
             lambda: _public_dispatch_digest(engine, max_depth, strict_backend),
         )
         world.require_engine_consensus(dispatch_digest)
-        native_runner = world.checked(
-            "resolve CNOT search controller", _native_search_runner
-        )
-        dispatch_selector = world.checked(
-            "resolve Rust CNOT dispatch policy", _native_public_dispatch_selector
-        )
-        common_dispatch_selector = world.supports_native("_select_cnot_dispatch")
-        if callable(dispatch_selector) and common_dispatch_selector:
-            capabilities = {
-                "native_controller": bool(
-                    callable(native_runner)
-                    and world.supports_native("run_cnot_native_search")
-                ),
-                "checked_control": world.supports_native("run_cnot_native_checked_control"),
-                "native_stages": world.supports_native("run_cnot_native"),
-                "stream5_start": world.supports_native("run_cnot_native_start_transport"),
-                "world_exchange": world.supports_native("run_cnot_native_world_exchange"),
-                "fixed_gather": world.supports_native("run_cnot_native_gather_fixed"),
-                "row_gather": world.supports_native("run_cnot_native_gather_rows"),
-                "broadcast": world.supports_native("run_cnot_native_broadcast"),
-                "compatibility_controller": world.supports_native("run_cnot"),
-            }
-            route = world.checked(
-                "select Rust CNOT runtime path",
-                lambda: dispatch_selector(engine, max_depth, strict_backend, capabilities),
-            )
-            if route == "rust_controller":
-                if not callable(native_runner):
-                    raise RuntimeError("Rust CNOT controller capability was not bound")
-                options = (width, shortlist, max_depth, mode, audit, validation, engine)
-                callbacks = (_input, native.cnot_identity, _native_stages_runner,
-                             _make_compat_stages, _search, CnotResult)
-                return native_runner(world, root, scorer, options, callbacks)
-            if route not in ("rust_compatibility", "python_reference"):
-                raise RuntimeError(f"Rust CNOT runtime returned an unknown path: {route}")
-            return _search_cnot_compat(
-                world, root, scorer, width, shortlist, max_depth, mode, audit,
-                validation, engine
-            )
 
-        if strict_backend:
+        # Resolve bindings once and vote on the fixed capability vector. Keep
+        # the live operations pinned so execution consumes the admitted set.
+        bindings = world.checked(
+            "resolve CNOT dispatch bindings",
+            lambda: {
+                name: world.native_method(name)
+                for name in _CNOT_DISPATCH_OPERATIONS
+            },
+        )
+        common = world.agree_native_bindings(bindings)
+        capabilities = _runtime_dispatch_capabilities(common)
+
+        if common["_select_cnot_dispatch"]:
+            selector = bindings["_select_cnot_dispatch"]
+            dispatch_path = world.checked(
+                "select Rust CNOT runtime path",
+                lambda: _typed_dispatch_path(
+                    selector(engine, max_depth, strict_backend, capabilities)
+                ),
+            )
+        elif strict_backend:
             raise RuntimeError(
                 "strict CNOT acceptance requires a matching Rust public dispatch ABI on every rank"
             )
-        common_search = world.supports_native("run_cnot_native_search")
-        common_checker = world.supports_native("run_cnot_native_checked_control")
-        if callable(native_runner) and common_search and common_checker:
+        else:
+            dispatch_path = world.checked(
+                "select legacy CNOT runtime path",
+                lambda: _select_legacy_dispatch_path(
+                    engine, max_depth, capabilities,
+                ),
+            )
+
+        if dispatch_path is _DispatchPath.RUST_CONTROLLER:
+            native_runner = bindings["run_cnot_native_search"]
             options = (width, shortlist, max_depth, mode, audit, validation, engine)
-            callbacks = (_input, native.cnot_identity, _native_stages_runner,
-                         _make_compat_stages, _search, CnotResult)
+            callbacks = (
+                _input, native.cnot_identity, _native_stages_runner,
+                _make_compat_stages, _search, CnotResult,
+            )
             return native_runner(world, root, scorer, options, callbacks)
-        return _search_cnot_compat(world, root, scorer, width, shortlist,
-                                   max_depth, mode, audit, validation, engine)
+
+        return _search_cnot_compat(
+            world, root, scorer, width, shortlist, max_depth, mode, audit,
+            validation, dispatch_path, bindings,
+        )
 
 def _search(world, root, identity, input_matrix, scorer, width, shortlist, max_depth, mode, audit):
     n, words = root.shape[1:]
