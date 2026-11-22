@@ -35,7 +35,6 @@ class PanelV2HandoffTests(unittest.TestCase):
 
         self.accepted_updates = 64
         self.checkpoint_sha = "c" * 64
-        self.dataset_sha = "d" * 64
         self.indices = [3, 9]
         self.case_ids = ["locked-case-a", "locked-case-b"]
         self.panel_digest = canonical_digest({
@@ -49,9 +48,25 @@ class PanelV2HandoffTests(unittest.TestCase):
             "max_depth": 8,
             "max_expansions": 201,
         }
+        records = [
+            {
+                "lineage_id": "locked-case-a" if index == 3 else "locked-case-b" if index == 9 else f"other-{index}",
+                "state": {"n": 2, "alphabet_id": "all_to_all_unit_cnot:2", "packed_rows": [1, 2]},
+            }
+            for index in range(10)
+        ]
+        dataset_value = {"schema": "synthetic-sealed-dataset", "panels": {"test": records}}
+        dataset_bytes = (json.dumps(dataset_value, sort_keys=True) + "\\n").encode("utf-8")
+        self.dataset_path = self.root / "data" / "frozen.json"
+        self.dataset_path.parent.mkdir(parents=True)
+        self.dataset_path.write_bytes(dataset_bytes)
+        self.dataset_sha = digest_bytes(dataset_bytes)
         self.training_manifest = write_json(
             self.manifests / "training.json",
-            {"schema": "cnot103_training_run_v1", "fixture": "synthetic"},
+            {
+                "schema": "cnot103_training_run_v1",
+                "dataset": {"path": str(self.dataset_path), "sha256": self.dataset_sha},
+            },
         )
         self.training_result = write_json(
             self.reports / "training-result.json",
@@ -154,6 +169,7 @@ class PanelV2HandoffTests(unittest.TestCase):
             "checkpoint_sha256": self.checkpoint_sha,
         }
         metrics = {
+            "case_count": len(self.indices),
             "panel_indices": list(self.indices),
             "panel_digest": self.panel_digest,
         }
