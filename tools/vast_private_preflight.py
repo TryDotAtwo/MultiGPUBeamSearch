@@ -21,15 +21,21 @@ CUTLASS_RECEIPT_PATTERN = re.compile(
     r"REMOTE_CUTLASS_PREFLIGHT_OK revision=([0-9a-f]{40}) "
     r"archive_sha256=([0-9a-f]{64})"
 )
+HANDOFF_ROOT_RECEIPT_PATTERN = re.compile(
+    r"REMOTE_CNOT_HANDOFF_ROOT_PREFLIGHT_OK status=ready"
+)
 
 
 def parse_receipt(text: str) -> dict[str, str]:
     private_matches = list(RECEIPT_PATTERN.finditer(text))
     cutlass_matches = list(CUTLASS_RECEIPT_PATTERN.finditer(text))
+    handoff_root_matches = list(HANDOFF_ROOT_RECEIPT_PATTERN.finditer(text))
     if len(private_matches) != 1:
         raise ValueError("private preflight must emit exactly one complete receipt")
     if len(cutlass_matches) != 1:
         raise ValueError("private preflight must emit exactly one pinned CUTLASS receipt")
+    if len(handoff_root_matches) != 1:
+        raise ValueError("private preflight must emit exactly one handoff-root receipt")
     upstream, manifest_sha, checkpoint_sha = private_matches[0].groups()
     cutlass_revision, cutlass_sha = cutlass_matches[0].groups()
     if upstream != EXPECTED_UPSTREAM:
@@ -46,6 +52,7 @@ def parse_receipt(text: str) -> dict[str, str]:
         "checkpoint_sha256": checkpoint_sha,
         "cutlass_revision": cutlass_revision,
         "cutlass_archive_sha256": cutlass_sha,
+        "handoff_root_preflight": "passed",
     }
 
 

@@ -24,6 +24,7 @@ class VastPrivatePreflightTests(unittest.TestCase):
             f"manifest_sha256={manifest} checkpoint_sha256={checkpoint}\n"
             f"REMOTE_CUTLASS_PREFLIGHT_OK revision={cutlass_revision} "
             f"archive_sha256={cutlass_sha256}\n"
+            "REMOTE_CNOT_HANDOFF_ROOT_PREFLIGHT_OK status=ready\n"
         )
 
     def test_accepts_one_complete_pinned_receipt(self):
@@ -33,6 +34,7 @@ class VastPrivatePreflightTests(unittest.TestCase):
         self.assertEqual(result["checkpoint_sha256"], EXPECTED_CHECKPOINT)
         self.assertEqual(result["cutlass_revision"], CUTLASS_REVISION)
         self.assertEqual(result["cutlass_archive_sha256"], CUTLASS_SHA256)
+        self.assertEqual(result["handoff_root_preflight"], "passed")
 
     def test_rejects_absent_or_duplicate_receipt(self):
         for text in ("", self.receipt() + self.receipt()):
@@ -54,6 +56,15 @@ class VastPrivatePreflightTests(unittest.TestCase):
         duplicate_cutlass = self.receipt() + self.receipt().split("REMOTE_PRIVATE_PREFLIGHT_OK", 1)[1]
         for text in (private_only, duplicate_cutlass):
             with self.subTest(text=text[-80:]), self.assertRaises(ValueError):
+                parse_receipt(text)
+
+    def test_rejects_missing_or_duplicate_private_handoff_root_receipt(self):
+        value = self.receipt().replace(
+            "REMOTE_CNOT_HANDOFF_ROOT_PREFLIGHT_OK status=ready\n", ""
+        )
+        duplicate = self.receipt() + "REMOTE_CNOT_HANDOFF_ROOT_PREFLIGHT_OK status=ready\n"
+        for text in (value, duplicate):
+            with self.subTest(text=text[-80:]), self.assertRaisesRegex(ValueError, "handoff-root"):
                 parse_receipt(text)
 
     def test_rejects_wrong_cutlass_revision_or_archive_sha(self):

@@ -281,6 +281,8 @@ class PanelV2HandoffTests(unittest.TestCase):
         self.assertEqual(resolved.panel_ids, tuple(self.case_ids))
         self.assertEqual(resolved.panel_digest, self.panel_digest)
         self.assertEqual(resolved.locked_test_status, "length_gain")
+        self.assertEqual(resolved.locked_test_comparison_sha256, canonical_digest(self.comparison))
+        self.assertEqual(resolved.locked_test_comparison, self.comparison)
         self.assertEqual(resolved.dataset_path, self.dataset_path.resolve())
         self.assertEqual(resolved.orientation, "row_target_xor_row_control")
         self.assertEqual(resolved.artifact_path_policy, "same_run_root_mount")

@@ -31,6 +31,10 @@ on:
       - tools/vast_campaign_watchdog.py
       - tools/test_vast_campaign_watchdog.py
       - tools/test_vast_campaign_workflow.py
+      - tools/validate_cnot_handoff.py
+      - tools/test_validate_cnot_handoff.py
+      - integrations/cnot_scorer/**
+      - integrations/cayleypy_native/tests/installed_cnot_handoff_endpoint.py
       - tools/cnot_producer_source_gate.py
       - tools/test_cnot_producer_source_gate.py
       - tools/vast_public_status.py
@@ -76,11 +80,15 @@ jobs:
           python-version: "3.11"
       - name: Compile source-only acceptance helpers
         id: compile_source
-        run: python -m py_compile tools/verify_permutation_cuda.py tools/permutation_acceptance.py tools/test_permutation_acceptance.py tools/verify_cnot.py tools/cnot_acceptance_events.py tools/test_cnot_acceptance_events.py tools/test_cnot_gpu_identity.py tools/verify_cnot_gpu_pair.py tools/test_verify_cnot_gpu_pair.py tools/test_vast_result_transport.py tools/vast_public_status.py tools/test_vast_public_status.py tools/test_vast_source_archive.py tools/create_vast_source_archive.py tools/vast_instance_contract.py tools/test_vast_instance_contract.py tools/vast_budget_deadline.py tools/test_vast_budget_deadline.py tools/vast_campaign_guard.py tools/test_vast_campaign_guard.py tools/vast_campaign_watchdog.py tools/test_vast_campaign_watchdog.py tools/test_vast_campaign_workflow.py tools/cnot_producer_source_gate.py tools/test_cnot_producer_source_gate.py tools/vast_private_preflight.py tools/test_vast_private_preflight.py integrations/cayleypy_native/tests/installed_verify_cnot_gloo_lifecycle.py integrations/cayleypy_native/multigpubeamsearch/gpu_identity.py
+        run: python -m py_compile tools/verify_permutation_cuda.py tools/permutation_acceptance.py tools/test_permutation_acceptance.py tools/verify_cnot.py tools/cnot_acceptance_events.py tools/test_cnot_acceptance_events.py tools/test_cnot_gpu_identity.py tools/verify_cnot_gpu_pair.py tools/test_verify_cnot_gpu_pair.py tools/test_vast_result_transport.py tools/vast_public_status.py tools/test_vast_public_status.py tools/test_vast_source_archive.py tools/create_vast_source_archive.py tools/vast_instance_contract.py tools/test_vast_instance_contract.py tools/vast_budget_deadline.py tools/test_vast_budget_deadline.py tools/vast_campaign_guard.py tools/test_vast_campaign_guard.py tools/vast_campaign_watchdog.py tools/test_vast_campaign_watchdog.py tools/test_vast_campaign_workflow.py tools/validate_cnot_handoff.py tools/test_validate_cnot_handoff.py tools/cnot_producer_source_gate.py tools/test_cnot_producer_source_gate.py tools/vast_private_preflight.py tools/test_vast_private_preflight.py integrations/cayleypy_native/tests/installed_verify_cnot_gloo_lifecycle.py integrations/cayleypy_native/multigpubeamsearch/gpu_identity.py
       - name: Test exact producer-source gate
         if: always()
         id: producer_source_gate_test
         run: python tools/test_cnot_producer_source_gate.py -v
+      - name: Test private CNOT handoff resolution and preflight summary
+        if: always()
+        id: cnot_handoff_preflight_test
+        run: python tools/test_validate_cnot_handoff.py -v
       - name: Test private result transport boundary
         if: always()
         id: private_transport
@@ -359,6 +367,7 @@ jobs:
       SPEND_CAP_USD: ${{ secrets.VAST_CNOT_ACCEPTANCE_CAP_USD }}
       SOURCE_SHA: ${{ github.sha }}
       REMOTE_ROOT: /workspace/codex-beam-gpu-acceptance-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+      HANDOFF_RUN_ROOT: ${{ secrets.VAST_CNOT_HANDOFF_RUN_ROOT }}
     steps:
       - name: Check out the exact source under test
         uses: actions/checkout@v4
@@ -375,6 +384,16 @@ jobs:
           set -euo pipefail
           exec 2>"${RUNNER_TEMP}/vast-preflight-private.log"
           echo "inventory_query=failed" >> "$GITHUB_OUTPUT"
+          [[ -n "$HANDOFF_RUN_ROOT" ]] || { echo "Required private handoff root is not configured." >&2; exit 1; }
+          python3 - "$HANDOFF_RUN_ROOT" <<'PY'
+          from pathlib import PurePosixPath
+          import sys
+          raw = sys.argv[1]
+          path = PurePosixPath(raw)
+          if (not path.is_absolute() or path.parts[:2] != ("/", "private")
+                  or len(path.parts) < 3 or ".." in path.parts or str(path) != raw):
+              raise SystemExit("private handoff root must be canonical under /private")
+          PY
           [[ -n "$VAST_API_KEY" ]] || { echo "Required private preflight configuration is missing." >&2; exit 1; }
           instances="${RUNNER_TEMP}/vast-instances.json"
           status="${RUNNER_TEMP}/vast-status.json"
@@ -467,10 +486,26 @@ jobs:
           [[ "$ready" == true ]] || { echo "SSH did not become ready for private preflight." >&2; exit 1; }
           preflight_remaining=$((preflight_deadline - SECONDS))
           (( preflight_remaining > 0 )) || { echo "Private preflight deadline expired before remote checks." >&2; exit 1; }
+          printf -v remote_preflight_command 'CNOT_HANDOFF_RUN_ROOT=%q bash -s' "$HANDOFF_RUN_ROOT"
           timeout --signal=TERM --kill-after=10s "${preflight_remaining}s" \
-            ssh "${ssh_opts[@]}" -o ConnectTimeout=15 "root@${SSH_HOST}" 'bash -s' \
+            ssh "${ssh_opts[@]}" -o ConnectTimeout=15 "root@${SSH_HOST}" "$remote_preflight_command" \
             >"$remote_log" 2>&1 <<'REMOTE_PREFLIGHT'
           set -euo pipefail
+          handoff_root="${CNOT_HANDOFF_RUN_ROOT:?}"
+          python3 - "$handoff_root" <<'PY'
+          from pathlib import Path
+          import sys
+          root = Path(sys.argv[1])
+          if not root.is_absolute() or root.parts[:2] != ("/", "private") or len(root.parts) < 3:
+              raise SystemExit("private handoff root is outside the approved mount")
+          if root.resolve(strict=True) != root or root.is_symlink():
+              raise SystemExit("private handoff root is not canonical")
+          reports = root / "reports"
+          receipt = reports / "learning-curve.private.json"
+          if reports.is_symlink() or not reports.is_dir() or receipt.is_symlink() or not receipt.is_file():
+              raise SystemExit("private handoff receipt is unavailable")
+          print("REMOTE_CNOT_HANDOFF_ROOT_PREFLIGHT_OK status=ready")
+          PY
           upstream=/private/TheQuantumProject
           gl4=/private/gl4
           manifest="$gl4/search-qhat.json"
@@ -639,6 +674,7 @@ jobs:
           github_run_id="${10}"
           github_run_attempt="${11}"
           results_relative="${12}"
+          handoff_run_root="${13}"
           acceptance_run_id="${github_run_id}-${github_run_attempt}"
           authorized=/root/.ssh/authorized_keys
           result_dir=""
@@ -700,9 +736,14 @@ jobs:
           [[ "$instance_id" =~ ^[1-9][0-9]*$ && "$instance_id" != "61080396" ]] || { echo "invalid or prohibited Vast instance ID" >&2; exit 2; }
           [[ "$github_run_id" =~ ^[0-9]+$ && "$github_run_attempt" =~ ^[0-9]+$ ]] || { echo "invalid GitHub Actions run identity" >&2; exit 2; }
           [[ "$manifest_sha" =~ ^[0-9a-f]{64}$ && "$checkpoint_sha" == "92f3ec8e6a6ef831916a9d3ba9bbdae9307c9850d61334916a2b3e690c0020c4" ]] || { echo "invalid private manifest or checkpoint receipt" >&2; exit 2; }
-          [[ "$results_relative" == "test_results/refactor_20261121/gpu-acceptance" ]] || { echo "invalid remote results path" >&2; exit 2; }
-          result_dir="${run_root}/${results_relative}"
+          [[ "$results_relative" == "private-cnot-acceptance-v1" ]] || { echo "invalid private result slot" >&2; exit 2; }
+          [[ -d "$handoff_run_root" && ! -L "$handoff_run_root" ]] || { echo "private handoff root changed after preflight" >&2; exit 2; }
+          reports_dir="${handoff_run_root}/reports"
+          receipt_input="${reports_dir}/learning-curve.private.json"
+          [[ -d "$reports_dir" && ! -L "$reports_dir" && -s "$receipt_input" && ! -L "$receipt_input" ]] || { echo "private handoff receipt changed after preflight" >&2; exit 2; }
+          result_dir="${reports_dir}/mgbs-acceptance-${acceptance_run_id}"
           receipt_path="${result_dir}/receipt.json"
+          [[ ! -e "$result_dir" && ! -L "$result_dir" ]] || { echo "private acceptance result path is not fresh" >&2; exit 2; }
           mkdir -p "$result_dir"
           python3 - "$receipt_path" "$instance_id" "$source_sha" "$manifest_sha" "$checkpoint_sha" "$acceptance_run_id" <<'PY'
           import json, pathlib, sys
@@ -729,7 +770,7 @@ jobs:
           run_test() {
             bash "$source_dir/tools/vast_cnot_gpu_acceptance.sh" \
               "$source_dir" "$run_root" "$result_dir" "$source_sha" "$instance_id" \
-              "$manifest_sha" "$checkpoint_sha" "$acceptance_run_id"
+              "$manifest_sha" "$checkpoint_sha" "$acceptance_run_id" "$handoff_run_root"
           }
           set +e
           run_test >"${result_dir}/cuda-nccl.log" 2>&1
@@ -753,7 +794,8 @@ jobs:
           VAST_REMOTE_ARCHIVE_SHA="$ARCHIVE_SHA" \
           VAST_REMOTE_MANIFEST_SHA="$MANIFEST_SHA256" \
           VAST_REMOTE_CHECKPOINT_SHA="$CHECKPOINT_SHA256" \
-          VAST_REMOTE_RESULTS_RELATIVE="test_results/refactor_20261121/gpu-acceptance" \
+          VAST_REMOTE_RESULTS_RELATIVE="private-cnot-acceptance-v1" \
+          VAST_REMOTE_HANDOFF_RUN_ROOT="$HANDOFF_RUN_ROOT" \
           VAST_SOURCE_SHA="$SOURCE_SHA" \
           VAST_INSTANCE_ID="$VAST_INSTANCE_ID" \
               VAST_GITHUB_RUN_ID="$GITHUB_RUN_ID" \

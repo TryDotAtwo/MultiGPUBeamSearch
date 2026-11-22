@@ -12,6 +12,7 @@ import unittest
 
 import torch
 import torch.distributed as dist
+import torch.multiprocessing as mp
 
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / "integrations" / "cnot_scorer"))
@@ -47,12 +48,45 @@ class SyntheticScorer:
         return torch.zeros((len(children),), dtype=torch.float32, device=children.device)
 
 
+def _synthetic_scorer_factory(library, manifest, *, n, device, inference_batch=4):
+    return SyntheticScorer()
+
+
+def _run_panel_endpoint_rank(rank, world_size, run_root, output_path, rendezvous):
+    dist.init_process_group(
+        backend="gloo",
+        init_method=f"file://{rendezvous}",
+        rank=rank,
+        world_size=world_size,
+    )
+    try:
+        verify = load_verify_endpoint()
+        verify.main(
+            [
+                "--case", "panel",
+                "--backend", "gloo",
+                "--engine", "rust",
+                "--library", str(Path(run_root) / "synthetic-scorer.so"),
+                "--run-root", run_root,
+                "--handoff-receipt", str(Path(run_root) / "reports" / "learning-curve.private.json"),
+                "--output", output_path,
+            ],
+            scorer_factory=_synthetic_scorer_factory,
+            manage_process_group=False,
+        )
+    finally:
+        if dist.is_initialized():
+            dist.destroy_process_group()
+
+
 class InstalledHandoffEndpointTests(unittest.TestCase):
     def setUp(self):
         package_path = Path(multigpubeamsearch.__file__).resolve()
         self.assertNotIn(ROOT.resolve(), package_path.parents, "test imported the checkout instead of the installed wheel")
         self.fixture = PanelV2HandoffTests()
         self.fixture.setUp()
+        self.scorer_library = self.fixture.root / "synthetic-scorer.so"
+        self.scorer_library.write_bytes(b"synthetic CNOT scorer library fixture")
         self.owns_process_group = not dist.is_initialized()
         if self.owns_process_group:
             dist.init_process_group(
@@ -92,13 +126,33 @@ class InstalledHandoffEndpointTests(unittest.TestCase):
             "--case", "panel",
             "--backend", "gloo",
             "--engine", "rust",
-            "--library", "synthetic-scorer.so",
+            "--library", str(self.scorer_library),
             "--run-root", str(self.fixture.root),
             "--handoff-receipt", str(receipt or self.fixture.receipt),
             "--output", str(self.fixture.reports / output_name),
             *extra,
         ]
         return self.verify.main(args, scorer_factory=self.scorer_factory, manage_process_group=False)
+
+    def test_replay_receipt_packs_identity_rows_above_64_bits(self):
+        n = 65
+        words = (n + 63) // 64
+        identity = [0] * (n * words)
+        for row in range(n):
+            identity[row * words + row // 64] |= 1 << (row % 64)
+        panel_root = {
+            "panel_index": 11,
+            "case_id": "synthetic-width-65-identity",
+            "dimension": n,
+            "alphabet_id": "all_to_all_unit_cnot:65",
+            "orientation": "row_target_xor_row_control",
+            "start_packed_rows": identity,
+        }
+        result = type("SolvedIdentity", (), {"status": "solved", "gates": (), "layers": []})()
+        row = self.verify._panel_result_row(panel_root, result, 0.0)
+        self.assertEqual(row["end_packed_rows"], identity)
+        self.assertEqual(row["word"]["physical_cost"], 0)
+        self.assertTrue(row["word"]["replayed"])
 
     def test_public_endpoint_loads_ordered_roots_and_searches_with_pinned_qhat_budget(self):
         self.invoke()
@@ -118,6 +172,18 @@ class InstalledHandoffEndpointTests(unittest.TestCase):
             self.fixture.handoff["baseline_search_manifest"]["sha256"],
         )
         self.assertEqual(report["head"], "qhat")
+        self.assertEqual(report["world"], 1)
+        self.assertEqual(report["status"], "completed")
+        self.assertEqual(report["engine"], "rust")
+        self.assertEqual(
+            report["scorer_library_sha256"],
+            hashlib.sha256(self.scorer_library.read_bytes()).hexdigest(),
+        )
+        self.assertEqual(report["locked_test_status"], "length_gain")
+        self.assertEqual(
+            report["locked_test_comparison_sha256"],
+            self.fixture.handoff["locked_test_comparison_sha256"],
+        )
         self.assertEqual(report["search"], self.fixture.search)
         self.assertEqual(report["expansion_upper_bound"], 201)
         self.assertEqual(
@@ -129,12 +195,18 @@ class InstalledHandoffEndpointTests(unittest.TestCase):
             ],
         )
         self.assertEqual([row["case_id"] for row in report["rows"]], self.fixture.case_ids)
-        self.assertTrue(all(row["status"] == "solved" and row["word"]["replayed"] for row in report["rows"]))
+        self.assertTrue(all(
+            row["status"] == "solved"
+            and row["word"]["replayed"]
+            and row["word"]["direction"] == "original_matrix_to_identity"
+            and row["wall_seconds"] >= 0
+            for row in report["rows"]
+        ))
         self.assertEqual(len(self.scorer_creations), 1)
         self.assertEqual(
             self.scorer_creations[0],
             (
-                "synthetic-scorer.so",
+                str(self.scorer_library),
                 self.fixture.search_manifest.resolve(),
                 2,
                 "cpu",
@@ -152,6 +224,53 @@ class InstalledHandoffEndpointTests(unittest.TestCase):
             for call in self.search_calls
         ))
         self.assertEqual([call["root"] for call in self.search_calls], [[[[1], [3]]], [[[3], [2]]]])
+
+    def test_installed_public_panel_endpoint_matches_one_and_two_gloo_ranks(self):
+        one_path = self.fixture.reports / "consumer-panel-one-rank.private.json"
+        self.invoke(output_name=one_path.name)
+        one = json.loads(one_path.read_text(encoding="utf-8"))
+        self.assertEqual(one["world"], 1)
+        self.assertEqual(one["execution_backend"], "cpu_gloo")
+        self.assertTrue(all(row["word"]["replayed"] for row in one["rows"]))
+
+        dist.destroy_process_group()
+        self.owns_process_group = False
+        two_path = self.fixture.reports / "consumer-panel-two-ranks.private.json"
+        rendezvous = self.fixture.root / "gloo-rendezvous-panel-pair"
+        rendezvous.unlink(missing_ok=True)
+        mp.spawn(
+            _run_panel_endpoint_rank,
+            args=(2, str(self.fixture.root), str(two_path), str(rendezvous)),
+            nprocs=2,
+            join=True,
+        )
+        two = json.loads(two_path.read_text(encoding="utf-8"))
+        self.assertEqual(two["world"], 2)
+        self.assertEqual(two["execution_backend"], "cpu_gloo")
+
+        def semantic(report):
+            return {
+                key: report[key]
+                for key in (
+                    "producer_source_revision", "producer_emitter_sha256", "accepted_updates",
+                    "checkpoint_sha256", "dataset_sha256", "search_manifest_sha256",
+                    "baseline_search_manifest_sha256", "training_manifest_sha256",
+                    "training_result_sha256", "panel", "panel_indices", "panel_ids",
+                    "panel_digest", "panel_roots", "search", "head", "runtime_contract",
+                    "expansion_upper_bound", "orientation", "adapter", "status", "engine",
+                    "scorer_library_sha256", "locked_test_status",
+                    "locked_test_comparison_sha256",
+                )
+            } | {
+                "rows": [
+                    {key: value for key, value in row.items() if key != "wall_seconds"}
+                    for row in report["rows"]
+                ]
+            }
+
+        self.assertEqual(semantic(one), semantic(two))
+        self.assertEqual([row["case_id"] for row in two["rows"]], self.fixture.case_ids)
+        self.assertTrue(all(row["word"]["replayed"] for row in two["rows"]))
 
     def test_bad_receipt_fails_before_scorer_or_search(self):
         self.fixture.receipt_source_revision = "f" * 40
@@ -249,6 +368,15 @@ class InstalledHandoffEndpointTests(unittest.TestCase):
                 encoding="utf-8",
             )
 
+        def permute_pinned_roots():
+            dataset = json.loads(self.fixture.dataset_path.read_text(encoding="utf-8"))
+            roots = dataset["panels"]["test"]
+            roots[3], roots[9] = roots[9], roots[3]
+            self.fixture.dataset_path.write_text(
+                json.dumps(dataset, sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
+
         cases = (
             ("source", change_source),
             ("model_abi", change_model_abi),
@@ -258,6 +386,7 @@ class InstalledHandoffEndpointTests(unittest.TestCase):
             ("mixed_comparison", mix_locked_comparison),
             ("baseline_manifest_pin", change_baseline_manifest_pin),
             ("pinned_root", change_pinned_root),
+            ("permuted_roots", permute_pinned_roots),
         )
         for name, mutate in cases:
             with self.subTest(name=name):

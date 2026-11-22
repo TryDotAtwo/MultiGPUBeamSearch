@@ -9,6 +9,7 @@ from pathlib import Path
 import re
 import socket
 import struct
+import time
 import sys
 
 import torch
@@ -316,6 +317,15 @@ def main(argv=None, *, scorer_factory=None, manage_process_group=True):
             resolved_handoff = resolver.resolve_panel_v2_handoff(
                 args.run_root, args.handoff_receipt
             )
+            for variable, expected in (
+                ("MGBS_CNOT_EXPECTED_CHECKPOINT_SHA256", resolved_handoff.checkpoint_sha256),
+                ("MGBS_CNOT_EXPECTED_SEARCH_MANIFEST_SHA256", resolved_handoff.search_manifest_sha256),
+            ):
+                current = os.environ.get(variable)
+                if current is not None and current != expected:
+                    raise ValueError(f"{variable} differs from the pinned producer handoff")
+                os.environ[variable] = expected
+            os.environ["MGBS_TQP_MANIFEST"] = str(resolved_handoff.search_manifest)
             output_root = Path(args.run_root).resolve(strict=True)
             args.output = args.output.resolve()
             args.output.relative_to(output_root)
@@ -501,7 +511,7 @@ def _control_target(move, n):
     return control, slot + (slot >= control)
 
 
-def _panel_result_row(panel_root, result):
+def _panel_result_row(panel_root, result, wall_seconds):
     n = panel_root["dimension"]
     start = _rows_from_panel_root(panel_root)
     status = result.status
@@ -528,9 +538,13 @@ def _panel_result_row(panel_root, result):
         word = {
             "control_target": [list(_control_target(move, n)) for move in reduction_moves],
             "physical_cost": len(reduction_moves),
+            "direction": "original_matrix_to_identity",
             "replayed": True,
         }
-        end = [1 << row for row in range(n)]
+        words = (n + 63) // 64
+        end = [0] * (n * words)
+        for row in range(n):
+            end[row * words + row // 64] |= 1 << (row % 64)
     return {
         "panel_index": panel_root["panel_index"],
         "case_id": panel_root["case_id"],
@@ -543,6 +557,7 @@ def _panel_result_row(panel_root, result):
         "end_packed_rows": end,
         "terminal_reason": status,
         "expanded_layers": len(result.layers),
+        "wall_seconds": wall_seconds,
     }
 
 
@@ -550,11 +565,15 @@ def _search_handoff_panel(args, resolved, device, world, *, scorer_factory):
     resolver = _load_handoff_resolver()
     expansion_bound = resolver.validate_search_contract(resolved.search)
     provenance = _adapter_provenance()
+    scorer_library_sha256 = hashlib.sha256(Path(args.library).read_bytes()).hexdigest()
     identity = {
         "producer_source_revision": resolved.producer_source_revision,
         "producer_emitter_sha256": resolved.producer_emitter_sha256,
         "accepted_updates": resolved.accepted_updates,
         "checkpoint_sha256": resolved.checkpoint_sha256,
+        "scorer_library_sha256": scorer_library_sha256,
+        "locked_test_status": resolved.locked_test_status,
+        "locked_test_comparison_sha256": resolved.locked_test_comparison_sha256,
         "dataset_sha256": resolved.dataset_sha256,
         "search_manifest_sha256": resolved.search_manifest_sha256,
         "baseline_search_manifest_sha256": resolved.baseline_search_manifest_sha256,
@@ -593,6 +612,9 @@ def _search_handoff_panel(args, resolved, device, world, *, scorer_factory):
                     world.checked("verify Rust-owned handoff scorer", verify_native_type)
                 scorers[n] = scorer
             root = pack_rows(_rows_from_panel_root(panel_root), device=device)
+            if device.type == "cuda":
+                torch.cuda.synchronize(device)
+            search_started = time.perf_counter()
             result = search_cnot(
                 root, scorers[n],
                 width=resolved.search["global_width"],
@@ -600,9 +622,12 @@ def _search_handoff_panel(args, resolved, device, world, *, scorer_factory):
                 max_depth=resolved.search["max_depth"],
                 mode="qhat", audit=False, validation="rust", engine="rust",
             )
+            if device.type == "cuda":
+                torch.cuda.synchronize(device)
+            wall_seconds = time.perf_counter() - search_started
             row = world.checked(
                 "independently replay handoff panel result",
-                lambda: _panel_result_row(panel_root, result) if world.rank == 0 else None,
+                lambda: _panel_result_row(panel_root, result, wall_seconds) if world.rank == 0 else None,
             )
             if world.rank == 0:
                 result_rows.append(row)
@@ -631,6 +656,12 @@ def _search_handoff_panel(args, resolved, device, world, *, scorer_factory):
         "adapter": provenance,
         "execution_backend": "cpu_gloo" if device.type == "cpu" else "cuda_distributed",
         "world_size": world.size,
+        "world": world.size,
+        "status": "completed",
+        "engine": "rust",
+        "scorer_library_sha256": scorer_library_sha256,
+        "locked_test_status": resolved.locked_test_status,
+        "locked_test_comparison_sha256": resolved.locked_test_comparison_sha256,
         "rows": result_rows if world.rank == 0 else None,
     }
 

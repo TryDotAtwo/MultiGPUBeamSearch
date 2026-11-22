@@ -17,10 +17,15 @@ class VastCampaignWorkflowTests(unittest.TestCase):
         self.assertIn("--run-id \"$GITHUB_RUN_ID\" --attempt \"$GITHUB_RUN_ATTEMPT\"", workflow)
 
         preflight = workflow.split("id: preflight", 1)[1].split("\n      - name:", 1)[0]
+        first_get = preflight.index('"https://console.vast.ai/api/v0/instances/"')
         label_put = preflight.index("instances/${VAST_INSTANCE_ID}/")
         fresh_get = preflight.index('"https://console.vast.ai/api/v0/instances/"', label_put)
         verify = preflight.index("tools/vast_campaign_guard.py verify", fresh_get)
         safe_output = preflight.index('echo "safe_to_stop=true"', verify)
+        root_guard = preflight.index('[[ -n "$HANDOFF_RUN_ROOT" ]]')
+        self.assertLess(root_guard, first_get)
+        self.assertLess(root_guard, label_put)
+        self.assertLess(root_guard, fresh_get)
         self.assertLess(label_put, fresh_get)
         self.assertLess(fresh_get, verify)
         self.assertLess(verify, safe_output)
@@ -57,6 +62,7 @@ class VastCampaignWorkflowTests(unittest.TestCase):
         self.assertNotIn("inputs.spend_cap_usd", workflow)
         self.assertIn("secrets.VAST_CNOT_ACCEPTANCE_INSTANCE_ID", workflow)
         self.assertIn("secrets.VAST_CNOT_ACCEPTANCE_CAP_USD", workflow)
+        self.assertIn("secrets.VAST_CNOT_HANDOFF_RUN_ROOT", workflow)
         self.assertNotIn('cat "$status"', workflow)
         self.assertNotIn('cat "$remote_log"', workflow)
         self.assertNotIn('cat "$lifecycle"', workflow)
@@ -78,6 +84,25 @@ class VastCampaignWorkflowTests(unittest.TestCase):
         ):
             self.assertNotIn(private_path, upload)
 
+    def test_private_handoff_runs_before_scorer_build_and_uses_locked_panel_pair(self):
+        worker = (ROOT / "tools/vast_cnot_gpu_acceptance.sh").read_text(encoding="utf-8")
+        self.assertLess(worker.index("validate_cnot_handoff.py"), worker.index("integrations/cnot_scorer/build.py"))
+        self.assertIn('--handoff-receipt "$handoff_receipt"', worker)
+        self.assertIn('--run-root "$handoff_run_root"', worker)
+        self.assertIn("--case panel --backend nccl --mode qhat --engine rust --require-rust-scorer", worker)
+        self.assertIn('run_panel_case cnot-panel-test-qhat-1-gpu "${physical_gpu_uuids[0]}" 1', worker)
+        self.assertIn('run_panel_case cnot-panel-test-qhat-2-gpu "${physical_gpu_uuids[0]},${physical_gpu_uuids[1]}" 2', worker)
+        self.assertIn('--panel-result-dir "$panel_result_dir" --handoff-preflight "$handoff_preflight"', worker)
+        self.assertIn('--manifest "$manifest"', worker, "GL4 direct-manifest runs remain isolated smoke cases")
+
+        workflow = (ROOT / ".github/workflows/vast-cnot-control-collectives.yml").read_text(encoding="utf-8")
+        self.assertIn("REMOTE_CNOT_HANDOFF_ROOT_PREFLIGHT_OK status=ready", workflow)
+        self.assertIn('VAST_REMOTE_HANDOFF_RUN_ROOT="$HANDOFF_RUN_ROOT"', workflow)
+        self.assertIn('VAST_REMOTE_RESULTS_RELATIVE="private-cnot-acceptance-v1"', workflow)
+        preflight_parser = (ROOT / "tools/vast_private_preflight.py").read_text(encoding="utf-8")
+        self.assertIn("HANDOFF_ROOT_RECEIPT_PATTERN", preflight_parser)
+        self.assertIn("handoff_root_preflight", preflight_parser)
+
     def test_installed_wheel_ci_publishes_only_redacted_status(self):
         workflow = (ROOT / ".github/workflows/installed-wheel-validation.yml").read_text(encoding="utf-8")
         self.assertIn("Write redacted hosted validation status", workflow)
@@ -94,6 +119,8 @@ class VastCampaignWorkflowTests(unittest.TestCase):
         transport = (ROOT / "tools/vast_result_transport.sh").read_text(encoding="utf-8")
         self.assertNotIn("VAST_SSH_RESULTS", transport)
         self.assertIn("VAST_REMOTE_RESULTS_RELATIVE", transport)
+        self.assertIn("VAST_REMOTE_HANDOFF_RUN_ROOT", transport)
+        self.assertIn('"private-cnot-acceptance-v1"', transport)
         self.assertNotIn("tail -n", transport)
         self.assertNotIn('cat "$VAST_SSH_LOG"', transport)
         self.assertIn("REMOTE_GPU_STATUS=passed", transport)

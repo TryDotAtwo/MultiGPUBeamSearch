@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 from pathlib import Path
 import sys
 import tempfile
@@ -209,11 +210,224 @@ def _write_permutation_report(root, report):
     )
 
 
+PANEL_SEARCH = {
+    "global_width": 36,
+    "shortlist": 4,
+    "max_depth": 8,
+    "max_expansions": 201,
+}
+PANEL_IDS = ["locked-case-a", "locked-case-b"]
+PANEL_INDICES = [3, 9]
+PANEL_ROOTS = [
+    {
+        "panel_index": 3,
+        "case_id": "locked-case-a",
+        "dimension": 3,
+        "alphabet_id": "all_to_all_unit_cnot:3",
+        "orientation": "row_target_xor_row_control",
+        "start_packed_rows": [1, 3, 5],
+    },
+    {
+        "panel_index": 9,
+        "case_id": "locked-case-b",
+        "dimension": 3,
+        "alphabet_id": "all_to_all_unit_cnot:3",
+        "orientation": "row_target_xor_row_control",
+        "start_packed_rows": [3, 2, 4],
+    },
+]
+LOCKED_COMPARISON_SHA = "7" * 64
+TRAINING_MANIFEST_SHA = "8" * 64
+TRAINING_RESULT_SHA = "9" * 64
+DATASET_SHA = "a" * 64
+BASELINE_MANIFEST_SHA = "c" * 64
+PRODUCER_SOURCE_SHA = "d" * 40
+PRODUCER_EMITTER_SHA = "e" * 64
+
+
+def _panel_preflight():
+    rows = [
+        {
+            "panel_index": 3,
+            "case_id": "locked-case-a",
+            "dimension": 3,
+            "alphabet_id": "all_to_all_unit_cnot:3",
+            "status": "solved",
+            "physical_cost": 2,
+            "start_packed_rows_sha256": verify_cnot_gpu_pair._panel_json_digest([1, 3, 5]),
+        },
+        {
+            "panel_index": 9,
+            "case_id": "locked-case-b",
+            "dimension": 3,
+            "alphabet_id": "all_to_all_unit_cnot:3",
+            "status": "depth_limit",
+            "physical_cost": None,
+            "start_packed_rows_sha256": verify_cnot_gpu_pair._panel_json_digest([3, 2, 4]),
+        },
+    ]
+    roots = [
+        {
+            "panel_index": row["panel_index"],
+            "case_id": row["case_id"],
+            "dimension": row["dimension"],
+            "alphabet_id": row["alphabet_id"],
+            "orientation": "row_target_xor_row_control",
+            "start_packed_rows_sha256": row["start_packed_rows_sha256"],
+        }
+        for row in rows
+    ]
+    return {
+        "schema": "cnot103_mgbs_handoff_preflight_v1",
+        "status": "passed",
+        "producer_source_revision": PRODUCER_SOURCE_SHA,
+        "producer_emitter_sha256": PRODUCER_EMITTER_SHA,
+        "accepted_updates": 8,
+        "checkpoint_sha256": CHECKPOINT_SHA,
+        "dataset_sha256": DATASET_SHA,
+        "training_manifest_sha256": TRAINING_MANIFEST_SHA,
+        "training_result_sha256": TRAINING_RESULT_SHA,
+        "search_manifest_sha256": MANIFEST_SHA,
+        "baseline_search_manifest_sha256": BASELINE_MANIFEST_SHA,
+        "search_manifest_relative_path": "manifests/locked-test-search.json",
+        "locked_test_status": "length_gain",
+        "locked_test_comparison_sha256": LOCKED_COMPARISON_SHA,
+        "panel": "test",
+        "panel_indices": PANEL_INDICES,
+        "panel_ids": PANEL_IDS,
+        "panel_digest": "b" * 64,
+        "search": dict(PANEL_SEARCH),
+        "orientation": "row_target_xor_row_control",
+        "artifact_path_policy": "same_run_root_mount",
+        "baseline_solved_count": 1,
+        "baseline_total_physical_cost": 3,
+        "candidate_solved_count": 1,
+        "candidate_total_physical_cost": 2,
+        "root_pins": roots,
+        "candidate_cases": rows,
+    }
+
+
+def _panel_row(root, *, status, gates=None, cost=None):
+    n = root["dimension"]
+    if status == "solved":
+        endpoint = [1, 2, 4]
+        word = {
+            "control_target": gates,
+            "physical_cost": cost,
+            "direction": "original_matrix_to_identity",
+            "replayed": True,
+        }
+    else:
+        endpoint, word = None, None
+    return {
+        "panel_index": root["panel_index"],
+        "case_id": root["case_id"],
+        "dimension": n,
+        "alphabet_id": root["alphabet_id"],
+        "orientation": root["orientation"],
+        "start_packed_rows": root["start_packed_rows"],
+        "status": status,
+        "word": word,
+        "end_packed_rows": endpoint,
+        "terminal_reason": status,
+        "expanded_layers": 2,
+        "wall_seconds": 0.5,
+    }
+
+
+def _write_panel_result(directory: Path, world: int):
+    directory.mkdir(parents=True, exist_ok=True)
+    case_id = f"cnot-panel-test-qhat-{world}-gpu"
+    report = {
+        "schema": "cnot103_mgbs_panel_search_result_v1",
+        "producer_source_revision": PRODUCER_SOURCE_SHA,
+        "producer_emitter_sha256": PRODUCER_EMITTER_SHA,
+        "accepted_updates": 8,
+        "checkpoint_sha256": CHECKPOINT_SHA,
+        "scorer_library_sha256": SCORER_SHA,
+        "dataset_sha256": DATASET_SHA,
+        "search_manifest_sha256": MANIFEST_SHA,
+        "baseline_search_manifest_sha256": BASELINE_MANIFEST_SHA,
+        "training_manifest_sha256": TRAINING_MANIFEST_SHA,
+        "training_result_sha256": TRAINING_RESULT_SHA,
+        "locked_test_status": "length_gain",
+        "locked_test_comparison_sha256": LOCKED_COMPARISON_SHA,
+        "panel": "test",
+        "panel_indices": PANEL_INDICES,
+        "panel_ids": PANEL_IDS,
+        "panel_digest": "b" * 64,
+        "panel_roots": PANEL_ROOTS,
+        "search": dict(PANEL_SEARCH),
+        "head": "qhat",
+        "runtime_contract": "native_device_search_v13",
+        "expansion_upper_bound": 201,
+        "orientation": "row_target_xor_row_control",
+        "adapter": verify_cnot_gpu_pair.expected_panel_adapter_provenance(),
+        "execution_backend": "cuda_distributed",
+        "world_size": world,
+        "world": world,
+        "status": "completed",
+        "engine": "rust",
+        "devices": [
+            {
+                "rank": rank,
+                "pid": 7000 + world * 10 + rank,
+                "device": f"cuda:{rank}",
+                "gpu_uuid": f"GPU-{rank + 1:04d}",
+            }
+            for rank in range(world)
+        ],
+        "rows": [
+            _panel_row(PANEL_ROOTS[0], status="solved", gates=[[0, 2], [0, 1]], cost=2),
+            _panel_row(PANEL_ROOTS[1], status="depth_limit"),
+        ],
+    }
+    digest = protocol.report_sha256(report)
+    report["acceptance"] = {
+        "schema": protocol.EVENT_SCHEMA,
+        "version": protocol.EVENT_VERSION,
+        "run_id": RUN_ID,
+        "case_id": case_id,
+        "source_sha": SOURCE_SHA,
+        "wheel_sha256": WHEEL_SHA,
+        "world": world,
+        "transport": "single_rank_no_exchange" if world == 1 else "rust_stream5_nccl",
+        "report_sha256": digest,
+    }
+    (directory / f"{case_id}.json").write_text(json.dumps(report), encoding="utf-8")
+    event_dir = directory / "backend-events"
+    event_dir.mkdir(exist_ok=True)
+    event = {
+        "status": "accepted",
+        "run_id": RUN_ID,
+        "case_id": case_id,
+        "source_sha": SOURCE_SHA,
+        "wheel_sha256": WHEEL_SHA,
+        "world": world,
+        "report_sha256": report["acceptance"]["report_sha256"],
+        "rank_devices": report["devices"],
+        "single_rank_transport": world == 1,
+    }
+    (event_dir / f"{case_id}.json").write_text(json.dumps(event), encoding="utf-8")
+    return report
+
+
+def _build_panel_campaign(root: Path):
+    panel_dir = root / "panel"
+    _write_panel_result(panel_dir, 1)
+    _write_panel_result(panel_dir, 2)
+    (root / "handoff-preflight.json").write_text(
+        json.dumps(_panel_preflight()), encoding="utf-8"
+    )
+
+
 def _build_campaign(root: Path):
     _build_case(root, "cnot-trained-qhat-1-gpu", 1, "qhat", 8, 11)
     left = _build_case(root, "cnot-trained-deep-paired-1-gpu", 1, "proposal", 2, 3)
     right = _build_case(root, "cnot-trained-deep-paired-2-gpu", 2, "proposal", 2, 3)
     _write_permutation_report(root, _build_permutation_report())
+    _build_panel_campaign(root)
     return left, right
 
 
@@ -227,10 +441,96 @@ def _validate(root: Path, instance_id="987654321"):
         SCORER_SHA,
         WHEEL_SHA,
         RUN_ID,
+        root / "panel",
+        root / "handoff-preflight.json",
     )
 
 
 class VerifyCnotGpuPairTests(unittest.TestCase):
+    def test_locked_panel_pair_is_bound_to_producer_receipt_and_replays_original_matrices(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            _build_panel_campaign(root)
+            result = verify_cnot_gpu_pair.validate_panel_gpu_pair(
+                root / "panel", root / "handoff-preflight.json",
+                source_sha=SOURCE_SHA, wheel_sha=WHEEL_SHA,
+                scorer_library_sha=SCORER_SHA, run_id=RUN_ID,
+            )
+            self.assertTrue(result["ordered_results_match"])
+            self.assertTrue(result["independent_replay"])
+            self.assertEqual(result["locked_test_status"], "length_gain")
+            self.assertEqual(result["world_sizes"], [1, 2])
+            self.assertEqual(result["case_count"], 2)
+
+    def test_rejects_changed_candidate_aggregate(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            _build_panel_campaign(root)
+            path = root / "handoff-preflight.json"
+            preflight = json.loads(path.read_text(encoding="utf-8"))
+            preflight["candidate_total_physical_cost"] = 3
+            path.write_text(json.dumps(preflight), encoding="utf-8")
+            with self.assertRaises(ValueError):
+                verify_cnot_gpu_pair.validate_panel_gpu_pair(
+                    root / "panel", path, source_sha=SOURCE_SHA,
+                    wheel_sha=WHEEL_SHA, scorer_library_sha=SCORER_SHA, run_id=RUN_ID,
+                )
+
+    def test_rejects_native_adapter_hash_or_endpoint_mismatch(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            _build_panel_campaign(root)
+            path = root / "panel" / "cnot-panel-test-qhat-1-gpu.json"
+            report = json.loads(path.read_text(encoding="utf-8"))
+            report["adapter"]["adapter_source_sha256"] = "0" * 64
+            report["acceptance"]["report_sha256"] = protocol.report_sha256(report)
+            path.write_text(json.dumps(report), encoding="utf-8")
+            with self.assertRaises(ValueError):
+                verify_cnot_gpu_pair.validate_panel_gpu_pair(
+                    root / "panel", root / "handoff-preflight.json",
+                    source_sha=SOURCE_SHA, wheel_sha=WHEEL_SHA,
+                    scorer_library_sha=SCORER_SHA, run_id=RUN_ID,
+                )
+
+    def test_rejects_locked_panel_root_replay_cost_and_comparison_mismatches(self):
+        mutations = ("root", "replay", "cost", "comparison", "order", "backend_event")
+        for mutation in mutations:
+            with self.subTest(mutation=mutation), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                _build_panel_campaign(root)
+                panel_path = root / "panel" / "cnot-panel-test-qhat-2-gpu.json"
+                report = json.loads(panel_path.read_text(encoding="utf-8"))
+                if mutation == "backend_event":
+                    event_path = root / "panel" / "backend-events" / "cnot-panel-test-qhat-2-gpu.json"
+                    event = json.loads(event_path.read_text(encoding="utf-8"))
+                    event["rank_devices"][1]["gpu_uuid"] = event["rank_devices"][0]["gpu_uuid"]
+                    event_path.write_text(json.dumps(event), encoding="utf-8")
+                    with self.assertRaises(ValueError):
+                        verify_cnot_gpu_pair.validate_panel_gpu_pair(
+                            root / "panel", root / "handoff-preflight.json",
+                            source_sha=SOURCE_SHA, wheel_sha=WHEEL_SHA,
+                            scorer_library_sha=SCORER_SHA, run_id=RUN_ID,
+                        )
+                    continue
+                if mutation == "root":
+                    report["rows"][0]["start_packed_rows"] = [1, 2, 4]
+                elif mutation == "replay":
+                    report["rows"][0]["word"]["control_target"] = [[0, 1], [0, 1]]
+                elif mutation == "cost":
+                    report["rows"][0]["word"]["physical_cost"] = 1
+                elif mutation == "comparison":
+                    report["locked_test_comparison_sha256"] = "0" * 64
+                else:
+                    report["rows"].reverse()
+                report["acceptance"]["report_sha256"] = protocol.report_sha256(report)
+                panel_path.write_text(json.dumps(report), encoding="utf-8")
+                with self.assertRaises(ValueError):
+                    verify_cnot_gpu_pair.validate_panel_gpu_pair(
+                        root / "panel", root / "handoff-preflight.json",
+                        source_sha=SOURCE_SHA, wheel_sha=WHEEL_SHA,
+                        scorer_library_sha=SCORER_SHA, run_id=RUN_ID,
+                    )
+
     def test_serialized_per_case_receipts_join_to_one_campaign(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

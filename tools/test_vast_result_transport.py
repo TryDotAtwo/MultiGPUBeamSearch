@@ -86,7 +86,7 @@ tokens = shlex.split(command)
 if ("987654321" not in tokens
         or "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc" not in command
         or "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd" not in command
-        or tokens[-3:] != ["123456789", "2", "test_results/refactor_20261121/gpu-acceptance"]):
+        or tokens[-4:] != ["123456789", "2", "private-cnot-acceptance-v1", "/private/synthetic-handoff-root"]):
     print("the selected instance, private pins, GitHub attempt or result path was not passed to the remote receipt", file=sys.stderr)
     raise SystemExit(94)
 if not authorized_key.exists():
@@ -157,7 +157,8 @@ class VastResultTransportTests(unittest.TestCase):
             "VAST_SSH_RESULTS": str(results_archive),
             "VAST_SSH_SCRIPT": str(remote_script),
             "VAST_REMOTE_ROOT": "/workspace/synthetic-run",
-            "VAST_REMOTE_RESULTS_RELATIVE": "test_results/refactor_20261121/gpu-acceptance",
+            "VAST_REMOTE_RESULTS_RELATIVE": "private-cnot-acceptance-v1",
+            "VAST_REMOTE_HANDOFF_RUN_ROOT": "/private/synthetic-handoff-root",
             "VAST_REMOTE_RUNTIME_MAX_SECONDS": "1200",
             "VAST_BUDGET_DEADLINE_EPOCH": str(int(time.time()) + deadline_seconds_from_now),
             "VAST_STOP_RESERVE_SECONDS": "1200",
@@ -212,7 +213,11 @@ class VastResultTransportTests(unittest.TestCase):
         worker_dir = source_dir / "tools"
         worker_dir.mkdir(parents=True)
         run_root = root / "remote-run"
-        result_dir = run_root / "test_results/refactor_20261121/gpu-acceptance"
+        handoff_run_root = root / "private-handoff"
+        reports_dir = handoff_run_root / "reports"
+        reports_dir.mkdir(parents=True)
+        (reports_dir / "learning-curve.private.json").write_text("{}", encoding="utf-8")
+        result_dir = reports_dir / "mgbs-acceptance-123456789-2"
         receipt_path = result_dir / "receipt.json"
         worker_events_path = root / "worker-events.jsonl"
 
@@ -282,7 +287,7 @@ class VastResultTransportTests(unittest.TestCase):
                 "ssh-ed25519 synthetic", str(root / "source.tar.gz"), "a" * 64,
                 "b" * 40, "987654321", "c" * 64,
                 "92f3ec8e6a6ef831916a9d3ba9bbdae9307c9850d61334916a2b3e690c0020c4",
-                "123456789", "2", "test_results/refactor_20261121/gpu-acceptance",
+                "123456789", "2", "private-cnot-acceptance-v1", str(handoff_run_root),
             ],
             env=environment,
             text=True,

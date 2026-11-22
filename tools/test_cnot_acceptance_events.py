@@ -237,6 +237,57 @@ class AcceptanceEventProtocolTest(unittest.TestCase):
                 self.assertEqual(receipt["world"], world)
                 self.assertEqual(receipt["single_rank_transport"], world == 1)
 
+    def test_panel_report_binds_top_level_pins_without_a_smoke_model_object(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            trace, report, events = build_bundle(
+                temporary, world=1, case_id="cnot-panel-test-qhat-1-gpu"
+            )
+            report["schema"] = "cnot103_mgbs_panel_search_result_v1"
+            report["status"] = "completed"
+            report["checkpoint_sha256"] = CHECKPOINT_SHA
+            report["search_manifest_sha256"] = MANIFEST_SHA
+            report["scorer_library_sha256"] = SCORER_SHA
+            report.pop("model", None)
+            digest = protocol.report_sha256(report)
+            report["acceptance"]["report_sha256"] = digest
+            for event in events:
+                if event["kind"] == "search_terminal":
+                    event["fields"] = {"status": "completed", "report_sha256": digest}
+            trace = rewrite_bundle(
+                temporary, report["acceptance"]["run_id"],
+                report["acceptance"]["case_id"], events,
+            )
+            accepted = protocol.validate_case(
+                trace, temporary, report,
+                expected_source_sha=SOURCE_SHA,
+                expected_wheel_sha256=WHEEL_SHA,
+                expected_checkpoint_sha256=CHECKPOINT_SHA,
+                expected_manifest_sha256=MANIFEST_SHA,
+                expected_scorer_library_sha256=SCORER_SHA,
+            )
+            self.assertEqual(accepted["status"], "accepted")
+            self.assertEqual(accepted["world"], 1)
+
+            report["checkpoint_sha256"] = "0" * 64
+            bad_digest = protocol.report_sha256(report)
+            report["acceptance"]["report_sha256"] = bad_digest
+            for event in events:
+                if event["kind"] == "search_terminal":
+                    event["fields"] = {"status": "completed", "report_sha256": bad_digest}
+            trace = rewrite_bundle(
+                temporary, report["acceptance"]["run_id"],
+                report["acceptance"]["case_id"], events,
+            )
+            with self.assertRaises(protocol.ValidationError):
+                protocol.validate_case(
+                    trace, temporary, report,
+                    expected_source_sha=SOURCE_SHA,
+                    expected_wheel_sha256=WHEEL_SHA,
+                    expected_checkpoint_sha256=CHECKPOINT_SHA,
+                    expected_manifest_sha256=MANIFEST_SHA,
+                    expected_scorer_library_sha256=SCORER_SHA,
+                )
+
     def test_repeated_operation_dispatch_is_valid_and_not_deduplicated(self):
         with tempfile.TemporaryDirectory() as temporary:
             trace, report, events = build_bundle(temporary, 2)

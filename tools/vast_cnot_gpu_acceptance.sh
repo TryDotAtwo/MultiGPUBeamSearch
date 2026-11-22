@@ -9,6 +9,7 @@ instance_id="$5"
 manifest_sha="$6"
 checkpoint_sha="$7"
 acceptance_run_id="$8"
+handoff_run_root="$9"
 
 python_bin="$(command -v python3)"
 command -v cargo >/dev/null
@@ -17,6 +18,20 @@ command -v ninja >/dev/null
 command -v git >/dev/null
 cuda_path="${CUDA_PATH:-/usr/local/cuda}"
 [[ -x "${cuda_path}/bin/nvcc" ]]
+[[ "$handoff_run_root" == /private/* && "$handoff_run_root" != *"/../"* && "$handoff_run_root" != */.. ]]
+python3 - "$handoff_run_root" <<'PY'
+from pathlib import Path
+import sys
+root = Path(sys.argv[1])
+if not root.is_absolute() or root.parts[:2] != ("/", "private") or len(root.parts) < 3:
+    raise SystemExit("private handoff root is outside the approved mount")
+if root.resolve(strict=True) != root or root.is_symlink():
+    raise SystemExit("private handoff root is not canonical")
+reports = root / "reports"
+receipt = reports / "learning-curve.private.json"
+if reports.is_symlink() or not reports.is_dir() or receipt.is_symlink() or not receipt.is_file():
+    raise SystemExit("private handoff receipt is unavailable")
+PY
 upstream=/private/TheQuantumProject
 manifest=/private/gl4/search-qhat.json
 expected_upstream=c5b3e3f93b45aa7e533fd2c06209c28ce516ffeb
@@ -52,6 +67,35 @@ export LIBTORCH_USE_PYTORCH=1
 wheel_dir="${run_root}/wheel-dist"
 venv="${run_root}/venv"
 mkdir -p "$wheel_dir" "${run_root}/wheel-smoke" "$result_dir"
+handoff_receipt="${handoff_run_root}/reports/learning-curve.private.json"
+handoff_preflight="${result_dir}/handoff-preflight.json"
+panel_result_dir="${result_dir}/panel"
+[[ ! -e "$handoff_preflight" && ! -L "$handoff_preflight" && ! -e "$panel_result_dir" && ! -L "$panel_result_dir" ]]
+mkdir -p "$panel_result_dir"
+"$python_bin" "$source_dir/tools/validate_cnot_handoff.py" \
+  --run-root "$handoff_run_root" --source-root "$source_dir" --output "$handoff_preflight"
+mapfile -t panel_pins < <("$python_bin" - "$handoff_preflight" "$handoff_run_root" <<'PY'
+import json
+import pathlib
+import sys
+report = json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))
+root = pathlib.Path(sys.argv[2]).resolve(strict=True)
+relative = pathlib.PurePosixPath(report["search_manifest_relative_path"])
+if relative.is_absolute() or ".." in relative.parts:
+    raise SystemExit("preflight manifest path is not run-relative")
+manifest = root.joinpath(*relative.parts).resolve(strict=True)
+if not manifest.is_relative_to(root):
+    raise SystemExit("preflight manifest escaped the private run root")
+print(report["checkpoint_sha256"])
+print(report["search_manifest_sha256"])
+print(manifest)
+PY
+)
+[[ "${#panel_pins[@]}" == 3 ]]
+panel_checkpoint_sha="${panel_pins[0]}"
+panel_manifest_sha="${panel_pins[1]}"
+panel_manifest="${panel_pins[2]}"
+[[ "$(sha256sum "$panel_manifest" | awk '{print $1}')" == "$panel_manifest_sha" ]]
 cd "$source_dir/integrations/cayleypy_native"
 cutlass_cache="/private/cache/cayleypy-native"
 cutlass_dir="$("$python_bin" - "$source_dir" "$cutlass_cache" <<'PY'
@@ -186,6 +230,31 @@ run_trained_case() {
     return "$case_exit"
   fi
 }
+run_panel_case() {
+  local case_id="$1" visible_devices="$2" nproc="$3" gpu_uuid_list="$4"
+  local case_log="${panel_result_dir}/${case_id}.log"
+  if CUDA_VISIBLE_DEVICES="$visible_devices" \
+    MGBS_TQP_MANIFEST="$panel_manifest" \
+    MGBS_CNOT_EXPECTED_CHECKPOINT_SHA256="$panel_checkpoint_sha" \
+    MGBS_CNOT_EXPECTED_SEARCH_MANIFEST_SHA256="$panel_manifest_sha" \
+    MGBS_CNOT_ACCEPTANCE_RUN_ID="$acceptance_run_id" \
+    MGBS_CNOT_ACCEPTANCE_CASE="$case_id" \
+    MGBS_CNOT_ACCEPTANCE_SOURCE_SHA="$source_sha" \
+    MGBS_CNOT_ACCEPTANCE_WHEEL_SHA256="$wheel_sha256" \
+    MGBS_CNOT_ACCEPTANCE_GPU_UUIDS="$gpu_uuid_list" \
+    "$wheel_python" -m torch.distributed.run --standalone --nproc_per_node="$nproc" \
+    "$source_dir/tools/verify_cnot.py" \
+    --case panel --backend nccl --mode qhat --engine rust --require-rust-scorer \
+    --library "$scorer_library" --handoff-receipt "$handoff_receipt" \
+    --run-root "$handoff_run_root" --output "${panel_result_dir}/${case_id}.json" \
+    >"$case_log" 2>&1; then
+    cat "$case_log"
+  else
+    local case_exit=$?
+    cat "$case_log"
+    return "$case_exit"
+  fi
+}
 run_trained_case cnot-trained-qhat-1-gpu "${physical_gpu_uuids[0]}" 1 "${physical_gpu_uuids[0]}" \
   --case trained --backend nccl --mode qhat --engine rust --require-rust-scorer \
   --library "$scorer_library" --manifest "$manifest" \
@@ -200,7 +269,9 @@ run_trained_case cnot-trained-deep-paired-2-gpu "${physical_gpu_uuids[0]},${phys
   --output "${result_dir}/cnot-trained-deep-paired-2-gpu.json"
 "$wheel_python" -m torch.distributed.run --standalone --nproc_per_node=2 "$source_dir/integrations/cayleypy_native/tests/cnot_stream5_control_nccl.py"
 "$wheel_python" -m torch.distributed.run --standalone --nproc_per_node=2 "$source_dir/integrations/cayleypy_native/tests/cnot_device_unseen_distributed.py"
-mkdir -p "${result_dir}/backend-events"
+run_panel_case cnot-panel-test-qhat-1-gpu "${physical_gpu_uuids[0]}" 1 "${physical_gpu_uuids[0]}"
+run_panel_case cnot-panel-test-qhat-2-gpu "${physical_gpu_uuids[0]},${physical_gpu_uuids[1]}" 2 "${physical_gpu_uuids[0]},${physical_gpu_uuids[1]}"
+mkdir -p "${result_dir}/backend-events" "${panel_result_dir}/backend-events"
 for case_id in cnot-trained-qhat-1-gpu cnot-trained-deep-paired-1-gpu cnot-trained-deep-paired-2-gpu; do
   "$python_bin" "$source_dir/tools/cnot_acceptance_events.py" validate \
     --trace "${result_dir}/${case_id}.log" --receipts "$CNOT_RUST_EVIDENCE" \
@@ -209,8 +280,19 @@ for case_id in cnot-trained-qhat-1-gpu cnot-trained-deep-paired-1-gpu cnot-train
     --expected-manifest-sha256 "$manifest_sha" --expected-scorer-library-sha256 "$scorer_sha256" \
     > "${result_dir}/backend-events/${case_id}.json"
 done
+for case_id in cnot-panel-test-qhat-1-gpu cnot-panel-test-qhat-2-gpu; do
+  "$python_bin" "$source_dir/tools/cnot_acceptance_events.py" validate \
+    --trace "${panel_result_dir}/${case_id}.log" --receipts "$CNOT_RUST_EVIDENCE" \
+    --report "${panel_result_dir}/${case_id}.json" \
+    --expected-source-sha "$source_sha" --expected-wheel-sha256 "$wheel_sha256" \
+    --expected-checkpoint-sha256 "$panel_checkpoint_sha" \
+    --expected-manifest-sha256 "$panel_manifest_sha" \
+    --expected-scorer-library-sha256 "$scorer_sha256" \
+    > "${panel_result_dir}/backend-events/${case_id}.json"
+done
 "$python_bin" "$source_dir/tools/verify_cnot_gpu_pair.py" \
   --result-dir "$result_dir" --source-sha "$source_sha" --instance-id "$instance_id" \
   --manifest-sha256 "$manifest_sha" --checkpoint-sha256 "$expected_checkpoint" \
   --scorer-library-sha256 "$scorer_sha256" --wheel-sha256 "$wheel_sha256" \
-  --run-id "$acceptance_run_id"
+  --run-id "$acceptance_run_id" \
+  --panel-result-dir "$panel_result_dir" --handoff-preflight "$handoff_preflight"

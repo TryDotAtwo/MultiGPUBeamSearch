@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 from pathlib import Path
 import re
@@ -353,11 +354,356 @@ def validate_permutation_report(report, source_sha, wheel_sha, run_id):
         "cases": case_summaries,
     }
 
+def _packed_identity(n):
+    words = (n + 63) // 64
+    lanes = [0] * (n * words)
+    for row in range(n):
+        lanes[row * words + row // 64] |= 1 << (row % 64)
+    return lanes
+
+
+def _panel_json_digest(value):
+    return __import__("hashlib").sha256(
+        json.dumps(value, sort_keys=True, separators=(",", ":"), allow_nan=False).encode("utf-8")
+    ).hexdigest()
+
+
+def _validate_panel_row(row, expected, root_pin, label):
+    require(isinstance(row, dict), f"{label}: panel row is malformed")
+    for key in ("panel_index", "case_id", "dimension", "alphabet_id", "orientation"):
+        require(row.get(key) == expected.get(key), f"{label}: {key} differs from the locked panel")
+    require(row.get("terminal_reason") == row.get("status"),
+            f"{label}: terminal reason differs from row status")
+    require(row.get("status") in {"solved", "depth_limit", "resource_limit", "exhausted"},
+            f"{label}: unknown terminal status")
+    n = expected["dimension"]
+    words = (n + 63) // 64
+    start = row.get("start_packed_rows")
+    require(
+        isinstance(start, list) and len(start) == n * words
+        and all(_is_int(value) and 0 <= value <= 0xFFFFFFFFFFFFFFFF for value in start)
+        and _panel_json_digest(start) == root_pin["start_packed_rows_sha256"],
+        f"{label}: ordered panel root does not match the sealed dataset",
+    )
+    require(
+        type(row.get("expanded_layers")) is int and row["expanded_layers"] >= 0,
+        f"{label}: expanded-layer count is invalid",
+    )
+    wall = row.get("wall_seconds")
+    require(
+        isinstance(wall, (int, float)) and not isinstance(wall, bool)
+        and 0 <= wall < float("inf"),
+        f"{label}: per-case wall time is invalid",
+    )
+    word = row.get("word")
+    if row["status"] == "solved":
+        require(isinstance(word, dict) and word.get("replayed") is True,
+                f"{label}: solved panel result lacks replay evidence")
+        require(word.get("direction") == "original_matrix_to_identity",
+                f"{label}: reported word direction is not explicit")
+        gates = word.get("control_target")
+        cost = word.get("physical_cost")
+        require(
+            isinstance(gates, list) and type(cost) is int and cost == len(gates),
+            f"{label}: physical word cost differs from gate count",
+        )
+        replay = list(start)
+        for gate in gates:
+            require(
+                isinstance(gate, list) and len(gate) == 2
+                and type(gate[0]) is int and type(gate[1]) is int
+                and 0 <= gate[0] < n and 0 <= gate[1] < n and gate[0] != gate[1],
+                f"{label}: physical word contains an invalid CNOT",
+            )
+            control, target = gate
+            for lane in range(words):
+                replay[target * words + lane] ^= replay[control * words + lane]
+        identity = _packed_identity(n)
+        require(replay == identity and row.get("end_packed_rows") == identity,
+                f"{label}: returned word does not replay from the original matrix to identity")
+        return cost
+    require(word is None and row.get("end_packed_rows") is None,
+            f"{label}: unsolved search returned a word or endpoint")
+    return None
+
+
+def expected_panel_adapter_provenance():
+    root = Path(__file__).resolve().parents[1]
+    build_path = root / "integrations" / "cnot_scorer" / "build.py"
+    bridge_path = root / "integrations" / "cnot_scorer" / "bridge_panel_v2.rs"
+    match = re.search(
+        r'^PANEL_SEARCH_V2_SOURCE_COMMIT = "([0-9a-f]{40})"$',
+        build_path.read_text(encoding="utf-8"),
+        flags=re.MULTILINE,
+    )
+    require(match is not None, "pinned native adapter source commit is missing")
+    return {
+        "native_adapter_source_commit": match.group(1),
+        "adapter_source_sha256": hashlib.sha256(bridge_path.read_bytes()).hexdigest(),
+        "endpoint_source_sha256": hashlib.sha256((root / "tools" / "verify_cnot.py").read_bytes()).hexdigest(),
+    }
+
+
+def validate_panel_gpu_pair(panel_result_dir, handoff_preflight_path, *,
+                            source_sha, wheel_sha, scorer_library_sha, run_id):
+    """Bind 1/2-rank MGBS search results to the producer's locked test receipt."""
+    preflight = load_json(handoff_preflight_path)
+    require(isinstance(preflight, dict)
+            and preflight.get("schema") == "cnot103_mgbs_handoff_preflight_v1"
+            and preflight.get("status") == "passed",
+            "producer handoff preflight is missing or invalid")
+    require(
+        preflight.get("panel") == "test"
+        and preflight.get("artifact_path_policy") == "same_run_root_mount"
+        and preflight.get("orientation") == "row_target_xor_row_control",
+        "producer handoff does not pin the locked test orientation and mount",
+    )
+    for name in (
+        "checkpoint_sha256", "dataset_sha256", "training_manifest_sha256",
+        "training_result_sha256", "search_manifest_sha256",
+        "baseline_search_manifest_sha256", "locked_test_comparison_sha256",
+        "panel_digest",
+    ):
+        require(isinstance(preflight.get(name), str) and SHA64.fullmatch(preflight[name]),
+                f"producer handoff {name} is missing or malformed")
+    require(
+        isinstance(preflight.get("producer_source_revision"), str)
+        and SHA40.fullmatch(preflight["producer_source_revision"])
+        and isinstance(preflight.get("producer_emitter_sha256"), str)
+        and SHA64.fullmatch(preflight["producer_emitter_sha256"]),
+        "producer source or emitter pin is malformed",
+    )
+    require(
+        type(preflight.get("accepted_updates")) is int and preflight["accepted_updates"] > 0,
+        "producer handoff has no accepted training updates",
+    )
+    require(
+        preflight.get("locked_test_status") in {
+            "length_gain", "coverage_gain", "combined_gain", "tie", "no_practical_gain"
+        },
+        "producer locked-test status is unsupported",
+    )
+    search = preflight.get("search")
+    require(
+        isinstance(search, dict)
+        and search == {
+            "global_width": 36, "shortlist": 4, "max_depth": 8, "max_expansions": 201
+        },
+        "producer handoff search geometry differs from the supported preset",
+    )
+    require(preflight.get("search_manifest_relative_path")
+            and not Path(preflight["search_manifest_relative_path"]).is_absolute()
+            and ".." not in Path(preflight["search_manifest_relative_path"]).parts,
+            "producer search manifest path is not run-relative")
+    candidate_cases = preflight.get("candidate_cases")
+    candidate_solved_count = preflight.get("candidate_solved_count")
+    candidate_total_cost = preflight.get("candidate_total_physical_cost")
+    require(
+        type(candidate_solved_count) is int
+        and type(candidate_total_cost) is int
+        and isinstance(candidate_cases, list)
+        and candidate_solved_count == sum(
+            1 for row in candidate_cases
+            if isinstance(row, dict) and row.get("status") == "solved"
+        )
+        and candidate_total_cost == sum(
+            row["physical_cost"] for row in candidate_cases
+            if isinstance(row, dict) and row.get("status") == "solved"
+            and type(row.get("physical_cost")) is int
+        ),
+        "producer locked-test aggregate differs from its ordered candidate cases",
+    )
+    ids, indices = preflight.get("panel_ids"), preflight.get("panel_indices")
+    expected_cases, root_pins = preflight.get("candidate_cases"), preflight.get("root_pins")
+    require(
+        isinstance(ids, list) and ids and len(ids) == len(set(ids))
+        and isinstance(indices, list) and len(indices) == len(ids)
+        and all(type(index) is int and index >= 0 for index in indices)
+        and isinstance(expected_cases, list) and len(expected_cases) == len(ids)
+        and isinstance(root_pins, list) and len(root_pins) == len(ids),
+        "producer handoff locked cohort is empty or malformed",
+    )
+    expected_rows = []
+    for position, (case_id, index, expected, root_pin) in enumerate(
+        zip(ids, indices, expected_cases, root_pins)
+    ):
+        require(
+            isinstance(expected, dict) and isinstance(root_pin, dict)
+            and expected.get("case_id") == case_id and root_pin.get("case_id") == case_id
+            and expected.get("panel_index") == index and root_pin.get("panel_index") == index
+            and expected.get("dimension") == root_pin.get("dimension")
+            and expected.get("alphabet_id") == root_pin.get("alphabet_id")
+            and expected.get("start_packed_rows_sha256") == root_pin.get("start_packed_rows_sha256"),
+            f"producer handoff ordered case {position} differs from its sealed root",
+        )
+        expected_rows.append(expected)
+
+    result_dir = Path(panel_result_dir)
+    paths = (
+        result_dir / "cnot-panel-test-qhat-1-gpu.json",
+        result_dir / "cnot-panel-test-qhat-2-gpu.json",
+    )
+    reports = [load_json(path) for path in paths]
+    semantic_rows = []
+    report_digests = []
+    backend_event_receipts = {}
+    for expected_world, case_id, report, path in zip((1, 2), (
+        "cnot-panel-test-qhat-1-gpu", "cnot-panel-test-qhat-2-gpu"
+    ), reports, paths):
+        acceptance = report.get("acceptance")
+        require(
+            report.get("schema") == "cnot103_mgbs_panel_search_result_v1"
+            and report.get("world") == expected_world
+            and report.get("world_size") == expected_world
+            and report.get("execution_backend") == "cuda_distributed"
+            and report.get("status") == "completed"
+            and report.get("engine") == "rust"
+            and report.get("head") == "qhat"
+            and report.get("runtime_contract") == "native_device_search_v13"
+            and report.get("expansion_upper_bound") == search["max_expansions"]
+            and report.get("search") == search
+            and report.get("panel") == "test"
+            and report.get("panel_ids") == ids
+            and report.get("panel_indices") == indices
+            and report.get("panel_digest") == preflight["panel_digest"]
+            and report.get("orientation") == preflight["orientation"],
+            f"{path.name}: panel search does not match the pinned producer contract",
+        )
+        for key in (
+            "producer_source_revision", "producer_emitter_sha256", "accepted_updates",
+            "checkpoint_sha256", "dataset_sha256", "training_manifest_sha256",
+            "training_result_sha256", "search_manifest_sha256",
+            "baseline_search_manifest_sha256", "locked_test_status",
+            "locked_test_comparison_sha256",
+        ):
+            require(report.get(key) == preflight.get(key),
+                    f"{path.name}: {key} differs from the producer handoff")
+        require(
+            report.get("adapter") == expected_panel_adapter_provenance(),
+            f"{path.name}: native adapter or endpoint source SHA differs from this consumer",
+        )
+        require(
+            report.get("scorer_library_sha256") == scorer_library_sha
+            and isinstance(acceptance, dict)
+            and acceptance.get("schema") == "org.trydotatwo.multigpubeamsearch.cnot.acceptance"
+            and acceptance.get("run_id") == run_id
+            and acceptance.get("case_id") == case_id
+            and acceptance.get("source_sha") == source_sha
+            and acceptance.get("wheel_sha256") == wheel_sha
+            and acceptance.get("world") == expected_world
+            and acceptance.get("transport") == (
+                "single_rank_no_exchange" if expected_world == 1 else "rust_stream5_nccl"
+            ),
+            f"{path.name}: scorer or acceptance invocation identity is foreign",
+        )
+        digest = acceptance.get("report_sha256")
+        require(
+            isinstance(digest, str) and SHA64.fullmatch(digest)
+            and digest == report_sha256(report),
+            f"{path.name}: result body changed after its terminal receipt",
+        )
+        report_digests.append(digest)
+        event_path = result_dir / "backend-events" / f"{case_id}.json"
+        event_receipt = load_json(event_path)
+        require(
+            event_receipt.get("status") == "accepted"
+            and event_receipt.get("run_id") == run_id
+            and event_receipt.get("case_id") == case_id
+            and event_receipt.get("source_sha") == source_sha
+            and event_receipt.get("wheel_sha256") == wheel_sha
+            and event_receipt.get("world") == expected_world
+            and event_receipt.get("report_sha256") == digest
+            and acceptance.get("report_sha256") == digest
+            and event_receipt.get("single_rank_transport") == (expected_world == 1),
+            f"{path.name}: strict backend receipt differs from the panel report",
+        )
+        rank_devices = event_receipt.get("rank_devices")
+        report_devices = report.get("devices")
+        require(
+            isinstance(rank_devices, list) and len(rank_devices) == expected_world
+            and isinstance(report_devices, list) and len(report_devices) == expected_world
+            and sorted((row.get("rank"), row.get("pid"), row.get("device"), row.get("gpu_uuid"))
+                       for row in rank_devices)
+            == sorted((row.get("rank"), row.get("pid"), row.get("device"), row.get("gpu_uuid"))
+                      for row in report_devices),
+            f"{path.name}: strict backend receipts name different rank devices",
+        )
+        require(
+            len({row.get("pid") for row in rank_devices}) == expected_world
+            and (expected_world == 1 or len({row.get("gpu_uuid") for row in rank_devices}) == expected_world),
+            f"{path.name}: strict backend receipt reuses a rank or physical GPU identity",
+        )
+        backend_event_receipts[case_id] = event_receipt
+
+        report_roots = report.get("panel_roots")
+        require(isinstance(report_roots, list) and len(report_roots) == len(ids),
+                f"{path.name}: ordered source roots are missing")
+        for root, root_pin in zip(report_roots, root_pins):
+            require(
+                isinstance(root, dict)
+                and root.get("panel_index") == root_pin["panel_index"]
+                and root.get("case_id") == root_pin["case_id"]
+                and root.get("dimension") == root_pin["dimension"]
+                and root.get("alphabet_id") == root_pin["alphabet_id"]
+                and root.get("orientation") == root_pin["orientation"]
+                and _panel_json_digest(root.get("start_packed_rows"))
+                    == root_pin["start_packed_rows_sha256"],
+                f"{path.name}: root differs from the sealed dataset",
+            )
+        rows = report.get("rows")
+        require(isinstance(rows, list) and len(rows) == len(expected_rows),
+                f"{path.name}: result rows differ from the frozen cohort")
+        semantic = []
+        for row, expected, root_pin in zip(rows, expected_rows, root_pins):
+            require(
+                isinstance(row, dict) and row.get("panel_index") == expected["panel_index"]
+                and row.get("case_id") == expected["case_id"]
+                and row.get("dimension") == expected["dimension"]
+                and row.get("alphabet_id") == expected["alphabet_id"]
+                and row.get("orientation") == preflight["orientation"]
+                and row.get("status") == expected["status"],
+                f"{path.name}: case ID, order, root or locked result differs",
+            )
+            cost = _validate_panel_row(row, expected, root_pin, path.name)
+            require(cost == expected["physical_cost"],
+                    f"{path.name}: physical cost differs from the producer's locked Qhat result")
+            semantic.append({key: value for key, value in row.items() if key != "wall_seconds"})
+        semantic_rows.append(semantic)
+    require(semantic_rows[0] == semantic_rows[1],
+            "ordered locked-test results differ between one and two GPUs")
+    return {
+        "status": "accepted",
+        "panel": "test",
+        "locked_test_status": preflight["locked_test_status"],
+        "locked_test_comparison_sha256": preflight["locked_test_comparison_sha256"],
+        "checkpoint_sha256": preflight["checkpoint_sha256"],
+        "dataset_sha256": preflight["dataset_sha256"],
+        "search_manifest_sha256": preflight["search_manifest_sha256"],
+        "panel_digest": preflight["panel_digest"],
+        "panel_indices": indices,
+        "panel_ids": ids,
+        "case_count": len(ids),
+        "candidate_solved_count": preflight.get("candidate_solved_count"),
+        "candidate_total_physical_cost": preflight.get("candidate_total_physical_cost"),
+        "world_sizes": [1, 2],
+        "report_sha256": report_digests,
+        "ordered_results_match": True,
+        "independent_replay": True,
+        "strict_backend_receipts": backend_event_receipts,
+    }
 def validate(result_dir, source_sha, instance_id, manifest_sha, checkpoint_sha,
-             scorer_library_sha, wheel_sha, run_id):
+             scorer_library_sha, wheel_sha, run_id, panel_result_dir, handoff_preflight_path):
     require(validate_instance_id(str(instance_id)) == str(instance_id),
             "receipt requires the explicitly selected new positive-decimal instance ID")
     root = Path(result_dir)
+    panel_verdict = validate_panel_gpu_pair(
+        panel_result_dir,
+        handoff_preflight_path,
+        source_sha=source_sha,
+        wheel_sha=wheel_sha,
+        scorer_library_sha=scorer_library_sha,
+        run_id=run_id,
+    )
     paired_names = (
         "cnot-trained-deep-paired-1-gpu.json",
         "cnot-trained-deep-paired-2-gpu.json",
@@ -492,6 +838,7 @@ def validate(result_dir, source_sha, instance_id, manifest_sha, checkpoint_sha,
         "scorer_library_sha256": scorer_library_sha,
         "upstream_commit": left["model"].get("upstream_commit"),
         "paired_cnot_survivor_hashes_match": True,
+        "paired_locked_test_panel": panel_verdict,
         "paired_cnot_world_sizes": [left.get("world"), right.get("world")],
         "permutation_report_sha256": permutation_verdict["report_sha256"],
         "permutation_smoke_world_sizes": permutation_verdict["smoke_world_sizes"],
@@ -508,6 +855,8 @@ def validate(result_dir, source_sha, instance_id, manifest_sha, checkpoint_sha,
             "permutation-1-and-2-gpu.json",
             qhat_name,
             *paired_names,
+            "cnot-panel-test-qhat-1-gpu.json",
+            "cnot-panel-test-qhat-2-gpu.json",
         ],
         "installed_wheel": True,
         "gpu_test": "passed",
@@ -526,6 +875,8 @@ def main(argv=None):
     parser.add_argument("--scorer-library-sha256", required=True)
     parser.add_argument("--wheel-sha256", required=True)
     parser.add_argument("--run-id", required=True)
+    parser.add_argument("--panel-result-dir", type=Path, required=True)
+    parser.add_argument("--handoff-preflight", type=Path, required=True)
     args = parser.parse_args(argv)
     try:
         if not SHA40.fullmatch(args.source_sha):
@@ -536,7 +887,7 @@ def main(argv=None):
         receipt = validate(
             args.result_dir, args.source_sha, args.instance_id, args.manifest_sha256,
             args.checkpoint_sha256, args.scorer_library_sha256, args.wheel_sha256,
-            args.run_id,
+            args.run_id, args.panel_result_dir, args.handoff_preflight,
         )
     except (OSError, json.JSONDecodeError, ValueError) as error:
         parser.error(str(error))

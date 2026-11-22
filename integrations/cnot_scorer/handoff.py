@@ -61,6 +61,8 @@ class ResolvedPanelV2Handoff:
     panel_digest: str
     search: dict[str, Any]
     locked_test_status: str
+    locked_test_comparison_sha256: str
+    locked_test_comparison: dict[str, Any]
     dataset_path: Path
     panel_roots: tuple[dict[str, Any], ...]
     orientation: str
@@ -587,6 +589,8 @@ def resolve_panel_v2_handoff(
         panel_digest=panel_digest,
         search=dict(search),
         locked_test_status=status,
+        locked_test_comparison_sha256=comparison_sha,
+        locked_test_comparison=comparison,
         dataset_path=dataset_path,
         panel_roots=panel_roots,
         orientation=_ORIENTATION,

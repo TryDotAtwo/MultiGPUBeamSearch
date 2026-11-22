@@ -182,6 +182,14 @@ def validate_case(trace_text: str, receipt_root, report: dict, *, expected_sourc
     transport = "single_rank_no_exchange" if world == 1 else "rust_stream5_nccl"
     if acceptance.get("transport") != transport:
         _fail("result JSON does not state the expected transport for this world size")
+    if report.get("schema") == "cnot103_mgbs_panel_search_result_v1":
+        model_pins = {
+            "checkpoint_sha256": report.get("checkpoint_sha256"),
+            "search_manifest_sha256": report.get("search_manifest_sha256"),
+            "scorer_library_sha256": report.get("scorer_library_sha256"),
+        }
+    else:
+        model_pins = report.get("model") or {}
     for name, expected in (
         ("checkpoint_sha256", expected_checkpoint_sha256),
         ("search_manifest_sha256", expected_manifest_sha256),
@@ -189,7 +197,7 @@ def validate_case(trace_text: str, receipt_root, report: dict, *, expected_sourc
     ):
         if not isinstance(expected, str) or not SHA64_RE.fullmatch(expected):
             _fail(f"expected {name} is not a SHA-256")
-        if (report.get("model") or {}).get(name) != expected:
+        if model_pins.get(name) != expected:
             _fail(f"result JSON has a different {name}")
 
     trace_events = parse_trace_events(trace_text)
