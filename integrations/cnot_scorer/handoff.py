@@ -50,6 +50,10 @@ class ResolvedPanelV2Handoff:
     panel_digest: str
     search: dict[str, Any]
     locked_test_status: str
+    dataset_path: Path
+    panel_roots: tuple[dict[str, Any], ...]
+    orientation: str
+    artifact_path_policy: str = "same_run_root_mount"
 
 
 def _sha256(data: bytes) -> str:
@@ -150,14 +154,161 @@ def _comparison_digest(comparison: dict[str, Any]) -> str:
     return _sha256(canonical)
 
 
+_ORIENTATION = "row_target_xor_row_control"
+
+
+def _sealed_panel_roots(
+    root: Path,
+    training_manifest_path: Path,
+    expected_dataset_sha: str,
+    panel: str,
+    indices: list[int],
+    ids: list[str],
+    expected_digest: str,
+) -> tuple[Path, tuple[dict[str, Any], ...]]:
+    training_manifest = _json_object(training_manifest_path, "training manifest")
+    if training_manifest.get("schema") != "cnot103_training_run_v1":
+        raise HandoffError("training manifest schema is unsupported")
+    dataset_pin = training_manifest.get("dataset")
+    if not isinstance(dataset_pin, dict):
+        raise HandoffError("training manifest lacks a sealed dataset pin")
+    path_value = dataset_pin.get("path")
+    sha_value = dataset_pin.get("sha256")
+    if (
+        not isinstance(path_value, str) or not path_value
+        or not isinstance(sha_value, str) or _SHA256.fullmatch(sha_value) is None
+        or sha_value != expected_dataset_sha
+    ):
+        raise HandoffError("training manifest dataset identity differs from the handoff")
+    candidate = Path(path_value)
+    if not candidate.is_absolute():
+        candidate = training_manifest_path.parent / candidate
+    dataset_path = _inside_root(candidate, root, "sealed dataset")
+    try:
+        raw = dataset_path.read_bytes()
+    except OSError:
+        raise HandoffError("sealed dataset cannot be read") from None
+    if _sha256(raw) != expected_dataset_sha:
+        raise HandoffError("sealed dataset SHA-256 differs from the training manifest")
+    try:
+        dataset = json.loads(raw)
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        raise HandoffError("sealed dataset JSON is unreadable") from None
+    panels = dataset.get("panels") if isinstance(dataset, dict) else None
+    records = panels.get(panel) if isinstance(panels, dict) else None
+    if not isinstance(records, list):
+        raise HandoffError("sealed dataset panel is missing")
+    roots: list[dict[str, Any]] = []
+    for position, (index, case_id) in enumerate(zip(indices, ids)):
+        if index >= len(records):
+            raise HandoffError("panel index is outside the sealed dataset")
+        record = records[index]
+        state = record.get("state") if isinstance(record, dict) else None
+        if not isinstance(record, dict) or record.get("lineage_id") != case_id or not isinstance(state, dict):
+            raise HandoffError("panel ID-to-index mapping differs from the sealed dataset")
+        dimension = state.get("n")
+        alphabet_id = state.get("alphabet_id")
+        packed_rows = state.get("packed_rows")
+        if (
+            type(dimension) is not int or dimension < 2 or dimension > 256
+            or alphabet_id != f"all_to_all_unit_cnot:{dimension}"
+            or not isinstance(packed_rows, list) or len(packed_rows) != dimension
+        ):
+            raise HandoffError("sealed panel root identity or CNOT alphabet is invalid")
+        orientation = record.get("orientation", state.get("orientation"))
+        if orientation is not None and orientation != _ORIENTATION:
+            raise HandoffError("sealed panel root orientation differs from the CNOT contract")
+        words_per_row = (dimension + 63) // 64
+        lanes: list[int] = []
+        for row in packed_rows:
+            if type(row) is int:
+                value = row
+            elif isinstance(row, str) and row.isdecimal():
+                value = int(row)
+            else:
+                raise HandoffError("sealed panel packed row is malformed")
+            if value < 0 or value.bit_length() > dimension:
+                raise HandoffError("sealed panel packed row exceeds its declared width")
+            lanes.extend((value >> (64 * word)) & 0xFFFFFFFFFFFFFFFF for word in range(words_per_row))
+        roots.append({
+            "panel_index": index,
+            "case_id": case_id,
+            "dimension": dimension,
+            "alphabet_id": alphabet_id,
+            "orientation": _ORIENTATION,
+            "start_packed_rows": lanes,
+        })
+    if _panel_digest(panel, indices, ids) != expected_digest:
+        raise HandoffError("sealed panel digest differs from its ordered case identities")
+    return dataset_path, tuple(roots)
+
+
+def _validate_locked_comparison(
+    comparison: object,
+    *,
+    status: object,
+    panel_indices: list[int],
+    panel_digest: str,
+    dataset_sha: str,
+    source_revision: str,
+    search_sha: str,
+    training_manifest_sha: str,
+    training_result_sha: str,
+    checkpoint_sha: str,
+) -> dict[str, Any]:
+    if not isinstance(comparison, dict):
+        raise HandoffError("locked-test comparison is malformed")
+    if comparison.get("status") != status or comparison.get("panel") != "test":
+        raise HandoffError("locked-test comparison status or split differs")
+    if comparison.get("baseline_head") != "hamming" or comparison.get("candidate_head") != "qhat":
+        raise HandoffError("locked-test comparison scorer differs from the accepted protocol")
+    if comparison.get("case_count") != len(panel_indices):
+        raise HandoffError("locked-test comparison case count differs from the frozen panel")
+    for name in ("baseline_metrics", "candidate_metrics"):
+        metrics = comparison.get(name)
+        if (
+            not isinstance(metrics, dict)
+            or metrics.get("panel_indices") != panel_indices
+            or metrics.get("panel_digest") != panel_digest
+            or metrics.get("case_count") != len(panel_indices)
+        ):
+            raise HandoffError(f"locked-test {name} panel pins differ from the frozen cohort")
+        pins = metrics.get("receipt_pins")
+        if not isinstance(pins, dict):
+            raise HandoffError(f"locked-test {name} lacks receipt pins")
+        if pins.get("dataset_sha256") != dataset_sha:
+            raise HandoffError(f"locked-test {name} dataset pin differs")
+        if name == "baseline_metrics":
+            if (
+                pins.get("source_revision") != source_revision
+                or pins.get("runtime_contract") != "native_device_search_v13"
+                or pins.get("training_manifest_sha256") is not None
+                or pins.get("training_result_sha256") is not None
+                or pins.get("checkpoint_sha256") is not None
+                or not isinstance(pins.get("search_manifest_sha256"), str)
+                or _SHA256.fullmatch(pins["search_manifest_sha256"]) is None
+            ):
+                raise HandoffError("locked-test Hamming baseline pins differ from the producer run")
+        elif (
+            pins.get("search_manifest_sha256") != search_sha
+            or pins.get("training_manifest_sha256") != training_manifest_sha
+            or pins.get("training_result_sha256") != training_result_sha
+            or pins.get("checkpoint_sha256") != checkpoint_sha
+        ):
+            raise HandoffError("locked-test candidate pins differ from the selected checkpoint")
+    return comparison
+
+
 def resolve_panel_v2_handoff(
     run_root: str | Path,
     learning_curve_receipt: str | Path,
 ) -> ResolvedPanelV2Handoff:
     """Verify the producer's private learning-curve receipt and return its test manifest.
 
-    The returned manifest is the input to the existing TQPScorer. Scorer creation
-    still runs the pinned Rust loader, which checks the full dataset and checkpoint.
+    Absolute paths embedded in the already-hashed search manifest are accepted only
+    when they resolve inside this same private run-root mount. Relocating that run
+    without rewriting the hashed manifest is rejected. The resolved ordered roots
+    are loaded from the pinned sealed dataset before a scorer may be constructed.
     """
     try:
         root = Path(run_root).resolve(strict=True)
@@ -188,7 +339,8 @@ def resolve_panel_v2_handoff(
     dataset_sha = handoff.get("dataset_sha256")
     model = handoff.get("model")
     if (
-        handoff.get("schema") != _HANDOFF_SCHEMA
+        receipt.get("source_revision") != source_revision
+        or handoff.get("schema") != _HANDOFF_SCHEMA
         or handoff.get("consumer") != "MultiGPUBeamSearch"
         or not isinstance(source_revision, str)
         or _SHA1.fullmatch(source_revision) is None
@@ -211,6 +363,20 @@ def resolve_panel_v2_handoff(
     search_path, search_sha = _artifact(
         root, handoff.get("search_manifest"), "panel search manifest"
     )
+
+    training_manifest_value = _json_object(train_manifest_path, "training manifest")
+    if (
+        receipt.get("dataset_sha256") != dataset_sha
+        or receipt.get("search") != search
+    ):
+        raise HandoffError("top-level receipt dataset or search identity differs from the handoff")
+    selected = receipt.get("selected")
+    if (
+        not isinstance(selected, dict)
+        or selected.get("accepted_updates") != accepted_updates
+        or selected.get("checkpoint_sha256") != checkpoint_sha
+    ):
+        raise HandoffError("selected learning-curve checkpoint differs from the handoff")
 
     result = _json_object(train_result_path, "training result")
     progress = result.get("end_progress")
@@ -275,21 +441,43 @@ def resolve_panel_v2_handoff(
         "training result",
     )
 
+    if receipt.get("locked_test_panel_digest") != panel_digest:
+        raise HandoffError("top-level locked-test panel digest differs from the handoff")
+    dataset_path, panel_roots = _sealed_panel_roots(
+        root,
+        train_manifest_path,
+        dataset_sha,
+        panel,
+        indices,
+        ids,
+        panel_digest,
+    )
     comparison = locked_test.get("comparison")
     status = handoff.get("locked_test_status")
     comparison_sha = handoff.get("locked_test_comparison_sha256")
     if (
-        not isinstance(comparison, dict)
-        or status not in _LOCKED_STATUSES
-        or comparison.get("status") != status
+        status not in _LOCKED_STATUSES
         or not isinstance(comparison_sha, str)
         or _SHA256.fullmatch(comparison_sha) is None
         or _comparison_digest(comparison) != comparison_sha
+        or receipt.get("locked_test_comparison") != comparison
         or type(locked_test.get("accepted_updates")) is not int
         or locked_test["accepted_updates"] != accepted_updates
         or locked_test.get("checkpoint_sha256") != checkpoint_sha
     ):
         raise HandoffError("locked-test comparison is not bound to the selected checkpoint")
+    _validate_locked_comparison(
+        comparison,
+        status=status,
+        panel_indices=indices,
+        panel_digest=panel_digest,
+        dataset_sha=dataset_sha,
+        source_revision=source_revision,
+        search_sha=search_sha,
+        training_manifest_sha=train_manifest_sha,
+        training_result_sha=train_result_sha,
+        checkpoint_sha=checkpoint_sha,
+    )
 
     return ResolvedPanelV2Handoff(
         search_manifest=search_path,
@@ -307,4 +495,7 @@ def resolve_panel_v2_handoff(
         panel_digest=panel_digest,
         search=dict(search),
         locked_test_status=status,
+        dataset_path=dataset_path,
+        panel_roots=panel_roots,
+        orientation=_ORIENTATION,
     )
