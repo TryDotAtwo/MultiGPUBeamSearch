@@ -121,7 +121,8 @@ fn run_local_search_ranks(
         environment,
     };
     crate::interrupt::run(py, &cancel, || {
-        beam_runtime::cluster::run_local_search_ranks(request, &cancel).map_err(|error| match error {
+        beam_runtime::cluster::run_local_search_ranks(request, &cancel).map_err(|error| match error
+        {
             beam_runtime::cluster::ClusterError::Invalid(message) => PyValueError::new_err(message),
             beam_runtime::cluster::ClusterError::Io(error) => PyErr::from(error),
             other => PyRuntimeError::new_err(other.to_string()),

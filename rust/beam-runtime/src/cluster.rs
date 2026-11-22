@@ -561,10 +561,7 @@ impl Drop for LocalOwnedChild {
 /// Spawn and supervise every local rank in one coarse Rust runtime call.
 /// The working directory, rank variables, argv suffix, and log layout match
 /// the public Python launcher contract.
-pub fn run_local_search_ranks(
-    request: LocalRanksRequest,
-    cancel: &AtomicBool,
-) -> Result<f64> {
+pub fn run_local_search_ranks(request: LocalRanksRequest, cancel: &AtomicBool) -> Result<f64> {
     if request.command.is_empty()
         || request.world_size < 2
         || !request.timeout.is_finite()
