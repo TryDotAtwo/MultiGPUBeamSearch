@@ -205,7 +205,7 @@ jobs:
           timeout --signal=TERM --kill-after=15s 180s \
             env -u PYTHONPATH python -m torch.distributed.run --standalone --nproc_per_node=2 \
             "$GITHUB_WORKSPACE/integrations/cayleypy_native/tests/installed_cnot_dispatch_consensus.py" \
-            > "${RUNNER_TEMP}/mgbs-private-cnot-dispatch-consensus.log" 2>&1
+            2>&1 | tee "${RUNNER_TEMP}/mgbs-private-cnot-dispatch-consensus.log"
       - name: Verify vendored source headers invalidate the installed native fingerprint
         id: vendor_source_fingerprint
         run: |
