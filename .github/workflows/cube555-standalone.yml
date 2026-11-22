@@ -14,7 +14,7 @@ permissions:
 jobs:
   bundle:
     runs-on: ubuntu-24.04
-    timeout-minutes: 35
+    timeout-minutes: 50
     steps:
       - uses: actions/checkout@v4
         with:
@@ -23,6 +23,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+      - name: Use the stable Rust toolchain
+        run: rustup toolchain install stable --profile minimal
       - name: Assemble wheels and export models
         run: |
           df -h .
@@ -41,7 +43,7 @@ jobs:
           sudo -n unshare --net -- env PYTHON="$(command -v python3.11)" bash run.sh --check
       - uses: actions/upload-artifact@v4
         with:
-          name: cube555-standalone-linux-x86_64-py311
+          name: cube555-standalone-max-linux-x86_64-py311
           path: ${{ runner.temp }}/cube555-artifact/
           if-no-files-found: error
           compression-level: 0

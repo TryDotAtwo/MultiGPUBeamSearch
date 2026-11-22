@@ -3,7 +3,7 @@ set -euo pipefail
 
 here="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 python="${PYTHON:-python3.11}"
-solver_rev=534f63516552081e48f5c575c6471a888c9db5b9
+solver_rev=e6c41b6dc6bb3a839f6338f3cfe9eaadf8608d5a
 cayleypy_rev=3cd11ecefc98e54d6fc0ccdec967d0bcc8ca4a93
 solver_url=https://github.com/TryDotAtwo/MultiGPUBeamSearch.git
 torch_index=https://download.pytorch.org/whl/cu128
