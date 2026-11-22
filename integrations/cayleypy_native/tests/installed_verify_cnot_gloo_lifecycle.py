@@ -52,18 +52,23 @@ def main():
     output_root = Path(os.environ["RUNNER_TEMP"])
     output_root.mkdir(parents=True, exist_ok=True)
     initialize_world("gloo")
-    observations = []
     diagnostics = []
     diagnostic_path = output_root / f"verify-cnot-gloo-diagnostic-rank-{rank}.json"
 
-    def report(phase, **fields):
-        event = {"rank": rank, "phase": phase, **fields}
+    def report(case_id, phase, common_outcome, **fields):
+        event = {
+            "rank": rank,
+            "case_id": case_id,
+            "phase": phase,
+            "common_outcome": common_outcome,
+            **fields,
+        }
         diagnostics.append(event)
         diagnostic_path.write_text(json.dumps(diagnostics, sort_keys=True), encoding="utf-8")
         print("CNOT_GLOO_LIFECYCLE_DIAGNOSTIC " + json.dumps(event, sort_keys=True), flush=True)
 
-    # A different requested controller changes which collectives follow. The
-    # public entry must reject rank-local engine choices before path selection.
+    # Requested controller is a rank-local input: receipt validation checks
+    # each value independently and compares only the common outcome.
     requested_engine = "auto" if rank == 0 else "python"
     try:
         verify_cnot.main(
@@ -78,29 +83,40 @@ def main():
     except (RuntimeError, ValueError) as error:
         rejected = "CNOT search engine settings differ" in str(error)
         report(
+            "engine_mismatch",
             "engine_consensus",
-            engine=requested_engine,
-            status="rejected" if rejected else "wrong_error",
+            "rejected" if rejected else "wrong_error",
+            requested_engine=requested_engine,
             error_type=type(error).__name__,
-            expected_rejection=rejected,
+            expected_error=rejected,
         )
         assert rejected, "engine mismatch did not reach the common consensus error"
-        observations.append({"mismatched_engine": requested_engine, "error": str(error)})
     else:
-        report("engine_consensus", engine=requested_engine, status="not_rejected")
+        report(
+            "engine_mismatch",
+            "engine_consensus",
+            "not_rejected",
+            requested_engine=requested_engine,
+            expected_error=False,
+        )
         raise AssertionError("rank-local CNOT engine choices were not rejected")
 
     try:
         invoke(
             "wide",
-            output_root / f"healthy-after-engine-mismatch-{rank}.json",
+            output_root / "healthy-after-engine-mismatch-0.json",
             engine="auto",
             forbid_python_reference=True,
         )
     except BaseException as error:
-        report("engine_consensus_retry", status="failed", error_type=type(error).__name__)
+        report(
+            "engine_mismatch_retry",
+            "healthy_retry",
+            "failed",
+            error_type=type(error).__name__,
+        )
         raise
-    report("engine_consensus_retry", status="passed")
+    report("engine_mismatch_retry", "healthy_retry", "passed")
 
     for failed_rank in (0, 1):
         def factory(*_args, target=failed_rank, **_kwargs):
@@ -108,6 +124,7 @@ def main():
                 raise RuntimeError(f"injected scorer load failure rank={target}")
             return SyntheticScorer()
 
+        case_id = f"scorer_failure_rank_{failed_rank}"
         try:
             invoke("trained", output_root / f"failed-{failed_rank}.json", factory)
         except BaseException as error:
@@ -119,42 +136,55 @@ def main():
             )
             coordinated = isinstance(error, RuntimeError) and correct_phase and correct_rank
             report(
-                f"scorer_failure_rank_{failed_rank}",
-                status="coordinated" if coordinated else "wrong_error",
+                case_id,
+                "scorer_failure",
+                "coordinated" if coordinated else "wrong_error",
+                failed_rank=failed_rank,
                 error_type=type(error).__name__,
                 expected_phase=correct_phase,
                 expected_rank=correct_rank,
             )
             if not coordinated:
                 raise AssertionError("scorer failure did not return the common expected phase") from error
-            observations.append({"failed_rank": failed_rank, "error": message})
         else:
-            report(f"scorer_failure_rank_{failed_rank}", status="not_rejected")
+            report(
+                case_id,
+                "scorer_failure",
+                "not_rejected",
+                failed_rank=failed_rank,
+                expected_phase=False,
+                expected_rank=False,
+            )
             raise AssertionError(f"rank-local scorer failure on {failed_rank} was not propagated")
 
-        # The public verifier must close its per-search World while retaining
-        # the torchrun process group for a healthy retry on the same ranks.
+        # verify_cnot writes reports only on rank zero; both ranks use the
+        # same output name so the aggregator can bind the actual root report.
+        retry_case = f"scorer_failure_rank_{failed_rank}_retry"
         try:
             invoke(
                 "wide",
-                output_root / f"healthy-after-{failed_rank}-{rank}.json",
+                output_root / f"healthy-after-{failed_rank}-0.json",
                 engine="auto",
                 forbid_python_reference=True,
             )
         except BaseException as error:
             report(
-                f"scorer_failure_rank_{failed_rank}_healthy_retry",
-                status="failed",
+                retry_case,
+                "healthy_retry",
+                "failed",
+                failed_rank=failed_rank,
                 error_type=type(error).__name__,
             )
             raise
-        report(f"scorer_failure_rank_{failed_rank}_healthy_retry", status="passed")
+        report(
+            retry_case,
+            "healthy_retry",
+            "passed",
+            failed_rank=failed_rank,
+        )
 
     if dist.is_initialized():
         dist.destroy_process_group()
-    (output_root / f"verify-cnot-lifecycle-rank-{rank}.json").write_text(
-        json.dumps(observations, sort_keys=True), encoding="utf-8"
-    )
     if rank == 0:
         print("VERIFY_CNOT_GLOO_LIFECYCLE_PASS", flush=True)
 

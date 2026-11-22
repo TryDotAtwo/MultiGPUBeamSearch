@@ -3329,3 +3329,10 @@ Main commit `148b2a826a369b7601e904ea409e0cc5301c75c9` also passed the 260-test 
 
 - Replaced the permutation world-size-only check in the paired CNOT verifier with validation of the LRX(4) Rust smoke and saturated LRX(5) B=3 1/2-GPU cases. The receipt now carries the canonical permutation report SHA-256, exact cutoff summary, independent replay status, and per-world rank identities.
 - The report includes per-rank candidate/cutoff counts, worker and GPU UUIDs, binary/build digests, two-call Rust-session reuse, full ordered Hash128 survivors, and fixture replay evidence. Search behavior, kernels, scoring and precision are unchanged.
+
+
+## 2026-11-22 - Validate CNOT Gloo lifecycle receipts
+
+- Keep rank-local engine inputs separate from common Gloo outcomes, with one phase receipt per rank for mismatch, Rust auto retries, and scorer failures on either rank.
+- The installed-wheel validator reads exactly the three rank-zero replay reports and checks solved status plus bitwise replay. CPU tests reject missing phases, wrong rank identity, missing report cases, and absent replay.
+- This is hosted CPU/Gloo acceptance only; physical CUDA/NCCL remains a separate gate.

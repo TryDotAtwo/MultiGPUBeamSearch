@@ -14,6 +14,8 @@ on:
       - integrations/cayleypy_native/tests/installed_cnot_backend_admission.py
       - integrations/cayleypy_native/tests/installed_cnot_phase_boundaries.py
       - integrations/cayleypy_native/tests/installed_verify_cnot_gloo_lifecycle.py
+      - tools/cnot_gloo_lifecycle.py
+      - tools/test_cnot_gloo_lifecycle.py
       - integrations/cayleypy_native/tests/test_build.py
       - integrations/cayleypy_native/tests/test_public_index_sort_build.py
       - integrations/cayleypy_native/multigpubeamsearch/native_source_manifest.json
@@ -170,6 +172,12 @@ jobs:
           print("INSTALLED_GPU_IDENTITY_HELPER=" + identity.__file__)
           PY
           python "$GITHUB_WORKSPACE/tools/test_cnot_gpu_identity.py" -v
+      - name: Verify CNOT Gloo receipt contract on hosted CPU
+        id: gloo_receipt_contract
+        run: |
+          set -o pipefail
+          python "$GITHUB_WORKSPACE/tools/test_cnot_gloo_lifecycle.py" -v \
+            > "${RUNNER_TEMP}/mgbs-private-cnot-gloo-receipt-contract.log" 2>&1
       - name: Exercise verify_cnot World lifecycle with two Gloo ranks
         id: verify_cnot_lifecycle
         env:
@@ -182,28 +190,8 @@ jobs:
             env -u PYTHONPATH python -m torch.distributed.run --standalone --nproc_per_node=2 \
             "$GITHUB_WORKSPACE/integrations/cayleypy_native/tests/installed_verify_cnot_gloo_lifecycle.py" \
             > "${RUNNER_TEMP}/mgbs-private-verify-cnot-gloo-lifecycle.log" 2>&1
-          python - "$RUNNER_TEMP" <<'PY' >> "${RUNNER_TEMP}/mgbs-private-verify-cnot-gloo-lifecycle.log" 2>&1
-          import json
-          from pathlib import Path
-          import sys
-
-          root = Path(sys.argv[1])
-          rows = [json.loads((root / f"verify-cnot-lifecycle-rank-{rank}.json").read_text()) for rank in range(2)]
-          if rows[0] != rows[1]:
-              raise SystemExit(f"ranks observed different failure phases: {rows}")
-          if [item["failed_rank"] for item in rows[0]] != [0, 1]:
-              raise SystemExit(f"missing rank-local failure scenarios: {rows[0]}")
-          for item in rows[0]:
-              if "load trained scorer failed" not in item["error"]:
-                  raise SystemExit(f"failure escaped the expected common phase: {item}")
-          for failed_rank in range(2):
-              for rank in range(2):
-                  report_path = root / f"healthy-after-{failed_rank}-{rank}.json"
-                  report = json.loads(report_path.read_text())
-                  if report.get("status") != "solved" or not report.get("bitwise_replay"):
-                      raise SystemExit(f"healthy follow-up search failed for rank={rank}: {report}")
-          print("VERIFY_CNOT_GLOO_RANK_FAILURES_AND_REUSE_PASS")
-          PY
+          python "$GITHUB_WORKSPACE/tools/verify_cnot_gloo_lifecycle.py" "$RUNNER_TEMP" \
+            >> "${RUNNER_TEMP}/mgbs-private-verify-cnot-gloo-lifecycle.log" 2>&1
       - name: Summarize synthetic CNOT Gloo lifecycle diagnostic
         if: always()
         env:
