@@ -3831,3 +3831,8 @@ The installed-wheel acceptance check exposed that the Rust extension exported ba
 ## Rust-owned public scheduler rank resolution
 
 The public `cluster.scheduler_rank` helper delegates torchrun/Slurm environment parsing to `beam-runtime` when the installed PyO3 extension exports the versioned resolver. Rust returns global, node, and local rank plus world/local-world sizes; Python keeps the existing `ScheduledRank` object and uses the original parser only for older wheels. Invalid scheduler input still raises `ValueError` at the Python API. A runtime failure from a present resolver is an error and does not fall back to a different rank assignment. This transfer does not change process launching, CUDA device binding, NCCL, or search behavior.
+
+
+## Rust-owned torchrun and Slurm scheduler rank resolution
+
+The public `cluster.scheduler_rank` path uses the typed `beam-runtime` resolver for torchrun and Slurm environments. Python preserves `ScheduledRank`, its `ValueError` contract, and fallback only when an older wheel lacks the resolver. Installed-wheel validation on source SHA `a96be795a011174d7f244c06f1593a62b16e6c27` passed in [run 45052314835](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45052314835); Rust CPU/Gloo and hosted acceptance passed in [run 45052314834](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45052314834) and [run 45052315268](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45052315268). The physical CUDA/NCCL job was skipped. This transfers scheduler metadata only; it does not change device binding, process launch, transport, or search behavior.

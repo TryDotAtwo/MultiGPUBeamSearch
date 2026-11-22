@@ -162,3 +162,6 @@ Keep an active goal until the migration and required verification are complete.
 ## 2026-11-22 — MultiGPUBeamSearch Rust migration continuation
 
 Continue moving public permutation and CNOT search control to Rust + CUDA/C++ while preserving multi-GPU behavior, Python and CLI compatibility, Kaggle, torchrun, Slurm, search semantics, and numerical policy. Validate changes on GitHub-hosted CPU/Gloo and installed wheels. Physical GPU runs remain separately gated.
+
+
+2026-11-22: Продолжать перенос управления MultiGPUBeamSearch в Rust небольшими рабочими срезами. Текущий срез переносит разбор torchrun/Slurm rank из публичного Python helper в beam-runtime через установленный PyO3 wheel; сохранить ScheduledRank, ошибки и fallback старых wheel. Проверять на hosted CPU/installed wheel, не запускать физический GPU в рамках этого шага.

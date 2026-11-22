@@ -80,3 +80,10 @@
 - The public torchrun/Slurm rank parser now uses the typed result from `beam-runtime` when the installed wheel provides it. The Python API and `ScheduledRank` dataclass remain unchanged; older wheels retain the existing Python parser.
 - Rust validation errors are mapped back to the public `ValueError` contract. A supported Rust resolver failure cannot silently switch the rank assignment path.
 - This transfers scheduler metadata only; it does not change device binding, rank launch selection, NCCL transport, or GPU execution.
+
+
+## 2026-11-22 - Resolve public scheduler rank in beam-runtime
+
+- Added a typed Rust/PyO3 resolver for torchrun and Slurm scheduler environments and routed the public Python `cluster.scheduler_rank` helper through it.
+- Preserved the `ScheduledRank` API, malformed-input `ValueError`, and compatibility fallback for installed wheels without the resolver. Errors from a present Rust resolver do not silently switch rank assignment paths.
+- Installed-wheel validation passed on `a96be795a011174d7f244c06f1593a62b16e6c27` ([run 45052314835](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45052314835)); Rust CPU/Gloo and hosted acceptance passed ([45052314834](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45052314834), [45052315268](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45052315268)). Physical CUDA/NCCL was skipped.
