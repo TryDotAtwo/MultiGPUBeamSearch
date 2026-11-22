@@ -1,5 +1,5 @@
 //! Coarse Python adapter for the owned packed CNOT input contract.
-use beam_runtime::cnot_search::{self, Backend, CnotRequest, Edge, Goal, Options, Round};
+use beam_runtime::cnot_search::{self, Backend, CnotRequest, Edge, Goal, Options, RankedCnotRequest, Round};
 use beam_runtime::cnot_selection;
 use pyo3::{
     exceptions::{PyRuntimeError, PyValueError},
@@ -19,6 +19,11 @@ struct PyCnotSearchInput {
     raw: Py<PyBytes>,
     root: Py<PyAny>,
     matrix: beam_core::cnot::CnotMatrix,
+}
+
+#[pyclass(name = "_CnotRankedRequest", frozen)]
+pub(crate) struct PyCnotRankedRequest {
+    pub(crate) inner: RankedCnotRequest,
 }
 
 pub(crate) fn search_input_is_identity(input: &Bound<'_, PyAny>) -> PyResult<Option<bool>> {
@@ -959,6 +964,10 @@ fn run_cnot_native_search<'py>(
                 (|| -> PyResult<Bound<'_, PyAny>> {
                     let kwargs = PyDict::new(py);
                     kwargs.set_item("admitted_topology", (request.rank(), request.world()))?;
+                    kwargs.set_item(
+                        "ranked_request",
+                        Py::new(py, PyCnotRankedRequest { inner: request })?,
+                    )?;
                     Ok(kwargs.into_any())
                 })(),
             )?;
@@ -1105,6 +1114,7 @@ pub(crate) fn outcome_to_python(
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<PyCnotMatrix>()?;
     module.add_class::<PyCnotSearchInput>()?;
+    module.add_class::<PyCnotRankedRequest>()?;
     module.add_function(wrap_pyfunction!(prepare_cnot_input, module)?)?;
     module.add_function(wrap_pyfunction!(validate_cnot_search_controls, module)?)?;
     module.add_function(wrap_pyfunction!(cnot_public_dispatch_digest, module)?)?;

@@ -3,10 +3,10 @@
 //! Tensor storage remains owned by PyTorch/CUDA. Existing ATen operators and
 //! rank collectives are invoked on the caller's thread in their former order.
 use crate::{
-    cnot_native_batch, cnot_native_checked::checked_v2 as checked, cnot_native_exchange,
-    cnot_scorer_dispatch,
+    cnot::PyCnotRankedRequest, cnot_native_batch,
+    cnot_native_checked::checked_v2 as checked, cnot_native_exchange, cnot_scorer_dispatch,
 };
-use beam_runtime::cnot_search::{self, Backend, Edge, Goal, Options, Round};
+use beam_runtime::cnot_search::{self, Backend, Edge, Goal, Options, RankedCnotRequest, Round};
 use pyo3::{
     exceptions::{PyOverflowError, PyRuntimeError, PyValueError},
     prelude::*,
@@ -570,17 +570,35 @@ impl<'py> NativeStages<'py> {
         audit: bool,
         admission: Option<Py<PyCnotBackendAdmission>>,
         admitted_topology: Option<(u32, u32)>,
+        ranked_request: Option<RankedCnotRequest>,
     ) -> PyResult<Self> {
         let python_rank: u32 = world.getattr("rank")?.extract()?;
         let python_size: u32 = world.getattr("size")?.extract()?;
-        let (rank, size) = match admitted_topology {
-            None => (python_rank, python_size),
-            Some((rank, size)) if rank == python_rank && size == python_size => (rank, size),
-            Some((rank, size)) => {
+        let (rank, size) = if let Some(request) = ranked_request {
+            let topology = (request.rank(), request.world());
+            if topology != (python_rank, python_size)
+                || admitted_topology.is_some_and(|value| value != topology)
+            {
                 return Err(PyRuntimeError::new_err(format!(
-                    "admitted CNOT rank topology (rank={rank}, world={size}) does not match Python World (rank={python_rank}, world={python_size})"
+                    "ranked CNOT request topology (rank={}, world={}) does not match Python World (rank={python_rank}, world={python_size})",
+                    topology.0, topology.1
                 )));
             }
+            (topology.0, topology.1)
+        } else {
+            match admitted_topology {
+                None => (python_rank, python_size),
+                Some((rank, size)) if rank == python_rank && size == python_size => (rank, size),
+                Some((rank, size)) => {
+                    return Err(PyRuntimeError::new_err(format!(
+                        "admitted CNOT rank topology (rank={rank}, world={size}) does not match Python World (rank={python_rank}, world={python_size})"
+                    )));
+                }
+            }
+        };
+        let (mode, audit) = match ranked_request {
+            Some(request) => (request.mode().as_str().to_owned(), request.audit()),
+            None => (mode, audit),
         };
         if size == 0 || rank >= size {
             return Err(PyValueError::new_err("invalid admitted CNOT rank topology"));
@@ -1542,7 +1560,7 @@ impl Backend for NativeStages<'_> {
 }
 
 #[pyfunction]
-#[pyo3(signature=(world, root, identity, input, scorer, mode, audit, width, shortlist, alphabet, max_depth, admission=None, admitted_topology=None))]
+#[pyo3(signature=(world, root, identity, input, scorer, mode, audit, width, shortlist, alphabet, max_depth, admission=None, admitted_topology=None, ranked_request=None))]
 #[allow(clippy::too_many_arguments)]
 fn run_cnot_native<'py>(
     py: Python<'py>,
@@ -1559,7 +1577,9 @@ fn run_cnot_native<'py>(
     max_depth: u64,
     admission: Option<Py<PyCnotBackendAdmission>>,
     admitted_topology: Option<(u32, u32)>,
+    ranked_request: Option<Py<PyCnotRankedRequest>>,
 ) -> PyResult<Py<PyAny>> {
+    let typed_request = ranked_request.as_ref().map(|request| request.borrow(py).inner);
     let mut backend = None;
     let prepare_backend = (|| -> PyResult<Bound<'py, PyAny>> {
         backend = Some(NativeStages::new(
@@ -1573,6 +1593,7 @@ fn run_cnot_native<'py>(
             audit,
             admission,
             admitted_topology,
+            typed_request,
         )?);
         Ok(py.None().into_bound(py))
     })();
@@ -1585,14 +1606,17 @@ fn run_cnot_native<'py>(
     let mut backend = backend.ok_or_else(|| {
         PyRuntimeError::new_err("CNOT rank-topology vote returned no native stages")
     })?;
-    let options = Options {
-        rank: backend.rank,
-        world: backend.size,
-        width,
-        shortlist,
-        alphabet,
-        max_depth,
-    };
+    let options = typed_request.map_or_else(
+        || Options {
+            rank: backend.rank,
+            world: backend.size,
+            width,
+            shortlist,
+            alphabet,
+            max_depth,
+        },
+        |request| request.search_options(),
+    );
     crate::cnot::outcome_to_python(py, cnot_search::search(&mut backend, options)?)
 }
 

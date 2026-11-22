@@ -1,3 +1,9 @@
+## One ranked CNOT request reaches the native stages — 2026-11-22
+
+The Rust CNOT controller now passes the same validated RankedCnotRequest it used for admission into the native-stage adapter. The adapter derives rank, world size, mode, audit and search options from that typed value and checks that its topology matches the live World before stage construction completes. The older scalar run_cnot_native arguments remain valid for direct compatibility callers; the public Rust-controller path no longer reconstructs stage configuration from those scalar copies. Tensor layouts, scorer callbacks, collectives, kernels, search ordering and numerical policy are unchanged.
+
+The existing hosted CPU and installed-wheel public CNOT paths exercise the controller through the native-stage boundary. The change is source-level/runtime ownership progress; it does not establish physical CUDA/NCCL acceptance.
+
 ## Rust-owned CNOT dispatch fingerprint — 2026-11-22
 
 The public CNOT path now asks `beam-runtime` for the versioned request fingerprint used by rank consensus. The PyO3 adapter converts the public engine and depth inputs once at this boundary; the Rust runtime hashes engine, u64-depth fit, and strict-mode bits using the established byte contract. The Python adapter uses this API when present and retains the identical legacy digest for older wheels. Gloo phase ordering, capability voting, route selection, search stages, scorer, and CUDA/NCCL behavior are unchanged.

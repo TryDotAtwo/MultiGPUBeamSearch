@@ -150,3 +150,5 @@ Keep an active goal until the migration and required verification are complete.
 2026-11-22: Иван поручил продолжить перенос Rust-сессии перестановок: включить разрешённый inference backend/policy/row limit в typed preparation identity, проверить повторный вызов и инвалидирование при смене плана, оставить форматы/API и численную политику прежними.
 
 2026-11-22: Иван поручил разделить hosted CNOT panel-v2 CI: быстрый no-Torch emitter/manifest handoff verdict, отдельные PyTorch environment и Rust native build caches, подготовка crate до Torch/Cargo, route tests для обоих путей и сквозная installed-wheel проверка настоящего Rust resolver; без Vast, платных и физических GPU запусков.
+
+2026-11-22: Продолжая Rust-перенос CNOT, передавать один уже проверенный RankedCnotRequest от Rust-контроллера к нативным стадиям; брать из него topology, режим, audit и search options. Сохранить старую extension signature для совместимых прямых вызовов и подтвердить публичный путь установленного wheel на hosted CPU. Алгоритм, kernels, precision и порядок collectives не менять.

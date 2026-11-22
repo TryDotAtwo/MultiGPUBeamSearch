@@ -1,3 +1,10 @@
+## 2026-11-22 - Carry one ranked CNOT request into native stages
+
+- The Rust CNOT controller now passes its validated RankedCnotRequest into the native-stage adapter as one private PyO3 value.
+- The native stage derives rank, world size, mode, audit flag, and Rust search options from that request, then checks its topology against the live world before entering the search.
+- The existing scalar extension arguments remain available to direct legacy callers. Tensor layout, scorer, collectives, kernels, and search policy are unchanged.
+- Hosted CPU and installed-wheel checks are required for this Rust adapter boundary.
+
 ## 2026-11-22 - Run the panel-v2 identity tests in the CPU adapter gate
 
 - The bridge's typed panel-v2 manifest and identity validator now live in a shared Rust module compiled with the CPU Torch feature; the CUDA C ABI bridge imports the same implementation.
