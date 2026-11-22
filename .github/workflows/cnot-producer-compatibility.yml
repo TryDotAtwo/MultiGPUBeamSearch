@@ -77,19 +77,28 @@ jobs:
             echo "source_adapter=failed" >> "$GITHUB_OUTPUT"
             exit 1
           fi
+          echo "source_adapter=passed" >> "$GITHUB_OUTPUT"
+      - name: Run synthetic panel-v2 handoff tests
+        id: handoff_tests
+        shell: bash
+        run: |
+          set -euo pipefail
           if ! python -m unittest discover -s integrations/cnot_scorer -p 'test_handoff.py' -v > "${RUNNER_TEMP}/producer-handoff-test.log" 2>&1; then
-            echo "source_adapter=failed" >> "$GITHUB_OUTPUT"
+            echo "handoff_tests=failed" >> "$GITHUB_OUTPUT"
             exit 1
           fi
-          echo "source_adapter=passed" >> "$GITHUB_OUTPUT"
+          echo "handoff_tests=passed" >> "$GITHUB_OUTPUT"
       - name: Publish redacted source status
         if: always()
         env:
           OUTCOME: ${{ steps.cpu_compile.outcome }}
+          HANDOFF_OUTCOME: ${{ steps.handoff_tests.outcome }}
         shell: bash
         run: |
-          if [[ "$OUTCOME" == "success" ]]; then
-            echo "CNOT producer adapter: passed (CPU compile and panel-manifest tests; GPU runtime not run)." >> "$GITHUB_STEP_SUMMARY"
+          if [[ "$OUTCOME" != "success" ]]; then
+            echo "CNOT producer adapter: failed (CPU source compile or panel-manifest tests; GPU runtime not run)." >> "$GITHUB_STEP_SUMMARY"
+          elif [[ "$HANDOFF_OUTCOME" == "success" ]]; then
+            echo "CNOT producer adapter: passed (CPU source compile, panel-manifest and synthetic handoff tests; GPU runtime not run)." >> "$GITHUB_STEP_SUMMARY"
           else
-            echo "CNOT producer adapter: failed (CPU compile or panel-manifest tests; GPU runtime not run)." >> "$GITHUB_STEP_SUMMARY"
+            echo "CNOT producer adapter: failed (CPU source compile passed; synthetic handoff tests failed; GPU runtime not run)." >> "$GITHUB_STEP_SUMMARY"
           fi
