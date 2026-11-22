@@ -3384,3 +3384,11 @@ Main commit `148b2a826a369b7601e904ea409e0cc5301c75c9` also passed the 260-test 
 - Added `beam_runtime::cnot_search::CnotRequest` with typed mode, validation policy, requested engine, width, capped shortlist, depth, and wire count.
 - The Rust controller now creates this request inside the existing collective input-admission phase and uses the validated values for native stage execution. Public input packing, scoring, stage order, kernels, and rank collectives are unchanged.
 - Runtime unit tests cover preserved controls, alphabet shortlist capping, selected-engine semantics, and rejection of invalid public options.
+
+
+## 2026-11-22 - Revalidate Gloo lifecycle receipts and panel handoff byte binding
+
+- The installed two-rank `verify_cnot` check records rank-local receipts with `case_id`, `phase` and `common_outcome`; it validates each rank's requested engine separately. It reads exactly three successful bitwise-replay reports written by rank 0: `healthy-after-engine-mismatch-0.json`, `healthy-after-0-0.json`, and `healthy-after-1-0.json`.
+- The panel-v2 resolver now hashes and parses each pinned JSON artifact from the same in-memory bytes, including both panel and baseline manifests. RED was reproduced by the one-read-per-artifact regression at run [44983615094](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44983615094); the fix is in code SHA `57bf4f0deb90e1b0009b1a458968e5ca4096fe23`.
+- At that SHA the installed PEP 517 wheel passed all 27 steps in [run 44983817156](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44983817156), including the two-rank Gloo lifecycle/receipt verifier and panel endpoint tests. The pinned producer CPU compile and handoff tests passed in [runs 44983817105](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44983817105) and [44983819836](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44983819836).
+- Physical CUDA/NCCL was skipped. These results establish hosted CPU, Gloo, and installed-wheel behavior only.
