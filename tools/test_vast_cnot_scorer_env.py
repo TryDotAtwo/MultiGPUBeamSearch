@@ -51,7 +51,7 @@ class VastScorerEnvironmentTests(unittest.TestCase):
         self.assertEqual(dev_env["MGBS_CNOT_STRICT_BACKEND"], "1")
         self.assertEqual(panel_env["MGBS_CNOT_STRICT_BACKEND"], "1")
         self.assertEqual(dev_env["MGBS_CNOT_EXPECTED_TQP_LIBRARY_SHA256"], dev_sha)
-        self.assertEqual(panel_env["MGBS_CNOT_EXPECTED_SCORER_LIBRARY_SHA256"], panel_sha)
+        self.assertEqual(panel_env["MGBS_CNOT_EXPECTED_TQP_LIBRARY_SHA256"], panel_sha)
 
     def test_rejects_malformed_hash(self):
         with self.assertRaises(AssertionError):

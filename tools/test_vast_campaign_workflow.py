@@ -87,9 +87,21 @@ class VastCampaignWorkflowTests(unittest.TestCase):
 
     def test_private_handoff_runs_before_scorer_build_and_uses_locked_panel_pair(self):
         worker = (ROOT / "tools/vast_cnot_gpu_acceptance.sh").read_text(encoding="utf-8")
-        self.assertLess(worker.index("validate_cnot_handoff.py"), worker.index("integrations/cnot_scorer/build.py"))
+        handoff_validation = worker.index('"$python_bin" "$source_dir/tools/validate_cnot_handoff.py"')
+        dev_build = worker.index(
+            '"$python_bin" "$source_dir/integrations/cnot_scorer/build.py" '
+            '--source "$upstream" --build-dir "$dev_scorer_build" --contract dev_v1'
+        )
+        panel_build = worker.index(
+            '"$python_bin" "$source_dir/integrations/cnot_scorer/build.py" '
+            '--source "$upstream" --build-dir "$panel_scorer_build" --contract panel_search_v2'
+        )
+        self.assertLess(handoff_validation, dev_build)
+        self.assertLess(handoff_validation, panel_build)
         self.assertIn('mgbs_vast_cnot_panel_cli_args "${handoff_run_root}"', worker)
-        self.assertIn('"${panel_result_dir}/${case_id}.json" "${scorer_library}"', worker)
+        self.assertIn('mgbs_vast_cnot_scorer_environment dev_v1', worker)
+        self.assertIn('mgbs_vast_cnot_scorer_environment panel_search_v2', worker)
+        self.assertIn('"${panel_result_dir}/${case_id}.json" "${panel_scorer_library}"', worker)
         panel_cli = (ROOT / "tools/vast_cnot_panel_cli_args.sh").read_text(encoding="utf-8")
         self.assertIn("--case panel", panel_cli)
         self.assertIn("--backend nccl", panel_cli)

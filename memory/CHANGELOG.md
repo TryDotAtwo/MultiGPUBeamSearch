@@ -1,3 +1,10 @@
+## 2026-11-22 - Reuse successful panel-v2 adapter build artifacts
+
+- Replaced the custom prior-verdict cache with GitHub Actions caching of the pinned panel-v2 Python environment, prepared native crate and Cargo target. The key includes the native adapter source digests, producer/emitter pins, CPU PyTorch version, Rust toolchain and runner image.
+- Cheap CPU contracts run before cache restoration. A cache hit re-runs the native Cargo tests and the pinned emitter consumer fixture; an unknown or changed native input misses the exact key and rebuilds. Only a successful native build is cached, so a previous failure cannot carry into a later PR run.
+- Removed the duplicate `cargo check`; `cargo test --lib` is the native compile-and-test gate.
+- Corrected hosted launcher assertions to order the real handoff validation before the actual scorer build commands and to verify the panel-v2 library digest environment variable.
+
 ## 2026-11-22 - Separate GL4 and panel-v2 scorer contracts
 
 - The Vast acceptance runner builds GL4 with the pinned `dev_v1` provider and the sealed panel with `panel_search_v2` from its separate pinned upstream revision. Each search receives its matching library, strict Rust admission, and launcher-bound library SHA-256.

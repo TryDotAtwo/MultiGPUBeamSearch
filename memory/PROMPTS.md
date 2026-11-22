@@ -1,3 +1,5 @@
+2026-11-22: Иван поручил продолжить PR #10 без Vast, платных workflow, физических GPU, локальных сборок/тестов и загрузки артефактов. Для panel-v2 compatibility переиспользовать только успешные native build artifacts с ключом по входам адаптера, emitter, toolchain и окружения; убрать повторный cargo check; сохранять независимые installed-wheel результаты и проверять реальные аргументы публичного CNOT consumer.
+
 2026-11-22: Иван поручил разделить GL4 dev_v1 и panel_search_v2 scorer artifacts в CNOT acceptance: выбирать .so по manifest contract, включать strict Rust admission, связывать hash и metadata реально загруженного panel provider, сохранить producer-owned файлы неизменными. Запрещены Vast/платные/физические GPU проверки и локальные сборки; использовать только hosted CPU/installed checks.
 
 2026-11-19: Ivan authorized installing the repository Actions secret `VAST_API_KEY`. The current hosted Actions environment has already authenticated with this secret; the existing value must not be exposed in code, command arguments, or logs.

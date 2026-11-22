@@ -8,13 +8,16 @@ on:
 
 permissions:
   contents: read
-  actions: read
 
 jobs:
   compile-current-producer-adapter:
     name: Compile pinned panel-v2 adapter with CPU PyTorch
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    env:
+      PANEL_PRODUCER_SOURCE_SHA: e17953891a36e3e3ae8b038695bfac8548ab784f
+      PANEL_EMITTER_SOURCE_SHA: 42ed72f587ab70fc74a85cf0a25001efb29cb994
+      PANEL_BUILD_RECIPE: panel-v2-cpu-torch-2.9.0-rust-stable-v1
     steps:
       - uses: actions/checkout@v4
         with:
@@ -24,53 +27,86 @@ jobs:
         id: python
         with:
           python-version: "3.11"
-      - name: Find a completed build for these inputs
-        id: previous
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PYTHON_VERSION_USED: ${{ steps.python.outputs.python-version }}
-          PANEL_INPUTS: >-
-            ${{ hashFiles('.github/workflows/cnot-producer-compatibility.yml',
-                         'integrations/cnot_scorer/build.py', 'integrations/cnot_scorer/bridge_panel_v2.rs',
-                         'integrations/cnot_scorer/handoff.py', 'integrations/cnot_scorer/test_handoff.py',
-                         'tools/cnot_producer_compatibility.py', 'tools/test_cnot_producer_compatibility.py') }}
-        run: python3 tools/cnot_producer_compatibility.py
-      - name: Carry the last failed build for identical inputs
-        if: steps.previous.outputs.verdict == 'failure'
-        run: |
-          echo "These inputs failed the last full build. Re-run this job to retry."
-          exit 1
-      - name: Run cheap CPU panel-v2 contract checks before building
-        if: steps.previous.outputs.verdict == 'run'
-        run: |
-          python3 tools/test_cnot_producer_compatibility.py
-          (cd integrations/cnot_scorer && python3 -m unittest -v test_handoff)
-      - uses: actions/checkout@v4
-        if: steps.previous.outputs.verdict == 'run'
-        with:
-          repository: TryDotAtwo/cnot-neural-synth-frontier6
-          ref: e17953891a36e3e3ae8b038695bfac8548ab784f
-          path: cnot-producer
-          fetch-depth: 1
-          persist-credentials: false
-      - uses: actions/checkout@v4
-        if: steps.previous.outputs.verdict == 'run'
-        with:
-          repository: TryDotAtwo/cnot-neural-synth-frontier6
-          ref: 42ed72f587ab70fc74a85cf0a25001efb29cb994
-          path: cnot-emitter
-          fetch-depth: 1
-          persist-credentials: false
-      - name: Install pinned CPU PyTorch
-        if: steps.previous.outputs.verdict == 'run'
+      - name: Run cheap CPU panel-v2 contracts before cache lookup
         shell: bash
         run: |
           set -euo pipefail
-          python -m pip install torch==2.9.0 --index-url https://download.pytorch.org/whl/cpu \
-            > "$RUNNER_TEMP/producer-adapter-pip.log" 2>&1
-      - name: Prepare and compile the pinned producer adapter
+          python3 tools/test_cnot_producer_compatibility.py -v
+          (cd integrations/cnot_scorer && python3 -m unittest -v test_handoff)
+      - name: Checkout pinned producer emitter for the consumer fixture
+        id: emitter_checkout
+        uses: actions/checkout@v4
+        with:
+          repository: TryDotAtwo/cnot-neural-synth-frontier6
+          ref: ${{ env.PANEL_EMITTER_SOURCE_SHA }}
+          path: cnot-emitter
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Fingerprint panel-v2 native inputs and toolchain
+        id: build_inputs
+        shell: bash
+        env:
+          RUSTUP_TOOLCHAIN: stable
+          PYTHON_VERSION_USED: ${{ steps.python.outputs.python-version }}
+        run: |
+          set -euo pipefail
+          build_py_sha="$(sha256sum "$GITHUB_WORKSPACE/integrations/cnot_scorer/build.py" | awk '{print $1}')"
+          bridge_sha="$(sha256sum "$GITHUB_WORKSPACE/integrations/cnot_scorer/bridge_panel_v2.rs" | awk '{print $1}')"
+          adapter_inputs_sha="$(printf 'build.py=%s\nbridge_panel_v2.rs=%s\n' "$build_py_sha" "$bridge_sha" | sha256sum | awk '{print $1}')"
+          runner_fingerprint="$(printf '%s\n' "${ImageOS:-unknown}" "${ImageVersion:-unknown}" | sha256sum | awk '{print $1}')"
+          rust_fingerprint="$(rustc -Vv | sha256sum | awk '{print $1}')"
+          cache_key="cnot-panel-v4-${RUNNER_OS}-${RUNNER_ARCH}-py${PYTHON_VERSION_USED}-torch2.9.0-${runner_fingerprint}-${rust_fingerprint}-${PANEL_BUILD_RECIPE}-${PANEL_PRODUCER_SOURCE_SHA}-${PANEL_EMITTER_SOURCE_SHA}-${adapter_inputs_sha}"
+          printf 'cache_key=%s\n' "$cache_key" >> "$GITHUB_OUTPUT"
+      - name: Restore the exact successful native build artifact
+        id: build_cache
+        uses: actions/cache/restore@v4
+        continue-on-error: true
+        with:
+          path: |
+            .venv-cnot-panel
+            ${{ runner.temp }}/cnot-panel-v2-build
+            ${{ runner.temp }}/cnot-panel-v2-target
+          key: ${{ steps.build_inputs.outputs.cache_key }}
+      - name: Validate restored native build artifact
+        id: cache_validation
+        shell: bash
+        env:
+          CACHE_HIT: ${{ steps.build_cache.outputs.cache-hit }}
+        run: |
+          set -euo pipefail
+          ready=false
+          if [[ "$CACHE_HIT" == "true" ]] \
+              && [[ -x .venv-cnot-panel/bin/python ]] \
+              && [[ -f "$RUNNER_TEMP/cnot-panel-v2-build/native/Cargo.toml" ]] \
+              && [[ -d "$RUNNER_TEMP/cnot-panel-v2-target" ]] \
+              && .venv-cnot-panel/bin/python -c 'import torch; raise SystemExit(torch.__version__.split("+")[0] != "2.9.0")'; then
+            ready=true
+          fi
+          printf 'ready=%s\n' "$ready" >> "$GITHUB_OUTPUT"
+      - name: Checkout pinned panel-v2 adapter source
+        if: steps.cache_validation.outputs.ready != 'true'
+        uses: actions/checkout@v4
+        with:
+          repository: TryDotAtwo/cnot-neural-synth-frontier6
+          ref: ${{ env.PANEL_PRODUCER_SOURCE_SHA }}
+          path: cnot-producer
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Install pinned CPU PyTorch for a cache miss
+        if: steps.cache_validation.outputs.ready != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf .venv-cnot-panel
+          python -m venv .venv-cnot-panel
+          if ! .venv-cnot-panel/bin/python -m pip install torch==2.9.0 \
+              --index-url https://download.pytorch.org/whl/cpu \
+              > "$RUNNER_TEMP/producer-adapter-pip.log" 2>&1; then
+            exit 1
+          fi
+      - name: Prepare and test the pinned producer adapter
         id: cpu_compile
-        if: steps.previous.outputs.verdict == 'run'
+        if: steps.cache_validation.outputs.ready != 'true'
         shell: bash
         env:
           RUSTUP_TOOLCHAIN: stable
@@ -79,42 +115,56 @@ jobs:
         run: |
           set -euo pipefail
           build_dir="$RUNNER_TEMP/cnot-panel-v2-build"
-          if ! python integrations/cnot_scorer/build.py --contract panel_search_v2 \
+          rm -rf "$build_dir" "$CARGO_TARGET_DIR"
+          if ! .venv-cnot-panel/bin/python integrations/cnot_scorer/build.py --contract panel_search_v2 \
               --source "$GITHUB_WORKSPACE/cnot-producer" \
               --build-dir "$build_dir" --prepare-only > "$RUNNER_TEMP/producer-adapter-prepare.log" 2>&1; then
             exit 1
           fi
           native="$build_dir/native"
-          torch_lib="$(python -c 'import pathlib, torch; print(pathlib.Path(torch.__file__).parent / "lib")')"
+          torch_lib="$(.venv-cnot-panel/bin/python -c 'import pathlib, torch; print(pathlib.Path(torch.__file__).parent / "lib")')"
           export LD_LIBRARY_PATH="$torch_lib:${LD_LIBRARY_PATH:-}"
-          if ! cargo check --locked --features torch --lib --manifest-path "$native/Cargo.toml" \
-              > "$RUNNER_TEMP/producer-adapter-cargo.log" 2>&1; then
-            exit 1
-          fi
           cargo test --locked --features torch --lib mgbs_scorer_panel_v2::tests \
             --manifest-path "$native/Cargo.toml" \
             > "$RUNNER_TEMP/producer-adapter-tests.log" 2>&1
-      - name: Run the pinned emitter through the consumer fixture
-        id: handoff_tests
-        if: steps.previous.outputs.verdict == 'run'
+      - name: Run the cached panel-v2 adapter tests
+        id: cached_adapter_tests
+        if: steps.cache_validation.outputs.ready == 'true'
         shell: bash
         env:
-          CNOT103_PRODUCER_CHECKOUT: ${{ github.workspace }}/cnot-emitter
-          CNOT103_PRODUCER_SOURCE_SHA: 42ed72f587ab70fc74a85cf0a25001efb29cb994
+          RUSTUP_TOOLCHAIN: stable
+          LIBTORCH_USE_PYTORCH: "1"
+          CARGO_TARGET_DIR: ${{ runner.temp }}/cnot-panel-v2-target
         run: |
           set -euo pipefail
-          (cd integrations/cnot_scorer && python3 -m unittest -v test_handoff) \
-            > "$RUNNER_TEMP/producer-handoff-test.log" 2>&1
-      # Only a full build creates an entry. The existing workflow file is a small cache payload.
-      - name: Remember the full build outcome
-        if: ${{ !cancelled() && steps.previous.outputs.verdict == 'run' }}
+          native="$RUNNER_TEMP/cnot-panel-v2-build/native"
+          torch_lib="$(.venv-cnot-panel/bin/python -c 'import pathlib, torch; print(pathlib.Path(torch.__file__).parent / "lib")')"
+          export LD_LIBRARY_PATH="$torch_lib:${LD_LIBRARY_PATH:-}"
+          cargo test --locked --features torch --lib mgbs_scorer_panel_v2::tests \
+            --manifest-path "$native/Cargo.toml" \
+            > "$RUNNER_TEMP/producer-adapter-tests.log" 2>&1
+      - name: Save successful native build artifact
+        if: success() && steps.cache_validation.outputs.ready != 'true'
         uses: actions/cache/save@v4
         continue-on-error: true
         with:
-          key: ${{ steps.previous.outputs.prefix }}${{ github.run_id }}-${{ github.run_attempt }}-${{ job.status }}
-          path: .github/workflows/cnot-producer-compatibility.yml
+          key: ${{ steps.build_inputs.outputs.cache_key }}
+          path: |
+            .venv-cnot-panel
+            ${{ runner.temp }}/cnot-panel-v2-build
+            ${{ runner.temp }}/cnot-panel-v2-target
+      - name: Run the pinned emitter through the consumer fixture
+        id: handoff_tests
+        shell: bash
+        env:
+          CNOT103_PRODUCER_CHECKOUT: ${{ github.workspace }}/cnot-emitter
+          CNOT103_PRODUCER_SOURCE_SHA: ${{ env.PANEL_EMITTER_SOURCE_SHA }}
+        run: |
+          set -euo pipefail
+          (cd integrations/cnot_scorer && "$GITHUB_WORKSPACE/.venv-cnot-panel/bin/python" -m unittest -v test_handoff) \
+            > "$RUNNER_TEMP/producer-handoff-test.log" 2>&1
       - name: Upload native diagnostics on failure
-        if: ${{ failure() && steps.previous.outputs.verdict == 'run' }}
+        if: failure()
         uses: actions/upload-artifact@v4
         continue-on-error: true
         with:
