@@ -75,3 +75,5 @@ Keep an active goal until the migration and required verification are complete.
 
 
 2026-11-20: Ivan сформулировал цель довести MultiGPUBeamSearch до проверенного запуска permutation и CNOT на Rust + CUDA/C++ со штатным checkpoint scorer. Сохранять мульти-GPU, Python, CLI, Kaggle, torchrun и Slurm, алгоритмы и precision. Исправлять публичные API и сбои распределённого запуска/обмена/отмены регрессионными тестами; сначала CNOT, где ранги могут выбрать разные коллективы. Проверить установленный wheel и физические 1/2 GPU, публиковать проверенные изменения в GitHub. Оптимизации не входят; соблюдать действующие ограничения ресурсов и бюджета.
+
+2026-11-22: Ivan requested a clear standalone MultiGPUBeamSearch launch for two A100 GPUs in an isolated network, using CayleyPy's graph.beam_search, a Cube555 Transformer/MLP blend and automatic profile discovery/calibration on the assigned node. The Kaggle notebooks are reference context. The standalone launcher should be independently organized and runnable by the cluster operator.

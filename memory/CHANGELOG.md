@@ -2972,3 +2972,8 @@ Main commit `148b2a826a369b7601e904ea409e0cc5301c75c9` also passed the 260-test 
 - Hosted source validation passed in [Actions run 44831036050](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44831036050); artifact [14675264978](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44831036050/artifacts/14675264978), SHA-256 `66fb835caa5cc9e1a897bb97777c18cccdffd9cb3092c3ec2e7908ae9181bfad`.
 - That push-triggered run validated Python/Bash syntax and packaging guards only. The physical GPU job was skipped; CUDA/NCCL search and checkpoint-scored CNOT remain unverified pending a supplied spend cap and an already-running instance.
 - Source-controlled evidence: `test_results/refactor_20261121/gpu-acceptance/GITHUB_STATUS.md`.
+
+## 2026-11-22 — Standalone CayleyPy Cube555 example
+
+- Added a single-node two-GPU launcher using CayleyPy graph.beam_search, an explicit Transformer/MLP blend and native automatic profile selection with a persistent local cache.
+- GitHub Actions run 44999863528 built the Linux x86-64 CPython 3.11/CUDA 12.8 wheelhouse and exported Cube555 inputs at a18d42ed. A clean install and input check passed in a network namespace without internet. Artifact 14745278210 is the resulting archive. No physical A100 run was performed.
