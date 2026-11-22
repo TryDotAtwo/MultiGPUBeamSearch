@@ -457,13 +457,26 @@ mod tests {
         assert_eq!(request.requested_engine, RequestedEngine::Auto);
         assert_eq!(request.selected_engine(), SelectedEngine::Rust);
 
-        let options = request.search_options(1, 2);
+        let ranked = request.bind_rank(1, 2).unwrap();
+        assert_eq!(ranked.rank, 1);
+        assert_eq!(ranked.world, 2);
+        let options = ranked.search_options();
         assert_eq!(options.rank, 1);
         assert_eq!(options.world, 2);
         assert_eq!(options.width, 9);
         assert_eq!(options.shortlist, 12);
         assert_eq!(options.alphabet, 12);
         assert_eq!(options.max_depth, 7);
+    }
+
+    #[test]
+    fn typed_cnot_request_rejects_invalid_rank_topology_before_stage_setup() {
+        let request = CnotRequest::new(4, 9, 4, 7, "qhat", false, "auto", "auto").unwrap();
+        assert!(request.bind_rank(0, 0).is_err());
+        assert!(request.bind_rank(2, 2).is_err());
+        assert!(request.bind_rank(0, 65_537).is_err());
+        assert!(request.bind_rank(0, 1).is_ok());
+        assert!(request.bind_rank(1, 2).is_ok());
     }
 
     #[test]
