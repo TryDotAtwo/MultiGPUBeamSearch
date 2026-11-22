@@ -10,6 +10,9 @@ on:
       - .github/workflows/installed-wheel-validation.yml
       - .github/workflows/vast-cnot-control-collectives.yml
       - integrations/cayleypy_native/tests/installed_wheel_smoke.py
+      - integrations/cayleypy_native/tests/installed_cnot_handoff_endpoint.py
+      - integrations/cnot_scorer/handoff.py
+      - integrations/cnot_scorer/test_handoff.py
       - integrations/cayleypy_native/tests/installed_cnot_dtype_contract.py
       - integrations/cayleypy_native/tests/installed_cnot_backend_admission.py
       - integrations/cayleypy_native/tests/installed_cnot_phase_boundaries.py
@@ -96,6 +99,13 @@ jobs:
           mkdir -p "$RUNNER_TEMP/mgbs-wheel-smoke"
           cd "$RUNNER_TEMP/mgbs-wheel-smoke"
           env -u PYTHONPATH python "$GITHUB_WORKSPACE/integrations/cayleypy_native/tests/installed_wheel_smoke.py" > "${RUNNER_TEMP}/mgbs-private-smoke.log" 2>&1
+      - name: Verify receipt-driven CNOT panel endpoint with the installed CPU wheel
+        id: cnot_handoff_endpoint
+        run: |
+          set -o pipefail
+          cd "$RUNNER_TEMP/mgbs-wheel-smoke"
+          env -u PYTHONPATH python "$GITHUB_WORKSPACE/integrations/cayleypy_native/tests/installed_cnot_handoff_endpoint.py" \
+            > "${RUNNER_TEMP}/mgbs-private-cnot-handoff-endpoint.log" 2>&1
       - name: Verify vendored source headers invalidate the installed native fingerprint
         id: vendor_source_fingerprint
         run: |
