@@ -1,3 +1,9 @@
+## Keep CNOT history edges typed across checked stages — 2026-11-22
+
+The Rust checked-stage helper now carries generic Rust results through the existing rank-wide vote and diagnostic path. CNOT history decodes the fixed signed wire row directly into the runtime `Edge` inside that checked phase; it does not convert the values back through a Python tuple. Error stage names, error text, vote ordering, history layout and replay checks remain unchanged.
+
+The typed row decoder rejects invalid length and signed or over-wide fields. Hosted CPU/Gloo and installed-wheel checks must cover normal history reconstruction and a coordinated history-stage failure with a healthy retry. This change does not establish physical CUDA/NCCL acceptance.
+
 ## One ranked CNOT request reaches the native stages — 2026-11-22
 
 The Rust CNOT controller now passes the same validated RankedCnotRequest it used for admission into the native-stage adapter. The adapter derives rank, world size, mode, audit and search options from that typed value and checks that its topology matches the live World before stage construction completes. The older scalar run_cnot_native arguments remain valid for direct compatibility callers; the public Rust-controller path no longer reconstructs stage configuration from those scalar copies. Tensor layouts, scorer callbacks, collectives, kernels, search ordering and numerical policy are unchanged.

@@ -1,7 +1,0 @@
-{
-  "instance": 61001341,
-  "observed_status": "loading",
-  "observed_duration_seconds": 423.09635734558105,
-  "message_excerpt": "ERROR: failed to solve: process \"/bin/sh -c mkdir -p /tmp; chmod 1777 /tmp; exit 0;\" did not complete successfully: exit code: 2",
-  "source": "Vast show instance, before teardown"
-}

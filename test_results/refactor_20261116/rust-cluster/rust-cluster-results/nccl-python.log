@@ -1,6 +1,0 @@
-W1116 12:39:35.158000 5767 site-packages/torch/distributed/run.py:803] 
-W1116 12:39:35.158000 5767 site-packages/torch/distributed/run.py:803] *****************************************
-W1116 12:39:35.158000 5767 site-packages/torch/distributed/run.py:803] Setting OMP_NUM_THREADS environment variable for each process to be 1 in default, to avoid your system being overloaded, please further tune the variable for optimal performance in your application as needed. 
-W1116 12:39:35.158000 5767 site-packages/torch/distributed/run.py:803] *****************************************
-{"rank": 0, "directory": "/workspace/rust-cluster-results/nccl-python/6ed969e5-f61b-47b6-b374-24fdafab1a9f/attempt-0/rank-0"}
-{"rank": 1, "directory": "/workspace/rust-cluster-results/nccl-python/6ed969e5-f61b-47b6-b374-24fdafab1a9f/attempt-0/rank-1"}

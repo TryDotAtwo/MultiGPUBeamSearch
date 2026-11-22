@@ -1,2 +1,0 @@
-static_rc=98
-arena_rc=98

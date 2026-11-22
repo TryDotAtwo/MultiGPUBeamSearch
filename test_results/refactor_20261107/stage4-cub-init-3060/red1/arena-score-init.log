@@ -1,4 +1,0 @@
-========= COMPUTE-SANITIZER
-score_histograms FAIL STREAM3_BATCH_CANDIDATES must be divisible by B_MICRO * MOVE_COUNT
-========= Target application returned an error
-========= ERROR SUMMARY: 0 errors

@@ -1,7 +1,0 @@
-native_input_tests.cpp
-tests\native_input_tests.cpp(30): error C2039: "load_p900_moves": не является членом "beam::input".
-D:\100XH100\tests\../src/native_input.hpp(10): note:  см. объявление "beam::input"
-tests\native_input_tests.cpp(30): error C3861: load_p900_moves: идентификатор не найден
-tests\native_input_tests.cpp(117): error C2039: "load_p900_moves": не является членом "beam::input".
-D:\100XH100\tests\../src/native_input.hpp(10): note:  см. объявление "beam::input"
-tests\native_input_tests.cpp(117): error C3861: load_p900_moves: идентификатор не найден

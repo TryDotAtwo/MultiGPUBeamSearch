@@ -1,4 +1,0 @@
-Linux-6.8.0-138-generic-x86_64-with-glibc2.35
-2.9.0+cu128
-12.8
-GPU_COUNT 2

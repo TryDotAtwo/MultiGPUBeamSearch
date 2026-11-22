@@ -1514,33 +1514,15 @@ impl Backend for NativeStages<'_> {
             "broadcast CNOT history edge",
             broadcast,
         )?;
-        let parsed = checked(
+        checked(
             self.py,
             &self.world,
             "validate CNOT history edge",
-            (|| -> PyResult<Bound<'_, PyAny>> {
+            (|| -> PyResult<Edge> {
                 let row: Vec<i64> = edge.call_method0("tolist")?.extract()?;
-                if row.len() != 3 {
-                    return Err(PyValueError::new_err("invalid CNOT history edge"));
-                }
-                let parent = u64::try_from(row[0])
-                    .map_err(|_| PyValueError::new_err("invalid CNOT history parent"))?;
-                let route = u32::try_from(row[1])
-                    .map_err(|_| PyValueError::new_err("invalid CNOT history route"))?;
-                let owner = u32::try_from(row[2])
-                    .map_err(|_| PyValueError::new_err("invalid CNOT history owner"))?;
-                let int = self.py.import("builtins")?.getattr("int")?;
-                let parent = int.call1((parent,))?;
-                let route = int.call1((route,))?;
-                let owner = int.call1((owner,))?;
-                Ok(PyTuple::new(self.py, [parent, route, owner])?.into_any())
+                Edge::from_i64_row(&row).map_err(PyValueError::new_err)
             })(),
-        )?;
-        Ok(Edge {
-            parent: parsed.get_item(0)?.extract()?,
-            route: parsed.get_item(1)?.extract()?,
-            owner: parsed.get_item(2)?.extract()?,
-        })
+        )
     }
 
     fn verifies_construction(&mut self, gates: &[u32]) -> PyResult<bool> {

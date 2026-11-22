@@ -1,2 +1,0 @@
-gpu=0 scan_graph_replay_and_block_prefix=pass
-gpu=1 scan_graph_replay_and_block_prefix=pass

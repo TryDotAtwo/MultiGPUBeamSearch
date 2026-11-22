@@ -1,3 +1,8 @@
+## 2026-11-22 - Keep CNOT history edges typed across checked stages
+
+- Generalized the Rust checked-stage boundary to coordinate a Rust-owned result value directly, while preserving the existing Gloo vote, diagnostics and cancellation behavior.
+- Decoded the fixed history wire row into the runtime Edge type inside the same checked phase. This removes the Rust-to-Python-tuple-to-Rust roundtrip and keeps malformed-row failures on the common stage vote.
+
 ## 2026-11-22 - Carry one ranked CNOT request into native stages
 
 - The Rust CNOT controller now passes its validated RankedCnotRequest into the native-stage adapter as one private PyO3 value.

@@ -1,5 +1,0 @@
-Traceback (most recent call last):
-  File "D:\100XH100\rust\beam-python\tests\search_session.py", line 41, in <module>
-    else:raise AssertionError('stale Python graph hash was accepted')
-         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-AssertionError: stale Python graph hash was accepted

@@ -166,28 +166,28 @@ pub(crate) fn gather_control_error_messages_v2<'py>(
         .collect()
 }
 
-fn checked_impl<'py>(
+fn checked_impl<'py, T>(
     py: Python<'py>,
     world: &Bound<'py, PyAny>,
     stage: &str,
-    result: PyResult<Bound<'py, PyAny>>,
+    result: PyResult<T>,
     byte_gather: bool,
-) -> PyResult<Bound<'py, PyAny>> {
+) -> PyResult<T> {
     let result = result.and_then(|value| py.check_signals().map(|()| value));
     let size: usize = world.getattr("size")?.extract()?;
     if size == 1 {
         return result;
     }
-    let (value, error) = match result {
-        Ok(value) => (Some(value), None),
+    let error = match &result {
+        Ok(_) => None,
         Err(error) => {
             if !error.is_instance_of::<PyBaseException>(py) {
-                return Err(error);
+                return Err(PyErr::from(error.clone_ref(py)));
             }
             let rank: usize = world.getattr("rank")?.extract()?;
             let name: String = error.get_type(py).getattr("__name__")?.extract()?;
             let message = error.value(py).str()?.to_str()?.to_owned();
-            (None, Some(format!("rank {rank}: {name}: {message}")))
+            Some(format!("rank {rank}: {name}: {message}"))
         }
     };
     let any_failed: bool = world
@@ -222,24 +222,24 @@ fn checked_impl<'py>(
         }
         return Err(PyRuntimeError::new_err(diagnostic));
     }
-    Ok(value.unwrap_or_else(|| py.None().into_bound(py)))
+    result
 }
 
-pub(crate) fn checked<'py>(
+pub(crate) fn checked<'py, T>(
     py: Python<'py>,
     world: &Bound<'py, PyAny>,
     stage: &str,
-    result: PyResult<Bound<'py, PyAny>>,
-) -> PyResult<Bound<'py, PyAny>> {
+    result: PyResult<T>,
+) -> PyResult<T> {
     checked_impl(py, world, stage, result, false)
 }
 
-pub(crate) fn checked_v2<'py>(
+pub(crate) fn checked_v2<'py, T>(
     py: Python<'py>,
     world: &Bound<'py, PyAny>,
     stage: &str,
-    result: PyResult<Bound<'py, PyAny>>,
-) -> PyResult<Bound<'py, PyAny>> {
+    result: PyResult<T>,
+) -> PyResult<T> {
     checked_impl(py, world, stage, result, true)
 }
 

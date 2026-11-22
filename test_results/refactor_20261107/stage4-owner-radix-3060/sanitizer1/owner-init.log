@@ -1,3 +1,0 @@
-========= COMPUTE-SANITIZER
-owner_scatter checks=1848 eager_and_graph=PASS
-========= ERROR SUMMARY: 0 errors

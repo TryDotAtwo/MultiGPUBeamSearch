@@ -1,5 +1,0 @@
-Traceback (most recent call last):
-  File "D:\100XH100\.local\tmp\beam-search-owner-27964\worker.py", line 6, in <module>
-    assert os.environ['BEAM_EXPECTED_GRAPH_HASH']=='0dfd25a031f018028e013a6cbbf83b3588c61b5b26897bb5321d117d7d3cca8d'
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-AssertionError

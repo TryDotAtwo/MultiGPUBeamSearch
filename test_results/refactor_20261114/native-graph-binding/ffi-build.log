@@ -1,9 +1,0 @@
-native_abi_tests.cpp
-beam_native.cpp
-Создание кода...
-   Создается библиотека beam-ffi.lib и объект beam-ffi.exp
-native_abi_tests.cpp
-beam_native.cpp
-Создание кода...
-   Создается библиотека beam-ffi-legacy.lib и объект beam-ffi-legacy.exp
-FFI_LIBRARIES_OK

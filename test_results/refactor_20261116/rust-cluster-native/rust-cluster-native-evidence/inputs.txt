@@ -1,2 +1,0 @@
-/workspace/cutlass-source.tar.gz: OK
-/workspace/cluster_native_rank_gpu.py: OK

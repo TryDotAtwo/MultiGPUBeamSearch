@@ -357,6 +357,26 @@ pub struct Edge {
     pub owner: u32,
 }
 
+impl Edge {
+    /// Decode the fixed [parent, route, owner] row exchanged by CNOT history.
+    pub fn from_i64_row(row: &[i64]) -> Result<Self, &'static str> {
+        if row.len() != 3 {
+            return Err("invalid CNOT history edge");
+        }
+        let parent =
+            u64::try_from(row[0]).map_err(|_| "invalid CNOT history parent")?;
+        let route =
+            u32::try_from(row[1]).map_err(|_| "invalid CNOT history route")?;
+        let owner =
+            u32::try_from(row[2]).map_err(|_| "invalid CNOT history owner")?;
+        Ok(Self {
+            parent,
+            route,
+            owner,
+        })
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Route {
     pub source: u32,
@@ -538,6 +558,40 @@ pub fn search<B: Backend>(
 mod tests {
     use super::*;
     use std::collections::VecDeque;
+
+    #[test]
+    fn history_edge_decodes_checked_signed_wire_rows() {
+        let edge = Edge::from_i64_row(&[11, (2 << 16) | 7, 3]).unwrap();
+        assert_eq!(
+            edge,
+            Edge {
+                parent: 11,
+                route: (2 << 16) | 7,
+                owner: 3,
+            }
+        );
+        assert_eq!(Edge::from_i64_row(&[1, 2]), Err("invalid CNOT history edge"));
+        assert_eq!(
+            Edge::from_i64_row(&[-1, 2, 3]),
+            Err("invalid CNOT history parent")
+        );
+        assert_eq!(
+            Edge::from_i64_row(&[1, -1, 3]),
+            Err("invalid CNOT history route")
+        );
+        assert_eq!(
+            Edge::from_i64_row(&[1, i64::from(u32::MAX) + 1, 3]),
+            Err("invalid CNOT history route")
+        );
+        assert_eq!(
+            Edge::from_i64_row(&[1, 2, -1]),
+            Err("invalid CNOT history owner")
+        );
+        assert_eq!(
+            Edge::from_i64_row(&[1, 2, i64::from(u32::MAX) + 1]),
+            Err("invalid CNOT history owner")
+        );
+    }
 
     #[test]
     fn public_dispatch_digest_validates_engine_and_tracks_route_inputs() {

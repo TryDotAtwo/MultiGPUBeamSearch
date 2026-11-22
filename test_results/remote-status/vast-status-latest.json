@@ -1,8 +1,0 @@
-{
-  "instance_id": 61080396,
-  "checked_at_utc": "2026-11-20T23:47:22.379410+00:00",
-  "actual_status": "exited",
-  "intended_status": "stopped",
-  "gpu_name": "RTX 3060",
-  "gpu_count": 2
-}
