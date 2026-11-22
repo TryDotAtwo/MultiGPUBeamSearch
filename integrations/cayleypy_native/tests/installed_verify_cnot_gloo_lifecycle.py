@@ -53,6 +53,32 @@ def main():
     output_root.mkdir(parents=True, exist_ok=True)
     initialize_world("gloo")
     observations = []
+
+    # A different requested controller changes which collectives follow. The
+    # public entry must reject rank-local engine choices before path selection.
+    requested_engine = "auto" if rank == 0 else "python"
+    try:
+        verify_cnot.main(
+            [
+                "--case", "wide", "--backend", "gloo",
+                "--engine", requested_engine,
+                "--output", str(output_root / f"engine-mismatch-{rank}.json"),
+            ],
+            scorer_factory=lambda *_args, **_kwargs: SyntheticScorer(),
+            manage_process_group=False,
+        )
+    except (RuntimeError, ValueError) as error:
+        assert "CNOT search engine settings differ" in str(error), str(error)
+        observations.append({"mismatched_engine": requested_engine, "error": str(error)})
+    else:
+        raise AssertionError("rank-local CNOT engine choices were not rejected")
+    invoke(
+        "wide",
+        output_root / f"healthy-after-engine-mismatch-{rank}.json",
+        engine="auto",
+        forbid_python_reference=True,
+    )
+
     for failed_rank in (0, 1):
         def factory(*_args, target=failed_rank, **_kwargs):
             if rank == target:
