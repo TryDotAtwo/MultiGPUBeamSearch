@@ -210,6 +210,80 @@ if legacy_environment != _rust_environment or legacy_metadata != _rust_metadata:
     raise AssertionError("old-wheel microbatch fallback changed behavior")
 print("INSTALLED_RUST_MICROBATCH_PLAN_PASS", flush=True)
 
+# Exercise the existing public multi-node rank layout through the installed Rust
+# runtime. Exact per-rank placement and capacity must match the Python API.
+cluster_plan_resolver = getattr(runtime, "resolve_cluster_plan", None)
+if not callable(cluster_plan_resolver):
+    raise AssertionError("the installed Rust runtime does not own cluster planning")
+
+cluster_request = {
+    "gpus_per_node": [2, 4, 1],
+    "beam_width": 1000003,
+    "shard_count": 16,
+    "batch_alignment": 1024,
+}
+cluster_expected = {
+    "ranks": [
+        {"global_rank": 0, "node_rank": 0, "local_rank": 0},
+        {"global_rank": 1, "node_rank": 0, "local_rank": 1},
+        {"global_rank": 2, "node_rank": 1, "local_rank": 0},
+        {"global_rank": 3, "node_rank": 1, "local_rank": 1},
+        {"global_rank": 4, "node_rank": 1, "local_rank": 2},
+        {"global_rank": 5, "node_rank": 1, "local_rank": 3},
+        {"global_rank": 6, "node_rank": 2, "local_rank": 0},
+    ],
+    "requested_beam": 1000003,
+    "effective_beam": 1000003,
+    "alignment": 114688,
+    "local_frontier_capacity": 142858,
+    "shard_count": 16,
+    "hardware_verified": False,
+}
+cluster_plan = json.loads(cluster_plan_resolver(json.dumps(cluster_request, sort_keys=True)))
+if cluster_plan != cluster_expected:
+    raise AssertionError(
+        f"Rust cluster plan mismatch: expected={cluster_expected}, actual={cluster_plan}"
+    )
+
+from multigpubeamsearch import cluster as cluster_module
+from multigpubeamsearch import rust_control as cluster_rust_control
+
+observed_cluster_requests = []
+_native_cluster_resolver = cluster_rust_control.resolve_cluster_plan
+
+
+def _observe_cluster_resolver(request):
+    observed_cluster_requests.append(request)
+    return _native_cluster_resolver(request)
+
+
+with _patch.object(cluster_rust_control, "resolve_cluster_plan", _observe_cluster_resolver), _patch.object(
+    cluster_module, "_resolve_cluster_plan_python",
+    side_effect=AssertionError("public cluster planning used the Python policy"),
+):
+    public_cluster_plan = cluster_module.plan_cluster((2, 4, 1), 1000003)
+if not observed_cluster_requests or observed_cluster_requests[-1] != cluster_request:
+    raise AssertionError("public plan_cluster did not delegate its exact request to Rust")
+if (
+    public_cluster_plan.requested_beam != cluster_plan["requested_beam"]
+    or public_cluster_plan.effective_beam != cluster_plan["effective_beam"]
+    or public_cluster_plan.alignment != cluster_plan["alignment"]
+    or public_cluster_plan.local_frontier_capacity != cluster_plan["local_frontier_capacity"]
+    or public_cluster_plan.shard_count != cluster_plan["shard_count"]
+    or public_cluster_plan.hardware_verified is not False
+    or [
+        {"global_rank": rank.global_rank, "node_rank": rank.node_rank, "local_rank": rank.local_rank}
+        for rank in public_cluster_plan.ranks
+    ] != cluster_plan["ranks"]
+):
+    raise AssertionError("public ClusterPlan does not preserve the installed Rust plan")
+
+with _patch.object(cluster_rust_control, "resolve_cluster_plan", return_value=None):
+    legacy_cluster_plan = cluster_module.plan_cluster((2, 4, 1), 1000003)
+if legacy_cluster_plan != public_cluster_plan:
+    raise AssertionError("old-wheel cluster-plan fallback changed the public result")
+print("INSTALLED_RUST_CLUSTER_PLAN_PASS", flush=True)
+
 module = importlib.import_module("multigpubeamsearch._beam_runtime")
 module_path = assert_installed(module.__file__, "Rust extension")
 package_path = assert_installed(package.__file__, "multigpubeamsearch")
