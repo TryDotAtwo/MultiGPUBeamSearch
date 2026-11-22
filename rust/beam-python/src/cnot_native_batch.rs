@@ -267,7 +267,8 @@ pub(crate) fn expand<'py>(
     arange_kwargs.set_item("device", &device)?;
     let all_ids = torch.call_method("arange", (alphabet,), Some(&arange_kwargs))?;
     let moves = if count > 0 && i64::from(k) < alphabet {
-        let raw = cnot_scorer_dispatch::parent_scores(py, world, scorer, parents, mode, strict_backend)?;
+        let raw =
+            cnot_scorer_dispatch::parent_scores(py, world, scorer, parents, mode, strict_backend)?;
         let valid = scores(py, raw, &[count as i64, alphabet], &device)?;
         let kwargs = PyDict::new(py);
         kwargs.set_item("dim", 1)?;
