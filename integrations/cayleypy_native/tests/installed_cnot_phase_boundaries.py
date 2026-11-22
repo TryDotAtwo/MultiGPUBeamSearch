@@ -562,6 +562,8 @@ if __name__ == "__main__":
                 f" rank={rank} worker_type={worker_type}"
                 f" worker_detail={json.dumps(worker_detail, ensure_ascii=True)}"
             )
+        safe_detail = _safe_error_detail(error)
+        detail += f" message={json.dumps(safe_detail, ensure_ascii=True)}"
         print(
             f"CNOT_PHASE_FAILURE case={_diagnostic_case} type={type(error).__name__}"
             f"{detail}",
