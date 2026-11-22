@@ -3,6 +3,7 @@
 - Added a versioned runtime plan that rejects unavailable CUDA before selecting process-local device indices, preserving existing explicit, `num_gpus`, graph-placement, and error rules.
 - Routed the public permutation preparation helper through that plan. Kept Linux/torchrun checks and old-wheel compatibility in place.
 - Added installed-wheel coverage for the real public Rust plan, compatibility fallback, and CUDA-unavailable short-circuit.
+- Installed-wheel and saturated permutation CPU acceptance passed on source SHA `e4e96c452dba8b531c7de262f8f333b088a579c3` ([run 45058727951](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45058727951)); the shared Rust CPU/Gloo check passed ([run 45058728166](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45058728166)). Physical CUDA/NCCL was not run.
 
 ## 2026-11-22 - Test child CUDA mapping at its public boundary
 

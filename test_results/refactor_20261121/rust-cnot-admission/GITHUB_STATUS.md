@@ -1,17 +1,25 @@
 # Rust + CUDA/C++ migration acceptance status
 
 Source branch: `codex/beam-3060-preflight-20261121`
-Latest tested code SHA: `1e8b88cf6f188171bbe583875a400fca9095c5f8`
+Latest tested code SHA: `e4e96c452dba8b531c7de262f8f333b088a579c3`
 Base main SHA: `e6c41b6dc6bb3a839f6338f3cfe9eaadf8608d5a`
 
 | Gate | Status | Evidence |
 |---|---|---|
-| Permutation installed wheel and CPU acceptance | PASS | [run 45056737762](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45056737762) passed on `1e8b88c`. It exercises direct CUDA visibility mapping, the public combined Rust child-environment resolver and saturated permutation CPU cases from an installed wheel. |
-| Permutation CUDA/NCCL on physical 1/2 GPUs | PENDING | Not run under the current resource limits. Physical rank participation, 1/2-GPU parity and hardware replay remain unverified. |
-| CNOT implementation and compatibility | PRESERVED; final acceptance DEFERRED | Per the current user instruction, no CNOT code was changed in this slice. Further CNOT work, checkpoint preparation and trained/physical acceptance are deferred. The automatic producer-source compatibility check completed in [run 45056742672](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45056742672); it is not CNOT runtime acceptance. |
-| Full Rust ownership migration | IN PROGRESS | Rust now owns public cluster geometry/scheduler resolution, CUDA ordinal and visibility mapping, child environment, inference planning and session identity. Python still prepares some model and world inputs; PR #10 remains draft. |
+| Permutation installed-wheel preparation and CPU acceptance | PASS | [run 45058727951](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45058727951) passed on `e4e96c4`, including the public Rust device plan, old-wheel fallback, unavailable-CUDA handling, and saturated permutation CPU acceptance. |
+| Shared Rust CPU/Gloo and formatting checks | PASS | [run 45058728166](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45058728166) passed on the same source SHA. |
+| Hosted source acceptance harness | PASS | [run 45058728397](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45058728397) passed on hosted CPU. The physical producer/GPU jobs were skipped. |
+| Permutation CUDA/NCCL on physical 1/2 GPUs | PENDING | Not run under current resource limits. Physical rank participation, 1/2-GPU parity, and hardware replay remain unverified. |
+| CNOT implementation and compatibility | PRESERVED; final acceptance DEFERRED | CNOT code is unchanged in this slice. Further CNOT changes, checkpoint preparation, and trained/physical acceptance are deferred at the user's request. The shared CPU checks do not establish CNOT GPU acceptance. |
+| Full Rust ownership migration | IN PROGRESS | Rust owns permutation device selection/admission, inference profile/microbatch planning, cluster geometry and scheduler parsing, session identity, CUDA ordinal/visibility mapping, and child environment. Python still prepares some model/world inputs; PR #10 remains draft. |
 
-The installed-wheel results are hosted CPU evidence. They do not establish physical CUDA/NCCL execution. The permutation physical gate is still required; CNOT final acceptance is deferred.
+Installed-wheel and hosted CPU results do not establish physical CUDA/NCCL execution. The permutation physical gate remains required; CNOT final acceptance is deferred.
+
+## Rust-owned permutation CUDA device admission — 2026-11-22
+
+- The public permutation preparation path now sends CUDA availability and normalized device inputs to one versioned `beam-runtime` plan. Rust rejects unavailable CUDA and resolves explicit, `num_gpus`, or graph-derived indices. Python retains Linux/torchrun checks, Torch observation, and compatibility with older extensions.
+- The installed-wheel test reached the real Rust plan through `backend.runtime_devices`, checked the unavailable-CUDA boundary and the old API fallback, and passed on SHA `e4e96c452dba8b531c7de262f8f333b088a579c3`: [run 45058727951](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45058727951). The same run passed saturated permutation CPU acceptance.
+- Shared Rust CPU/Gloo and formatting checks passed: [run 45058728166](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45058728166). The hosted acceptance harness passed on CPU: [run 45058728397](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45058728397); physical jobs were skipped.
 
 ## Rust-owned child CUDA visibility translation — 2026-11-22
 
