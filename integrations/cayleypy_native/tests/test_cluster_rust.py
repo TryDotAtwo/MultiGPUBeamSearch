@@ -174,3 +174,59 @@ while True: time.sleep(.02)
         if worker.poll() is None:
             worker.kill()
             worker.wait()
+
+def test_installed_rust_scheduler_rank_resolves_torchrun_and_slurm():
+    resolver = getattr(runtime, "resolve_scheduler_rank", None)
+    assert callable(resolver), "the installed Rust runtime does not return its scheduler rank"
+
+    torchrun = torch_env(1)
+    assert json.loads(resolver(torchrun)) == {
+        "global_rank": 1,
+        "node_rank": 0,
+        "local_rank": 1,
+        "world_size": 2,
+        "local_world_size": 2,
+    }
+
+    slurm = {
+        "SLURM_PROCID": "12",
+        "SLURM_LOCALID": "4",
+        "SLURM_NODEID": "1",
+        "SLURM_STEP_NUM_TASKS": "14",
+        "SLURM_STEP_TASKS_PER_NODE": "8,6",
+    }
+    assert json.loads(resolver(slurm)) == {
+        "global_rank": 12,
+        "node_rank": 1,
+        "local_rank": 4,
+        "world_size": 14,
+        "local_world_size": 6,
+    }
+    with pytest.raises(ValueError, match="rank or world size"):
+        resolver(dict(torchrun, RANK="2"))
+
+
+def test_public_scheduler_rank_uses_installed_rust_then_legacy_fallback(monkeypatch):
+    from multigpubeamsearch import rust_control
+
+    native_resolver = rust_control.resolve_scheduler_rank
+    observed = []
+
+    def observe(environment):
+        observed.append(dict(environment))
+        return native_resolver(environment)
+
+    monkeypatch.setattr(rust_control, "resolve_scheduler_rank", observe)
+    python_fallback = cluster._scheduler_rank_python
+
+    def forbidden_fallback(*_args, **_kwargs):
+        pytest.fail("the installed Rust scheduler path fell back to Python")
+
+    monkeypatch.setattr(cluster, "_scheduler_rank_python", forbidden_fallback)
+    environment = torch_env(1)
+    assert cluster.scheduler_rank(environment) == cluster.ScheduledRank(1, 0, 1, 2, 2)
+    assert observed == [environment]
+
+    monkeypatch.setattr(rust_control, "resolve_scheduler_rank", lambda _environment: None)
+    monkeypatch.setattr(cluster, "_scheduler_rank_python", python_fallback)
+    assert cluster.scheduler_rank(environment) == python_fallback(environment)
