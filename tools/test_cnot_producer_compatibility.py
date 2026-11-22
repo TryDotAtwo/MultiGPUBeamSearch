@@ -114,9 +114,18 @@ class ProducerBuildCacheWorkflowTests(unittest.TestCase):
         torch_restore = workflow.index("Restore the CPU PyTorch environment")
         torch_install = workflow.index("Install CPU PyTorch into the environment")
         cargo = workflow.index("cargo test --locked --features torch --lib")
+        rust_toolchain = workflow.index("rustup toolchain install stable")
+        self.assertLess(prepare, rust_toolchain)
         self.assertLess(prepare, torch_restore)
         self.assertLess(prepare, torch_install)
         self.assertLess(prepare, cargo)
+        prepare_block = workflow.split(
+            "- name: Prepare exact panel-v2 Rust crate before Torch or Cargo", 1
+        )[1].split("\n      - name:", 1)[0]
+        self.assertIn("--prepare-only", prepare_block)
+        self.assertNotIn("cargo", prepare_block.lower())
+        self.assertNotIn("pip install", prepare_block.lower())
+        self.assertNotIn("torch", prepare_block.lower())
 
         self.assertIn("actions/cache/restore@v4", workflow)
         self.assertIn("actions/cache/save@v4", workflow)
@@ -152,7 +161,7 @@ class ProducerBuildCacheWorkflowTests(unittest.TestCase):
         self.assertIn("steps.scope.outputs.run_native == 'true'", workflow)
         handoff = workflow.split("- name: Run pinned emitter through the no-Torch consumer fixture", 1)[1].split("\n      - name:", 1)[0]
         self.assertIn('find_spec("torch") is None', handoff)
-        self.assertIn("python -m unittest -v test_handoff", handoff)
+        self.assertIn('"$handoff_python" -m unittest -v test_handoff', handoff)
         self.assertNotIn("cargo", handoff.lower())
         self.assertNotIn("pip install", handoff.lower())
 

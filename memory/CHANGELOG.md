@@ -6,6 +6,7 @@
 
 ## 2026-11-22 - Split panel-v2 producer feedback and build caches
 
+- Hosted routing contracts inspect the actual venv-qualified handoff command and require preparation to precede Rust/PyTorch setup.
 - The required PR workflow routes emitter and producer-manifest changes to a stdlib-only handoff check. That route uses a fresh Python environment without PyTorch and skips Cargo even when the native cache is cold. Producer/native adapter changes route to the CPU Rust test.
 - The native crate is prepared before installing Rust or PyTorch. A preparation failure therefore exits before either toolchain setup.
 - The PyTorch environment cache is keyed by runner platform, Python version and dependency file. The Rust target cache is separate and keyed by the prepared native tree bytes, build recipe, adapter ABI, Rust toolchain, Python/PyTorch ABI and runner image; emitter and manifest pins are not inputs to this key.
