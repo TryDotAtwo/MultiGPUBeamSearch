@@ -1,3 +1,8 @@
+## 2026-11-22 - Keep installed CNOT dispatch diagnostics redacted
+
+- The two-rank installed-wheel job keeps the complete diagnostic log in the runner's private temporary directory. On success it emits only three fixed PASS markers; on failure it emits only the fixed phase and exception type from the test's structured marker.
+- This preserves the workflow's redacted-status contract while making the failing phase visible in public Actions output. It does not change dispatch behavior or test coverage.
+
 ## 2026-11-22 - Move the CNOT public-dispatch fingerprint into beam-runtime
 
 - Added a typed Rust digest for the CNOT route request and exposed it through PyO3. The public Python entry uses this API inside the existing checked Gloo phase; older wheels retain the previous byte-for-byte Python fallback.

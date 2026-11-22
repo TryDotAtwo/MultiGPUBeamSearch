@@ -200,12 +200,24 @@ jobs:
         env:
           PYTHONWARNINGS: error::DeprecationWarning
         run: |
-          set -o pipefail
+          set -euo pipefail
           cd "$RUNNER_TEMP/mgbs-wheel-smoke"
-          timeout --signal=TERM --kill-after=15s 180s \
+          log="${RUNNER_TEMP}/mgbs-private-cnot-dispatch-consensus.log"
+          if timeout --signal=TERM --kill-after=15s 180s \
             env -u PYTHONPATH python -m torch.distributed.run --standalone --nproc_per_node=2 \
             "$GITHUB_WORKSPACE/integrations/cayleypy_native/tests/installed_cnot_dispatch_consensus.py" \
-            2>&1 | tee "${RUNNER_TEMP}/mgbs-private-cnot-dispatch-consensus.log"
+            > "$log" 2>&1; then
+            grep -oE 'CNOT_RUST_PUBLIC_DISPATCH_DIGEST_PASS|CNOT_RUST_SELECTOR_SINGLE_PARSE_PASS|INSTALLED_CNOT_DISPATCH_CONSENSUS_PASS' "$log" | sort -u
+          else
+            status=$?
+            marker="$(grep -oE 'CNOT_DISPATCH_CONSENSUS_FAILURE phase=[A-Za-z0-9_]+ type=[A-Za-z0-9_]+' "$log" | tail -n 1 || true)"
+            if [ -n "$marker" ]; then
+              printf '%s\\n' "$marker"
+            else
+              printf '%s\\n' "CNOT_DISPATCH_CONSENSUS_FAILURE diagnostic=unavailable"
+            fi
+            exit "$status"
+          fi
       - name: Verify vendored source headers invalidate the installed native fingerprint
         id: vendor_source_fingerprint
         run: |

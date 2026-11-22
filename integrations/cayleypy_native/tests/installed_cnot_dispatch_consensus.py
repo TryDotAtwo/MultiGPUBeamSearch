@@ -191,11 +191,15 @@ def _assert_rust_selector_reads_depth_once():
     print("CNOT_RUST_SELECTOR_SINGLE_PARSE_PASS", flush=True)
 
 def main():
-    _assert_rust_dispatch_digest_matches_compatibility()
-    _assert_rust_selector_reads_depth_once()
-    dist.init_process_group("gloo", timeout=timedelta(seconds=90))
+    phase = "rust_dispatch_digest"
     try:
+        _assert_rust_dispatch_digest_matches_compatibility()
+        phase = "rust_selector"
+        _assert_rust_selector_reads_depth_once()
+        phase = "gloo_init"
+        dist.init_process_group("gloo", timeout=timedelta(seconds=90))
         for hidden_rank in (0, 1):
+            phase = f"auto_missing_controller_rank_{hidden_rank}"
             record = _attempt(
                 hidden_rank=hidden_rank,
                 hidden_names={"run_cnot_native_search"},
@@ -209,6 +213,7 @@ def main():
 
         # With no common Rust controller or compatibility controller, auto
         # must honor the shared PythonReference path instead of reselecting.
+        phase = "auto_python_fallback"
         record = _attempt(
             hidden_rank=0,
             hidden_names={"run_cnot_native_search", "run_cnot"},
@@ -217,6 +222,7 @@ def main():
 
         # Strict acceptance must reject a missing required operation before
         # any transport setup. The error text and phase are identical per rank.
+        phase = "strict_missing_operation"
         record = _attempt(
             hidden_rank=0,
             hidden_names={"run_cnot_native_start_transport"},
@@ -226,6 +232,7 @@ def main():
 
         # Explicit Rust must fail collectively when neither Rust controller is
         # available on every rank.
+        phase = "explicit_rust_missing_route"
         record = _attempt(
             hidden_rank=0,
             hidden_names={"run_cnot_native_search", "run_cnot"},
@@ -235,6 +242,7 @@ def main():
 
         # An older wheel has no Rust digest export. Its Python fallback must
         # produce the same rank-consensus bytes and still finish the search.
+        phase = "legacy_digest_fallback"
         record = _attempt(engine="auto", legacy_digest=True)
         _expect_solved(
             "legacy wheel digest fallback",
@@ -244,10 +252,20 @@ def main():
         )
 
         # The live default process group must remain usable after all failures.
+        phase = "healthy_retry"
         record = _attempt(engine="auto")
         _expect_solved("healthy auto retry", record, [])
         if dist.get_rank() == 0:
             print("INSTALLED_CNOT_DISPATCH_CONSENSUS_PASS", flush=True)
+    except BaseException as error:
+        error_type = type(error).__name__
+        if not error_type.isascii() or not error_type.replace("_", "").isalnum():
+            error_type = "Exception"
+        print(
+            f"CNOT_DISPATCH_CONSENSUS_FAILURE phase={phase} type={error_type}",
+            flush=True,
+        )
+        raise
     finally:
         if dist.is_initialized():
             dist.destroy_process_group()
