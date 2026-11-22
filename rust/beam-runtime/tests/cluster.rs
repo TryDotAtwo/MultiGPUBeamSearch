@@ -1,4 +1,4 @@
-use beam_runtime::cluster::scheduler_rank;
+use beam_runtime::cluster::{cuda_ordinal, scheduler_rank, ClusterError};
 use std::collections::BTreeMap;
 
 fn env(values: &[(&str, &str)]) -> BTreeMap<String, String> {
@@ -183,4 +183,25 @@ fn typed_cluster_plan_rejects_world_and_frontier_overflow() {
         batch_alignment: u32::MAX,
     })
     .is_err());
+}
+
+
+#[test]
+fn scheduled_cuda_ordinal_preserves_visible_namespace_mapping() {
+    assert_eq!(cuda_ordinal(7, 1).unwrap(), 0);
+    assert_eq!(cuda_ordinal(0, 4).unwrap(), 0);
+    assert_eq!(cuda_ordinal(3, 4).unwrap(), 3);
+    assert_eq!(cuda_ordinal(-1, 4).unwrap(), -1);
+}
+
+#[test]
+fn scheduled_cuda_ordinal_rejects_missing_or_insufficient_visibility() {
+    assert!(matches!(
+        cuda_ordinal(0, 0),
+        Err(ClusterError::Invalid(message)) if message == "no visible CUDA devices"
+    ));
+    assert!(matches!(
+        cuda_ordinal(4, 4),
+        Err(ClusterError::Invalid(message)) if message == "LOCAL_RANK exceeds the visible CUDA devices"
+    ));
 }

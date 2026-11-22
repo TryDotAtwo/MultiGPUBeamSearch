@@ -93,4 +93,4 @@
 
 - Added a typed `beam-runtime` rule for mapping the local scheduler rank into the visible CUDA namespace and exposed it through a separately versioned PyO3 API.
 - Routed `ScheduledRank.cuda_ordinal` through the installed extension; kept the same Python method, exact validation behavior, and fallback when an older wheel lacks the function.
-- Added Rust unit cases and installed-wheel checks for a single visible device, local ordinal mapping, insufficient visibility, error propagation, and legacy fallback. No device binding or NCCL behavior changed.
+- Added Rust runtime contract tests and installed-wheel checks for a single visible device, local ordinal mapping, insufficient visibility, error propagation, and legacy fallback. No device binding or NCCL behavior changed.
