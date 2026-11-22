@@ -329,12 +329,14 @@ def test_rust_top_level_controller_preserves_compatibility_stage_fallback(monkey
 
         def all_ranks_support(self, local_support):
             events.append(("all-ranks-support", bool(local_support)))
-            return next(support_votes)
+            remote_support = next(support_votes)
+            return bool(local_support) and remote_support
 
         _stream5_library = None
 
     world = World()
-    support_votes = iter((False, True, False, True, False, True))
+    # Simulate a peer that supports every optional capability.
+    support_votes = iter((True, True, True, True))
     monkeypatch.delenv("MGBS_CNOT_STRICT_BACKEND", raising=False)
 
     def prepare_input(*args):
@@ -381,9 +383,7 @@ def test_rust_top_level_controller_preserves_compatibility_stage_fallback(monkey
         ("all-ranks-support", False),
         ("all-ranks-support", True),
         ("all-ranks-support", False),
-        ("all-ranks-support", True),
         ("all-ranks-support", False),
-        ("all-ranks-support", True),
     ]
     assert [event for event in events if event[0] != "all-ranks-support"] == [
         ("prepare-input", caller_root, 7, 12, 8, "proposal", "python"),
