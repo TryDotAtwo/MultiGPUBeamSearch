@@ -202,6 +202,28 @@ jobs:
                   raise SystemExit(f"healthy follow-up search failed: {report}")
           print("VERIFY_CNOT_GLOO_RANK_FAILURES_AND_REUSE_PASS")
           PY
+      - name: Summarize synthetic CNOT Gloo lifecycle diagnostic
+        if: always()
+        env:
+          RUNNER_TEMP: ${{ runner.temp }}
+        run: |
+          python - "${RUNNER_TEMP}/mgbs-private-verify-cnot-gloo-lifecycle.log" <<'PY'
+          from pathlib import Path
+          import sys
+
+          log = Path(sys.argv[1])
+          markers = []
+          if log.is_file():
+              markers = [
+                  line.strip()
+                  for line in log.read_text(encoding="utf-8", errors="replace").splitlines()
+                  if line.startswith("CNOT_GLOO_ENGINE_DIAGNOSTIC ")
+              ]
+          for marker in markers:
+              print(marker)
+          if not markers:
+              print("CNOT_GLOO_ENGINE_DIAGNOSTIC missing")
+          PY
       - name: Run public CNOT search through the installed wheel
         id: public_search
         run: |

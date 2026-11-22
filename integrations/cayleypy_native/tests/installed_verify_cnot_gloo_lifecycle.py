@@ -57,6 +57,8 @@ def main():
     # A different requested controller changes which collectives follow. The
     # public entry must reject rank-local engine choices before path selection.
     requested_engine = "auto" if rank == 0 else "python"
+    diagnostic_path = output_root / f"engine-mismatch-diagnostic-{rank}.json"
+    diagnostic = {"rank": rank, "phase": "engine_consensus", "engine": requested_engine}
     try:
         verify_cnot.main(
             [
@@ -68,16 +70,35 @@ def main():
             manage_process_group=False,
         )
     except (RuntimeError, ValueError) as error:
-        assert "CNOT search engine settings differ" in str(error), str(error)
+        diagnostic["rejected"] = "CNOT search engine settings differ" in str(error)
+        diagnostic["error_type"] = type(error).__name__
+        if not diagnostic["rejected"]:
+            diagnostic["message"] = str(error)[:160]
+        diagnostic_path.write_text(json.dumps(diagnostic, sort_keys=True), encoding="utf-8")
+        print("CNOT_GLOO_ENGINE_DIAGNOSTIC " + json.dumps(diagnostic, sort_keys=True), flush=True)
+        assert diagnostic["rejected"], str(error)
         observations.append({"mismatched_engine": requested_engine, "error": str(error)})
     else:
+        diagnostic["rejected"] = False
+        diagnostic_path.write_text(json.dumps(diagnostic, sort_keys=True), encoding="utf-8")
+        print("CNOT_GLOO_ENGINE_DIAGNOSTIC " + json.dumps(diagnostic, sort_keys=True), flush=True)
         raise AssertionError("rank-local CNOT engine choices were not rejected")
-    invoke(
-        "wide",
-        output_root / f"healthy-after-engine-mismatch-{rank}.json",
-        engine="auto",
-        forbid_python_reference=True,
-    )
+    try:
+        invoke(
+            "wide",
+            output_root / f"healthy-after-engine-mismatch-{rank}.json",
+            engine="auto",
+            forbid_python_reference=True,
+        )
+    except BaseException as error:
+        diagnostic["healthy_retry"] = "failed"
+        diagnostic["retry_error_type"] = type(error).__name__
+        diagnostic_path.write_text(json.dumps(diagnostic, sort_keys=True), encoding="utf-8")
+        print("CNOT_GLOO_ENGINE_DIAGNOSTIC " + json.dumps(diagnostic, sort_keys=True), flush=True)
+        raise
+    diagnostic["healthy_retry"] = "passed"
+    diagnostic_path.write_text(json.dumps(diagnostic, sort_keys=True), encoding="utf-8")
+    print("CNOT_GLOO_ENGINE_DIAGNOSTIC " + json.dumps(diagnostic, sort_keys=True), flush=True)
 
     for failed_rank in (0, 1):
         def factory(*_args, target=failed_rank, **_kwargs):
