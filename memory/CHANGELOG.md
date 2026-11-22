@@ -3410,5 +3410,5 @@ Main commit `148b2a826a369b7601e904ea409e0cc5301c75c9` also passed the 260-test 
 ## 2026-11-22 - Pin CNOT backend mode after collective admission
 
 - The Rust CNOT controller now retains the collectively admitted strict/compatibility mode in its per-search backend admission object.
-- Stream 5 startup, native-stage admission, and the native stage constructor consume that same mode instead of rereading the mutable environment during the search. Legacy direct extension calls without an admission object retain their compatibility fallback.
+- Stream 5 startup, native-stage admission and construction, and Rust scorer dispatch consume that same mode instead of rereading the mutable environment during the search. Legacy direct extension calls without an admission object retain their compatibility fallback.
 - Added installed-wheel coverage for changing the process environment after admission and for the compatibility admission object passed to native stage dispatch. Search order, collectives, scoring, kernels and precision are unchanged.

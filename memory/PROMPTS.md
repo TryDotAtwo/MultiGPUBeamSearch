@@ -122,4 +122,4 @@ Keep an active goal until the migration and required verification are complete.
 
 - 2026-11-22 follow-up: Preserve the public scheduler worker for torchrun and Slurm, both `--local-rank` spellings, Python compatibility and explicit Rust rank supervision. Validate the installed wheel outside the checkout; keep the Python default until physical 1/2-GPU parity is accepted.
 
-- 2026-11-22 follow-up: Retain the rank-agreed CNOT strict/compatibility mode in the per-search Rust admission object and pass it unchanged through Stream 5 startup and native-stage binding; keep environment-based behavior only for legacy direct extension calls without admission. Validate the installed two-rank Gloo environment-change regression and the single-rank controller contract.
+- 2026-11-22 follow-up: Retain the rank-agreed CNOT strict/compatibility mode in the per-search Rust admission object and pass it unchanged through Stream 5 startup, native-stage binding and scorer dispatch; keep environment-based behavior only for legacy direct extension calls without admission. Validate the installed two-rank Gloo environment-change regression and the single-rank controller contract.

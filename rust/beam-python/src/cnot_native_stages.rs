@@ -743,6 +743,7 @@ impl<'py> NativeStages<'py> {
                 begin,
                 &self.scorer,
                 &self.mode,
+                self.strict_backend,
                 k,
                 self.n,
                 self.words,
@@ -771,6 +772,7 @@ impl<'py> NativeStages<'py> {
                     &self.scorer,
                     &parents,
                     &self.mode,
+                    self.strict_backend,
                 )?;
                 cnot_native_batch::scores(
                     self.py,
@@ -803,6 +805,7 @@ impl<'py> NativeStages<'py> {
                 begin,
                 &self.scorer,
                 &self.mode,
+                self.strict_backend,
                 k,
                 self.n,
                 self.words,
@@ -824,6 +827,7 @@ impl<'py> NativeStages<'py> {
                 self.n,
                 self.words,
                 &self.scorer,
+                self.strict_backend,
                 self.device_domain.as_mut(),
             )?;
             self.trace_device_dispatch("full_matrix_distinct", input_rows)?;
@@ -849,6 +853,7 @@ impl<'py> NativeStages<'py> {
                     &self.world,
                     &self.scorer,
                     &children,
+                    self.strict_backend,
                 )?;
                 cnot_native_batch::scores(
                     self.py,
@@ -873,6 +878,7 @@ impl<'py> NativeStages<'py> {
                 self.n,
                 self.words,
                 &self.scorer,
+                self.strict_backend,
                 None,
             )
         }

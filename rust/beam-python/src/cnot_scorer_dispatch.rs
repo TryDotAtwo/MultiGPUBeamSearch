@@ -11,9 +11,10 @@ pub(crate) fn parent_scores<'py>(
     scorer: &Bound<'py, PyAny>,
     rows: &Bound<'py, PyAny>,
     mode: &str,
+    strict: bool,
 ) -> PyResult<Bound<'py, PyAny>> {
     let rust_tqp = scorer.is_instance_of::<PyTqpScorer>();
-    if strict_acceptance() && !rust_tqp {
+    if strict && !rust_tqp {
         return Err(PyRuntimeError::new_err(
             "strict CNOT acceptance observed a non-Rust parent scorer",
         ));
@@ -25,7 +26,7 @@ pub(crate) fn parent_scores<'py>(
     } else {
         scorer.call_method1("parent_scores", (rows, mode))?
     };
-    if strict_acceptance() && rows.len()? > 0 {
+    if strict && rows.len()? > 0 {
         trace_native_tqp(world, scorer, "parent_scores", rows.len()?)?;
     }
     Ok(result)
@@ -36,9 +37,10 @@ pub(crate) fn child_values<'py>(
     world: &Bound<'py, PyAny>,
     scorer: &Bound<'py, PyAny>,
     rows: &Bound<'py, PyAny>,
+    strict: bool,
 ) -> PyResult<Bound<'py, PyAny>> {
     let rust_tqp = scorer.is_instance_of::<PyTqpScorer>();
-    if strict_acceptance() && !rust_tqp {
+    if strict && !rust_tqp {
         return Err(PyRuntimeError::new_err(
             "strict CNOT acceptance observed a non-Rust child scorer",
         ));
@@ -50,17 +52,10 @@ pub(crate) fn child_values<'py>(
     } else {
         scorer.call_method1("child_values", (rows,))?
     };
-    if strict_acceptance() && rows.len()? > 0 {
+    if strict && rows.len()? > 0 {
         trace_native_tqp(world, scorer, "child_values", rows.len()?)?;
     }
     Ok(result)
-}
-
-fn strict_acceptance() -> bool {
-    matches!(
-        std::env::var("MGBS_CNOT_STRICT_BACKEND").as_deref(),
-        Ok("1")
-    )
 }
 
 fn trace_native_tqp(

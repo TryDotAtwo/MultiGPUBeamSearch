@@ -252,6 +252,7 @@ pub(crate) fn expand<'py>(
     begin: u64,
     scorer: &Bound<'py, PyAny>,
     mode: &str,
+    strict_backend: bool,
     k: u32,
     n: i64,
     words: i64,
@@ -266,7 +267,7 @@ pub(crate) fn expand<'py>(
     arange_kwargs.set_item("device", &device)?;
     let all_ids = torch.call_method("arange", (alphabet,), Some(&arange_kwargs))?;
     let moves = if count > 0 && i64::from(k) < alphabet {
-        let raw = cnot_scorer_dispatch::parent_scores(py, world, scorer, parents, mode)?;
+        let raw = cnot_scorer_dispatch::parent_scores(py, world, scorer, parents, mode, strict_backend)?;
         let valid = scores(py, raw, &[count as i64, alphabet], &device)?;
         let kwargs = PyDict::new(py);
         kwargs.set_item("dim", 1)?;
@@ -454,6 +455,7 @@ pub(crate) fn distinct<'py>(
     n: i64,
     words: i64,
     scorer: &Bound<'py, PyAny>,
+    strict_backend: bool,
     device_domain: Option<&mut beam_native_sys::cnot_device_bridge::DeviceDomain>,
 ) -> PyResult<Bound<'py, PyAny>> {
     let torch = py.import("torch")?;
@@ -478,7 +480,7 @@ pub(crate) fn distinct<'py>(
     let meta = incoming.get_item((&first, slice(py, None, Some(4))?))?;
     let device = world.getattr("device")?;
     let values = if children.len()? > 0 {
-        let raw = cnot_scorer_dispatch::child_values(py, world, scorer, &children)?;
+        let raw = cnot_scorer_dispatch::child_values(py, world, scorer, &children, strict_backend)?;
         scores(py, raw, &[children.len()? as i64], &device)?
     } else {
         let empty_kwargs = PyDict::new(py);
