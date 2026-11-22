@@ -27,6 +27,25 @@ After the existing collective input-admission vote, the Rust controller keeps on
 
 The hosted RED fixture at `c383aa9` confirmed that the runtime conversion was absent. The exact green source SHA `c63937944b7752227982b388ee075be26e89c055` passed Rust CNOT CPU/Gloo [run 44976811410](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44976811410), installed wheel [run 44976811495](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44976811495), hosted harness [run 44976811467](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44976811467), and panel-v2 CPU compile/handoff [run 44976815210](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44976815210). Physical CUDA/NCCL execution remains unverified.
 
+## Rank-bound CNOT request — 2026-11-22
+
+The public controller binds its validated scalar request to the active
+`rank/world` as `RankedCnotRequest` during the existing collective input
+admission. It rejects `world=0`, `rank >= world`, and `world > 65536`
+before native backend admission or stage allocation. The typed request supplies
+normalized controls to the Rust controller while Python `World` still provides
+the rank topology. That remaining Python ownership is an open migration
+boundary. Search semantics, tensors, collective ordering, scoring, kernels and
+precision are unchanged.
+
+On source SHA `25bc43abc1911d6a96c14d7c7d0c766a043f5f4d`, Rust CNOT CPU/Gloo,
+installed wheel, hosted acceptance and panel-v2 CPU checks passed in runs
+[44980014848](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44980014848),
+[44980014912](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44980014912),
+[44980014854](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44980014854) and
+[44980018575](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44980018575).
+The physical CUDA/NCCL job was skipped.
+
 # Конфиг
 
 ## Paired permutation acceptance receipt contract, 2026-11-22
