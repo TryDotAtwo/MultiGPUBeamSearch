@@ -826,10 +826,7 @@ fn run_cnot_native_search<'py>(
             selected_engine,
         )?;
         request = Some(request_value);
-        let admitted = PyTuple::new(
-            py,
-            [input_matrix, digest.into_bound(py).into_any()],
-        )?;
+        let admitted = PyTuple::new(py, [input_matrix, digest.into_bound(py).into_any()])?;
         Ok(admitted.into_any())
     })();
     let admitted =

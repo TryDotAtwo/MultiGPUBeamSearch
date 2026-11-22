@@ -75,7 +75,11 @@ impl CnotRequest {
         let mode = match mode {
             "qhat" => CnotMode::Qhat,
             "proposal" => CnotMode::Proposal,
-            _ => return Err(CnotRequestError::Controls(beam_core::cnot::SearchControlsError::Mode)),
+            _ => {
+                return Err(CnotRequestError::Controls(
+                    beam_core::cnot::SearchControlsError::Mode,
+                ))
+            }
         };
         let validation = match validation {
             "auto" => CnotValidation::Auto,
@@ -91,8 +95,9 @@ impl CnotRequest {
         };
         beam_core::cnot::validate_search_controls(wires, width, shortlist, mode.as_str())?;
         let alphabet = u64::from(wires) * u64::from(wires.saturating_sub(1));
-        let shortlist = u32::try_from(shortlist.min(alphabet))
-            .map_err(|_| CnotRequestError::Controls(beam_core::cnot::SearchControlsError::WidthOrShortlist))?;
+        let shortlist = u32::try_from(shortlist.min(alphabet)).map_err(|_| {
+            CnotRequestError::Controls(beam_core::cnot::SearchControlsError::WidthOrShortlist)
+        })?;
         Ok(Self {
             wires,
             width,
