@@ -55,8 +55,7 @@ fn resolve_search_environment(
         touch_bfs_max_entries,
     };
     let environment = beam_runtime::cluster::search_environment(&request);
-    serde_json::to_string(&environment)
-        .map_err(|error| PyRuntimeError::new_err(error.to_string()))
+    serde_json::to_string(&environment).map_err(|error| PyRuntimeError::new_err(error.to_string()))
 }
 
 #[pyfunction]
