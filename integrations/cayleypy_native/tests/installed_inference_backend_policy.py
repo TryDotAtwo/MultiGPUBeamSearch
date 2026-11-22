@@ -14,6 +14,9 @@ runtime = extension()
 resolve_native = getattr(runtime, "resolve_inference_backend", None)
 if not callable(resolve_native):
     raise AssertionError("installed Rust runtime does not expose inference backend resolution")
+resolve_plan_native = getattr(runtime, "resolve_inference_plan", None)
+if not callable(resolve_plan_native):
+    raise AssertionError("installed Rust runtime does not expose inference plan resolution")
 
 
 def request(requested, model_backend, dtype, output_dim, devices):
@@ -34,6 +37,10 @@ def check(value, expected):
     actual = resolve(value)
     if actual != expected:
         raise AssertionError(f"backend selection mismatch: expected={expected}, actual={actual}, request={value}")
+
+
+def resolve_plan(value):
+    return json.loads(resolve_plan_native(json.dumps(value, sort_keys=True)))
 
 
 def reject(value, expected_text):
@@ -68,6 +75,10 @@ reject(request("cutlass", "ensemble", "fp16", 64, [(75, "NVIDIA RTX A6000")]),
 reject(request("auto", "mlp", "fp16", 8, []),
        "inference backend selection requires at least one GPU")
 
+plan = resolve_plan(request("auto", "mlp", "fp16", 8, [(86, "NVIDIA GeForce RTX 3060")]))
+if plan != {"backend": "cutlass", "policy": "cutlass-default-v1", "inference_row_limit": 8192}:
+    raise AssertionError(f"Rust inference plan did not preserve the CUTLASS profile: {plan}")
+
 
 from multigpubeamsearch import backend, build, rust_control
 from multigpubeamsearch.options import NativeOptions
@@ -100,6 +111,37 @@ if legacy_route != "libtorch":
     raise AssertionError("the compatibility resolver changed behavior for an older wheel")
 
 
+with patch.object(rust_control, "extension", return_value=LegacyRuntime()):
+    legacy_plan = backend._resolve_inference_plan(
+        request("auto", "mlp", "fp16", 8, [(75, "Tesla T4")])
+    )
+if legacy_plan != {
+    "backend": "libtorch", "policy": "libtorch-conservative-v1",
+    "inference_row_limit": 2048,
+}:
+    raise AssertionError(f"the old-wheel policy profile changed: {legacy_plan}")
+
+
+class RouteOnlyRuntime:
+    ABI_VERSION = 1
+    InferenceCalibration = object()
+
+    @staticmethod
+    def resolve_inference_backend(_payload):
+        return "libtorch"
+
+
+with patch.object(rust_control, "extension", return_value=RouteOnlyRuntime()):
+    route_only_plan = backend._resolve_inference_plan(
+        request("auto", "mlp", "fp16", 8, [(86, "NVIDIA A100")])
+    )
+if route_only_plan != {
+    "backend": "libtorch", "policy": "libtorch-conservative-v1",
+    "inference_row_limit": 2048,
+}:
+    raise AssertionError(f"the route-only wheel fallback changed: {route_only_plan}")
+
+
 class PolicyProbe:
     ABI_VERSION = 1
     InferenceCalibration = object()
@@ -107,9 +149,13 @@ class PolicyProbe:
     def __init__(self):
         self.requests = []
 
-    def resolve_inference_backend(self, payload):
+    def resolve_inference_plan(self, payload):
         self.requests.append(json.loads(payload))
-        return "libtorch"
+        return json.dumps({
+            "backend": "libtorch",
+            "policy": "rust-profile-probe-v1",
+            "inference_row_limit": 1234,
+        })
 
 
 policy_probe = PolicyProbe()
@@ -145,5 +191,8 @@ with tempfile.TemporaryDirectory(prefix="beam-inference-policy-") as temporary:
         raise AssertionError(f"prepare_runtime did not use the Rust policy result: {selected}")
     if prepared.profile.get("inference_backend") != "libtorch":
         raise AssertionError(f"prepared profile recorded a different backend: {prepared.profile}")
+    if (prepared.profile.get("policy") != "rust-profile-probe-v1"
+            or prepared.profile.get("inference_row_limit") != 1234):
+        raise AssertionError(f"prepare_runtime did not use the Rust profile plan: {prepared.profile}")
 
 print("INSTALLED_RUST_INFERENCE_BACKEND_POLICY_PASS", flush=True)
