@@ -96,8 +96,8 @@ def test_rust_top_level_controller_owns_cnot_admission_and_stage_dispatch():
         events.append(("identity", wires, device))
         return identity
 
-    def stage_runner(*args):
-        events.append(("native-stages", *args))
+    def stage_runner(*args, **kwargs):
+        events.append(("native-stages", *args, kwargs))
         return result
 
     def native_stages():
@@ -127,7 +127,7 @@ def test_rust_top_level_controller_owns_cnot_admission_and_stage_dispatch():
         ("native-runner",),
         ("all-ranks-support", True),
         ("native-stages", world, admitted_root, identity, input_matrix, scorer,
-         "qhat", True, 5, 6, 6, 4),
+         "qhat", True, 5, 6, 6, 4, {"admitted_topology": (0, 1)}),
     ]
 
 
