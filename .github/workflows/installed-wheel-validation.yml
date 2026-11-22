@@ -196,10 +196,12 @@ jobs:
           for item in rows[0]:
               if "load trained scorer failed" not in item["error"]:
                   raise SystemExit(f"failure escaped the expected common phase: {item}")
-          for index in range(2):
-              report = json.loads((root / f"healthy-after-{index}.json").read_text())
-              if report.get("status") != "solved" or not report.get("bitwise_replay"):
-                  raise SystemExit(f"healthy follow-up search failed: {report}")
+          for failed_rank in range(2):
+              for rank in range(2):
+                  report_path = root / f"healthy-after-{failed_rank}-{rank}.json"
+                  report = json.loads(report_path.read_text())
+                  if report.get("status") != "solved" or not report.get("bitwise_replay"):
+                      raise SystemExit(f"healthy follow-up search failed for rank={rank}: {report}")
           print("VERIFY_CNOT_GLOO_RANK_FAILURES_AND_REUSE_PASS")
           PY
       - name: Summarize synthetic CNOT Gloo lifecycle diagnostic
