@@ -1,0 +1,73 @@
+# Cube555 на двух GPU через CayleyPy
+
+Запуск из терминала на одном Linux x86-64 узле. Входные данные и веса берутся
+из [публичного комплекта Cube555](https://github.com/TryDotAtwo/MultiGPUBeamSearch/releases/tag/cube555-inputs-20261001).
+Внутри контура поиск и калибровка используют файлы из архива и локальные GPU.
+
+## Внутри контура
+
+На узле нужны два видимых CUDA GPU, драйвер NVIDIA с поддержкой CUDA 12.8,
+CUDA Toolkit 12.8 с `nvcc`, совместимый компилятор C++ и CPython 3.11
+с `venv`. Скрипт ставит Python-пакеты из архива в `.venv` без прав администратора.
+Если Python или CUDA предоставляются модулями кластера, загрузите модули
+перед запуском. Для `PYTHON` можно указать путь к интерпретатору Python 3.11.
+
+Проверьте архив и распакуйте его в каталог с правом записи.
+
+~~~bash
+sha256sum -c cube555-standalone-linux-x86_64-py311.tar.sha256
+tar -xf cube555-standalone-linux-x86_64-py311.tar
+cd cube555-standalone
+bash run.sh --check
+~~~
+
+Короткий прогон проверяет запуск нативного поиска на двух GPU с обеими моделями.
+На двух шагах задача 1020 обычно ещё не решена.
+
+~~~bash
+bash run.sh --puzzle-id 1020 --beam-width 4096 --max-steps 2 --bfs-radius 0
+~~~
+
+По умолчанию `bash run.sh` берёт пазл `1020`, общий beam `1 048 576`,
+лимит 140 шагов и веса blend `0.8` для Transformer и `0.2` для MLP.
+Настройки видны в `bash run.sh --help`. Флаг `--collect` сохраняет найденные
+альтернативные решения.
+
+~~~bash
+bash run.sh --puzzle-id 1020 --transformer-weight 0.8
+~~~
+
+В планировщике выделите **две GPU на одном узле** и запустите одну копию этого
+скрипта внутри задания. `CUDA_VISIBLE_DEVICES` задаёт видимые устройства.
+Первый поиск собирает CUDA runner для выбранных GPU. MultiGPUBeamSearch
+проверяет подходящие сохранённые профили и при необходимости калибрует inference
+и параметры пайплайна на этом узле. Совместимый профиль и сборка повторно
+используются из `beam_run/cache`. Изменение beam, blend или состава GPU может
+потребовать нового профиля.
+
+`beam_run/results/` содержит JSON с путём, проверкой воспроизведения и
+`native_metadata.profile`. Запуск с другим `--work-dir` использует собственный
+каталог результатов и кэша.
+
+## Где менять код
+
+В `solve_cube555.py` граф строится через `CayleyGraphDef` и `CayleyGraph`.
+`NativeEnsemble` связывает два экспортированных чекпойнта с коэффициентами
+`(w, 1 - w)`. `enable_native(NativeOptions(..., autotune=True))` подключает
+CUDA-бэкенд, а поиск вызывается как `graph.beam_search(..., backend="native")`.
+Параметр `--beam-width` задаёт общий beam на обе GPU.
+
+## Сборка архива снаружи контура
+
+`prepare_bundle.sh` выполняется по сети на Linux x86-64 с Git и CPython 3.11
+с `venv`. Для скачивания зависимостей и CPU-экспорта чекпойнтов GPU не нужны.
+Скрипт создаёт `.tar` и `.tar.sha256`. Перенесите оба файла на узел.
+
+~~~bash
+bash prepare_bundle.sh
+~~~
+
+Зафиксированы ревизии CayleyPy `3cd11ece` и MultiGPUBeamSearch `534f6351`
+и CUDA-сборка PyTorch `2.8.0+cu128`. В архиве лежат экспортированные
+Transformer и MLP, граф, стартовые состояния, проверенные исходники CUTLASS
+и wheelhouse. Исходники native runner входят в wheel MultiGPUBeamSearch.

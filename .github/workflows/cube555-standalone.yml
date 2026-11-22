@@ -1,0 +1,48 @@
+name: Build Cube555 standalone bundle
+
+on:
+  push:
+    branches:
+      - codex/cube555-standalone-20261122
+    paths:
+      - examples/cube555-standalone/**
+      - .github/workflows/cube555-standalone.yml
+
+permissions:
+  contents: read
+
+jobs:
+  bundle:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          sparse-checkout: examples/cube555-standalone
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Assemble wheels and export models
+        run: |
+          df -h .
+          bash -n examples/cube555-standalone/prepare_bundle.sh
+          bash -n examples/cube555-standalone/run.sh
+          mkdir -p "$RUNNER_TEMP/cube555-artifact"
+          bash examples/cube555-standalone/prepare_bundle.sh \
+            "$RUNNER_TEMP/cube555-artifact/cube555-standalone-linux-x86_64-py311.tar"
+      - name: Check the archive and run the local input check with networking disabled
+        run: |
+          cd "$RUNNER_TEMP/cube555-artifact"
+          sha256sum -c cube555-standalone-linux-x86_64-py311.tar.sha256
+          mkdir "$RUNNER_TEMP/cube555-offline"
+          tar -xf cube555-standalone-linux-x86_64-py311.tar -C "$RUNNER_TEMP/cube555-offline"
+          cd "$RUNNER_TEMP/cube555-offline/cube555-standalone"
+          sudo -n unshare --net -- env PYTHON="$(command -v python3.11)" bash run.sh --check
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cube555-standalone-linux-x86_64-py311
+          path: ${{ runner.temp }}/cube555-artifact/
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
