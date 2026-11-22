@@ -1,3 +1,5 @@
+2026-11-22: Иван поручил закрыть producer→consumer panel-v2 несовпадение: принимать receipt source revision `eafc0f82f088603a525f428a8fa3d00e9e702fa8` только с точным emitter ABI, сохранить старые закреплённые receipts и проверить реальный producer serializer через consumer resolver на hosted CPU. Без платных запусков и GPU.
+
 2026-11-22: Иван поручил продолжить PR #10 без Vast, платных workflow, физических GPU, локальных сборок/тестов и загрузки артефактов. Для panel-v2 compatibility переиспользовать только успешные native build artifacts с ключом по входам адаптера, emitter, toolchain и окружения; убрать повторный cargo check; сохранять независимые installed-wheel результаты и проверять реальные аргументы публичного CNOT consumer.
 
 2026-11-22: Иван поручил разделить GL4 dev_v1 и panel_search_v2 scorer artifacts в CNOT acceptance: выбирать .so по manifest contract, включать strict Rust admission, связывать hash и metadata реально загруженного panel provider, сохранить producer-owned файлы неизменными. Запрещены Vast/платные/физические GPU проверки и локальные сборки; использовать только hosted CPU/installed checks.

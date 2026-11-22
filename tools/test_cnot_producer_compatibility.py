@@ -16,7 +16,7 @@ PINS_PATH = ".github/cnot-producer-panel-pins.json"
 BASE_PINS = {
     "schema": "cnot-producer-panel-pins-v1",
     "producer_source_sha": "e17953891a36e3e3ae8b038695bfac8548ab784f",
-    "emitter_source_sha": "42ed72f587ab70fc74a85cf0a25001efb29cb994",
+    "emitter_source_sha": "eafc0f82f088603a525f428a8fa3d00e9e702fa8",
     "panel_manifest_sha256": "a" * 64,
 }
 

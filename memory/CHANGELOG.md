@@ -1,3 +1,8 @@
+## 2026-11-22 - Accept the current panel-v2 producer revision
+
+- Added producer source revision `eafc0f82f088603a525f428a8fa3d00e9e702fa8` to the consumer allowlist under the existing emitter ABI hash. Kept support for the prior `42ed72f587ab70fc74a85cf0a25001efb29cb994` and historical `7310b1eb5ec07c76c131ba8c60b105ff4aad7a9c` receipts.
+- Updated the hosted no-Torch emitter fixture to load the actual producer serializer at `eafc0f82f088603a525f428a8fa3d00e9e702fa8`, create a receipt, and pass it through the consumer resolver. Added a regression for the previous source pin. Hosted verification pending; no paid or GPU run.
+
 ## 2026-11-22 - Include the resolved inference plan in Rust session identity
 
 - The installed-wheel identity test requires the schema-v3 native extension and passes its canonical JSON identity through the real PyO3 `SearchSession` API; the session test checks same-plan reuse and invalidation after plan or model changes.

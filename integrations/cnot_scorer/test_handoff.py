@@ -14,6 +14,7 @@ from unittest.mock import patch
 from handoff import (
     CURRENT_PRODUCER_SOURCE_REVISION,
     EXPECTED_PRODUCER_EMITTER_SHA256,
+    PREVIOUS_PRODUCER_SOURCE_REVISION,
     EXPECTED_PRODUCER_SOURCE_REVISION,
     HandoffError,
     resolve_panel_v2_handoff,
@@ -594,6 +595,12 @@ class PanelV2HandoffTests(unittest.TestCase):
         self.pin_producer_revision(CURRENT_PRODUCER_SOURCE_REVISION)
         resolved = resolve_panel_v2_handoff(self.root, self.receipt)
         self.assertEqual(resolved.producer_source_revision, CURRENT_PRODUCER_SOURCE_REVISION)
+        self.assertEqual(resolved.producer_emitter_sha256, EXPECTED_PRODUCER_EMITTER_SHA256)
+
+    def test_preserves_previous_producer_revision_receipts(self):
+        self.pin_producer_revision(PREVIOUS_PRODUCER_SOURCE_REVISION)
+        resolved = resolve_panel_v2_handoff(self.root, self.receipt)
+        self.assertEqual(resolved.producer_source_revision, PREVIOUS_PRODUCER_SOURCE_REVISION)
         self.assertEqual(resolved.producer_emitter_sha256, EXPECTED_PRODUCER_EMITTER_SHA256)
 
     def test_rejects_an_emitter_abi_not_pinned_for_the_source_revision(self):

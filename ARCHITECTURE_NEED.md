@@ -1,3 +1,7 @@
+## Accept the current panel-v2 producer receipt — 2026-11-22
+
+The consumer accepts producer source revision `eafc0f82f088603a525f428a8fa3d00e9e702fa8` with the exact existing `build_multigpu_beam_handoff` emitter SHA-256. The receipt source revision is distinct from the emitter ABI: the producer function is unchanged from its parent `42ed72f587ab70fc74a85cf0a25001efb29cb994`, whose receipts remain supported, along with the historical `7310b1eb5ec07c76c131ba8c60b105ff4aad7a9c` pin. The hosted no-Torch compatibility fixture checks out the current producer revision, calls its real serializer, and sends the serialized receipt through the consumer resolver. This is CPU-only handoff validation; trained scorer/GPU acceptance remains separate.
+
 ## Rust session identity includes the resolved inference plan — 2026-11-22
 
 Permutation preparation identity schema v3 carries a typed `ResolvedInferencePlanIdentity` with the selected backend, policy and inference row limit returned by the Rust resolver used in `prepare_runtime`. A repeated `NativeSession` call can reuse its resident rank owner only while this plan and the other typed preparation inputs match; a changed policy or row limit invalidates the preparation. Schema-v2 extensions keep the plan inside the existing structured options value, and older extensions retain the Python compatibility identity.
