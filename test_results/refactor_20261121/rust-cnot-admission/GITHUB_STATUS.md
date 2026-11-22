@@ -1,15 +1,16 @@
 # Rust + CUDA/C++ migration acceptance status
 
 Source branch: `codex/beam-3060-preflight-20261121`
-Latest installed-wheel code SHA: `d9814462b05938f3419aa5c71332f9c3ce6619cd`
-Latest hosted CPU test SHA: `519897eef927d7c60603260c2464f53addf8ea6b`
+Latest installed-wheel code SHA: `bcdb5ae82f10b3b0e8ad6b7b357f255cb638efef`
+Latest hosted CPU test SHA: `948ffe320e32fb54500c669e35920f9e41a99194`
 Base main SHA: `e6c41b6dc6bb3a839f6338f3cfe9eaadf8608d5a`
 
 | Gate | Status | Evidence |
 |---|---|---|
-| Hosted source harness and new-host acceptance workflow checks | PASS | [run 44981755539](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44981755539): hosted CPU acceptance and workflow contracts passed. Physical GPU job skipped. |
-| Rust CNOT CPU compatibility suite | PASS | Rust dispatch policy RED was reproduced at `881b274`; the fix passed Rust CPU/Gloo at [run 44981350445](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44981350445), then the installed-wheel test at the latest tested SHA revalidated rank-common selection. |
-| Installed PEP 517 wheel outside checkout | PASS | [run 44981755387](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44981755387): all 27 steps passed, including rank-consistent CNOT dispatch, Gloo lifecycle recovery, one/two-rank wide cutoff parity and separate topology/deduplication/tie fixtures. Redacted status artifact [14737644688](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44981755387/artifacts/14737644688). |
+| Hosted source harness and new-host acceptance workflow checks | PASS | [run 44994732760](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44994732760): hosted CPU acceptance passed; redacted artifact [14743547032](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44994732760/artifacts/14743547032). Physical GPU job skipped. |
+| Rust CNOT CPU compatibility suite | PASS | 323 passed, 2 skipped on current test SHA `948ffe320e32fb54500c669e35920f9e41a99194`, [run 44994974016](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44994974016). |
+| Installed PEP 517 wheel outside checkout | PASS | [run 44994732751](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44994732751) on code SHA `bcdb5ae82f10b3b0e8ad6b7b357f255cb638efef`; the two-rank Gloo phase-failure/reuse test, receipt validator, and real `verify_cnot` lifecycle passed. Redacted status artifact [14743162189](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44994732751/artifacts/14743162189). |
+| Panel-v2 CPU producer compatibility | PASS | [run 44994978882](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44994978882) on test SHA `948ffe320e32fb54500c669e35920f9e41a99194`; this is compile/handoff CPU evidence only, not trained GPU replay. |
 | Default CNOT Rust controller dispatch | PASS on 2-rank Gloo | Rank 0 and rank 1 each had the native runner hidden in turn. Strict rejected before transport; `auto` used one common compatibility route; explicit Rust returned the same no-common-route error; a healthy `auto` retry then completed on the same process group. [run 44981755387](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44981755387). |
 | Runtime engine policy | PASS | `beam-runtime::cnot_search::select_dispatch` now requires a rank-common native-stage set before selecting the Rust controller; its unit regression and installed-wheel Gloo path pass. |
 | Vendored source manifest and native fingerprint | PASS | Installed-wheel tests checked required source-bundle headers and that changing vendored headers changes the native fingerprint. |
