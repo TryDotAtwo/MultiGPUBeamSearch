@@ -3338,3 +3338,6 @@ Main commit `148b2a826a369b7601e904ea409e0cc5301c75c9` also passed the 260-test 
 - This is hosted CPU/Gloo acceptance only; physical CUDA/NCCL remains a separate gate.
 
 - Corrected the installed-wheel workflow to invoke the validator at `tools/cnot_gloo_lifecycle.py`; the previous command referenced a nonexistent file and failed after the Gloo scenarios.
+
+- Pin the public CNOT dispatch decision to one fixed rank-wide capability intersection and execute the selected route without a second Python engine decision.
+- Preserve explicit `engine="rust"` capability errors as `NativeUnavailable`; move the mixed-engine Gloo regression through the public `search_cnot` entry and keep compatibility mocks aligned with the selected-route contract.

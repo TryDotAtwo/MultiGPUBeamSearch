@@ -109,3 +109,5 @@ Keep an active goal until the migration and required verification are complete.
 2026-11-22 follow-up: Preserve Slurm and torchrun launcher compatibility while rejecting inconsistent Slurm assignments. For uneven task counts per node, require SLURM_PROCID to equal the sum of prior nodes' step task counts plus SLURM_LOCALID; run the same contract in Python compatibility and Rust runtime paths on hosted CPU.
 
 - 2026-11-22: Keep installed CNOT Gloo lifecycle receipts rank-local for request inputs and shared for phase outcomes; validate only rank-zero healthy reports, with CPU negative cases for missing phase, wrong rank, missing report, and missing replay.
+
+- 2026-11-22: Resolve CNOT controller selection from one fixed snapshot of actual callable bindings voted across ranks; pass the selected typed route into compatibility execution. Verify mismatched public engine requests through `search_cnot`, hidden per-rank callables, strict fail-before-transport and healthy retry. Keep explicit Rust-unavailable errors compatible with the Python API.

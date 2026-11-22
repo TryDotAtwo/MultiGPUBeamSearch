@@ -427,7 +427,10 @@ def _select_legacy_dispatch_path(engine, max_depth, capabilities):
         return _DispatchPath.RUST_COMPATIBILITY
     if engine == "auto":
         return _DispatchPath.PYTHON_REFERENCE
-    raise RuntimeError("Rust CNOT controller is unavailable on every rank")
+    from .errors import NativeUnavailable
+    raise NativeUnavailable(
+        "the matching Rust/PyO3 runtime could not be loaded with a common CNOT controller on every rank"
+    )
 
 def search_cnot(root, scorer, *, width, shortlist, max_depth, mode="qhat", audit=False,
                 validation="auto", engine="auto"):

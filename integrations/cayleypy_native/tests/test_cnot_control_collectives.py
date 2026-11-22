@@ -865,10 +865,9 @@ def test_search_controller_falls_back_when_native_runner_is_not_universal(monkey
         rank=0,
         size=2,
         checked=lambda _stage, callback: callback(),
-        all_ranks_support=lambda _local: False,
         require_engine_consensus=lambda _digest: None,
-        native_method=lambda _name: lambda: None,
-        supports_native=lambda _name: False,
+        native_method=lambda _name: None,
+        agree_native_bindings=lambda bindings: {name: False for name in bindings},
     )
 
     class WorldContext:
@@ -878,22 +877,16 @@ def test_search_controller_falls_back_when_native_runner_is_not_universal(monkey
         def __exit__(self, *_args):
             return False
 
-    native_calls = []
     compat_calls = []
     expected = object()
 
-    def native_runner(*args):
-        native_calls.append(args)
-        raise AssertionError("one rank cannot enter the Rust controller alone")
-
     def compat(actual_world, actual_root, scorer, width, shortlist, max_depth,
-               mode, audit, validation, engine):
+               mode, audit, validation, dispatch_path, bindings):
         compat_calls.append((actual_world, actual_root, width, shortlist,
-                             max_depth, mode, audit, validation, engine))
+                             max_depth, mode, audit, validation, dispatch_path, bindings))
         return expected
 
     monkeypatch.setattr(cnot, "World", lambda _device: WorldContext())
-    monkeypatch.setattr(cnot, "_native_search_runner", lambda: native_runner)
     monkeypatch.setattr(cnot, "_search_cnot_compat", compat)
 
     result = cnot.search_cnot(
@@ -901,9 +894,10 @@ def test_search_controller_falls_back_when_native_runner_is_not_universal(monkey
     )
 
     assert result is expected
-    assert native_calls == []
     assert len(compat_calls) == 1
-
+    assert compat_calls[0][8] is cnot._DispatchPath.PYTHON_REFERENCE
+    assert tuple(compat_calls[0][9]) == cnot._CNOT_DISPATCH_OPERATIONS
+    assert all(binding is None for binding in compat_calls[0][9].values())
 
 def test_world_coordinates_device_preflight_error_over_control_group(monkeypatch):
     world = World("cuda:0")
@@ -932,32 +926,35 @@ def test_world_coordinates_device_preflight_error_over_control_group(monkeypatch
     assert gathered and gathered[0][1] is control_group
 
 
-def test_compat_search_forces_python_engine_when_auto_engine_is_not_universal(monkeypatch):
+def test_compat_search_consumes_preselected_python_reference_route(monkeypatch):
     from multigpubeamsearch import cnot
 
     world = _two_rank_world()
     root = torch.zeros((1, 2, 1), dtype=torch.int64)
     input_matrix = SimpleNamespace(root=root, n=2, raw=b"input")
     engine_calls = []
-    support_calls = []
     transport_calls = []
     expected = object()
 
     monkeypatch.setattr(world, "checked", lambda _stage, callback: callback())
-    monkeypatch.setattr(
-        world, "all_ranks_support",
-        lambda local: support_calls.append(local) or False,
-    )
     monkeypatch.setattr(world, "require_consensus", lambda _digest: None)
     monkeypatch.setattr(
         world, "start_transport",
         lambda *, prefer_rust: transport_calls.append(prefer_rust),
     )
-    monkeypatch.setattr(cnot, "_search_engine", lambda *_args: ("rust", object()))
+    monkeypatch.setattr(
+        world, "supports_native",
+        lambda _name: pytest.fail("compat execution must consume the admitted route"),
+    )
+    monkeypatch.setattr(
+        cnot, "_search_engine",
+        lambda *_args: pytest.fail("compat execution must not reselect from engine"),
+    )
 
-    def admit(_root, _scorer, _width, _shortlist, _depth, _mode, _audit, _validation, engine):
-        engine_calls.append(engine)
-        return input_matrix, b"digest", None
+    def admit(_root, _scorer, _width, _shortlist, _depth, _mode, _audit,
+              _validation, engine, *, dispatch_runner):
+        engine_calls.append((engine, dispatch_runner))
+        return input_matrix, b"digest", dispatch_runner
 
     monkeypatch.setattr(cnot, "_admit", admit)
     monkeypatch.setattr(
@@ -966,14 +963,16 @@ def test_compat_search_forces_python_engine_when_auto_engine_is_not_universal(mo
     )
     monkeypatch.setattr(cnot, "_search", lambda *_args: expected)
 
+    bindings = {"run_cnot": None, "run_cnot_native": None}
     result = cnot._search_cnot_compat(
         world, root, object(), width=8, shortlist=4, max_depth=3,
-        mode="qhat", audit=False, validation="auto", engine="auto",
+        mode="qhat", audit=False, validation="auto",
+        dispatch_path=cnot._DispatchPath.PYTHON_REFERENCE,
+        bindings=bindings,
     )
 
     assert result is expected
-    assert support_calls == [True]
-    assert engine_calls == ["python"]
+    assert engine_calls == [("python", None)]
     assert transport_calls == [False]
 
 def test_native_goal_uses_common_rank_capability_before_dispatch(monkeypatch):
@@ -1020,7 +1019,6 @@ def _mixed_engine_gloo_worker(rank, init_method, output_dir):
     observed = None
     try:
         from multigpubeamsearch import cnot, rust_control
-        from multigpubeamsearch.cnot_collectives import World
         from multigpubeamsearch.errors import NativeUnavailable
 
         def missing_extension():
@@ -1031,24 +1029,22 @@ def _mixed_engine_gloo_worker(rank, init_method, output_dir):
 
         rust_control.extension = missing_extension
         cnot._admit = unexpected_admission
-        with World("cpu") as world:
-            try:
-                cnot._search_cnot_compat(
-                    world,
-                    torch.zeros((1, 2, 1), dtype=torch.int64),
-                    object(),
-                    width=8,
-                    shortlist=4,
-                    max_depth=3,
-                    mode="qhat",
-                    audit=False,
-                    validation="auto",
-                    engine="auto" if rank == 0 else "python",
-                )
-            except Exception as error:
-                observed = {"type": type(error).__name__, "message": str(error)}
-            else:
-                observed = {"type": "returned", "message": ""}
+        try:
+            cnot.search_cnot(
+                torch.zeros((1, 2, 1), dtype=torch.int64),
+                object(),
+                width=8,
+                shortlist=4,
+                max_depth=3,
+                mode="qhat",
+                audit=False,
+                validation="auto",
+                engine="auto" if rank == 0 else "python",
+            )
+        except Exception as error:
+            observed = {"type": type(error).__name__, "message": str(error)}
+        else:
+            observed = {"type": "returned", "message": ""}
     except Exception as error:
         observed = {"type": type(error).__name__, "message": str(error)}
     finally:
@@ -1057,7 +1053,6 @@ def _mixed_engine_gloo_worker(rank, init_method, output_dir):
     Path(output_dir, f"rank-{rank}.json").write_text(
         json.dumps(observed), encoding="utf-8"
     )
-
 
 def test_two_rank_gloo_rejects_mixed_cnot_engine_requests(tmp_path):
     rendezvous = tmp_path / "gloo-store"
