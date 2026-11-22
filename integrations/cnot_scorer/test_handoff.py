@@ -56,7 +56,7 @@ class PanelV2HandoffTests(unittest.TestCase):
             for index in range(10)
         ]
         dataset_value = {"schema": "synthetic-sealed-dataset", "panels": {"test": records}}
-        dataset_bytes = (json.dumps(dataset_value, sort_keys=True) + "\\n").encode("utf-8")
+        dataset_bytes = (json.dumps(dataset_value, sort_keys=True) + "\n").encode("utf-8")
         self.dataset_path = self.root / "data" / "frozen.json"
         self.dataset_path.parent.mkdir(parents=True)
         self.dataset_path.write_bytes(dataset_bytes)
