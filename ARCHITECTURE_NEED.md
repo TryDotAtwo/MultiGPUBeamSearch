@@ -3836,3 +3836,8 @@ The public `cluster.scheduler_rank` helper delegates torchrun/Slurm environment 
 ## Rust-owned torchrun and Slurm scheduler rank resolution
 
 The public `cluster.scheduler_rank` path uses the typed `beam-runtime` resolver for torchrun and Slurm environments. Python preserves `ScheduledRank`, its `ValueError` contract, and fallback only when an older wheel lacks the resolver. Installed-wheel validation on source SHA `a96be795a011174d7f244c06f1593a62b16e6c27` passed in [run 45052314835](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45052314835); Rust CPU/Gloo and hosted acceptance passed in [run 45052314834](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45052314834) and [run 45052315268](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45052315268). The physical CUDA/NCCL job was skipped. This transfers scheduler metadata only; it does not change device binding, process launch, transport, or search behavior.
+
+
+## Rust-owned scheduler-to-CUDA ordinal mapping
+
+`ScheduledRank.cuda_ordinal` now delegates its existing single-visible-device and local-rank rules to `beam-runtime` through a versioned PyO3 function. The public method, error text, and old-wheel compatibility fallback remain unchanged. This only maps an already assigned scheduler rank into the process-local CUDA namespace; it does not bind devices, alter `CUDA_VISIBLE_DEVICES`, launch ranks, or initialize NCCL. The extension's ordinary rank resolver and CUDA ordinal API use separate version constants.

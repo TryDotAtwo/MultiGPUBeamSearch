@@ -231,6 +231,47 @@ pub fn scheduler_rank(env: &BTreeMap<String, String>) -> Result<ScheduledRank> {
     })
 }
 
+/// Apply the existing scheduler-rank to process-local CUDA ordinal mapping.
+pub fn cuda_ordinal(local_rank: i64, visible_devices: u64) -> Result<i64> {
+    if visible_devices == 0 {
+        return Err(ClusterError::Invalid("no visible CUDA devices".into()));
+    }
+    if visible_devices == 1 {
+        return Ok(0);
+    }
+    if i128::from(local_rank) >= i128::from(visible_devices) {
+        return Err(ClusterError::Invalid(
+            "LOCAL_RANK exceeds the visible CUDA devices".into(),
+        ));
+    }
+    Ok(local_rank)
+}
+
+#[cfg(test)]
+mod cuda_ordinal_contract_tests {
+    use super::{cuda_ordinal, ClusterError};
+
+    #[test]
+    fn preserves_single_and_multi_device_mapping() {
+        assert_eq!(cuda_ordinal(7, 1).unwrap(), 0);
+        assert_eq!(cuda_ordinal(0, 4).unwrap(), 0);
+        assert_eq!(cuda_ordinal(3, 4).unwrap(), 3);
+        assert_eq!(cuda_ordinal(-1, 4).unwrap(), -1);
+    }
+
+    #[test]
+    fn rejects_missing_or_insufficient_visible_devices() {
+        assert!(matches!(
+            cuda_ordinal(0, 0),
+            Err(ClusterError::Invalid(message)) if message == "no visible CUDA devices"
+        ));
+        assert!(matches!(
+            cuda_ordinal(4, 4),
+            Err(ClusterError::Invalid(message)) if message == "LOCAL_RANK exceeds the visible CUDA devices"
+        ));
+    }
+}
+
 pub struct Request {
     pub command: Vec<String>,
     /// Executable lookup and Python pathlib resolution preserve existing Python semantics.

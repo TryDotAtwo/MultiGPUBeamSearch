@@ -87,3 +87,10 @@
 - Added a typed Rust/PyO3 resolver for torchrun and Slurm scheduler environments and routed the public Python `cluster.scheduler_rank` helper through it.
 - Preserved the `ScheduledRank` API, malformed-input `ValueError`, and compatibility fallback for installed wheels without the resolver. Errors from a present Rust resolver do not silently switch rank assignment paths.
 - Installed-wheel validation passed on `a96be795a011174d7f244c06f1593a62b16e6c27` ([run 45052314835](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45052314835)); Rust CPU/Gloo and hosted acceptance passed ([45052314834](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45052314834), [45052315268](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45052315268)). Physical CUDA/NCCL was skipped.
+
+
+## 2026-11-22 - Resolve scheduled CUDA ordinal in Rust
+
+- Added a typed `beam-runtime` rule for mapping the local scheduler rank into the visible CUDA namespace and exposed it through a separately versioned PyO3 API.
+- Routed `ScheduledRank.cuda_ordinal` through the installed extension; kept the same Python method, exact validation behavior, and fallback when an older wheel lacks the function.
+- Added Rust unit cases and installed-wheel checks for a single visible device, local ordinal mapping, insufficient visibility, error propagation, and legacy fallback. No device binding or NCCL behavior changed.

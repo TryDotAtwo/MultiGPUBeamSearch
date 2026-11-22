@@ -250,6 +250,34 @@ def resolve_runtime_devices(visible_device_count, explicit_devices, num_gpus, gr
     return tuple(selected)
 
 
+def resolve_cuda_ordinal(local_rank, visible_devices):
+    """Resolve a scheduler rank in the process-local CUDA namespace when supported."""
+    if type(visible_devices) is not int or visible_devices <= 0:
+        raise NativeUnavailable("no visible CUDA devices")
+    # Preserve the Python compatibility path for unusual values outside the
+    # fixed-width Rust ABI; scheduler_rank itself always produces bounded ints.
+    if type(local_rank) is not int or not -(1 << 63) <= local_rank < (1 << 63):
+        return None
+    if visible_devices >= 1 << 64:
+        return None
+    try:
+        native = extension()
+    except (NativeUnavailable, ImportError):
+        return None
+    resolver = getattr(native, "resolve_cuda_ordinal", None)
+    if not callable(resolver):
+        return None
+    if getattr(native, "CLUSTER_DEVICE_BINDING_VERSION", None) != 1:
+        raise NativeUnavailable("Rust CUDA ordinal API version is incompatible")
+    try:
+        ordinal = resolver(local_rank, visible_devices)
+    except (RuntimeError, ValueError, TypeError, OverflowError) as error:
+        raise NativeUnavailable(str(error)) from error
+    if type(ordinal) is not int:
+        raise NativeUnavailable("Rust runtime returned an invalid CUDA ordinal")
+    return ordinal
+
+
 def resolve_scheduler_rank(environment):
     """Resolve torchrun/Slurm placement in beam-runtime when the wheel supports it."""
     if type(environment) is not dict or any(

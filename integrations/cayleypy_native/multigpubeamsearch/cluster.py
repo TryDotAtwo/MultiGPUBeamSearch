@@ -85,6 +85,17 @@ def plan_cluster(gpus_per_node, beam_width, *, shard_count=16, batch_alignment=1
     )
 
 
+def _cuda_ordinal_python(local_rank, visible_devices):
+    """Compatibility rule for older extensions and nonstandard Python inputs."""
+    if type(visible_devices) is not int or visible_devices <= 0:
+        raise ValueError("no visible CUDA devices")
+    if visible_devices == 1:
+        return 0
+    if local_rank >= visible_devices:
+        raise ValueError("LOCAL_RANK exceeds the visible CUDA devices")
+    return local_rank
+
+
 @dataclass(frozen=True)
 class ScheduledRank(RankPlacement):
     world_size: int
@@ -92,13 +103,15 @@ class ScheduledRank(RankPlacement):
 
     def cuda_ordinal(self, visible_devices: int) -> int:
         """Resolve the scheduler rank inside this process's CUDA namespace."""
-        if type(visible_devices) is not int or visible_devices <= 0:
-            raise ValueError("no visible CUDA devices")
-        if visible_devices == 1:
-            return 0
-        if self.local_rank >= visible_devices:
-            raise ValueError("LOCAL_RANK exceeds the visible CUDA devices")
-        return self.local_rank
+        from .rust_control import resolve_cuda_ordinal
+
+        try:
+            ordinal = resolve_cuda_ordinal(self.local_rank, visible_devices)
+        except NativeUnavailable as error:
+            raise ValueError(str(error)) from error
+        if ordinal is None:
+            return _cuda_ordinal_python(self.local_rank, visible_devices)
+        return ordinal
 
 
 def _number(env, name):

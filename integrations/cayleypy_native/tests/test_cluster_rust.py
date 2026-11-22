@@ -238,3 +238,57 @@ def test_public_scheduler_rank_uses_installed_rust_then_legacy_fallback(monkeypa
     monkeypatch.setattr(rust_control, "resolve_scheduler_rank", lambda _environment: None)
     monkeypatch.setattr(cluster, "_scheduler_rank_python", python_fallback)
     assert cluster.scheduler_rank(environment) == python_fallback(environment)
+
+
+@pytest.mark.parametrize(
+    "local_rank,visible_devices,expected",
+    [(7, 1, 0), (0, 4, 0), (3, 4, 3), (-1, 4, -1)],
+)
+def test_installed_rust_cuda_ordinal_matches_scheduler_mapping(
+    local_rank, visible_devices, expected
+):
+    resolver = getattr(runtime, "resolve_cuda_ordinal", None)
+    assert callable(resolver), "the installed Rust runtime lacks CUDA ordinal resolution"
+    assert getattr(runtime, "CLUSTER_DEVICE_BINDING_VERSION", None) == 1
+    assert resolver(local_rank, visible_devices) == expected
+
+
+def test_installed_rust_cuda_ordinal_rejects_invalid_visibility_and_rank():
+    resolver = getattr(runtime, "resolve_cuda_ordinal", None)
+    assert callable(resolver)
+    with pytest.raises(ValueError, match="no visible CUDA devices"):
+        resolver(0, 0)
+    with pytest.raises(ValueError, match="LOCAL_RANK exceeds the visible CUDA devices"):
+        resolver(4, 4)
+
+
+def test_public_cuda_ordinal_uses_rust_and_preserves_legacy_fallback(monkeypatch):
+    from multigpubeamsearch import rust_control
+
+    observed = []
+    native_resolver = rust_control.resolve_cuda_ordinal
+
+    def observe(local_rank, visible_devices):
+        observed.append((local_rank, visible_devices))
+        return native_resolver(local_rank, visible_devices)
+
+    def forbidden_fallback(*_args, **_kwargs):
+        pytest.fail("the installed Rust CUDA ordinal path fell back to Python")
+
+    monkeypatch.setattr(rust_control, "resolve_cuda_ordinal", observe)
+    monkeypatch.setattr(cluster, "_cuda_ordinal_python", forbidden_fallback)
+    assert cluster.ScheduledRank(3, 0, 3, 4, 4).cuda_ordinal(4) == 3
+    assert cluster.ScheduledRank(0, 0, 9, 9, 1).cuda_ordinal(1) == 0
+    assert observed == [(3, 4), (9, 1)]
+
+    fallback = cluster._cuda_ordinal_python
+    monkeypatch.setattr(rust_control, "resolve_cuda_ordinal", lambda *_args: None)
+    monkeypatch.setattr(cluster, "_cuda_ordinal_python", fallback)
+    assert cluster.ScheduledRank(1, 0, 1, 2, 2).cuda_ordinal(2) == 1
+
+    monkeypatch.setattr(
+        rust_control, "resolve_cuda_ordinal",
+        lambda *_args: (_ for _ in ()).throw(NativeUnavailable("incompatible resolver")),
+    )
+    with pytest.raises(ValueError, match="incompatible resolver"):
+        cluster.ScheduledRank(1, 0, 1, 2, 2).cuda_ordinal(2)

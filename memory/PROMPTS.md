@@ -165,3 +165,6 @@ Continue moving public permutation and CNOT search control to Rust + CUDA/C++ wh
 
 
 2026-11-22: Продолжать перенос управления MultiGPUBeamSearch в Rust небольшими рабочими срезами. Текущий срез переносит разбор torchrun/Slurm rank из публичного Python helper в beam-runtime через установленный PyO3 wheel; сохранить ScheduledRank, ошибки и fallback старых wheel. Проверять на hosted CPU/installed wheel, не запускать физический GPU в рамках этого шага.
+
+
+2026-11-22: Перенести существующее правило ScheduledRank.cuda_ordinal в beam-runtime через отдельный версионированный PyO3 API. Сохранить Python API, правило single-visible-device, local rank mapping, ошибки и fallback старых wheel; не менять реальное device binding и NCCL. Проверить Rust unit tests и установленный wheel.
