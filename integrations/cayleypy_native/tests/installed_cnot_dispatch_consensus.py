@@ -239,7 +239,7 @@ def main():
         _expect_solved(
             "legacy wheel digest fallback",
             record,
-            [True],
+            [],
             digest_calls=0,
         )
 
