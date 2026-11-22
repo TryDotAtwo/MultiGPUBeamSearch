@@ -114,6 +114,11 @@ jobs:
           CARGO_TARGET_DIR: ${{ runner.temp }}/cnot-panel-v2-target
         run: |
           set -euo pipefail
+          python_bin="$GITHUB_WORKSPACE/.venv-cnot-panel/bin/python"
+          export PATH="$GITHUB_WORKSPACE/.venv-cnot-panel/bin:$PATH"
+          export PYTHON="$python_bin"
+          export PYO3_PYTHON="$python_bin"
+          "$python_bin" -c 'import torch; print(torch.__version__)'
           build_dir="$RUNNER_TEMP/cnot-panel-v2-build"
           rm -rf "$build_dir" "$CARGO_TARGET_DIR"
           if .venv-cnot-panel/bin/python integrations/cnot_scorer/build.py --contract panel_search_v2 \
@@ -147,6 +152,11 @@ jobs:
           CARGO_TARGET_DIR: ${{ runner.temp }}/cnot-panel-v2-target
         run: |
           set -euo pipefail
+          python_bin="$GITHUB_WORKSPACE/.venv-cnot-panel/bin/python"
+          export PATH="$GITHUB_WORKSPACE/.venv-cnot-panel/bin:$PATH"
+          export PYTHON="$python_bin"
+          export PYO3_PYTHON="$python_bin"
+          "$python_bin" -c 'import torch; print(torch.__version__)'
           native="$RUNNER_TEMP/cnot-panel-v2-build/native"
           torch_lib="$(.venv-cnot-panel/bin/python -c 'import pathlib, torch; print(pathlib.Path(torch.__file__).parent / "lib")')"
           export LD_LIBRARY_PATH="$torch_lib:${LD_LIBRARY_PATH:-}"
