@@ -93,8 +93,8 @@ pub(super) fn load_panel_checkpoint_on(""" + signature + """    device: Option<u
         run_config = native / "src" / "run_config.rs"
         replace_once(
             run_config,
-            '#[cfg(feature = "torch")]\\nmod panel;',
-            '#[cfg(feature = "torch")]\\nmod panel;\\n#[cfg(feature = "torch")]\\nmod panel_v2_manifest;',
+            '#[cfg(feature = "torch")]\nmod panel;',
+            '#[cfg(feature = "torch")]\nmod panel;\n#[cfg(feature = "torch")]\nmod panel_v2_manifest;',
         )
         shutil.copyfile(
             Path(__file__).with_name("panel_v2_manifest.rs"),
