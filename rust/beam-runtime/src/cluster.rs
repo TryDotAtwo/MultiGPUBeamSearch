@@ -71,9 +71,8 @@ pub fn plan_cluster(request: &PlanRequest) -> Result<ClusterPlan> {
             "batch_alignment must be a positive uint32".into(),
         ));
     }
-    let alignment = u128::from(world)
-        * u128::from(request.shard_count)
-        * u128::from(request.batch_alignment);
+    let alignment =
+        u128::from(world) * u128::from(request.shard_count) * u128::from(request.batch_alignment);
     let beam = u128::from(request.beam_width);
     let capacity = (beam + u128::from(world) - 1) / u128::from(world);
     if alignment >= (1u128 << 64) || capacity >= (1u128 << 32) {

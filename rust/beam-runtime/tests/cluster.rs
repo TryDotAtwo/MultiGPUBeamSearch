@@ -114,13 +114,41 @@ fn typed_cluster_plan_preserves_rank_order_and_capacity() {
     assert_eq!(
         plan.ranks,
         vec![
-            PlannedRank { global_rank: 0, node_rank: 0, local_rank: 0 },
-            PlannedRank { global_rank: 1, node_rank: 0, local_rank: 1 },
-            PlannedRank { global_rank: 2, node_rank: 1, local_rank: 0 },
-            PlannedRank { global_rank: 3, node_rank: 1, local_rank: 1 },
-            PlannedRank { global_rank: 4, node_rank: 1, local_rank: 2 },
-            PlannedRank { global_rank: 5, node_rank: 1, local_rank: 3 },
-            PlannedRank { global_rank: 6, node_rank: 2, local_rank: 0 },
+            PlannedRank {
+                global_rank: 0,
+                node_rank: 0,
+                local_rank: 0,
+            },
+            PlannedRank {
+                global_rank: 1,
+                node_rank: 0,
+                local_rank: 1,
+            },
+            PlannedRank {
+                global_rank: 2,
+                node_rank: 1,
+                local_rank: 0,
+            },
+            PlannedRank {
+                global_rank: 3,
+                node_rank: 1,
+                local_rank: 1,
+            },
+            PlannedRank {
+                global_rank: 4,
+                node_rank: 1,
+                local_rank: 2,
+            },
+            PlannedRank {
+                global_rank: 5,
+                node_rank: 1,
+                local_rank: 3,
+            },
+            PlannedRank {
+                global_rank: 6,
+                node_rank: 2,
+                local_rank: 0,
+            },
         ]
     );
     assert_eq!(plan.requested_beam, 1_000_003);
