@@ -956,10 +956,7 @@ fn run_cnot_native_search<'py>(
                 "prepare admitted CNOT rank topology",
                 (|| -> PyResult<Bound<'_, PyAny>> {
                     let kwargs = PyDict::new(py);
-                    kwargs.set_item(
-                        "admitted_topology",
-                        (request.rank(), request.world()),
-                    )?;
+                    kwargs.set_item("admitted_topology", (request.rank(), request.world()))?;
                     Ok(kwargs.into_any())
                 })(),
             )?;
