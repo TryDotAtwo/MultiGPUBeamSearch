@@ -14,8 +14,8 @@ import re
 from typing import Any
 
 
-_SHA1 = re.compile(r"[0-9a-f]{40}\\Z")
-_SHA256 = re.compile(r"[0-9a-f]{64}\\Z")
+_SHA1 = re.compile(r"[0-9a-f]{40}\Z")
+_SHA256 = re.compile(r"[0-9a-f]{64}\Z")
 _HANDOFF_SCHEMA = "cnot103_multigpu_beam_handoff_v1"
 _RECEIPT_SCHEMA = "cnot103_learning_curve_campaign_v1"
 _SEARCH_SCHEMA = "cnot103_panel_search_v2"
