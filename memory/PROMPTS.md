@@ -158,3 +158,7 @@ Keep an active goal until the migration and required verification are complete.
 2026-11-22: Иван поручил устранить рассинхрон при rank-local сбое создания CNOT identity в Rust compatibility dispatch: один общий checked Gloo этап до старта transport, точная одинаковая ошибка на обоих рангах и успешный повтор публичного поиска на той же process group; без изменений алгоритма, kernels и precision.
 
 2026-11-22: Иван поручил продолжить перенос управления permutation beam search в Rust без оптимизаций. Перенести выбор CUDA-устройств из Python policy в typed beam-runtime API, оставить Python только сборщиком Torch/CayleyPy наблюдений, сохранить fallback старых wheel и проверить установленный публичный путь на hosted CPU.
+
+## 2026-11-22 — MultiGPUBeamSearch Rust migration continuation
+
+Continue moving public permutation and CNOT search control to Rust + CUDA/C++ while preserving multi-GPU behavior, Python and CLI compatibility, Kaggle, torchrun, Slurm, search semantics, and numerical policy. Validate changes on GitHub-hosted CPU/Gloo and installed wheels. Physical GPU runs remain separately gated.

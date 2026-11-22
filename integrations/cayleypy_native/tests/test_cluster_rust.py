@@ -39,16 +39,24 @@ def torch_env(rank, world=2, local_world=2):
     {"WORLD_SIZE": "00000000002"},
 ])
 def test_scheduler_validation_matches_python(changes):
+    from dataclasses import asdict
+
     env = torch_env(0)
     env.update(changes)
     try:
-        cluster.scheduler_rank(env)
+        expected = cluster._scheduler_rank_python(env)
     except ValueError as error:
+        with pytest.raises(ValueError, match=__import__("re").escape(str(error))):
+            runtime.resolve_scheduler_rank(env)
         with pytest.raises(ValueError, match=__import__("re").escape(str(error))):
             runtime.validate_cluster_rank(env)
     else:
+        expected_fields = {
+            "global_rank", "node_rank", "local_rank", "world_size", "local_world_size",
+        }
+        assert asdict(expected).keys() == expected_fields
+        assert json.loads(runtime.resolve_scheduler_rank(env)) == asdict(expected)
         runtime.validate_cluster_rank(env)
-
 
 @pytest.mark.parametrize("engine", ["python", "rust"])
 def test_two_ranks_share_id_and_preserve_native_environment(tmp_path, engine):

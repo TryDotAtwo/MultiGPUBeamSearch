@@ -31,6 +31,13 @@ fn validate_cluster_rank(environment: BTreeMap<String, String>) -> PyResult<()> 
 }
 
 #[pyfunction]
+fn resolve_scheduler_rank(environment: BTreeMap<String, String>) -> PyResult<String> {
+    let rank = beam_runtime::cluster::scheduler_rank(&environment)
+        .map_err(|error| PyValueError::new_err(error.to_string()))?;
+    serde_json::to_string(&rank).map_err(|error| PyRuntimeError::new_err(error.to_string()))
+}
+
+#[pyfunction]
 fn run_cluster_rank(
     py: Python<'_>,
     command: Vec<String>,
@@ -62,6 +69,7 @@ pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add("CLUSTER_RANK_VERSION", 1)?;
     module.add_function(wrap_pyfunction!(run_cluster_rank, module)?)?;
     module.add_function(wrap_pyfunction!(validate_cluster_rank, module)?)?;
+    module.add_function(wrap_pyfunction!(resolve_scheduler_rank, module)?)?;
     module.add_function(wrap_pyfunction!(resolve_cluster_plan, module)?)?;
     Ok(())
 }

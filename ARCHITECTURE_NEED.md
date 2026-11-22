@@ -3827,3 +3827,7 @@ The producer compatibility fixture now changes the baseline Hamming manifest's s
 ## Rust-owned inference profile resolution (2026-11-22)
 
 The installed-wheel acceptance check exposed that the Rust extension exported backend selection but not the typed profile plan consumed by the preparation path. Rust now returns the selected backend together with the existing profile name and inference row limit. The Python adapter uses that single plan for runner construction and the prepared profile. Older extensions retain the existing backend-selection fallback and the same fixed profile mapping. No inference kernel, numerical policy, or beam-search behavior changes. CPU/PyO3 verification passed through the installed-wheel policy and preparation path on tested SHA a0f406238515ffab5d0c45b9ae4b0d5dc5011931 (run 45040185404). Physical CUDA/NCCL verification remains pending.
+
+## Rust-owned public scheduler rank resolution
+
+The public `cluster.scheduler_rank` helper delegates torchrun/Slurm environment parsing to `beam-runtime` when the installed PyO3 extension exports the versioned resolver. Rust returns global, node, and local rank plus world/local-world sizes; Python keeps the existing `ScheduledRank` object and uses the original parser only for older wheels. Invalid scheduler input still raises `ValueError` at the Python API. A runtime failure from a present resolver is an error and does not fall back to a different rank assignment. This transfer does not change process launching, CUDA device binding, NCCL, or search behavior.

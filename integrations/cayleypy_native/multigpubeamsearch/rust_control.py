@@ -250,6 +250,50 @@ def resolve_runtime_devices(visible_device_count, explicit_devices, num_gpus, gr
     return tuple(selected)
 
 
+def resolve_scheduler_rank(environment):
+    """Resolve torchrun/Slurm placement in beam-runtime when the wheel supports it."""
+    if type(environment) is not dict or any(
+        type(name) is not str or type(value) is not str
+        for name, value in environment.items()
+    ):
+        raise NativeUnavailable("scheduler environment must map strings to strings")
+    try:
+        native = extension()
+    except (NativeUnavailable, ImportError):
+        return None
+    resolver = getattr(native, "resolve_scheduler_rank", None)
+    if not callable(resolver):
+        return None
+    if getattr(native, "CLUSTER_RANK_VERSION", None) != 1:
+        raise NativeUnavailable("Rust scheduler rank API version is incompatible")
+    try:
+        encoded = resolver(environment)
+    except (RuntimeError, ValueError, TypeError, OverflowError) as error:
+        raise NativeUnavailable(str(error)) from error
+    if not isinstance(encoded, str):
+        raise NativeUnavailable("Rust runtime returned an invalid scheduler rank")
+    try:
+        rank = json.loads(encoded)
+    except (TypeError, ValueError) as error:
+        raise NativeUnavailable("Rust runtime returned malformed scheduler-rank JSON") from error
+    fields = {
+        "global_rank", "node_rank", "local_rank", "world_size", "local_world_size",
+    }
+    if not isinstance(rank, dict) or set(rank) != fields:
+        raise NativeUnavailable("Rust runtime returned an invalid scheduler rank")
+    if any(type(rank[name]) is not int or not 0 <= rank[name] < (1 << 64) for name in fields):
+        raise NativeUnavailable("Rust runtime returned an invalid scheduler rank")
+    if (
+        not 1 <= rank["world_size"] <= 128
+        or not 1 <= rank["local_world_size"] <= rank["world_size"]
+        or rank["global_rank"] >= rank["world_size"]
+        or rank["node_rank"] >= rank["world_size"]
+        or rank["local_rank"] >= rank["local_world_size"]
+    ):
+        raise NativeUnavailable("Rust runtime returned an invalid scheduler rank")
+    return rank
+
+
 def resolve_cluster_plan(request):
     """Resolve the public multi-node rank layout in beam-runtime when available."""
     fields = {"gpus_per_node", "beam_width", "shard_count", "batch_alignment"}

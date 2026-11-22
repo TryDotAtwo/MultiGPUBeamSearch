@@ -74,3 +74,9 @@
 - Moved device-list policy from the Python backend into a typed Rust runtime function. The adapter supplies the visible CUDA count, explicit `devices` or `num_gpus`, and normalized CayleyPy/Torch graph-device observations.
 - Preserved explicit selection, exact requested GPU counts, all-visible-GPU selection for absent/CPU graph devices, configured CUDA order, `cuda` mapping to ordinal zero, the 128-device limit, and existing rejection cases.
 - Wheels without the new PyO3 function keep the Python policy. Runtime kernels, precision, scoring, graph search, and launch visibility mapping are unchanged.
+
+## 2026-11-22 — Rust scheduler rank resolution
+
+- The public torchrun/Slurm rank parser now uses the typed result from `beam-runtime` when the installed wheel provides it. The Python API and `ScheduledRank` dataclass remain unchanged; older wheels retain the existing Python parser.
+- Rust validation errors are mapped back to the public `ValueError` contract. A supported Rust resolver failure cannot silently switch the rank assignment path.
+- This transfers scheduler metadata only; it does not change device binding, rank launch selection, NCCL transport, or GPU execution.

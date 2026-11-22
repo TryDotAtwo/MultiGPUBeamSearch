@@ -9,6 +9,8 @@ import shutil
 import subprocess
 import time
 
+from .errors import NativeUnavailable
+
 
 MAX_WORLD_SIZE = 128  # Fixed host control arrays in the native final exchange.
 
@@ -120,7 +122,7 @@ def _slurm_counts(text):
     return counts
 
 
-def scheduler_rank(environ=None):
+def _scheduler_rank_python(environ=None):
     """Read the actual torchrun or Slurm step assignment, including task masks."""
     env = os.environ if environ is None else environ
     rank_offset = None
@@ -144,6 +146,25 @@ def scheduler_rank(environ=None):
     if rank_offset is not None and rank != rank_offset + local:
         raise ValueError("Slurm rank does not match node/local assignment")
     return ScheduledRank(rank, node, local, world, local_size)
+
+
+def scheduler_rank(environ=None):
+    """Resolve the public scheduler placement through Rust, with old-wheel fallback."""
+    env = os.environ if environ is None else environ
+    from .rust_control import resolve_scheduler_rank
+
+    try:
+        rank = resolve_scheduler_rank(dict(env))
+    except NativeUnavailable as error:
+        # Preserve the public helper's ValueError contract for malformed
+        # torchrun/Slurm environments; a Rust error never chooses Python.
+        raise ValueError(str(error)) from error
+    if rank is None:
+        return _scheduler_rank_python(environ)
+    return ScheduledRank(
+        rank["global_rank"], rank["node_rank"], rank["local_rank"],
+        rank["world_size"], rank["local_world_size"],
+    )
 
 
 def run_cluster_rank(command, *, shared_dir, run_id=None, timeout=3600, environ=None, engine="python"):
