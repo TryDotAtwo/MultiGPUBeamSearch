@@ -11,6 +11,12 @@ on:
       - .github/workflows/vast-cnot-control-collectives.yml
       - integrations/cayleypy_native/tests/installed_wheel_smoke.py
       - integrations/cayleypy_native/tests/installed_inference_backend_policy.py
+      - integrations/cayleypy_native/tests/test_rust_persistent_search.py
+      - integrations/cayleypy_native/multigpubeamsearch/persistent.py
+      - integrations/cayleypy_native/multigpubeamsearch/rust_control.py
+      - rust/beam-runtime/src/search_session.rs
+      - rust/beam-runtime/tests/session_preparation_identity.rs
+      - rust/beam-python/src/search_session.rs
       - integrations/cayleypy_native/tests/test_cluster_rust.py
       - integrations/cayleypy_native/tests/test_cluster_worker.py
       - integrations/cayleypy_native/tests/installed_cnot_handoff_endpoint.py
@@ -152,6 +158,26 @@ jobs:
           cd "$RUNNER_TEMP/mgbs-wheel-smoke"
           env -u PYTHONPATH python "$GITHUB_WORKSPACE/integrations/cayleypy_native/tests/installed_inference_backend_policy.py" \
             > "${RUNNER_TEMP}/mgbs-private-inference-backend-policy.log" 2>&1
+      - name: Verify installed Rust session identity and reuse
+        if: always() && steps.wheel_smoke.outcome == 'success'
+        id: installed_rust_session_identity
+        env:
+          REQUIRE_RUST_PREPARATION_IDENTITY: "1"
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/mgbs-wheel-smoke"
+          log="$GITHUB_WORKSPACE/test_results/refactor_20261122/rust-session/installed-plan-reuse.log"
+          mkdir -p "$(dirname "$log")"
+          if env -u PYTHONPATH python -m pytest -q \
+            "$GITHUB_WORKSPACE/integrations/cayleypy_native/tests/test_rust_persistent_search.py" \
+            -k "compiled_rust_preparation_identity_uses_structured_options or rust_session_reuses_and_releases_rank_owner" \
+            > "$log" 2>&1; then
+            cat "$log"
+          else
+            status=$?
+            cat "$log"
+            exit "$status"
+          fi
       - name: Verify Rust inference backend policy
         if: always()
         id: rust_inference_backend_runtime
@@ -450,6 +476,14 @@ jobs:
           path: ${{ runner.temp }}/cnot-public-status.json
           if-no-files-found: error
           retention-days: 7
+      - name: Upload installed Rust session diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rust-session-plan-reuse-${{ github.run_id }}
+          path: ${{ github.workspace }}/test_results/refactor_20261122/rust-session/installed-plan-reuse.log
+          if-no-files-found: ignore
+          retention-days: 14
       - name: Upload synthetic panel endpoint diagnostics
         if: always()
         uses: actions/upload-artifact@v4

@@ -142,23 +142,10 @@ if route_only_plan != {
     raise AssertionError(f"the route-only wheel fallback changed: {route_only_plan}")
 
 
-class PolicyProbe:
-    ABI_VERSION = 1
-    InferenceCalibration = object()
-
-    def __init__(self):
-        self.requests = []
-
-    def resolve_inference_plan(self, payload):
-        self.requests.append(json.loads(payload))
-        return json.dumps({
-            "backend": "libtorch",
-            "policy": "rust-profile-probe-v1",
-            "inference_row_limit": 1234,
-        })
-
-
-policy_probe = PolicyProbe()
+prepared_request = request(
+    "auto", "mlp", "fp16", 8, [(80, "NVIDIA A100")]
+)
+expected_prepared_plan = resolve_plan(prepared_request)
 selected = []
 
 
@@ -175,7 +162,6 @@ with tempfile.TemporaryDirectory(prefix="beam-inference-policy-") as temporary:
     )
     options = NativeOptions(cache_dir=root / "cache", inference_backend="auto")
     with (
-        patch.object(rust_control, "extension", return_value=policy_probe),
         patch.object(torch.cuda, "get_device_capability", return_value=(8, 0)),
         patch.object(torch.cuda, "get_device_name", return_value="NVIDIA A100"),
         patch.object(build, "ensure_runner", side_effect=fake_ensure_runner),
@@ -183,16 +169,24 @@ with tempfile.TemporaryDirectory(prefix="beam-inference-policy-") as temporary:
         prepared = backend.prepare_runtime(
             FakeContract(), model, options, root / "run", (0,)
         )
-    if len(policy_probe.requests) != 1:
-        raise AssertionError(f"prepare_runtime did not call the Rust policy exactly once: {policy_probe.requests}")
-    if policy_probe.requests[0]["devices"] != [{"sm": 80, "name": "NVIDIA A100"}]:
-        raise AssertionError(f"Rust policy received the wrong device observation: {policy_probe.requests[0]}")
-    if selected != ["libtorch"]:
-        raise AssertionError(f"prepare_runtime did not use the Rust policy result: {selected}")
-    if prepared.profile.get("inference_backend") != "libtorch":
-        raise AssertionError(f"prepared profile recorded a different backend: {prepared.profile}")
-    if (prepared.profile.get("policy") != "rust-profile-probe-v1"
-            or prepared.profile.get("inference_row_limit") != 1234):
-        raise AssertionError(f"prepare_runtime did not use the Rust profile plan: {prepared.profile}")
-
+    if selected != [expected_prepared_plan["backend"]]:
+        raise AssertionError(
+            f"prepare_runtime did not pass the real Rust backend to runner setup: "
+            f"expected={expected_prepared_plan}, selected={selected}"
+        )
+    if prepared.profile.get("inference_backend") != expected_prepared_plan["backend"]:
+        raise AssertionError(
+            f"prepared runtime backend differs from the installed Rust plan: "
+            f"expected={expected_prepared_plan}, profile={prepared.profile}"
+        )
+    if prepared.profile.get("policy") != expected_prepared_plan["policy"]:
+        raise AssertionError(
+            f"prepared runtime policy differs from the installed Rust plan: "
+            f"expected={expected_prepared_plan}, profile={prepared.profile}"
+        )
+    if prepared.profile.get("inference_row_limit") != expected_prepared_plan["inference_row_limit"]:
+        raise AssertionError(
+            f"prepared runtime row limit differs from the installed Rust plan: "
+            f"expected={expected_prepared_plan}, profile={prepared.profile}"
+        )
 print("INSTALLED_RUST_INFERENCE_BACKEND_POLICY_PASS", flush=True)

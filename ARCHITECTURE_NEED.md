@@ -1,3 +1,9 @@
+## Rust session identity includes the resolved inference plan — 2026-11-22
+
+Permutation preparation identity schema v3 carries a typed `ResolvedInferencePlanIdentity` with the selected backend, policy and inference row limit returned by the Rust resolver used in `prepare_runtime`. A repeated `NativeSession` call can reuse its resident rank owner only while this plan and the other typed preparation inputs match; a changed policy or row limit invalidates the preparation. Schema-v2 extensions keep the plan inside the existing structured options value, and older extensions retain the Python compatibility identity.
+
+The installed-wheel contract calls the real PyO3 resolver through `prepare_runtime`, checks the runner backend and profile fields, and exercises Rust identity reuse and plan invalidation without CUDA. This changes preparation identity only; scoring, inference kernels, numerical policy and rank execution are unchanged.
+
 ## CNOT scorer contract selection — 2026-11-22
 
 The acceptance launcher builds two separate Rust scorer libraries: the historical

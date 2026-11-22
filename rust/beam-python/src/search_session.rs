@@ -1,5 +1,7 @@
 use beam_core::search::PermutationGraph;
-use beam_runtime::search_session::{PreparationIdentity, RequestedBeam, SessionIdentity};
+use beam_runtime::search_session::{
+    PreparationIdentity, RequestedBeam, ResolvedInferencePlanIdentity, SessionIdentity,
+};
 use pyo3::{
     exceptions::{PyRuntimeError, PyValueError},
     prelude::*,
@@ -85,12 +87,17 @@ fn build_preparation_identity(
         .map(|raw| serde_json::from_str(&raw))
         .transpose()
         .map_err(error)?;
-    let options: serde_json::Value = serde_json::from_str(&options_json).map_err(error)?;
-    if !options.is_object() {
+    let mut options: serde_json::Value = serde_json::from_str(&options_json).map_err(error)?;
+    let Some(option_map) = options.as_object_mut() else {
         return Err(PyValueError::new_err(
             "preparation options must be a JSON object",
         ));
-    }
+    };
+    let resolved_inference_plan = option_map
+        .remove("resolved_inference_plan")
+        .map(serde_json::from_value::<ResolvedInferencePlanIdentity>)
+        .transpose()
+        .map_err(error)?;
     let identity = PreparationIdentity::new(
         graph_hash,
         geometry,
@@ -107,6 +114,7 @@ fn build_preparation_identity(
         cuda_visible_devices,
         cuda_device_order,
         runtime_build,
+        resolved_inference_plan,
     );
     serde_json::to_string(&identity).map_err(error)
 }
@@ -226,7 +234,7 @@ fn parse_terminal(
 pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add("SEARCH_TERMINAL_RESULT_VERSION", 1)?;
     module.add("PREPARATION_IDENTITY_AUTO_MAX_VERSION", 1)?;
-    module.add("PREPARATION_IDENTITY_SCHEMA_VERSION", 2)?;
+    module.add("PREPARATION_IDENTITY_SCHEMA_VERSION", 3)?;
     module.add_function(wrap_pyfunction!(build_preparation_identity, module)?)?;
     module.add_function(wrap_pyfunction!(build_session_identity, module)?)?;
     module.add_class::<SearchSession>()?;

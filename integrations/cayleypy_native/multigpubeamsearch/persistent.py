@@ -343,6 +343,20 @@ class NativeSession:
             visible_devices=os.environ.get('CUDA_VISIBLE_DEVICES')
             cuda_device_order=os.environ.get('CUDA_DEVICE_ORDER')
             runtime_build=runtime.build_metadata if runtime is not None else None
+            runtime_profile = None if runtime is None else getattr(runtime, 'profile', None)
+            resolved_inference_plan = None
+            if type(runtime_profile) is dict:
+                plan_backend = runtime_profile.get('inference_backend')
+                plan_policy = runtime_profile.get('policy')
+                plan_row_limit = runtime_profile.get('inference_row_limit')
+                if (plan_backend in ('libtorch', 'cutlass')
+                        and type(plan_policy) is str and plan_policy
+                        and type(plan_row_limit) is int and plan_row_limit > 0):
+                    resolved_inference_plan = {
+                        'backend': plan_backend,
+                        'policy': plan_policy,
+                        'inference_row_limit': plan_row_limit,
+                    }
             identity = None
 
             def legacy_identity():
@@ -354,7 +368,8 @@ class NativeSession:
                                      if runtime_build is not None else None)
                 return (contract.graph_hash, geometry, graph_content, model.artifact_hash, artifact_sizes,
                         model.backend, device_order, binding_scope, beam_width, max_steps,
-                        options_repr, visible_devices, cuda_device_order, runtime_build_key)
+                        options_repr, visible_devices, cuda_device_order, runtime_build_key,
+                        resolved_inference_plan)
 
             rust_preparation_identity_supported = False
             identity_key = None
@@ -387,6 +402,7 @@ class NativeSession:
                         cuda_visible_devices=visible_devices,
                         cuda_device_order=cuda_device_order,
                         runtime_build=runtime_build,
+                        resolved_inference_plan=resolved_inference_plan,
                     )
                     rust_preparation_identity_supported = identity_key is not None
             if (self.model_snapshot_cache is None
@@ -429,6 +445,7 @@ class NativeSession:
                     'artifact_sizes': None if artifact_sizes is None else list(artifact_sizes),
                     'binding_scope': binding_scope,
                     'options': options_descriptor(options),
+                    'resolved_inference_plan': resolved_inference_plan,
                 }
                 self._pending = {
                     'model': model,

@@ -144,3 +144,7 @@ Keep an active goal until the migration and required verification are complete.
 
 
 - 2026-11-22: Resolve the permutation inference route and its existing policy name/row limit together in Rust; have preparation use that single plan. Preserve backend, profile and microbatch values, plus the explicit fallback for older installed extensions. Verify through the installed-wheel public preparation path; do not alter kernels, precision, or search semantics.
+
+2026-11-22: Иван поручил продолжить перенос Rust-сессии перестановок: включить разрешённый inference backend/policy/row limit в typed preparation identity, проверить повторный вызов и инвалидирование при смене плана, оставить форматы/API и численную политику прежними.
+
+2026-11-22: Иван поручил разделить hosted CNOT panel-v2 CI: быстрый no-Torch emitter/manifest handoff verdict, отдельные PyTorch environment и Rust native build caches, подготовка crate до Torch/Cargo, route tests для обоих путей и сквозная installed-wheel проверка настоящего Rust resolver; без Vast, платных и физических GPU запусков.

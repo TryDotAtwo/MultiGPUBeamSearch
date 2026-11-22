@@ -81,7 +81,7 @@ def build_preparation_identity(*, graph_hash, geometry, center, generators,
                                model_artifact_hash, artifact_sizes, model_backend,
                                devices, binding_scope, beam_width, max_steps,
                                options, cuda_visible_devices, cuda_device_order,
-                               runtime_build):
+                               runtime_build, resolved_inference_plan=None):
     """Build the typed resident-session identity in Rust when supported."""
     try:
         native = extension()
@@ -93,7 +93,22 @@ def build_preparation_identity(*, graph_hash, geometry, center, generators,
     if not callable(builder) or type(options) is not dict:
         return None
     try:
-        options_json = json.dumps(options, sort_keys=True, allow_nan=False)
+        options_payload = dict(options)
+        if resolved_inference_plan is not None:
+            if (
+                type(resolved_inference_plan) is not dict
+                or set(resolved_inference_plan) != {
+                    "backend", "policy", "inference_row_limit"
+                }
+                or resolved_inference_plan.get("backend") not in ("libtorch", "cutlass")
+                or type(resolved_inference_plan.get("policy")) is not str
+                or not resolved_inference_plan["policy"]
+                or type(resolved_inference_plan.get("inference_row_limit")) is not int
+                or resolved_inference_plan["inference_row_limit"] <= 0
+            ):
+                raise ValueError("invalid resolved inference plan")
+            options_payload["resolved_inference_plan"] = dict(resolved_inference_plan)
+        options_json = json.dumps(options_payload, sort_keys=True, allow_nan=False)
         runtime_build_json = (None if runtime_build is None
                               else json.dumps(runtime_build, sort_keys=True, allow_nan=False))
         if type(beam_width) is str and beam_width == 'max':

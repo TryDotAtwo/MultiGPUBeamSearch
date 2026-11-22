@@ -1,5 +1,6 @@
 """The experimental Rust session owns rank workers behind NativeSession."""
 import json
+import os
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -22,9 +23,14 @@ def test_compiled_rust_preparation_identity_builder_round_trips_fields():
 
     try:
         runtime = rust_control.extension()
-    except NativeUnavailable:
+    except NativeUnavailable as error:
+        if os.environ.get("REQUIRE_RUST_PREPARATION_IDENTITY") == "1":
+            raise AssertionError(
+                "installed-wheel gate requires the compiled Rust preparation API"
+            ) from error
         pytest.skip("Rust extension is not built in this CPU-only job")
 
+    assert getattr(runtime, "PREPARATION_IDENTITY_SCHEMA_VERSION", 0) >= 3
     build = getattr(runtime, "build_preparation_identity", None)
     assert callable(build), "Rust preparation identity builder is missing"
     runtime_build = {"binary_sha256": "c" * 64, "inference_backend": "cutlass"}
@@ -75,10 +81,16 @@ def test_compiled_rust_preparation_identity_uses_structured_options():
 
     build = getattr(runtime, "build_preparation_identity", None)
     assert callable(build), "Rust preparation identity builder is missing"
+    plan = {
+        "backend": "cutlass",
+        "policy": "cutlass-default-v1",
+        "inference_row_limit": 8192,
+    }
     options = {
         "inference_backend": "cutlass",
         "calibration_frontier_max_states": 1234,
         "source_dir": "/remote/project",
+        "resolved_inference_plan": plan,
     }
     identity = json.loads(build(
         "a" * 64,
@@ -97,8 +109,39 @@ def test_compiled_rust_preparation_identity_uses_structured_options():
         "PCI_BUS_ID",
         json.dumps({"binary_sha256": "c" * 64}),
     ))
-    assert identity["options"] == options
+    assert identity["options"] == {
+        "inference_backend": "cutlass",
+        "calibration_frontier_max_states": 1234,
+        "source_dir": "/remote/project",
+    }
+    assert identity["resolved_inference_plan"] == plan
     assert "options_repr" not in identity
+
+    session = runtime.SearchSession()
+    assert session.begin_preparation(identity) is False
+    session.remember_preparation(identity)
+    assert session.begin_preparation(identity) is True
+    changed_plan = dict(plan, inference_row_limit=4096)
+    options["resolved_inference_plan"] = changed_plan
+    changed_identity = build(
+        "a" * 64,
+        [4, 4, 2],
+        [0, 1],
+        [[1, 0]],
+        "b" * 64,
+        [17],
+        "mlp",
+        [0],
+        False,
+        64,
+        4,
+        json.dumps(options, sort_keys=True, allow_nan=False),
+        "0",
+        "PCI_BUS_ID",
+        json.dumps({"binary_sha256": "c" * 64}),
+    )
+    assert session.begin_preparation(changed_identity) is False
+    session.close()
 
 
 def test_legacy_preparation_identity_extension_is_not_used_for_typed_identity(monkeypatch):
@@ -287,6 +330,9 @@ def test_rust_session_reuses_and_releases_rank_owner(tmp_path, monkeypatch, worl
         )
         identity = dict(zip(names, values))
         identity["options"] = json.loads(identity.pop("options_json"))
+        identity["resolved_inference_plan"] = identity["options"].pop(
+            "resolved_inference_plan", None
+        )
         if identity["runtime_build"] is not None:
             identity["runtime_build"] = json.loads(identity["runtime_build"])
         return json.dumps(identity, sort_keys=True)
@@ -307,13 +353,21 @@ def test_rust_session_reuses_and_releases_rank_owner(tmp_path, monkeypatch, worl
         return json.dumps(identity, sort_keys=True)
     monkeypatch.setattr(rust_control, "extension", lambda: SimpleNamespace(
         SearchSession=Owner, SEARCH_TERMINAL_RESULT_VERSION=1,
-        PREPARATION_IDENTITY_SCHEMA_VERSION=2,
+        PREPARATION_IDENTITY_SCHEMA_VERSION=3,
         build_preparation_identity=build_preparation_identity,
         build_session_identity=build_session_identity))
     contract = GraphContract(2, 2, ((1, 0),), ("swap",), (0, 1), (1, 0), "a" * 64)
     model = SimpleNamespace(artifact_hash="b" * 64, backend="mlp")
-    runtime = SimpleNamespace(runner=tmp_path / "runner", architectures=(86,),
-                              build_metadata={"binary_sha256": "c" * 64})
+    runtime = SimpleNamespace(
+        runner=tmp_path / "runner",
+        architectures=(86,),
+        build_metadata={"binary_sha256": "c" * 64},
+        profile={
+            "inference_backend": "cutlass",
+            "policy": "cutlass-default-v1",
+            "inference_row_limit": 8192,
+        },
+    )
     options = NativeOptions(cache_dir=tmp_path)
     def reject_python_repr(self):
         raise AssertionError("Rust-owned preparation identity must not use Python repr(options)")
@@ -329,10 +383,10 @@ def test_rust_session_reuses_and_releases_rank_owner(tmp_path, monkeypatch, worl
                              {"requested_beam_width": beam, "profile": {}, "terminal_records": 1,
                               "callback_metadata_owner": "python-execute"})
 
-    def run(number):
+    def run(number, current_options=options):
         directory = tmp_path / f"run-{number}"
         directory.mkdir()
-        return session.run(execute, contract, model, options, 64, 4, directory,
+        return session.run(execute, contract, model, current_options, 64, 4, directory,
                            tuple(range(world)), runtime=runtime)
 
     try:
@@ -350,25 +404,44 @@ def test_rust_session_reuses_and_releases_rank_owner(tmp_path, monkeypatch, worl
         assert python_identity["geometry"] == [2, 2, 1]
         assert python_identity["artifact_sizes"] == []
         assert python_identity["binding_scope"] is False
+        assert python_identity["resolved_inference_plan"] == {
+            "backend": "cutlass",
+            "policy": "cutlass-default-v1",
+            "inference_row_limit": 8192,
+        }
         assert launch["command"] == [str(worker), "0", "4", "64"]
         assert launch["protocol_command"] == [str(worker), "--resident-protocol-info"]
         assert launch["environment"]["BEAM_NATIVE_LIBRARY"] == str(library)
         assert launch["environment"]["TEST_ENV"] == "retained"
         assert start == [1, 0] and timeout == 5
+        runtime.profile["inference_row_limit"] = 4096
+        changed_plan = run(3)
+        assert not changed_plan.metadata["persistent_session"]["reused"]
+        assert changed_plan.metadata["persistent_session"]["request_count"] == 1
+        assert owners[0].requests[2][0]["options"]["python_session_identity"]["resolved_inference_plan"]["inference_row_limit"] == 4096
+        assert len(owners) == 1 and not owners[0].closed
+
         model.artifact_hash = "f" * 64
-        changed = run(3)
-        assert not changed.metadata["persistent_session"]["reused"]
-        assert changed.metadata["persistent_session"]["request_count"] == 1
-        assert len(owners) == 1 and len(calls) == 2 and not owners[0].closed
-        assert len(owners[0].requests) == 3
+        changed_model = run(4)
+        assert not changed_model.metadata["persistent_session"]["reused"]
+        assert changed_model.metadata["persistent_session"]["request_count"] == 1
+        assert len(owners) == 1 and not owners[0].closed
+        assert len(owners[0].requests) == 4
         assert owners[0].preparation_checks == []
         assert len(owners[0].preparation_begins) == 2
-        assert owners[0].preparation_resets == 1
+        assert owners[0].preparation_resets == 2
         assert owners[0].preparation_records == []
-        assert len(owners[0].preparation_results) == 2
+        assert len(owners[0].preparation_results) == 3
         assert owners[0].preparation_begins[0] == owners[0].preparation_results[0][0]
         assert owners[0].preparation_begins[1] != owners[0].preparation_results[0][0]
         assert owners[0].preparation_begins[1] == owners[0].preparation_results[1][0]
+        assert owners[0].preparation_begins[2] == owners[0].preparation_results[2][0]
+        assert json.loads(owners[0].preparation_results[0][0])["resolved_inference_plan"] == {
+            "backend": "cutlass",
+            "policy": "cutlass-default-v1",
+            "inference_row_limit": 8192,
+        }
+        assert json.loads(owners[0].preparation_results[1][0])["resolved_inference_plan"]["inference_row_limit"] == 4096
         assert owners[0].preparation_results[0][1]["callback_metadata_owner"] == "python-execute"
         expected_first_session = {
             "reused": False, "worker_pids": list(range(100, 100 + world)),
@@ -389,25 +462,35 @@ def test_rust_session_reuses_and_releases_rank_owner(tmp_path, monkeypatch, worl
             "beam_width": 64,
             "max_steps": 4,
             "options": rust_control.options_descriptor(options),
+            "resolved_inference_plan": {
+                "backend": "cutlass",
+                "policy": "cutlass-default-v1",
+                "inference_row_limit": 8192,
+            },
             "cuda_visible_devices": "0,1",
             "cuda_device_order": "PCI_BUS_ID",
             "runtime_build": {"binary_sha256": "c" * 64},
         }
-        assert owners[0].requests[2][0]["model_artifact_hash"] == "f" * 64
-        assert len(identity_builds) == 3
-        assert len(session_identity_builds) == 2
-        assert session_identity_builds[1][3] == "f" * 64
+        assert owners[0].requests[3][0]["model_artifact_hash"] == "f" * 64
+        assert len(identity_builds) == 4
+        assert len(session_identity_builds) == 3
+        assert session_identity_builds[2][3] == "f" * 64
         assert session_identity_builds[0][0:6] == (
             [0, 1], [[1, 0]], "a" * 64, "b" * 64, "mlp", list(range(world)))
         assert json.loads(session_identity_builds[0][9])["python_session_identity"]["geometry"] == [2, 2, 1]
         nested_options = json.loads(session_identity_builds[0][9])["python_session_identity"]
         assert nested_options["options"] == rust_control.options_descriptor(options)
+        assert nested_options["resolved_inference_plan"] == {
+            "backend": "cutlass",
+            "policy": "cutlass-default-v1",
+            "inference_row_limit": 8192,
+        }
         assert "options_repr" not in nested_options
         assert identity_builds[0][0:4] == ("a" * 64, [2, 2, 1], [0, 1], [[1, 0]])
         assert identity_builds[0][4:8] == ("b" * 64, [], "mlp", list(range(world)))
         owners[0].fail = True
         with pytest.raises(NativeBackendError, match="injected rank failure"):
-            run(4)
+            run(5)
         assert owners[0].closed
     finally:
         session.close()

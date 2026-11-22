@@ -1,3 +1,9 @@
+## 2026-11-22 - Include the resolved inference plan in Rust session identity
+
+- Extended typed permutation preparation identity with the resolved backend, policy and row limit from the Rust inference resolver. A repeated `NativeSession` call can reuse its resident rank owner only when the plan and other preparation inputs match; a changed plan invalidates preparation.
+- Kept schema-v2 extension compatibility by carrying the plan inside its existing structured options object.
+- The installed-wheel inference-policy check calls the actual installed Rust extension through `prepare_runtime` and verifies the runner selection and resulting profile.
+
 ## 2026-11-22 - Split panel-v2 producer feedback and build caches
 
 - The required PR workflow routes emitter and producer-manifest changes to a stdlib-only handoff check. That route uses a fresh Python environment without PyTorch and skips Cargo even when the native cache is cold. Producer/native adapter changes route to the CPU Rust test.
