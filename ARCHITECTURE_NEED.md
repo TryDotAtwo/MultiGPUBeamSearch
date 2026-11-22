@@ -3720,3 +3720,19 @@ two-rank Gloo route/failure/retry cases. The test failed on
 `9ce5954b6b1d6bd014a2af086dec71ff7686a255` ([run
 44996962384](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44996962384)).
 CUDA/NCCL behavior remains pending.
+
+## Rust-owned permutation inference backend selection, 2026-11-22
+
+The public permutation runner preparation now sends a typed device/model request to
+`beam_runtime::inference_backend`. Python/Torch still observes the selected CUDA
+devices and supplies their SM version and device name. Rust selects `libtorch` or
+`cutlass` and enforces the existing dtype, ensemble and MLP Q-head compatibility
+rules before native runner construction. The Python rule table remains only for
+older installed extensions that do not expose this API. The selected route is
+stored in the prepared profile and passed to the native build.
+
+This slice moves runner backend selection only. Search stages, model scoring,
+specialized inference kernels, precision policy, CUDA/NCCL ownership and public
+result formats are unchanged. The installed-wheel test covers direct PyO3 policy
+calls, legacy-extension fallback, error translation, and the normal
+`prepare_runtime` caller with a discriminating Rust resolver response.

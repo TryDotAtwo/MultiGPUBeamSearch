@@ -3441,3 +3441,28 @@ Main commit `148b2a826a369b7601e904ea409e0cc5301c75c9` also passed the 260-test 
 
 - The producer-source test now delimits workflow jobs by top-level indentation, so nested `gpu-acceptance` fields remain visible to the assertion.
 - RED: hosted source validation failed at the exact producer-source gate on SHA `e87925d2006b0c65ca2bd2962e9e7bb13f5fca23`, [run 44999068267](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44999068267). GREEN: source harness passed on SHA `0ca418cbbc2757508dc96ff986af75b888cba5e2`, [run 44999384719](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44999384719). The physical workflow remained skipped.
+
+## 2026-11-22 - Resolve permutation inference backend in beam-runtime
+
+- Moved the existing `auto`/`libtorch`/`cutlass` route table and its T4,
+  mixed-ensemble, dtype and Q-head checks into typed
+  `beam_runtime::inference_backend`; Python/Torch supplies device observations
+  and receives the selected route before runner construction. Older wheels keep
+  the former Python policy only when the new PyO3 entry point is absent.
+- The test-only installed-wheel RED at SHA
+  `bd39207485691e904cbc546f7c85188441f466fb` was
+  [run 45001165651](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45001165651).
+  The first implementation-wheel attempt at `02868b1` exposed a test import
+  mistake (`NativeOptions` was not exported from the backend module); the
+  test import was corrected at `a0fa983`.
+- Installed PEP 517 wheel validation passed all 30 steps at SHA
+  `a0fa983ec925cdee79424a6d255ecb24b237665d` in
+  [run 45002245084](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45002245084),
+  including the direct Rust policy and normal preparation-path checks.
+  Rust/Python CNOT CPU/Gloo passed at `02868b1` in
+  [run 45001958999](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45001958999);
+  the hosted acceptance harness passed at `a0fa983` in
+  [run 45002245294](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45002245294),
+  and the pinned panel-v2 CPU compatibility gate passed in
+  [run 45002249209](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45002249209).
+  The physical GPU acceptance jobs were skipped; CUDA/NCCL behavior is unverified.

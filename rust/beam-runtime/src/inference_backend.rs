@@ -90,7 +90,7 @@ pub fn resolve(request: &Request) -> Result<Backend> {
                 Backend::Cutlass
             }
         }
-        _ => unreachable!("the requested backend was validated above"),
+        _ => return Err(Error::Message("inference_backend must be auto, libtorch, or cutlass".into())),
     };
 
     if request.model_backend == "ensemble"
