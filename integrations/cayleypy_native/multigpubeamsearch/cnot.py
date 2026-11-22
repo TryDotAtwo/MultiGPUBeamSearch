@@ -275,6 +275,14 @@ def _native_search_runner():
         return None
 
 
+def _public_dispatch_digest(engine, max_depth, strict_backend):
+    """Fingerprint every input that can change rank-local route selection."""
+    engine_digest = _requested_engine_digest(engine)
+    depth_fits_u64 = not (max_depth > 2**64 - 1)
+    flags = bytes((int(strict_backend), int(depth_fits_u64)))
+    return hashlib.sha256(b"cnot-public-dispatch-v1:" + flags + engine_digest).digest()
+
+
 def _native_public_dispatch_selector():
     """Resolve the typed Rust policy for selecting the public CNOT runtime path."""
     from .errors import NativeUnavailable
@@ -363,7 +371,11 @@ def search_cnot(root, scorer, *, width, shortlist, max_depth, mode="qhat", audit
     """
     with World(root.device) as world:
         strict_backend = os.environ.get("MGBS_CNOT_STRICT_BACKEND") == "1"
-        world.require_engine_consensus(bytes((int(strict_backend),)))
+        dispatch_digest = world.checked(
+            "validate CNOT runtime dispatch request",
+            lambda: _public_dispatch_digest(engine, max_depth, strict_backend),
+        )
+        world.require_engine_consensus(dispatch_digest)
         native_runner = world.checked(
             "resolve CNOT search controller", _native_search_runner
         )
