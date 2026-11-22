@@ -196,10 +196,7 @@ fn selected_engine_name(
     })
 }
 
-fn cnot_dispatch_capability(
-    capabilities: &Bound<'_, PyDict>,
-    key: &str,
-) -> PyResult<bool> {
+fn cnot_dispatch_capability(capabilities: &Bound<'_, PyDict>, key: &str) -> PyResult<bool> {
     capabilities
         .get_item(key)?
         .ok_or_else(|| PyValueError::new_err(format!("missing CNOT dispatch capability {key}")))?
@@ -220,7 +217,11 @@ fn select_cnot_dispatch(
         "auto" => beam_runtime::cnot_search::RequestedEngine::Auto,
         "python" => beam_runtime::cnot_search::RequestedEngine::Python,
         "rust" => beam_runtime::cnot_search::RequestedEngine::Rust,
-        _ => return Err(PyValueError::new_err("CNOT engine must be auto, python, or rust")),
+        _ => {
+            return Err(PyValueError::new_err(
+                "CNOT engine must be auto, python, or rust",
+            ))
+        }
     };
     let depth_fits_u64 = !max_depth.call_method1("__gt__", (u64::MAX,))?.is_truthy()?;
     let caps = beam_runtime::cnot_search::DispatchCapabilities {
@@ -232,7 +233,10 @@ fn select_cnot_dispatch(
         fixed_gather: cnot_dispatch_capability(&capabilities, "fixed_gather")?,
         row_gather: cnot_dispatch_capability(&capabilities, "row_gather")?,
         broadcast: cnot_dispatch_capability(&capabilities, "broadcast")?,
-        compatibility_controller: cnot_dispatch_capability(&capabilities, "compatibility_controller")?,
+        compatibility_controller: cnot_dispatch_capability(
+            &capabilities,
+            "compatibility_controller",
+        )?,
     };
     let path = beam_runtime::cnot_search::select_dispatch(
         requested,

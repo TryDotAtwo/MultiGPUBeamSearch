@@ -80,8 +80,8 @@ pub fn select_dispatch(
     strict_backend: bool,
     capabilities: DispatchCapabilities,
 ) -> Result<DispatchPath, DispatchError> {
-    let selected = select_engine(requested, depth_fits_u64)
-        .map_err(DispatchError::EngineSelection)?;
+    let selected =
+        select_engine(requested, depth_fits_u64).map_err(DispatchError::EngineSelection)?;
     if strict_backend {
         if selected != SelectedEngine::Rust {
             return Err(DispatchError::StrictRequiresRustController);
@@ -103,9 +103,7 @@ pub fn select_dispatch(
 
     match selected {
         SelectedEngine::Python => Ok(DispatchPath::PythonReference),
-        SelectedEngine::Rust
-            if capabilities.native_controller && capabilities.checked_control =>
-        {
+        SelectedEngine::Rust if capabilities.native_controller && capabilities.checked_control => {
             Ok(DispatchPath::RustController)
         }
         SelectedEngine::Rust if capabilities.compatibility_controller => {
