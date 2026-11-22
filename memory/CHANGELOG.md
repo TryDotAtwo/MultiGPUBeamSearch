@@ -1,3 +1,9 @@
+## 2026-11-22 - Move public CNOT route selection into Rust runtime
+
+- Added a typed capability matrix and dispatch decision in `beam-runtime` for the Rust controller, compatibility Rust controller and Python reference path.
+- The public CNOT adapter now asks the installed PyO3 runtime to select the route from rank-agreed capabilities. Strict acceptance fails closed unless Rust controller, native stages, Gloo vote and required Stream 5 operations are present on every rank. Older extensions keep the existing non-strict fallback.
+- Search ordering, scoring, kernels, precision and result formats are unchanged. Hosted validation is pending.
+
 ## 2026-11-22 - Resolve CNOT controller choice in beam-runtime
 
 - Moved the `auto/python/rust` decision table from the PyO3 adapter into typed `beam-runtime::cnot_search` policy. The adapter retains public value normalization and delegates the decision; oversized depth still selects the reference path for `auto` and `python`, while explicit Rust fails with the same error.

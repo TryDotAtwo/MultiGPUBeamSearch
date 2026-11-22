@@ -196,6 +196,73 @@ fn selected_engine_name(
     })
 }
 
+fn cnot_dispatch_capability(
+    capabilities: &Bound<'_, PyDict>,
+    key: &str,
+) -> PyResult<bool> {
+    capabilities
+        .get_item(key)?
+        .ok_or_else(|| PyValueError::new_err(format!("missing CNOT dispatch capability {key}")))?
+        .extract()
+}
+
+#[pyfunction(name = "_select_cnot_dispatch")]
+fn select_cnot_dispatch(
+    py: Python<'_>,
+    engine: Bound<'_, PyAny>,
+    max_depth: Bound<'_, PyAny>,
+    strict_backend: bool,
+    capabilities: Bound<'_, PyDict>,
+) -> PyResult<&'static str> {
+    let _selected_by_request = select_cnot_engine(py, &engine, &max_depth)?;
+    let engine_text: String = engine.extract()?;
+    let requested = match engine_text.as_str() {
+        "auto" => beam_runtime::cnot_search::RequestedEngine::Auto,
+        "python" => beam_runtime::cnot_search::RequestedEngine::Python,
+        "rust" => beam_runtime::cnot_search::RequestedEngine::Rust,
+        _ => return Err(PyValueError::new_err("CNOT engine must be auto, python, or rust")),
+    };
+    let depth_fits_u64 = !max_depth.call_method1("__gt__", (u64::MAX,))?.is_truthy()?;
+    let caps = beam_runtime::cnot_search::DispatchCapabilities {
+        native_controller: cnot_dispatch_capability(&capabilities, "native_controller")?,
+        checked_control: cnot_dispatch_capability(&capabilities, "checked_control")?,
+        native_stages: cnot_dispatch_capability(&capabilities, "native_stages")?,
+        stream5_start: cnot_dispatch_capability(&capabilities, "stream5_start")?,
+        world_exchange: cnot_dispatch_capability(&capabilities, "world_exchange")?,
+        fixed_gather: cnot_dispatch_capability(&capabilities, "fixed_gather")?,
+        row_gather: cnot_dispatch_capability(&capabilities, "row_gather")?,
+        broadcast: cnot_dispatch_capability(&capabilities, "broadcast")?,
+        compatibility_controller: cnot_dispatch_capability(&capabilities, "compatibility_controller")?,
+    };
+    let path = beam_runtime::cnot_search::select_dispatch(
+        requested,
+        depth_fits_u64,
+        strict_backend,
+        caps,
+    )
+    .map_err(|error| match error {
+        beam_runtime::cnot_search::DispatchError::Engine(
+            beam_runtime::cnot_search::EngineSelectionError::RustDepthExceedsU64,
+        ) => PyValueError::new_err("CNOT Rust engine depth exceeds u64"),
+        beam_runtime::cnot_search::DispatchError::StrictRequiresRustController => {
+            PyRuntimeError::new_err("strict CNOT acceptance requires the Rust CNOT controller")
+        }
+        beam_runtime::cnot_search::DispatchError::StrictBackendUnavailable => {
+            PyRuntimeError::new_err(
+                "strict CNOT acceptance requires matching Rust controller, stage, transport, and Gloo ABIs on every rank",
+            )
+        }
+        beam_runtime::cnot_search::DispatchError::RustControllerUnavailable => {
+            PyRuntimeError::new_err("CNOT Rust engine requested but no compatible Rust controller is available")
+        }
+    })?;
+    Ok(match path {
+        beam_runtime::cnot_search::DispatchPath::RustController => "rust_controller",
+        beam_runtime::cnot_search::DispatchPath::RustCompatibility => "rust_compatibility",
+        beam_runtime::cnot_search::DispatchPath::PythonReference => "python_reference",
+    })
+}
+
 fn cnot_admission_digest<'py>(
     py: Python<'py>,
     input_matrix: &Bound<'py, PyAny>,
@@ -977,6 +1044,7 @@ pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(prepare_cnot_input, module)?)?;
     module.add_function(wrap_pyfunction!(validate_cnot_search_controls, module)?)?;
     module.add_function(wrap_pyfunction!(run_cnot_native_require_consensus, module)?)?;
+    module.add_function(wrap_pyfunction!(select_cnot_dispatch, module)?)?;
     module.add_function(wrap_pyfunction!(run_cnot_native_search, module)?)?;
     module.add_function(wrap_pyfunction!(run_cnot, module)?)?;
     module.add_function(wrap_pyfunction!(run_cnot_selection, module)?)

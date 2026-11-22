@@ -40,6 +40,84 @@ pub fn select_engine(
     }
 }
 
+
+/// Capabilities agreed by all ranks before choosing the public controller path.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct DispatchCapabilities {
+    pub native_controller: bool,
+    pub checked_control: bool,
+    pub native_stages: bool,
+    pub stream5_start: bool,
+    pub world_exchange: bool,
+    pub fixed_gather: bool,
+    pub row_gather: bool,
+    pub broadcast: bool,
+    pub compatibility_controller: bool,
+}
+
+/// Public CNOT dispatch route selected from the request and rank capabilities.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DispatchPath {
+    RustController,
+    RustCompatibility,
+    PythonReference,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DispatchError {
+    EngineSelection(EngineSelectionError),
+    StrictRequiresRustController,
+    StrictBackendUnavailable,
+    RustControllerUnavailable,
+}
+
+/// Resolve the CNOT control path once from typed options and the rank-wide
+/// capability vote. Strict acceptance requires the complete Rust data path;
+/// ordinary auto mode retains the Python reference fallback.
+pub fn select_dispatch(
+    requested: RequestedEngine,
+    depth_fits_u64: bool,
+    strict_backend: bool,
+    capabilities: DispatchCapabilities,
+) -> Result<DispatchPath, DispatchError> {
+    let selected = select_engine(requested, depth_fits_u64)
+        .map_err(DispatchError::EngineSelection)?;
+    if strict_backend {
+        if selected != SelectedEngine::Rust {
+            return Err(DispatchError::StrictRequiresRustController);
+        }
+        return if capabilities.native_controller
+            && capabilities.checked_control
+            && capabilities.native_stages
+            && capabilities.stream5_start
+            && capabilities.world_exchange
+            && capabilities.fixed_gather
+            && capabilities.row_gather
+            && capabilities.broadcast
+        {
+            Ok(DispatchPath::RustController)
+        } else {
+            Err(DispatchError::StrictBackendUnavailable)
+        };
+    }
+
+    match selected {
+        SelectedEngine::Python => Ok(DispatchPath::PythonReference),
+        SelectedEngine::Rust
+            if capabilities.native_controller && capabilities.checked_control =>
+        {
+            Ok(DispatchPath::RustController)
+        }
+        SelectedEngine::Rust if capabilities.compatibility_controller => {
+            Ok(DispatchPath::RustCompatibility)
+        }
+        SelectedEngine::Rust if requested == RequestedEngine::Auto => {
+            Ok(DispatchPath::PythonReference)
+        }
+        SelectedEngine::Rust => Err(DispatchError::RustControllerUnavailable),
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct Options {
     pub rank: u32,

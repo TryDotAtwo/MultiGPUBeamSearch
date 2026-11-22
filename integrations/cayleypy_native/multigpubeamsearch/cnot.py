@@ -275,6 +275,17 @@ def _native_search_runner():
         return None
 
 
+def _native_public_dispatch_selector():
+    """Resolve the typed Rust policy for selecting the public CNOT runtime path."""
+    from .errors import NativeUnavailable
+    from .rust_control import extension
+
+    try:
+        return getattr(extension(), "_select_cnot_dispatch", None)
+    except (ImportError, NativeUnavailable):
+        return None
+
+
 def _admit(root, scorer, width, shortlist, max_depth, mode, audit, validation, engine):
     input_matrix = _input(root, width, shortlist, max_depth, mode, validation)
     engine, runner = _search_engine(engine, max_depth)
@@ -356,29 +367,49 @@ def search_cnot(root, scorer, *, width, shortlist, max_depth, mode="qhat", audit
         native_runner = world.checked(
             "resolve CNOT search controller", _native_search_runner
         )
+        dispatch_selector = world.checked(
+            "resolve Rust CNOT dispatch policy", _native_public_dispatch_selector
+        )
+        common_dispatch_selector = world.supports_native("_select_cnot_dispatch")
+        if callable(dispatch_selector) and common_dispatch_selector:
+            capabilities = {
+                "native_controller": bool(
+                    callable(native_runner)
+                    and world.supports_native("run_cnot_native_search")
+                ),
+                "checked_control": world.supports_native("run_cnot_native_checked_control"),
+                "native_stages": world.supports_native("run_cnot_native"),
+                "stream5_start": world.supports_native("run_cnot_native_start_transport"),
+                "world_exchange": world.supports_native("run_cnot_native_world_exchange"),
+                "fixed_gather": world.supports_native("run_cnot_native_gather_fixed"),
+                "row_gather": world.supports_native("run_cnot_native_gather_rows"),
+                "broadcast": world.supports_native("run_cnot_native_broadcast"),
+                "compatibility_controller": world.supports_native("run_cnot"),
+            }
+            route = world.checked(
+                "select Rust CNOT runtime path",
+                lambda: dispatch_selector(engine, max_depth, strict_backend, capabilities),
+            )
+            if route == "rust_controller":
+                if not callable(native_runner):
+                    raise RuntimeError("Rust CNOT controller capability was not bound")
+                options = (width, shortlist, max_depth, mode, audit, validation, engine)
+                callbacks = (_input, native.cnot_identity, _native_stages_runner,
+                             _make_compat_stages, _search, CnotResult)
+                return native_runner(world, root, scorer, options, callbacks)
+            if route not in ("rust_compatibility", "python_reference"):
+                raise RuntimeError(f"Rust CNOT runtime returned an unknown path: {route}")
+            return _search_cnot_compat(
+                world, root, scorer, width, shortlist, max_depth, mode, audit,
+                validation, engine
+            )
+
+        if strict_backend:
+            raise RuntimeError(
+                "strict CNOT acceptance requires a matching Rust public dispatch ABI on every rank"
+            )
         common_search = world.supports_native("run_cnot_native_search")
         common_checker = world.supports_native("run_cnot_native_checked_control")
-        if strict_backend:
-            common_transport = world.supports_native("run_cnot_native_start_transport")
-            common_exchange = world.supports_native("run_cnot_native_world_exchange")
-            common_fixed_gather = world.supports_native("run_cnot_native_gather_fixed")
-            common_row_gather = world.supports_native("run_cnot_native_gather_rows")
-            common_broadcast = world.supports_native("run_cnot_native_broadcast")
-            def require_rust_controller():
-                required = (
-                    common_search,
-                    common_checker,
-                    common_transport,
-                    common_exchange,
-                    common_fixed_gather,
-                    common_row_gather,
-                    common_broadcast,
-                )
-                if engine == "python" or not callable(native_runner) or not all(required):
-                    raise RuntimeError(
-                        "strict CNOT acceptance requires matching Rust controller, stage, transport, and Gloo ABIs on every rank"
-                    )
-            world.checked("admit strict Rust CNOT controller", require_rust_controller)
         if callable(native_runner) and common_search and common_checker:
             options = (width, shortlist, max_depth, mode, audit, validation, engine)
             callbacks = (_input, native.cnot_identity, _native_stages_runner,

@@ -1,3 +1,7 @@
+## CNOT public dispatch ownership — 2026-11-22
+
+The public CNOT entry point obtains its runtime route from typed `beam-runtime` policy. The capability snapshot is rank-agreed before selection. The policy selects the Rust controller, the Rust controller with compatibility stages, or the Python reference path; strict acceptance requires the complete Rust controller/stage/transport capability set and fails closed. Older extension builds retain their ordinary compatibility path. This does not yet move PyTorch's Gloo control-group object out of the Python adapter; that lifecycle remains an open migration boundary. Search order, score semantics and kernels are unchanged.
+
 # Конфиг
 
 ## Paired permutation acceptance receipt contract, 2026-11-22
