@@ -631,6 +631,30 @@ mod tests {
     }
 
     #[test]
+    fn runtime_requires_common_native_stage_runner_before_selecting_rust_controller() {
+        let mut missing_native_stage = complete_dispatch_capabilities();
+        missing_native_stage.native_stages = false;
+        assert_eq!(
+            select_dispatch(RequestedEngine::Auto, true, false, missing_native_stage),
+            Ok(DispatchPath::RustCompatibility)
+        );
+        assert_eq!(
+            select_dispatch(RequestedEngine::Rust, true, false, missing_native_stage),
+            Ok(DispatchPath::RustCompatibility)
+        );
+
+        missing_native_stage.compatibility_controller = false;
+        assert_eq!(
+            select_dispatch(RequestedEngine::Auto, true, false, missing_native_stage),
+            Ok(DispatchPath::PythonReference)
+        );
+        assert_eq!(
+            select_dispatch(RequestedEngine::Rust, true, false, missing_native_stage),
+            Err(DispatchError::RustControllerUnavailable)
+        );
+    }
+
+    #[test]
     fn strict_public_cnot_path_requires_all_native_rank_capabilities() {
         let complete = complete_dispatch_capabilities();
         assert_eq!(
