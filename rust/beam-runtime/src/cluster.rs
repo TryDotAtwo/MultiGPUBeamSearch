@@ -5,9 +5,9 @@ use std::{
     io::{self, Write},
     path::{Path, PathBuf},
     process::{Child, Command, Stdio},
-    sync::atomic::{AtomicBool, Ordering},
+    sync::atomic::{AtomicBool, AtomicU64, Ordering},
     thread,
-    time::{Duration, Instant},
+    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
 const MAX_WORLD_SIZE: u64 = 128;
@@ -518,6 +518,158 @@ pub fn search_policy_environment(
     .into_iter()
     .map(|(key, value)| (key.into(), value))
     .collect())
+}
+
+pub struct LocalRanksRequest {
+    pub command: Vec<String>,
+    pub world_size: u32,
+    pub cwd: PathBuf,
+    pub log_path: PathBuf,
+    pub worker_logs: PathBuf,
+    pub timeout: f64,
+    pub environment: BTreeMap<String, String>,
+}
+
+struct LocalOwnedChild(Child);
+
+impl Drop for LocalOwnedChild {
+    fn drop(&mut self) {
+        let pid = self.0.id();
+        #[cfg(unix)]
+        {
+            let _ = beam_native_sys::terminate_process_group(pid);
+            let began = Instant::now();
+            while began.elapsed() < Duration::from_secs(2) {
+                match self.0.try_wait() {
+                    Ok(Some(_)) | Err(_) => break,
+                    Ok(None) => thread::sleep(Duration::from_millis(10)),
+                }
+            }
+            let _ = beam_native_sys::kill_process_group(pid);
+            let _ = self.0.wait();
+        }
+        #[cfg(not(unix))]
+        {
+            if matches!(self.0.try_wait(), Ok(None)) {
+                let _ = self.0.kill();
+            }
+            let _ = self.0.wait();
+        }
+    }
+}
+
+/// Spawn and supervise every local rank in one coarse Rust runtime call.
+/// The working directory, rank variables, argv suffix, and log layout match
+/// the public Python launcher contract.
+pub fn run_local_search_ranks(
+    request: LocalRanksRequest,
+    cancel: &AtomicBool,
+) -> Result<f64> {
+    if request.command.is_empty()
+        || request.world_size < 2
+        || !request.timeout.is_finite()
+        || request.timeout <= 0.0
+    {
+        return Err(ClusterError::Invalid(
+            "invalid local rank launch geometry or timeout".into(),
+        ));
+    }
+    let world_size = usize::try_from(request.world_size)
+        .map_err(|_| ClusterError::Invalid("local world size does not fit host".into()))?;
+    let started = Instant::now();
+    let session_root = request.worker_logs.join("native");
+    fs::create_dir_all(&session_root)?;
+    let root = session_root.join("attempt_0");
+    fs::create_dir(&root)?;
+    if let Some(parent) = request.log_path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    fs::write(&request.log_path, "single-host direct native ranks\n")?;
+
+    static NEXT_LOCAL_RUN: AtomicU64 = AtomicU64::new(0);
+    let timestamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
+    let run_id = format!(
+        "native-local-{}-{timestamp}-{}",
+        std::process::id(),
+        NEXT_LOCAL_RUN.fetch_add(1, Ordering::Relaxed)
+    );
+    let mut children = Vec::with_capacity(world_size);
+    for rank in 0..world_size {
+        let directory = root.join(rank.to_string());
+        fs::create_dir(&directory)?;
+        let mut command = request.command.clone();
+        command.push(request.world_size.to_string());
+        command.push(rank.to_string());
+        let mut command_json = serde_json::to_vec(&command)?;
+        command_json.push(b'\n');
+        fs::write(directory.join("command.json"), command_json)?;
+        let stdout = File::create(directory.join("stdout.log"))?;
+        let stderr = File::create(directory.join("stderr.log"))?;
+        let mut environment = request.environment.clone();
+        environment.insert("WORLD_SIZE".into(), request.world_size.to_string());
+        environment.insert("RANK".into(), rank.to_string());
+        environment.insert("LOCAL_RANK".into(), rank.to_string());
+        environment.insert("OMP_NUM_THREADS".into(), "1".into());
+        environment.insert("BEAM_NCCL_RUN_ID".into(), run_id.clone());
+
+        let mut child_command = Command::new(&request.command[0]);
+        child_command
+            .args(&request.command[1..])
+            .current_dir(&request.cwd)
+            .env_clear()
+            .envs(&environment)
+            .stdin(Stdio::null())
+            .stdout(Stdio::from(stdout))
+            .stderr(Stdio::from(stderr));
+        #[cfg(unix)]
+        {
+            use std::os::unix::process::CommandExt;
+            child_command.process_group(0);
+        }
+        children.push(LocalOwnedChild(child_command.spawn()?));
+    }
+
+    loop {
+        let mut codes = Vec::with_capacity(world_size);
+        let mut failed = false;
+        let mut all_succeeded = true;
+        for child in &mut children {
+            match child.0.try_wait()? {
+                Some(status) => {
+                    let code = status.code().unwrap_or(-1);
+                    codes.push(Some(code));
+                    failed |= code != 0;
+                }
+                None => {
+                    codes.push(None);
+                    all_succeeded = false;
+                }
+            }
+        }
+        if failed {
+            return Err(ClusterError::Runtime(format!(
+                "native local ranks failed; exit codes={codes:?}; log={}",
+                request.log_path.display()
+            )));
+        }
+        if all_succeeded {
+            return Ok(started.elapsed().as_secs_f64());
+        }
+        if cancel.load(Ordering::Acquire) {
+            return Err(ClusterError::Runtime("native local ranks cancelled".into()));
+        }
+        if started.elapsed().as_secs_f64() >= request.timeout {
+            return Err(ClusterError::Runtime(format!(
+                "native local ranks timed out after {}s; log={}",
+                request.timeout,
+                request.log_path.display()
+            )));
+        }
+        thread::sleep(Duration::from_millis(20));
+    }
 }
 
 pub struct Request {

@@ -584,6 +584,46 @@ def resolve_scheduler_rank(environment):
     return rank
 
 
+def run_local_search_ranks(command, *, world_size, cwd, timeout, log_path, worker_logs, environment):
+    """Run one local multi-rank native job under the Rust runtime supervisor."""
+    if type(command) not in (tuple, list) or not command or any(type(item) is not str for item in command):
+        return None
+    if (
+        type(world_size) is not int
+        or world_size < 2
+        or type(timeout) not in (int, float)
+        or not math.isfinite(timeout)
+        or timeout <= 0
+        or type(environment) is not dict
+        or any(type(key) is not str or type(value) is not str for key, value in environment.items())
+    ):
+        return None
+    try:
+        native = extension()
+    except (NativeUnavailable, ImportError):
+        return None
+    runner = getattr(native, "run_local_search_ranks", None)
+    if not callable(runner):
+        return None
+    if getattr(native, "CLUSTER_LOCAL_RANKS_VERSION", None) != 1:
+        raise NativeBackendError("Rust local rank launcher API version is incompatible")
+    try:
+        elapsed = runner(
+            list(command),
+            world_size,
+            os.fspath(cwd),
+            os.fspath(log_path),
+            os.fspath(worker_logs),
+            float(timeout),
+            environment,
+        )
+    except (OSError, RuntimeError, ValueError, TypeError, OverflowError) as error:
+        raise NativeBackendError(str(error)) from error
+    if type(elapsed) is not float or not math.isfinite(elapsed) or elapsed < 0:
+        raise NativeBackendError("Rust runtime returned an invalid local rank launch time")
+    return elapsed
+
+
 def resolve_cluster_plan(request):
     """Resolve the public multi-node rank layout in beam-runtime when available."""
     fields = {"gpus_per_node", "beam_width", "shard_count", "batch_alignment"}

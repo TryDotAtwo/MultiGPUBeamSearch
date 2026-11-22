@@ -100,6 +100,36 @@ fn resolve_cuda_ordinal(local_rank: i64, visible_devices: u64) -> PyResult<i64> 
 }
 
 #[pyfunction]
+fn run_local_search_ranks(
+    py: Python<'_>,
+    command: Vec<String>,
+    world_size: u32,
+    cwd: PathBuf,
+    log_path: PathBuf,
+    worker_logs: PathBuf,
+    timeout: f64,
+    environment: BTreeMap<String, String>,
+) -> PyResult<f64> {
+    let cancel = Arc::new(AtomicBool::new(false));
+    let request = beam_runtime::cluster::LocalRanksRequest {
+        command,
+        world_size,
+        cwd,
+        log_path,
+        worker_logs,
+        timeout,
+        environment,
+    };
+    crate::interrupt::run(py, &cancel, || {
+        beam_runtime::cluster::run_local_search_ranks(request, &cancel).map_err(|error| match error {
+            beam_runtime::cluster::ClusterError::Invalid(message) => PyValueError::new_err(message),
+            beam_runtime::cluster::ClusterError::Io(error) => PyErr::from(error),
+            other => PyRuntimeError::new_err(other.to_string()),
+        })
+    })
+}
+
+#[pyfunction]
 fn run_cluster_rank(
     py: Python<'_>,
     command: Vec<String>,
@@ -131,10 +161,12 @@ pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add("CLUSTER_SEARCH_ENVIRONMENT_VERSION", 1)?;
     module.add("CLUSTER_MODEL_SEARCH_ENVIRONMENT_VERSION", 1)?;
     module.add("CLUSTER_SEARCH_POLICY_ENVIRONMENT_VERSION", 1)?;
+    module.add("CLUSTER_LOCAL_RANKS_VERSION", 1)?;
     module.add("CLUSTER_RANK_VERSION", 1)?;
     module.add("CLUSTER_DEVICE_BINDING_VERSION", 1)?;
     module.add("CLUSTER_CHILD_ENVIRONMENT_VERSION", 1)?;
     module.add_function(wrap_pyfunction!(run_cluster_rank, module)?)?;
+    module.add_function(wrap_pyfunction!(run_local_search_ranks, module)?)?;
     module.add_function(wrap_pyfunction!(validate_cluster_rank, module)?)?;
     module.add_function(wrap_pyfunction!(resolve_scheduler_rank, module)?)?;
     module.add_function(wrap_pyfunction!(resolve_cuda_ordinal, module)?)?;

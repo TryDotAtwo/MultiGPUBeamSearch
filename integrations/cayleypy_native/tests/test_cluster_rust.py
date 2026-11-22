@@ -622,3 +622,76 @@ def test_installed_rust_search_policy_environment_controls_public_launch_and_fal
     with pytest.raises(NativeUnavailable, match="incompatible Rust search policy environment"):
         backend.search_policy_environment(first)
 
+
+def test_installed_rust_local_rank_launcher_preserves_rank_contract_and_reaps_failed_peer(tmp_path, monkeypatch):
+    from multigpubeamsearch import backend, local_launcher
+    from multigpubeamsearch.errors import NativeBackendError
+
+    assert getattr(extension(), "CLUSTER_LOCAL_RANKS_VERSION", None) == 1
+    monkeypatch.setattr(
+        local_launcher.subprocess,
+        "Popen",
+        lambda *_args, **_kwargs: pytest.fail("installed Rust local launcher fell back to Python"),
+    )
+    code = (
+        "import json, os, pathlib, sys; "
+        "world, rank = map(int, sys.argv[1:3]); "
+        "pathlib.Path(os.environ['MARKER_DIR'], str(rank)).write_text(json.dumps({"
+        "'rank': int(os.environ['RANK']), 'world': int(os.environ['WORLD_SIZE']), "
+        "'local_rank': int(os.environ['LOCAL_RANK']), 'threads': os.environ['OMP_NUM_THREADS'], "
+        "'run_id': os.environ['BEAM_NCCL_RUN_ID']})); "
+        "print('rank', rank, flush=True)"
+    )
+    markers = tmp_path / "markers"
+    markers.mkdir()
+    worker_logs = tmp_path / "worker-logs"
+    worker_logs.mkdir()
+    log_path = tmp_path / "launcher.log"
+    elapsed = local_launcher.run_local_ranks(
+        [sys.executable, "-c", code],
+        world_size=2,
+        cwd=tmp_path,
+        env={"MARKER_DIR": str(markers)},
+        timeout=10,
+        log_path=log_path,
+        worker_logs=worker_logs,
+    )
+    assert elapsed >= 0
+    observations = [json.loads((markers / str(rank)).read_text()) for rank in range(2)]
+    assert [(row["rank"], row["world"], row["local_rank"], row["threads"]) for row in observations] == [
+        (0, 2, 0, "1"), (1, 2, 1, "1")
+    ]
+    assert len({row["run_id"] for row in observations}) == 1
+    assert observations[0]["run_id"].startswith("native-local-")
+    for rank in range(2):
+        row_dir = worker_logs / "native" / "attempt_0" / str(rank)
+        assert json.loads((row_dir / "command.json").read_text()) == [
+            sys.executable, "-c", code, "2", str(rank)
+        ]
+
+    from multigpubeamsearch.backend import collect_worker_logs
+    metadata = collect_worker_logs(
+        worker_logs, log_path, tmp_path / "native.log", 2, strict=True
+    )
+    assert metadata["worker_logs_complete"] is True
+
+    failing_logs = tmp_path / "failing-worker-logs"
+    failing_logs.mkdir()
+    failure_code = (
+        "import sys, time; "
+        "rank = int(sys.argv[2]); "
+        "sys.exit(7) if rank == 0 else time.sleep(30)"
+    )
+    started = time.monotonic()
+    with pytest.raises(NativeBackendError, match="native local ranks failed"):
+        local_launcher.run_local_ranks(
+            [sys.executable, "-c", failure_code],
+            world_size=2,
+            cwd=tmp_path,
+            env={},
+            timeout=10,
+            log_path=tmp_path / "failing-launcher.log",
+            worker_logs=failing_logs,
+        )
+    assert time.monotonic() - started < 5
+
