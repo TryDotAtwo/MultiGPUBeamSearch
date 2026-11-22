@@ -52,14 +52,14 @@ pub enum CnotRequestError {
 /// A single admitted CNOT search configuration owned by beam-runtime.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CnotRequest {
-    pub wires: u32,
-    pub width: u64,
-    pub shortlist: u32,
-    pub max_depth: u64,
-    pub mode: CnotMode,
-    pub audit: bool,
-    pub validation: CnotValidation,
-    pub requested_engine: RequestedEngine,
+    wires: u32,
+    width: u64,
+    shortlist: u32,
+    max_depth: u64,
+    mode: CnotMode,
+    audit: bool,
+    validation: CnotValidation,
+    requested_engine: RequestedEngine,
 }
 
 impl CnotRequest {
@@ -118,7 +118,7 @@ impl CnotRequest {
 
     /// Convert the admitted request into the generic runtime search options.
     /// The shortlist is already capped to the request's directed-gate alphabet.
-    pub fn search_options(self, rank: u32, world: u32) -> Options {
+    fn search_options(self, rank: u32, world: u32) -> Options {
         Options {
             rank,
             world,
@@ -153,12 +153,44 @@ impl CnotRequest {
 /// One validated task bound to its rank in the active distributed world.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct RankedCnotRequest {
-    pub task: CnotRequest,
-    pub rank: u32,
-    pub world: u32,
+    task: CnotRequest,
+    rank: u32,
+    world: u32,
 }
 
 impl RankedCnotRequest {
+    pub fn rank(self) -> u32 {
+        self.rank
+    }
+
+    pub fn world(self) -> u32 {
+        self.world
+    }
+
+    pub fn wires(self) -> u32 {
+        self.task.wires
+    }
+
+    pub fn width(self) -> u64 {
+        self.task.width
+    }
+
+    pub fn shortlist(self) -> u32 {
+        self.task.shortlist
+    }
+
+    pub fn max_depth(self) -> u64 {
+        self.task.max_depth
+    }
+
+    pub fn mode(self) -> CnotMode {
+        self.task.mode
+    }
+
+    pub fn audit(self) -> bool {
+        self.task.audit
+    }
+
     pub fn search_options(self) -> Options {
         self.task.search_options(self.rank, self.world)
     }
@@ -491,8 +523,8 @@ mod tests {
         assert_eq!(request.selected_engine(), SelectedEngine::Rust);
 
         let ranked = request.bind_rank(1, 2).unwrap();
-        assert_eq!(ranked.rank, 1);
-        assert_eq!(ranked.world, 2);
+        assert_eq!(ranked.rank(), 1);
+        assert_eq!(ranked.world(), 2);
         let options = ranked.search_options();
         assert_eq!(options.rank, 1);
         assert_eq!(options.world, 2);
