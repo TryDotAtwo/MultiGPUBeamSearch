@@ -1,3 +1,9 @@
+## Rust-owned permutation microbatch plan — 2026-11-22
+
+The existing integer plan for Stream 3's initial inference rows is resolved in beam-runtime, including the scalar-head row-to-parent mapping, four initial sort slots, 1024-row alignment, capacity scale and metadata fields. The Python adapter supplies typed request values and turns the plan into the same BEAM_B_MICRO environment value consumed by the existing runner. Older wheels retain the Python implementation. This transfers the current policy without changing candidate, search, model, kernel or precision behavior.
+
+The installed-wheel smoke compares exact scalar-head, ensemble/nondefault-row-limit and unadjusted plans, then exercises the real helper with the Python fallback forced to fail and checks legacy-extension behavior. CPU verification is pending; physical CUDA/NCCL verification remains separate.
+
 ## Rust-owned permutation device selection — 2026-11-22
 
 The public native preparation path now sends the visible CUDA count, explicit device request, requested GPU count, and normalized graph-device kind/index observations to `beam-runtime`. Rust applies the existing selection rules and returns the concrete device ordinals used by preparation. Python continues to query Torch and translate CayleyPy device objects; it uses the prior Python resolver only when an older extension does not expose this API. CUDA_VISIBLE_DEVICES mapping remains a separate launch-environment step.

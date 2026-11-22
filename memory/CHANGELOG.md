@@ -1,3 +1,9 @@
+## 2026-11-22 - Move permutation microbatch planning into beam-runtime
+
+- Added a typed Rust request and plan for the existing integer microbatch formula; kept all alignment, capacity, row-limit, scalar-head, ensemble and environment semantics unchanged.
+- The public Python helper now consumes the Rust plan and retains the old Python formula only when the installed extension lacks the API.
+- Added installed-wheel assertions for the exact public helper output and old-wheel fallback.
+
 ## 2026-11-22 - Keep CNOT history edges typed across checked stages
 
 - Generalized the Rust checked-stage boundary to coordinate a Rust-owned result value directly, while preserving the existing Gloo vote, diagnostics and cancellation behavior.

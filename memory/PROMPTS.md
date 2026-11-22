@@ -1,3 +1,5 @@
+2026-11-22: Продолжить Rust-перенос permutation без оптимизаций: перенести существующую формулу inference microbatch в beam-runtime, подключить её к публичному helper, оставить Python fallback только для старых wheel и проверить фактический installed-wheel путь на CPU; физические/платные запуски запрещены.
+
 2026-11-22: Иван поручил закрыть producer→consumer panel-v2 несовпадение: принимать receipt source revision `eafc0f82f088603a525f428a8fa3d00e9e702fa8` только с точным emitter ABI, сохранить старые закреплённые receipts и проверить реальный producer serializer через consumer resolver на hosted CPU. Без платных запусков и GPU.
 
 2026-11-22: Иван поручил продолжить PR #10 без Vast, платных workflow, физических GPU, локальных сборок/тестов и загрузки артефактов. Для panel-v2 compatibility переиспользовать только успешные native build artifacts с ключом по входам адаптера, emitter, toolchain и окружения; убрать повторный cargo check; сохранять независимые installed-wheel результаты и проверять реальные аргументы публичного CNOT consumer.

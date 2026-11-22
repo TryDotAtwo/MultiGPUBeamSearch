@@ -160,6 +160,7 @@ for plan_request, expected_plan in microbatch_cases:
     microbatch_plans.append(actual_plan)
 
 from multigpubeamsearch import rust_control as microbatch_rust_control
+from unittest.mock import patch as _patch
 
 _python_plan = device_backend._resolve_microbatch_plan_python
 device_backend._resolve_microbatch_plan_python = lambda *args, **kwargs: (_ for _ in ()).throw(
@@ -191,12 +192,12 @@ finally:
 class OlderMicrobatchRuntime:
     pass
 
-_python_environment, _python_metadata = device_backend.microbatch_environment(
+_rust_environment, _rust_metadata = device_backend.microbatch_environment(
     SimpleNamespace(move_count=12),
     SimpleNamespace(backend="mlp", manifest={"output_dim": 1}),
     1, 2, row_limit=8192,
 )
-with __import__("unittest").mock.patch.object(
+with _patch.object(
     microbatch_rust_control, "extension", return_value=OlderMicrobatchRuntime()
 ):
     device_backend._resolve_microbatch_plan_python = _python_plan
@@ -205,7 +206,7 @@ with __import__("unittest").mock.patch.object(
         SimpleNamespace(backend="mlp", manifest={"output_dim": 1}),
         1, 2, row_limit=8192,
     )
-if legacy_environment != _python_environment or legacy_metadata != _python_metadata:
+if legacy_environment != _rust_environment or legacy_metadata != _rust_metadata:
     raise AssertionError("old-wheel microbatch fallback changed behavior")
 print("INSTALLED_RUST_MICROBATCH_PLAN_PASS", flush=True)
 

@@ -28,8 +28,19 @@ fn resolve_inference_plan(request_json: &str) -> PyResult<String> {
     .map_err(|error| PyRuntimeError::new_err(error.to_string()))
 }
 
+#[pyfunction]
+fn resolve_microbatch_plan(request_json: &str) -> PyResult<String> {
+    let request: beam_runtime::microbatch::Request = serde_json::from_str(request_json)
+        .map_err(|error| PyValueError::new_err(error.to_string()))?;
+    let plan = beam_runtime::microbatch::resolve(&request)
+        .map_err(|error| PyRuntimeError::new_err(error.to_string()))?;
+    serde_json::to_string(&plan)
+        .map_err(|error| PyRuntimeError::new_err(error.to_string()))
+}
+
 pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(resolve_inference_backend, module)?)?;
     module.add_function(wrap_pyfunction!(resolve_inference_plan, module)?)?;
+    module.add_function(wrap_pyfunction!(resolve_microbatch_plan, module)?)?;
     Ok(())
 }

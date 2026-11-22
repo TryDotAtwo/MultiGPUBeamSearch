@@ -86,6 +86,7 @@ jobs:
               rust/beam-runtime/src/cluster.rs \
               rust/beam-runtime/src/search_inputs.rs \
               rust/beam-runtime/src/shared_profiles.rs \
+              rust/beam-runtime/src/microbatch.rs \
               rust/beam-core/src/permutation.rs \
               rust/beam-core/src/search.rs \
               rust/beam-python/src/configuration.rs \

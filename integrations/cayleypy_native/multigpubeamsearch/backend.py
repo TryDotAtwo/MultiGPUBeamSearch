@@ -368,29 +368,49 @@ def child_environment(devices: tuple[int, ...], run_dir: Path, environ=None) -> 
     return env
 
 
-def microbatch_environment(contract, model, beam_width: int, world_size: int, *, row_limit=8192) -> tuple[dict[str, str], dict]:
-    """Fit one inference slot into a native auto candidate without changing beam.
-
-    Native runtime_config.cpp uses 8192 inference rows, four initial sort slots,
-    alignment 1024 and capacity scale 1.25. At tiny beams it otherwise rejects
-    every candidate when Stream3's one-slot batch exceeds physical shard storage.
-    Only lower the row budget; leave shards, ring count and VRAM planning to native.
-    """
+def _resolve_microbatch_plan_python(contract, model, beam_width: int, world_size: int, *, row_limit=8192) -> dict:
+    """Compatibility implementation for extensions without the Rust planner."""
     default_rows, alignment, initial_sort_slots = row_limit, 1024, 4
     divisor = world_size * initial_sort_slots * alignment
     logical_shard = ((beam_width + divisor - 1) // divisor) * alignment
     scaled_capacity = (logical_shard * 5 + 3) // 4
     shard_storage = ((scaled_capacity + alignment - 1) // alignment) * alignment
-    rows_per_parent = contract.move_count if model.manifest["output_dim"] == 1 and getattr(model,"backend","mlp") != "ensemble" else 1
+    rows_per_parent = contract.move_count if model.manifest["output_dim"] == 1 and getattr(model, "backend", "mlp") != "ensemble" else 1
     default_parents = default_rows // rows_per_parent
     parents = min(default_parents, shard_storage // contract.move_count)
     row_budget = default_rows if parents == default_parents else parents * rows_per_parent
-    env = {} if row_budget == 8192 else {"BEAM_B_MICRO": str(row_budget)}
-    return env, {"native_default_row_budget": default_rows, "configured_row_budget": row_budget,
-                 "derived_parent_batch": parents, "derived_candidates_per_slot": parents * contract.move_count,
-                 "reference_logical_shard": logical_shard, "reference_shard_storage": shard_storage,
-                 "adjusted_for_small_beam": bool(env)}
+    return {
+        "native_default_row_budget": default_rows,
+        "configured_row_budget": row_budget,
+        "derived_parent_batch": parents,
+        "derived_candidates_per_slot": parents * contract.move_count,
+        "reference_logical_shard": logical_shard,
+        "reference_shard_storage": shard_storage,
+        "adjusted_for_small_beam": row_budget != 8192,
+    }
 
+
+def microbatch_environment(contract, model, beam_width: int, world_size: int, *, row_limit=8192) -> tuple[dict[str, str], dict]:
+    """Build the legacy runner environment from one Rust-owned resource plan."""
+    request = {
+        "beam_width": beam_width,
+        "world_size": world_size,
+        "move_count": contract.move_count,
+        "output_dim": model.manifest["output_dim"],
+        "model_backend": getattr(model, "backend", "mlp"),
+        "row_limit": row_limit,
+    }
+    from .rust_control import resolve_microbatch_plan
+
+    plan = resolve_microbatch_plan(request)
+    if plan is None:
+        plan = _resolve_microbatch_plan_python(
+            contract, model, beam_width, world_size, row_limit=row_limit
+        )
+    env = {} if plan["configured_row_budget"] == 8192 else {
+        "BEAM_B_MICRO": str(plan["configured_row_budget"])
+    }
+    return env, plan
 
 def _stop_process_tree(process: subprocess.Popen) -> None:
     if os.name == "posix":

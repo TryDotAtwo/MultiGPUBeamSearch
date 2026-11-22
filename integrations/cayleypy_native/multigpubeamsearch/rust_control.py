@@ -250,6 +250,65 @@ def resolve_runtime_devices(visible_device_count, explicit_devices, num_gpus, gr
     return tuple(selected)
 
 
+def resolve_microbatch_plan(request):
+    """Resolve the established inference-row plan in beam-runtime when available."""
+    fields = {
+        "beam_width", "world_size", "move_count", "output_dim",
+        "model_backend", "row_limit",
+    }
+    if type(request) is not dict or set(request) != fields:
+        raise NativeUnavailable("microbatch request must contain the exact typed planning fields")
+    integer_limits = {
+        "beam_width": (1, (1 << 64) - 1),
+        "world_size": (1, (1 << 32) - 1),
+        "move_count": (1, (1 << 32) - 1),
+        "output_dim": (1, (1 << 32) - 1),
+        "row_limit": (1, (1 << 64) - 1),
+    }
+    for name, (lower, upper) in integer_limits.items():
+        value = request[name]
+        if type(value) is not int or not lower <= value <= upper:
+            raise NativeUnavailable(f"microbatch {name} must be an integer in [{lower}, {upper}]")
+    if type(request["model_backend"]) is not str or not request["model_backend"]:
+        raise NativeUnavailable("microbatch model_backend must be a nonempty string")
+    try:
+        payload = json.dumps(request, sort_keys=True, allow_nan=False)
+    except (TypeError, ValueError, OverflowError) as error:
+        raise NativeUnavailable("microbatch request is not JSON-compatible") from error
+    try:
+        native = extension()
+    except (NativeUnavailable, ImportError):
+        return None
+    resolver = getattr(native, "resolve_microbatch_plan", None)
+    if not callable(resolver):
+        return None
+    try:
+        encoded = resolver(payload)
+    except (RuntimeError, ValueError) as error:
+        raise NativeUnavailable(str(error)) from error
+    if not isinstance(encoded, str):
+        raise NativeUnavailable("Rust runtime returned an invalid microbatch plan")
+    try:
+        plan = json.loads(encoded)
+    except (TypeError, ValueError) as error:
+        raise NativeUnavailable("Rust runtime returned malformed microbatch-plan JSON") from error
+    expected = {
+        "native_default_row_budget", "configured_row_budget", "derived_parent_batch",
+        "derived_candidates_per_slot", "reference_logical_shard",
+        "reference_shard_storage", "adjusted_for_small_beam",
+    }
+    if not isinstance(plan, dict) or set(plan) != expected:
+        raise NativeUnavailable("Rust runtime returned an invalid microbatch plan")
+    for name in expected - {"adjusted_for_small_beam"}:
+        if type(plan[name]) is not int or not 0 <= plan[name] <= (1 << 64) - 1:
+            raise NativeUnavailable("Rust runtime returned an invalid microbatch plan")
+    if type(plan["adjusted_for_small_beam"]) is not bool:
+        raise NativeUnavailable("Rust runtime returned an invalid microbatch plan")
+    if plan["native_default_row_budget"] != request["row_limit"]:
+        raise NativeUnavailable("Rust microbatch plan changed the requested row limit")
+    return plan
+
+
 def resolve_inference_backend(request):
     """Resolve the prepared permutation runner in Rust when the wheel supports it.
 
