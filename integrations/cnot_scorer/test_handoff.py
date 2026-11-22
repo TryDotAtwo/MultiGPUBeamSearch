@@ -168,7 +168,8 @@ class PanelV2HandoffTests(unittest.TestCase):
             resolve_panel_v2_handoff(self.root, self.receipt)
 
     def test_rejects_a_checkpoint_swap(self):
-        self.handoff["checkpoint_sha256"] = "f" * 64
+        self.checkpoint_sha = "f" * 64
+        self.handoff["checkpoint_sha256"] = self.checkpoint_sha
         self.write_receipt()
         with self.assertRaises(HandoffError):
             resolve_panel_v2_handoff(self.root, self.receipt)
