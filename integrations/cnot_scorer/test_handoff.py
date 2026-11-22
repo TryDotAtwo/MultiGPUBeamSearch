@@ -236,6 +236,31 @@ class PanelV2HandoffTests(unittest.TestCase):
             "panel_ids": list(self.case_ids),
             "panel_digest": self.panel_digest,
         }
+        baseline_cases = {}
+        candidate_cases = {}
+        for position, (panel_index, case_id) in enumerate(zip(self.indices, self.case_ids)):
+            row_identity = {
+                "panel_index": panel_index,
+                "dimension": 2,
+                "alphabet_id": "all_to_all_unit_cnot:2",
+                "status": "solved",
+            }
+            baseline_cases[case_id] = {**row_identity, "physical_cost": position + 3}
+            candidate_cases[case_id] = {**row_identity, "physical_cost": position + 2}
+        baseline_metrics = {
+            **metrics,
+            "solved_count": len(self.indices),
+            "total_physical_cost": sum(row["physical_cost"] for row in baseline_cases.values()),
+            "cases": baseline_cases,
+            "receipt_pins": baseline_pins,
+        }
+        candidate_metrics = {
+            **metrics,
+            "solved_count": len(self.indices),
+            "total_physical_cost": sum(row["physical_cost"] for row in candidate_cases.values()),
+            "cases": candidate_cases,
+            "receipt_pins": candidate_pins,
+        }
         return {
             "status": "length_gain",
             "reason": "paired physical cost reduced with coverage preserved",
@@ -243,8 +268,8 @@ class PanelV2HandoffTests(unittest.TestCase):
             "candidate_head": "qhat",
             "panel": "test",
             "case_count": len(self.indices),
-            "baseline_metrics": {**metrics, "receipt_pins": baseline_pins},
-            "candidate_metrics": {**metrics, "receipt_pins": candidate_pins},
+            "baseline_metrics": baseline_metrics,
+            "candidate_metrics": candidate_metrics,
         }
 
     def _pin_baseline_source_revision(self, revision):

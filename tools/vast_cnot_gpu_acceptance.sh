@@ -11,6 +11,8 @@ checkpoint_sha="$7"
 acceptance_run_id="$8"
 handoff_run_root="$9"
 
+source "$source_dir/tools/vast_cnot_panel_cli_args.sh"
+
 python_bin="$(command -v python3)"
 command -v cargo >/dev/null
 command -v cmake >/dev/null
@@ -232,21 +234,24 @@ run_trained_case() {
 run_panel_case() {
   local case_id="$1" visible_devices="$2" nproc="$3" gpu_uuid_list="$4"
   local case_log="${panel_result_dir}/${case_id}.log"
-  if CUDA_VISIBLE_DEVICES="$visible_devices" \
-    MGBS_TQP_MANIFEST="$panel_manifest" \
-    MGBS_CNOT_EXPECTED_CHECKPOINT_SHA256="$panel_checkpoint_sha" \
-    MGBS_CNOT_EXPECTED_SEARCH_MANIFEST_SHA256="$panel_manifest_sha" \
-    MGBS_CNOT_ACCEPTANCE_RUN_ID="$acceptance_run_id" \
-    MGBS_CNOT_ACCEPTANCE_CASE="$case_id" \
-    MGBS_CNOT_ACCEPTANCE_SOURCE_SHA="$source_sha" \
-    MGBS_CNOT_ACCEPTANCE_WHEEL_SHA256="$wheel_sha256" \
-    MGBS_CNOT_ACCEPTANCE_GPU_UUIDS="$gpu_uuid_list" \
-    "$wheel_python" -m torch.distributed.run --standalone --nproc_per_node="$nproc" \
-    "$source_dir/tools/verify_cnot.py" \
-    --case panel --backend nccl --mode qhat --engine rust --require-rust-scorer \
-     --library "$scorer_library" --handoff-preflight "$handoff_preflight" \
-     --handoff-preflight-sha256 "$handoff_preflight_sha" \
-    >"$case_log" 2>&1; then
+  local -a panel_args=()
+  mapfile -d '' -t panel_args < <(
+    mgbs_vast_cnot_panel_cli_args "${handoff_run_root}" \
+      "${panel_result_dir}/${case_id}.json" "${scorer_library}" \
+      "${handoff_preflight}" "${handoff_preflight_sha}"
+  )
+  if CUDA_VISIBLE_DEVICES="${visible_devices}" \
+    MGBS_TQP_MANIFEST="${panel_manifest}" \
+    MGBS_CNOT_EXPECTED_CHECKPOINT_SHA256="${panel_checkpoint_sha}" \
+    MGBS_CNOT_EXPECTED_SEARCH_MANIFEST_SHA256="${panel_manifest_sha}" \
+    MGBS_CNOT_ACCEPTANCE_RUN_ID="${acceptance_run_id}" \
+    MGBS_CNOT_ACCEPTANCE_CASE="${case_id}" \
+    MGBS_CNOT_ACCEPTANCE_SOURCE_SHA="${source_sha}" \
+    MGBS_CNOT_ACCEPTANCE_WHEEL_SHA256="${wheel_sha256}" \
+    MGBS_CNOT_ACCEPTANCE_GPU_UUIDS="${gpu_uuid_list}" \
+    "${wheel_python}" -m torch.distributed.run --standalone --nproc_per_node="${nproc}" \
+    "${source_dir}/tools/verify_cnot.py" "${panel_args[@]}" \
+    >"${case_log}" 2>&1; then
     cat "$case_log"
   else
     local case_exit=$?

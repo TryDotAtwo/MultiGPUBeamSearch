@@ -46,6 +46,8 @@ on:
       - tools/test_vast_result_transport.py
       - tools/test_vast_source_archive.py
       - tools/create_vast_source_archive.py
+      - tools/vast_cnot_panel_cli_args.sh
+      - tools/test_vast_cnot_panel_cli_args.py
       - tools/vast_cnot_gpu_acceptance.sh
       - integrations/cayleypy_native/tests/test_build.py
       - integrations/cayleypy_native/multigpubeamsearch/build.py
@@ -53,7 +55,6 @@ on:
       - integrations/cayleypy_native/build_backend.py
       - integrations/cayleypy_native/pyproject.toml
       - integrations/cayleypy_native/tests/installed_verify_cnot_gloo_lifecycle.py
-      - memory/CHANGELOG.md
       - rust/beam-**
       - integrations/cayleypy_native/multigpubeamsearch/cnot*.py
       - integrations/cayleypy_native/multigpubeamsearch/gpu_identity.py
@@ -80,7 +81,7 @@ jobs:
           python-version: "3.11"
       - name: Compile source-only acceptance helpers
         id: compile_source
-        run: python -m py_compile tools/verify_permutation_cuda.py tools/permutation_acceptance.py tools/test_permutation_acceptance.py tools/verify_cnot.py tools/cnot_acceptance_events.py tools/test_cnot_acceptance_events.py tools/test_cnot_gpu_identity.py tools/verify_cnot_gpu_pair.py tools/test_verify_cnot_gpu_pair.py tools/test_vast_result_transport.py tools/vast_public_status.py tools/test_vast_public_status.py tools/test_vast_source_archive.py tools/create_vast_source_archive.py tools/vast_instance_contract.py tools/test_vast_instance_contract.py tools/vast_budget_deadline.py tools/test_vast_budget_deadline.py tools/vast_campaign_guard.py tools/test_vast_campaign_guard.py tools/vast_campaign_watchdog.py tools/test_vast_campaign_watchdog.py tools/test_vast_campaign_workflow.py tools/validate_cnot_handoff.py tools/test_validate_cnot_handoff.py tools/cnot_producer_source_gate.py tools/test_cnot_producer_source_gate.py tools/vast_private_preflight.py tools/test_vast_private_preflight.py integrations/cayleypy_native/tests/installed_verify_cnot_gloo_lifecycle.py integrations/cayleypy_native/multigpubeamsearch/gpu_identity.py
+        run: python -m py_compile tools/verify_permutation_cuda.py tools/permutation_acceptance.py tools/test_permutation_acceptance.py tools/verify_cnot.py tools/cnot_acceptance_events.py tools/test_cnot_acceptance_events.py tools/test_cnot_gpu_identity.py tools/verify_cnot_gpu_pair.py tools/test_verify_cnot_gpu_pair.py tools/test_vast_result_transport.py tools/vast_public_status.py tools/test_vast_public_status.py tools/test_vast_source_archive.py tools/create_vast_source_archive.py tools/vast_instance_contract.py tools/test_vast_instance_contract.py tools/vast_budget_deadline.py tools/test_vast_budget_deadline.py tools/vast_campaign_guard.py tools/test_vast_campaign_guard.py tools/vast_campaign_watchdog.py tools/test_vast_campaign_watchdog.py tools/test_vast_campaign_workflow.py tools/validate_cnot_handoff.py tools/test_validate_cnot_handoff.py tools/cnot_producer_source_gate.py tools/test_cnot_producer_source_gate.py tools/vast_private_preflight.py tools/test_vast_private_preflight.py integrations/cayleypy_native/tests/installed_verify_cnot_gloo_lifecycle.py integrations/cayleypy_native/multigpubeamsearch/gpu_identity.py tools/test_vast_cnot_panel_cli_args.py && bash -n tools/vast_cnot_panel_cli_args.sh
       - name: Test exact producer-source gate
         if: always()
         id: producer_source_gate_test

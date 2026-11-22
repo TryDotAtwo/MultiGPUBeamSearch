@@ -72,6 +72,7 @@ class ValidateCnotHandoffTests(unittest.TestCase):
             panel_ids=("locked-a", "locked-b"),
             panel_digest="4" * 64,
             search={"global_width": 36, "shortlist": 4, "max_depth": 8, "max_expansions": 201},
+            expansion_upper_bound=201,
             orientation="row_target_xor_row_control",
             artifact_path_policy="same_run_root_mount",
             search_manifest=search,
@@ -87,6 +88,7 @@ class ValidateCnotHandoffTests(unittest.TestCase):
             self.assertEqual(summary["panel_ids"], ["locked-a", "locked-b"])
             self.assertEqual(summary["panel_indices"], [2, 8])
             self.assertEqual(summary["locked_test_status"], "length_gain")
+            self.assertEqual(summary["expansion_upper_bound"], 201)
             self.assertEqual(summary["candidate_cases"][0]["physical_cost"], 2)
             self.assertEqual(summary["candidate_cases"][1]["physical_cost"], None)
             self.assertNotIn(str(root), str(summary))

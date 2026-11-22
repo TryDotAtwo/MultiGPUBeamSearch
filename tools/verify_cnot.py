@@ -310,7 +310,27 @@ def main(argv=None, *, scorer_factory=None, manage_process_group=True):
     parser.add_argument("--require-rust-scorer", action="store_true",
                         help="require the Rust-owned checkpoint scorer and Rust controller")
     parser.add_argument("--output", required=True, type=Path)
+    parser.add_argument("--validate-cli-only", action="store_true", help=argparse.SUPPRESS)
     args = parser.parse_args(argv)
+    if args.validate_cli_only:
+        if args.case != "panel":
+            parser.error("--validate-cli-only is reserved for the panel launch contract")
+        direct_receipt = args.handoff_receipt is not None
+        resolved_snapshot = args.handoff_preflight is not None
+        if args.run_root is None or direct_receipt == resolved_snapshot:
+            parser.error("--case panel requires --run-root and exactly one of --handoff-receipt or --handoff-preflight")
+        if resolved_snapshot and args.handoff_preflight_sha256 is None:
+            parser.error("--handoff-preflight requires --handoff-preflight-sha256")
+        if not resolved_snapshot and args.handoff_preflight_sha256 is not None:
+            parser.error("--handoff-preflight-sha256 requires --handoff-preflight")
+        if args.manifest is not None or args.library is None:
+            parser.error("--case panel requires a scorer library and does not accept --manifest")
+        if args.mode != "qhat" or args.backend != "nccl" or args.audit or args.inference_batch != 4 or args.width is not None:
+            parser.error("paired panel acceptance uses the pinned Qhat/NCCL search and inference batch")
+        if args.engine != "rust" or not args.require_rust_scorer:
+            parser.error("paired panel acceptance requires the Rust search engine and scorer")
+        print("CNOT_PANEL_CLI_VALIDATION=passed")
+        return 0
     resolved_handoff = None
     if args.case == "panel":
         direct_receipt = args.handoff_receipt is not None
