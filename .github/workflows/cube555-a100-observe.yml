@@ -1,0 +1,64 @@
+name: Inspect the running Cube555 test
+
+on:
+  push:
+    branches: [codex/cube555-standalone-20261122]
+    paths: [.github/workflows/cube555-a100-observe.yml]
+
+permissions: {}
+
+jobs:
+  observe:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    env:
+      VAST_API_KEY: ${{ secrets.VAST_API_KEY }}
+    steps:
+      - name: Check the lease and read current test progress
+        shell: bash
+        run: |
+          set -euo pipefail
+          id=61937382
+          endpoint=https://console.vast.ai/api/v0/instances
+          authorization="Authorization: Bearer ${VAST_API_KEY}"
+          row="$(curl --fail --silent --show-error --max-time 20 -H "$authorization" "$endpoint/" \
+            | jq -cer --argjson id "$id" '.instances[] | select(.id==$id and .label=="cube555-a100-45001828045-1" and .actual_status=="running")')"
+          key="$RUNNER_TEMP/observe-key"
+          ssh-keygen -q -t ed25519 -N "" -C "cube555-observe-$GITHUB_RUN_ID" -f "$key"
+          request="$(jq -cn --arg ssh_key "$(cat "$key.pub")" '{ssh_key:$ssh_key}')"
+          curl --fail --silent --show-error --max-time 30 -H "$authorization" \
+            -H 'Content-Type: application/json' -X POST --data-binary "$request" \
+            --output /dev/null "$endpoint/$id/ssh"
+          direct_host="$(jq -r '.public_ipaddr // empty' <<< "$row")"
+          direct_port="$(jq -r '.ports["22/tcp"][0].HostPort // empty' <<< "$row")"
+          proxy_host="$(jq -r '.ssh_host // empty' <<< "$row")"
+          proxy_port="$(jq -r '.ssh_port // empty' <<< "$row")"
+          options=(-i "$key" -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new
+                   -o "UserKnownHostsFile=$RUNNER_TEMP/observe-known-hosts" -o ConnectTimeout=8)
+          code='
+          set -e
+          cd /root/cube555-test 2>/dev/null || { echo "No test directory yet"; exit 0; }
+          du -sh . evidence cube555-standalone/beam_run 2>/dev/null || true
+          for file in evidence/*.log; do
+            [[ -f "$file" ]] || continue
+            echo "$file"
+            tail -n 7 "$file"
+          done
+          ps -eo comm | sort | uniq -c | grep -E "python|cmake|cc1|nvcc|pipeline|ninja|tar|ssh" || true
+          nvidia-smi --query-gpu=name,utilization.gpu,memory.used,temperature.gpu --format=csv,noheader
+          if [[ -d cube555-standalone/beam_run/cache ]]; then
+            find cube555-standalone/beam_run/cache -name maximum-beam.json -o -name verification-budget.json -o -name native-build.json | tail -n 15
+          fi'
+          for attempt in 1 2 3; do
+            if [[ "$direct_host" =~ ^[0-9.]+$ && "$direct_port" =~ ^[0-9]+$ ]] &&
+                ssh "${options[@]}" -p "$direct_port" "root@$direct_host" "$code"; then
+              exit 0
+            fi
+            if [[ "$proxy_host" =~ ^[a-zA-Z0-9.-]+$ && "$proxy_port" =~ ^[0-9]+$ ]] &&
+                ssh "${options[@]}" -p "$proxy_port" "root@$proxy_host" "$code"; then
+              exit 0
+            fi
+            sleep 12
+          done
+          echo 'Unable to read progress via either Vast SSH endpoint.' >&2
+          exit 1
