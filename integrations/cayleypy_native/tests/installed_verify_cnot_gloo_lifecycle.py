@@ -30,9 +30,15 @@ def invoke(case, output, scorer_factory=None, *, engine="rust", forbid_python_re
         def forbidden_python_reference(*_args, **_kwargs):
             raise AssertionError("engine=auto entered the Python CNOT reference loop")
         cnot._search = forbidden_python_reference
+    argv = ["--case", case, "--backend", "gloo", "--engine", engine, "--output", str(output)]
+    if case in ("trained", "trained-deep"):
+        # The public CLI requires these options before it reaches the injected
+        # scorer factory. The synthetic factory owns scorer construction and
+        # never opens these placeholder paths.
+        argv.extend(["--library", "synthetic-scorer.so", "--manifest", "synthetic-manifest.json"])
     try:
         result = verify_cnot.main(
-            ["--case", case, "--backend", "gloo", "--engine", engine, "--output", str(output)],
+            argv,
             scorer_factory=scorer_factory,
             manage_process_group=False,
         )

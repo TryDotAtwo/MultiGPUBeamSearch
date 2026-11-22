@@ -113,3 +113,6 @@ Keep an active goal until the migration and required verification are complete.
 - 2026-11-22: Resolve CNOT controller selection from one fixed snapshot of actual callable bindings voted across ranks; pass the selected typed route into compatibility execution. Verify mismatched public engine requests through `search_cnot`, hidden per-rank callables, strict fail-before-transport and healthy retry. Keep explicit Rust-unavailable errors compatible with the Python API.
 
 - 2026-11-22: Keep the installed panel-v2 handoff endpoint tests aligned with the actual packed CNOT tensor shape, and report specific source-revision and selected-checkpoint failures from the receipt resolver.
+
+
+- 2026-11-22 follow-up: In the installed two-rank `verify_cnot` lifecycle fixture, pass inert library/manifest argument values for trained cases to satisfy the public CLI before the injected synthetic scorer factory runs. Do not load checkpoint files in this CPU/Gloo test; retain rank-local scorer failure and healthy retry coverage.

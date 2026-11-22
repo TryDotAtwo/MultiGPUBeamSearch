@@ -3345,3 +3345,9 @@ Main commit `148b2a826a369b7601e904ea409e0cc5301c75c9` also passed the 260-test 
 - Print the synthetic installed-wheel panel endpoint traceback on failure, and the panel handoff unittest log on the producer CPU gate, so CI failures retain the actual assertion rather than only an exit code.
 
 - Keep panel handoff diagnostics specific: distinguish receipt/source revision disagreement, selected checkpoint disagreement and accepted-update mismatch; correct the installed endpoint oracle for the input tensor's batch dimension.
+
+
+## 2026-11-22 - Reach injected scorer in the public Gloo verifier lifecycle
+
+- The installed two-rank lifecycle test supplies inert `--library` and `--manifest` arguments for trained cases so the public CLI reaches the injected synthetic scorer factory. No model or checkpoint files are opened by this CPU fixture.
+- This preserves validation of the real CLI contract while exercising rank-local scorer failure, common phase reporting, and healthy retry under Gloo.
