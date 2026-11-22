@@ -1,6 +1,7 @@
 """Smoke the installed wheel without importing Python modules from the checkout."""
 import importlib
 import importlib.metadata
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -206,6 +207,54 @@ while not (directory / 'stop').exists():
     assert owner.begin_preparation(exact_key) is False
     assert owner.pids == []
     owner.close()
+
+
+from multigpubeamsearch.shared_profiles import find_profile
+
+native_profile_reader = getattr(runtime, "find_shared_profile", None)
+if not callable(native_profile_reader):
+    raise AssertionError("the installed Rust runtime does not expose shared profile lookup")
+
+profile_identity = {"backend": "cutlass", "beam": 1_000_000, "world_size": 2}
+with tempfile.TemporaryDirectory(prefix="beam-shared-profile-") as temporary:
+    source_root = Path(temporary)
+    profiles = source_root / "profiles"
+    records = profiles / "records"
+    records.mkdir(parents=True)
+    profile_record = {
+        "schema": 1,
+        "compatibility": profile_identity,
+        "inference": {"parent_batch": 512},
+        "evidence": {"status": "verified", "source_commit": "a" * 40},
+    }
+    payload = json.dumps(profile_record, sort_keys=True).encode("utf-8")
+    profile_sha = hashlib.sha256(payload).hexdigest()
+    (records / f"{profile_sha}.json").write_bytes(payload)
+    (profiles / "index.json").write_text(
+        json.dumps(
+            {"schema": 1, "profiles": [{"compatibility": profile_identity, "sha256": profile_sha}]},
+            sort_keys=True,
+        ),
+        encoding="utf-8",
+    )
+
+    rust_record = native_profile_reader(
+        str(profiles), json.dumps(profile_identity, sort_keys=True)
+    )
+    if not isinstance(rust_record, str):
+        raise AssertionError("Rust profile lookup missed a valid hash-addressed proposal")
+    parsed_rust_record = json.loads(rust_record)
+    if parsed_rust_record.get("registry_sha256") != profile_sha:
+        raise AssertionError("Rust profile lookup did not bind the record digest")
+    if find_profile(source_root, profile_identity) != parsed_rust_record:
+        raise AssertionError("Python profile adapter did not use the Rust lookup result")
+    if find_profile(source_root, dict(profile_identity, beam=2_000_000)) is not None:
+        raise AssertionError("Rust profile lookup accepted a mismatched workload")
+
+    (records / f"{profile_sha}.json").write_text("{}", encoding="utf-8")
+    if native_profile_reader(str(profiles), json.dumps(profile_identity, sort_keys=True)) is not None:
+        raise AssertionError("Rust profile lookup accepted a record with the wrong SHA")
+print("INSTALLED_RUST_SHARED_PROFILE_LOOKUP_PASS", flush=True)
 
 summary = {
     "distribution_version": importlib.metadata.version("multigpubeamsearch"),
