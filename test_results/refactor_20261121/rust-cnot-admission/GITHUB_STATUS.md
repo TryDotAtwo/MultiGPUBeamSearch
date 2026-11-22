@@ -1,22 +1,29 @@
 # Rust + CUDA/C++ migration acceptance status
 
 Source branch: `codex/beam-3060-preflight-20261121`
-Latest installed-wheel SHA: `a0f406238515ffab5d0c45b9ae4b0d5dc5011931`
-Latest Rust CNOT CPU suite SHA: `3e8e321c18e4c382985b158ab571ffac017229a2`
+Latest tested code SHA: `74c3c33f3de796af00485b0f0d770d485135efd4`
 Base main SHA: `e6c41b6dc6bb3a839f6338f3cfe9eaadf8608d5a`
 
 | Gate | Status | Evidence |
 |---|---|---|
-| Rust CNOT CPU/Gloo suite | PASS | 323 passed, 2 skipped on `3e8e321`; the new `Edge::from_i64_row` signed/width/length cases passed in [run 45039189653](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45039189653). |
-| Installed PEP 517 wheel outside checkout | PASS | Wheel built and exercised from outside the checkout on `a0f4062`. The Gloo phase test injected malformed history rows after broadcast on rank 0 and rank 1 separately, checked common phase/error, then completed a healthy retry in the same group. [Run 45040185404](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45040185404). |
-| Panel-v2 producer compatibility | PASS | Hosted producer/consumer adapter validation passed on `a0f4062`, [run 45040191347](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45040191347). |
-| Hosted acceptance harness | PASS | Source checks passed on `3e8e321`, [run 45039190060](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45039190060). Its CUDA/physical jobs were skipped. |
-| Permutation CPU acceptance | PASS on CPU | Existing LRX(4) replay/reuse and saturated LRX(5), B=3 oracle tests are covered by the installed-wheel run. Physical GPU parity remains unverified. |
-| CUDA/NCCL permutation and trained CNOT on physical 1/2 GPUs | PENDING | No physical CUDA/NCCL execution, trained checkpoint replay, or physical rank recovery was claimed in these hosted runs. |
-| Vast campaign staging and total storage cost | BLOCKED | Trusted private GL4 manifest/checkpoint staging and complete cost disposition are still outstanding for the authorized new 2x desktop RTX 3060 campaign. No paid instance was started. |
-| Full Rust ownership migration | IN PROGRESS | Rust owns CNOT request policy, stage order, typed history edge validation and rank-wide checked outcomes. Native stages still retain Python `World`/Torch objects; permutation model/profile and scheduler preparation also retain Python control. PR #10 remains draft. |
+| Rust CNOT CPU/Gloo suite | PASS | 323 passed, 2 hardware-only skipped on `74c3c33`, [run 45044225075](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45044225075). |
+| Installed PEP 517 wheel outside checkout | PASS | Installed-wheel run [45044225072](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45044225072) passed. Its two-rank Gloo phase test injects CNOT identity initialization failures on rank 0 and rank 1, requires the same phase/error on both, verifies transport has not started, then completes a public search retry on the same process group. |
+| Panel-v2 producer compatibility | PASS | Pinned emitter/consumer adapter workflow passed on [run 45044229550](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45044229550); the matching Rust adapter build artifact was reused. |
+| Hosted acceptance harness | PASS | Source-only checks passed on [run 45044225521](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45044225521). Physical GPU jobs were skipped by the push trigger. |
+| Permutation CPU acceptance | PASS on CPU | Installed-wheel CPU replay/reuse and saturated LRX(5), B=3 oracle cases remain covered. No physical permutation parity is claimed. |
+| CUDA/NCCL permutation and trained CNOT on physical 1/2 GPUs | PENDING | No physical CUDA/NCCL execution, trained checkpoint replay, physical rank participation, or physical rank recovery has been run. |
+| Vast campaign staging and total storage cost | BLOCKED | Trusted private GL4 manifest/checkpoint staging and complete storage-cost disposition remain unresolved for the authorized new 2x desktop RTX 3060 campaign. No paid instance was started. |
+| Full Rust ownership migration | IN PROGRESS | CNOT compatibility identity setup now has a rank-wide checked phase. Python `World`/Torch ownership and permutation model/profile/scheduler preparation remain; PR #10 is draft. |
 
 Hosted CPU and installed-wheel evidence does not establish physical CUDA/NCCL execution or complete the Rust migration.
+
+## Compatibility-route CNOT identity initialization — 2026-11-22
+
+- Test-only installed-wheel SHA `6cd3dc1` exposed a rank disagreement when identity initialization failed on rank 0; the repeat diagnostic at `48e5a32` reported that the two ranks returned different compatibility-dispatch errors.
+- Implementation SHA `74c3c33` moves identity creation into a checked Gloo phase before transport startup.
+- Installed PEP 517 wheel PASS: [run 45044225072](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45044225072). The same test injects the failure on both rank positions, checks matching phase and cause, confirms no transport startup on the failed call, then replays the healthy public search on the same Gloo group.
+- Rust CNOT CPU/Gloo PASS: 323 passed, 2 hardware-only skipped, [run 45044225075](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45044225075).
+- Hosted acceptance source harness PASS; physical acceptance skipped, [run 45044225521](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45044225521).
 
 ## Latest rank-common dispatch and Gloo parity gate
 
