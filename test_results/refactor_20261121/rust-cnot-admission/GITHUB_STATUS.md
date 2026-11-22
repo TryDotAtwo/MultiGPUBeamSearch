@@ -126,3 +126,14 @@ Tested source SHA: `9ce5954b6b1d6bd014a2af086dec71ff7686a255`.
 - Rust CNOT CPU/Gloo: 323 passed, 2 hardware-only skipped, [run 44996962379](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44996962379).
 - Hosted acceptance: PASS, physical job SKIPPED, [run 44996962394](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44996962394). Panel-v2 CPU compile/handoff: PASS, [run 44996966326](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44996966326).
 - No physical CUDA/NCCL or trained-checkpoint GPU execution is claimed.
+
+
+## Shared profile registry lookup in Rust — 2026-11-22
+
+Tested code SHA: `0ca418cbbc2757508dc96ff986af75b888cba5e2`.
+
+- Installed PEP 517 wheel outside checkout: PASS, including Rust shared-profile lookup, Python adapter authority, mismatch/tamper rejection, legacy-extension fallback, Rust selector, Gloo failure/retry, CNOT 1/2-rank Gloo parity, and permutation CPU acceptance: [run 44999384648](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44999384648), redacted artifact [14745650691](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44999384648/artifacts/14745650691).
+- Rust CNOT CPU/Gloo: PASS, 323 passed, 2 hardware-only skipped; shared-profile runtime tests passed, including path escape and symlink rejection: [run 44999384690](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44999384690), log artifact [14745685215](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44999384690/artifacts/14745685215).
+- Hosted source acceptance: PASS, [run 44999384719](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44999384719), redacted artifact [14744704817](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44999384719/artifacts/14744704817). Physical acceptance: SKIPPED.
+- Pinned panel-v2 CPU compile and synthetic handoff: PASS, [run 44999387783](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44999387783).
+- Remaining in this slice: Python still assembles the profile identity; physical 1/2-GPU and trained-profile execution remain unverified.

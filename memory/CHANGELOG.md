@@ -3427,3 +3427,17 @@ Main commit `148b2a826a369b7601e904ea409e0cc5301c75c9` also passed the 260-test 
 - RED: installed-wheel dispatch step failed at test SHA `edcafd46a1585deb81c4f6007db877015a699fae`, [run 44996678906](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44996678906). GREEN: full installed-wheel validation passed at implementation SHA `9ce5954b6b1d6bd014a2af086dec71ff7686a255`, [run 44996962384](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44996962384).
 - Rust CNOT CPU/Gloo passed with 323 passed and 2 hardware tests skipped in [run 44996962379](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44996962379). Hosted acceptance passed in [run 44996962394](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44996962394), and the panel-v2 CPU compile/handoff gate passed in [run 44996966326](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44996966326).
 - Physical CUDA/NCCL remains unverified; the GPU job was skipped.
+
+
+## 2026-11-22 - Move shared inference profile registry reads into Rust
+
+- Added `beam-runtime::shared_profiles::find_profile` and a PyO3 entry point. Rust now performs bounded index/record reads, compatibility matching, lowercase SHA-256 verification, record path containment and evidence/schema checks before returning a profile proposal.
+- The Python adapter calls the Rust method when the installed extension exposes it. A Rust miss stays a miss; it cannot fall through to a weaker Python read. Wheels without the method retain the previous Python reader. Python still assembles the hardware/model compatibility identity, and target calibration/admission remains required.
+- Installed-wheel coverage exercises a valid profile, workload mismatch, tampered bytes, the old-wheel fallback and fail-closed behavior. Runtime tests cover index/record size limits and symlink/path escape rejection.
+- RED: the test-only installed-wheel probe failed at the smoke step on SHA `b8dd5abbcdf40dd50bc036341e8692c283990924`, [run 44997790639](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44997790639). GREEN: code SHA `0ca418cbbc2757508dc96ff986af75b888cba5e2` passed the installed wheel [run 44999384648](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44999384648), Rust CNOT CPU/Gloo with 323 passed and 2 hardware-only skipped [run 44999384690](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44999384690), source harness [run 44999384719](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44999384719), and panel-v2 CPU compile/handoff [run 44999387783](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44999387783).
+- Physical CUDA/NCCL remained skipped. No hardware run is claimed.
+
+## 2026-11-22 - Fix top-level YAML job extraction in the source gate test
+
+- The producer-source test now delimits workflow jobs by top-level indentation, so nested `gpu-acceptance` fields remain visible to the assertion.
+- RED: hosted source validation failed at the exact producer-source gate on SHA `e87925d2006b0c65ca2bd2962e9e7bb13f5fca23`, [run 44999068267](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44999068267). GREEN: source harness passed on SHA `0ca418cbbc2757508dc96ff986af75b888cba5e2`, [run 44999384719](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44999384719). The physical workflow remained skipped.

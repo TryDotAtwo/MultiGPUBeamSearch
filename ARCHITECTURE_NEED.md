@@ -407,6 +407,14 @@ Python fallback. Алгоритм поиска, оценки, precision, GPU-с�
 multi-GPU не менялись. Проверка CPU с PyO3 не является аппаратной проверкой
 CUDA/NCCL. Результат: `test_results/refactor_20261119/rust-inference-selection/GITHUB_STATUS.md`.
 
+## Rust-владелец чтения shared inference profile registry, 2026-11-22
+
+Чтение source-pinned `profiles/index.json` и hash-addressed record перенесено в `beam-runtime::shared_profiles::find_profile`. Rust ограничивает размер index/record двумя MiB и индекс 1024 записями, проверяет совпадение compatibility identity, lowercase SHA-256, нахождение record внутри registry, schema, verified evidence и диапазон `parent_batch`.
+
+PyO3 возвращает только проверенную запись и её digest. Если новый extension вернул отсутствие совпадения, Python не повторяет чтение в обход Rust-проверок. Для старого extension без этого метода сохранён прежний Python reader. Формирование hardware/model compatibility identity пока остаётся Python адаптеру; найденный профиль остаётся предложением и проходит обычную проверку target runtime. Search, scoring, kernels, precision и transport не менялись.
+
+На code SHA `0ca418cbbc2757508dc96ff986af75b888cba5e2` installed wheel прошёл в [run 44999384648](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44999384648); Rust CPU/Gloo прошёл в [run 44999384690](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44999384690), source harness — в [run 44999384719](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44999384719), panel-v2 CPU compile/handoff — в [run 44999387783](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44999387783). Физические CUDA/NCCL проверки пропущены.
+
 ## Самостоятельный CUDA-домен CNOT, 2026-11-17
 
 Отдельная необязательная библиотека предоставляет версионированный C ABI для
