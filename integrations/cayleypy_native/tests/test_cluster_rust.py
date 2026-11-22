@@ -437,3 +437,45 @@ def test_installed_rust_runtime_device_plan_rejects_missing_cuda_before_count(mo
     monkeypatch.setattr(torch.cuda, "device_count", forbidden_count)
     with pytest.raises(NativeUnavailable, match="native beam requires available CUDA devices"):
         backend.runtime_devices(object(), SimpleNamespace(devices=(0,), num_gpus=None))
+
+
+def test_installed_rust_search_environment_controls_public_permutation_launch(monkeypatch):
+    from multigpubeamsearch import backend, rust_control
+
+    native_resolver = rust_control.resolve_search_environment
+    python_fallback = backend._runtime_search_environment_python
+    observed = []
+
+    def observe(*args):
+        observed.append(args)
+        return native_resolver(*args)
+
+    def forbidden(*_args, **_kwargs):
+        pytest.fail("installed Rust search environment plan fell back to Python")
+
+    monkeypatch.setattr(rust_control, "resolve_search_environment", observe)
+    monkeypatch.setattr(backend, "_runtime_search_environment_python", forbidden)
+    values = (
+        "/run/puzzle_info.json", "/run/test.csv", "/models/weights",
+        "/run", 3, 17,
+    )
+    expected = {
+        "BEAM_GENERATOR_PATH": "/run/puzzle_info.json",
+        "BEAM_PUZZLE_INFO_JSON": "/run/puzzle_info.json",
+        "BEAM_TEST_CSV": "/run/test.csv",
+        "BEAM_WEIGHT_DIR": "/models/weights",
+        "BEAM_RUNTIME_CONFIG_MODE": "auto",
+        "BEAM_SOLVED_NEIGHBORHOOD_RADIUS": "3",
+        "BEAM_SOLVED_NEIGHBORHOOD_MAX_ENTRIES": "17",
+        "BEAM_STREAM2_SUFFIX_RADIUS": "0",
+        "BEAM_SOLVE_BUCKET_MODE": "0",
+        "BEAM_HISTORY_MODE": "disk",
+        "BEAM_HISTORY_DIR": "/run/history",
+        "BEAM_HISTORY_DISK_PATH": "/run/history",
+    }
+    assert backend.runtime_search_environment(*values) == expected
+    assert observed == [values]
+
+    monkeypatch.setattr(rust_control, "resolve_search_environment", lambda *_args: None)
+    monkeypatch.setattr(backend, "_runtime_search_environment_python", python_fallback)
+    assert backend.runtime_search_environment(*values) == expected

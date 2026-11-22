@@ -315,6 +315,51 @@ def resolve_runtime_device_plan(
     return tuple(selected)
 
 
+
+def resolve_search_environment(
+    puzzle_info, test_csv, weight_dir, run_dir,
+    effective_touch_bfs_radius, touch_bfs_max_entries
+):
+    """Build fixed permutation search variables with the installed Rust runtime."""
+    values = (puzzle_info, test_csv, weight_dir, run_dir)
+    if any(type(value) is not str for value in values):
+        return None
+    if (type(effective_touch_bfs_radius) is not int
+            or not 0 <= effective_touch_bfs_radius <= 0xFFFFFFFF
+            or type(touch_bfs_max_entries) is not int
+            or not 0 <= touch_bfs_max_entries <= 0xFFFFFFFFFFFFFFFF):
+        return None
+    try:
+        native = extension()
+    except (NativeUnavailable, ImportError):
+        return None
+    resolver = getattr(native, "resolve_search_environment", None)
+    if not callable(resolver):
+        return None
+    if getattr(native, "CLUSTER_SEARCH_ENVIRONMENT_VERSION", None) != 1:
+        raise NativeUnavailable("Rust search environment API version is incompatible")
+    try:
+        encoded = resolver(
+            puzzle_info, test_csv, weight_dir, run_dir,
+            effective_touch_bfs_radius, touch_bfs_max_entries
+        )
+    except (RuntimeError, ValueError, TypeError, OverflowError) as error:
+        raise NativeUnavailable(str(error)) from error
+    if type(encoded) is not str:
+        raise NativeUnavailable("Rust runtime returned an invalid search environment")
+    try:
+        result = json.loads(encoded)
+    except (TypeError, ValueError) as error:
+        raise NativeUnavailable("Rust runtime returned malformed search environment JSON") from error
+    if not isinstance(result, dict) or any(
+        type(name) is not str or type(value) is not str
+        for name, value in result.items()
+    ):
+        raise NativeUnavailable("Rust runtime returned an invalid search environment")
+    return result
+
+
+
 def resolve_child_environment(environment, devices, nccl_id_file):
     """Build the filtered native child environment in beam-runtime when supported."""
     if type(environment) is not dict or any(

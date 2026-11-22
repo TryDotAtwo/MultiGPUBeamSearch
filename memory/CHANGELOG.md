@@ -1,3 +1,9 @@
+## 2026-11-22 - Build fixed permutation launch environment in Rust
+
+- Moved the public runner's puzzle, input, weight, history, and base BFS environment variables into a versioned `beam-runtime` function.
+- Kept model-specific inference variables in the existing adapter and preserved the Python environment builder for older wheels.
+- Added an installed-wheel regression for the actual Rust function through the public permutation environment helper and for the compatibility fallback.
+
 ## 2026-11-22 - Resolve permutation CUDA availability and device selection in Rust
 
 - Added a versioned runtime plan that rejects unavailable CUDA before selecting process-local device indices, preserving existing explicit, `num_gpus`, graph-placement, and error rules.

@@ -1,3 +1,7 @@
+## Rust-owned permutation search launch environment — 2026-11-22
+
+The public permutation launcher now obtains its fixed puzzle/input/weight/history paths and base BEAM controls from a versioned Rust runtime function. Python supplies the already prepared paths and validated BFS settings, then merges the returned variables with model-specific inference settings. Older wheels keep the previous Python builder. This does not change search controls, model dispatch, kernel behavior, or numerical policy.
+
 ## Rust-owned permutation CUDA device admission — 2026-11-22
 
 The public permutation preparation path now sends the observed CUDA availability and normalized device request to one versioned `beam-runtime` plan. Rust rejects a missing CUDA runtime and resolves the same explicit, `num_gpus`, or graph-derived process-local indices; Python keeps the Linux/torchrun boundary checks, collects Torch facts, and retains the prior device selection for wheels without this API. No device binding, worker launch, search order, kernel, or numerical behavior changes.

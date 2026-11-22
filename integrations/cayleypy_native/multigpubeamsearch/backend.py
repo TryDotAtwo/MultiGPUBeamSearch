@@ -400,6 +400,42 @@ def child_environment(devices: tuple[int, ...], run_dir: Path, environ=None) -> 
     return _child_environment_python(inherited, devices, nccl_id_file)
 
 
+
+def _runtime_search_environment_python(puzzle_info, test_csv, weight_dir, run_dir,
+                                       effective_touch_bfs_radius, touch_bfs_max_entries):
+    history_dir = str(Path(run_dir) / "history")
+    return {
+        "BEAM_GENERATOR_PATH": str(puzzle_info),
+        "BEAM_PUZZLE_INFO_JSON": str(puzzle_info),
+        "BEAM_TEST_CSV": str(test_csv),
+        "BEAM_WEIGHT_DIR": str(weight_dir),
+        "BEAM_RUNTIME_CONFIG_MODE": "auto",
+        "BEAM_SOLVED_NEIGHBORHOOD_RADIUS": str(effective_touch_bfs_radius),
+        "BEAM_SOLVED_NEIGHBORHOOD_MAX_ENTRIES": str(touch_bfs_max_entries),
+        "BEAM_STREAM2_SUFFIX_RADIUS": "0",
+        "BEAM_SOLVE_BUCKET_MODE": "0",
+        "BEAM_HISTORY_MODE": "disk",
+        "BEAM_HISTORY_DIR": history_dir,
+        "BEAM_HISTORY_DISK_PATH": history_dir,
+    }
+
+
+def runtime_search_environment(puzzle_info, test_csv, weight_dir, run_dir,
+                              effective_touch_bfs_radius, touch_bfs_max_entries):
+    """Build fixed native search variables through the versioned Rust runtime API."""
+    from .rust_control import resolve_search_environment
+
+    paths = tuple(str(path) for path in (puzzle_info, test_csv, weight_dir, run_dir))
+    native = resolve_search_environment(
+        *paths, effective_touch_bfs_radius, touch_bfs_max_entries
+    )
+    if native is not None:
+        return native
+    return _runtime_search_environment_python(
+        *paths, effective_touch_bfs_radius, touch_bfs_max_entries
+    )
+
+
 def _resolve_microbatch_plan_python(contract, model, beam_width: int, world_size: int, *, row_limit=8192) -> dict:
     """Compatibility implementation for extensions without the Rust planner."""
     default_rows, alignment, initial_sort_slots = row_limit, 1024, 4
@@ -761,12 +797,10 @@ def _run_native_once(contract, model, options, beam_width, max_steps, run_dir, d
     for acceptance_name in tuple(env):
         if acceptance_name.startswith("MGBS_ACCEPTANCE_"):
             env.pop(acceptance_name, None)
-    env.update({"BEAM_GENERATOR_PATH": str(puzzle), "BEAM_PUZZLE_INFO_JSON": str(puzzle),
-                "BEAM_TEST_CSV": str(inputs), "BEAM_WEIGHT_DIR": str(model.weights_dir),
-                "BEAM_RUNTIME_CONFIG_MODE": "auto", "BEAM_SOLVED_NEIGHBORHOOD_RADIUS": str(effective_touch_bfs_radius),
-                "BEAM_SOLVED_NEIGHBORHOOD_MAX_ENTRIES": str(options.touch_bfs_max_entries),
-                "BEAM_STREAM2_SUFFIX_RADIUS": "0", "BEAM_SOLVE_BUCKET_MODE": "0", "BEAM_HISTORY_MODE": "disk",
-                "BEAM_HISTORY_DIR": str(run_dir / "history"), "BEAM_HISTORY_DISK_PATH": str(run_dir / "history")})
+    env.update(runtime_search_environment(
+        puzzle, inputs, model.weights_dir, run_dir,
+        effective_touch_bfs_radius, options.touch_bfs_max_entries
+    ))
     from .persistent import current_session
     from .model_snapshot import requires_mlp_host_binding
     resident_session = current_session()

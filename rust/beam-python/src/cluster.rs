@@ -38,6 +38,28 @@ fn resolve_scheduler_rank(environment: BTreeMap<String, String>) -> PyResult<Str
 }
 
 #[pyfunction]
+fn resolve_search_environment(
+    puzzle_info: String,
+    test_csv: String,
+    weight_dir: String,
+    run_dir: String,
+    effective_touch_bfs_radius: u32,
+    touch_bfs_max_entries: u64,
+) -> PyResult<String> {
+    let request = beam_runtime::cluster::SearchEnvironmentRequest {
+        puzzle_info,
+        test_csv,
+        weight_dir,
+        run_dir,
+        effective_touch_bfs_radius,
+        touch_bfs_max_entries,
+    };
+    let environment = beam_runtime::cluster::search_environment(&request);
+    serde_json::to_string(&environment)
+        .map_err(|error| PyRuntimeError::new_err(error.to_string()))
+}
+
+#[pyfunction]
 fn resolve_child_environment(
     environment: BTreeMap<String, String>,
     devices: Vec<u32>,
@@ -89,6 +111,7 @@ fn run_cluster_rank(
 }
 
 pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
+    module.add("CLUSTER_SEARCH_ENVIRONMENT_VERSION", 1)?;
     module.add("CLUSTER_RANK_VERSION", 1)?;
     module.add("CLUSTER_DEVICE_BINDING_VERSION", 1)?;
     module.add("CLUSTER_CHILD_ENVIRONMENT_VERSION", 1)?;
@@ -98,6 +121,7 @@ pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(resolve_cuda_ordinal, module)?)?;
     module.add_function(wrap_pyfunction!(resolve_cuda_visibility, module)?)?;
     module.add_function(wrap_pyfunction!(resolve_child_environment, module)?)?;
+    module.add_function(wrap_pyfunction!(resolve_search_environment, module)?)?;
     module.add_function(wrap_pyfunction!(resolve_cluster_plan, module)?)?;
     Ok(())
 }

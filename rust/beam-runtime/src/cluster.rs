@@ -336,6 +336,48 @@ pub fn child_environment(
     Ok(environment)
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SearchEnvironmentRequest {
+    pub puzzle_info: String,
+    pub test_csv: String,
+    pub weight_dir: String,
+    pub run_dir: String,
+    pub effective_touch_bfs_radius: u32,
+    pub touch_bfs_max_entries: u64,
+}
+
+/// Build the fixed permutation worker environment consumed by the native runner.
+pub fn search_environment(request: &SearchEnvironmentRequest) -> BTreeMap<String, String> {
+    let history_dir = Path::new(&request.run_dir)
+        .join("history")
+        .to_string_lossy()
+        .into_owned();
+    [
+        ("BEAM_GENERATOR_PATH", request.puzzle_info.clone()),
+        ("BEAM_PUZZLE_INFO_JSON", request.puzzle_info.clone()),
+        ("BEAM_TEST_CSV", request.test_csv.clone()),
+        ("BEAM_WEIGHT_DIR", request.weight_dir.clone()),
+        ("BEAM_RUNTIME_CONFIG_MODE", "auto".into()),
+        (
+            "BEAM_SOLVED_NEIGHBORHOOD_RADIUS",
+            request.effective_touch_bfs_radius.to_string(),
+        ),
+        (
+            "BEAM_SOLVED_NEIGHBORHOOD_MAX_ENTRIES",
+            request.touch_bfs_max_entries.to_string(),
+        ),
+        ("BEAM_STREAM2_SUFFIX_RADIUS", "0".into()),
+        ("BEAM_SOLVE_BUCKET_MODE", "0".into()),
+        ("BEAM_HISTORY_MODE", "disk".into()),
+        ("BEAM_HISTORY_DIR", history_dir.clone()),
+        ("BEAM_HISTORY_DISK_PATH", history_dir),
+    ]
+    .into_iter()
+    .map(|(key, value)| (key.into(), value))
+    .collect()
+}
+
 pub struct Request {
     pub command: Vec<String>,
     /// Executable lookup and Python pathlib resolution preserve existing Python semantics.
