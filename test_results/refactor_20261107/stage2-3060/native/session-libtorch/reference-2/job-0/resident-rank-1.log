@@ -1,0 +1,6 @@
+GLOBAL_BEAM_WIDTH_EFFECTIVE=64
+runtime_depth_start=0 frontier_size=0
+runtime_depth_done=0 depth_sec=0.497076
+runtime_depth_start=1 frontier_size=12
+runtime_depth_done=1 depth_sec=0.292471
+runtime_depth_start=2 frontier_size=32

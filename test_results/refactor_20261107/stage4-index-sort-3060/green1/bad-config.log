@@ -1,0 +1,9 @@
+-- Beam state logical bytes: 96
+-- Beam state physical bytes: 112
+-- Beam state alignment: 16
+-- Beam move count: 24
+CMake Error at CMakeLists.txt:33 (message):
+  BEAM_EXPERIMENTAL_INDEX_SORT requires BEAM_EXPERIMENTAL_RADIX128
+
+
+-- Configuring incomplete, errors occurred!

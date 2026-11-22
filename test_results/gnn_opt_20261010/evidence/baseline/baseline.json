@@ -1,0 +1,47 @@
+{
+  "metadata": {
+    "source_commit": "96c76779043e26348f0a99f275d3866a82f33552",
+    "binary_sha256": "4b1f4970dc3001a7458efc70725995b4a6d7559d8cdb45e028500dd301d1bccb",
+    "arch_flags": "8.6",
+    "gpu": "NVIDIA GeForce RTX 3060",
+    "cc": [
+      8,
+      6
+    ],
+    "torch": "2.11.0+cu128",
+    "cuda": "12.8",
+    "driver": "580.173.02",
+    "model": {
+      "n": 100,
+      "d_model": 256,
+      "layers": 2,
+      "hops": 2,
+      "max_neighbors": 75,
+      "neighbor_counts": [
+        75,
+        38
+      ],
+      "cap": 100000,
+      "parameters": 2983268
+    },
+    "artifact_hash": "fc01aedd5f9b787894308f671f894000fb93be5ceccece4f91bab0eb7032d3e9",
+    "seed": 42,
+    "precision": "FP16 body + common FP32 scalar readout",
+    "scope": "one GNN forward including both levels; excludes beam streams, host transfers, loading and compilation",
+    "slots": 1,
+    "streams": 1,
+    "warmup": 2,
+    "repeats": 5,
+    "trained_quality": false
+  },
+  "batch": 3,
+  "wall_ms": [
+    652.2684311494231,
+    652.364069595933,
+    652.1919080987573,
+    652.6620537042618,
+    652.1430881693959
+  ],
+  "median_ms": 652.2684311494231,
+  "profile": "-------------------------------------------------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  \n                                                   Name    Self CPU %      Self CPU   CPU total %     CPU total  CPU time avg     Self CUDA   Self CUDA %    CUDA total  CUDA time avg    # of Calls  \n-------------------------------------------------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  \n                         multigpubeamsearch_gnn::linear         0.20%       1.363ms        13.74%      94.355ms       1.474ms     186.142ms        29.08%     191.192ms       2.987ms            64  \n_ZN7cutlass6KernelINS_4gemm6kernel4GemmINS1_11thread...         0.00%       0.000us         0.00%       0.000us       0.000us     143.237ms        22.37%     143.237ms       2.470ms            58  \n                                        aten::index_add         0.06%     435.668us         0.17%       1.193ms      49.723us     143.108ms        22.35%     156.897ms       6.537ms            24  \nvoid at::native::indexFuncLargeIndex<c10::Half, long...         0.00%       0.000us         0.00%       0.000us       0.000us     142.136ms        22.20%     142.136ms      11.845ms            12  \nvoid at::native::vectorized_gather_kernel<16, long>(...         0.00%       0.000us         0.00%       0.000us       0.000us      86.441ms        13.50%      86.441ms       1.490ms            58  \n                                            aten::index         0.21%       1.432ms         0.35%       2.414ms      43.105us      79.488ms        12.42%      79.504ms       1.420ms            56  \n                   fused_add_add_leaky_relu_mul_add_add         0.03%     175.702us         0.04%     247.272us      27.475us      65.887ms        10.29%      65.887ms       7.321ms             9  \n                   fused_add_add_leaky_relu_mul_add_add         0.00%       0.000us         0.00%       0.000us       0.000us      65.887ms        10.29%      65.887ms       7.321ms             9  \n                                    fused_unsqueeze_mul         0.02%     164.698us         0.04%     262.028us      21.836us      55.655ms         8.69%      55.655ms       4.638ms            12  \n                                    fused_unsqueeze_mul         0.00%       0.000us         0.00%       0.000us       0.000us      55.655ms         8.69%      55.655ms       4.638ms            12  \nbeam::(anonymous namespace)::add_bias(__half*, __hal...         0.00%       0.000us         0.00%       0.000us       0.000us      42.905ms         6.70%      42.905ms     932.709us            46  \n                       fused_add_add_leaky_relu_mul_cat         0.01%      61.480us         0.01%      86.407us      28.802us      20.825ms         3.25%      20.825ms       6.942ms             3  \n                       fused_add_add_leaky_relu_mul_cat         0.00%       0.000us         0.00%       0.000us       0.000us      20.825ms         3.25%      20.825ms       6.942ms             3  \n                                              aten::sum         0.04%     263.213us         0.06%     394.488us      32.874us      20.016ms         3.13%      20.016ms       1.668ms            12  \nvoid at::native::reduce_kernel<512, 1, at::native::R...         0.00%       0.000us         0.00%       0.000us       0.000us      20.016ms         3.13%      20.016ms       1.668ms            12  \n                                            aten::copy_         0.14%     976.403us         0.62%       4.276ms      45.491us      15.369ms         2.40%      15.370ms     163.516us            94  \n                         Memcpy DtoD (Device -> Device)         0.00%       0.000us         0.00%       0.000us       0.000us      13.789ms         2.15%      13.789ms     574.539us            24  \n                                aten::native_layer_norm         0.04%     281.897us         0.10%     669.181us      44.612us      13.036ms         2.04%      13.036ms     869.082us            15  \nvoid at::native::(anonymous namespace)::vectorized_l...         0.00%       0.000us         0.00%       0.000us       0.000us      13.036ms         2.04%      13.036ms     869.082us            15  \n                                             aten::mean         0.05%     352.557us         0.08%     516.817us      32.301us       9.267ms         1.45%       9.267ms     579.196us            16  \nvoid at::native::reduce_kernel<128, 4, at::native::R...         0.00%       0.000us         0.00%       0.000us       0.000us       9.264ms         1.45%       9.264ms     617.619us            15  \n                                           aten::gather         0.02%     170.501us         0.04%     305.751us      30.575us       7.063ms         1.10%       7.063ms     706.271us            10  \n                                            aten::fill_         0.05%     347.863us         0.11%     746.038us      16.955us       6.836ms         1.07%       6.836ms     155.371us            44  \nvoid at::native::vectorized_elementwise_kernel<4, at...         0.00%       0.000us         0.00%       0.000us       0.000us       6.600ms         1.03%       6.600ms     549.978us            12  \n                                            aten::addmm         0.06%     397.479us         0.07%     513.254us      64.157us       5.058ms         0.79%       5.058ms     632.255us             8  \n                        ampere_fp16_sgemm_fp16_64x64_tn         0.00%       0.000us         0.00%       0.000us       0.000us       4.996ms         0.78%       4.996ms       2.498ms             2  \n                                             aten::gelu         0.04%     293.344us         0.07%     464.860us      23.243us       3.451ms         0.54%       3.451ms     172.565us            20  \nvoid at::native::vectorized_elementwise_kernel<4, at...         0.00%       0.000us         0.00%       0.000us       0.000us       3.451ms         0.54%       3.451ms     172.565us            20  \n                                    fused_gelu_gelu_cat         0.00%      33.770us         0.01%      63.367us      21.122us       2.493ms         0.39%       2.493ms     831.108us             3  \n                                    fused_gelu_gelu_cat         0.00%       0.000us         0.00%       0.000us       0.000us       2.493ms         0.39%       2.493ms     831.108us             3  \n-------------------------------------------------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  \nSelf CPU time total: 686.776ms\nSelf CUDA time total: 640.179ms\n"
+}

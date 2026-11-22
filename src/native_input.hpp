@@ -1,0 +1,57 @@
+#pragma once
+#include "types.hpp"
+#include <cstddef>
+#include <filesystem>
+#include <map>
+#include <set>
+#include <string>
+#include <vector>
+
+namespace beam::input {
+// Views borrow host-owned tensor vectors only for the duration of hashing.
+// They are never device pointers and do not outlive the weight loader.
+struct NamedHostBytes {
+    std::string name;
+    const std::vector<std::byte>* bytes;
+};
+std::string mlp_artifact_sha256(const std::string& manifest, const std::string& graph_hash,
+                                std::vector<NamedHostBytes> tensors);
+bool lowercase_sha256(const std::string& value);
+// Canonical CayleyPy SHA-256 of the logical loaded graph. Padding and names
+// are excluded. The input vectors remain owned by the native runner.
+std::string loaded_permutation_graph_sha256(const State128& center,
+                                           const std::vector<std::uint8_t>& generators);
+
+// Binds loaded bytes to a manifest; does not authenticate the manifest itself.
+class TensorBinding {
+public:
+    TensorBinding(const std::string& manifest, bool required);
+    void verify(const std::string& name, const std::vector<std::byte>& bytes);
+    void finish() const;
+private:
+    bool active_ = false;
+    std::map<std::string, std::pair<std::uint64_t, std::string>> expected_;
+    std::set<std::string> seen_;
+};
+std::uint64_t parse_u64(const char*, const char*);
+std::uint32_t parse_u32(const char*, const char*);
+std::string read_text_file(const std::filesystem::path&);
+bool json_has_field(const std::string&, const char*);
+std::uint32_t json_u32_field(const std::string&, const char*);
+std::string json_string_field(const std::string&, const char*);
+State128 parse_state_text(const std::string&, const char*);
+// A permutation search preserves the central state's multiset. Validate both
+// states against the actual model alphabet before embedding/hash access.
+void validate_state(const State128&, const State128& central, std::uint32_t classes, const char*);
+State128 load_central_state(const std::filesystem::path&);
+// The two vectors are parsed from the same file snapshot and owned together.
+struct NativeMoves {
+    std::vector<std::uint8_t> data;
+    std::vector<std::string> names;
+};
+NativeMoves load_p900_moves(const std::filesystem::path&);
+std::vector<std::uint8_t> load_p900_generators(const std::filesystem::path&);
+std::vector<std::string> load_p900_move_names(const std::filesystem::path&);
+std::map<std::uint64_t, State128> load_initial_states_from_test_csv(const std::filesystem::path&);
+State128 load_initial_state_from_test_csv(const std::filesystem::path&, std::uint64_t);
+}

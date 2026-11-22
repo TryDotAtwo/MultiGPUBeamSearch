@@ -1,0 +1,8 @@
+INFERENCE_JOB_OK native_mlp world=1
+INFERENCE_JOB_OK libtorch_mlp world=1
+INFERENCE_JOB_OK ensemble world=1
+INFERENCE_JOB_OK native_mlp world=2
+INFERENCE_JOB_OK libtorch_mlp world=2
+INFERENCE_JOB_OK ensemble world=2
+PUBLIC_THIN_INFERENCE_OK
+NATIVE_INFERENCE_JOB_GPU_OK

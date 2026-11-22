@@ -1,0 +1,10 @@
+   Compiling beam-runtime v0.1.0 (/workspace/beam-work/rust/beam-runtime)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.49s
+     Running tests/calibration.rs (/workspace/target/debug/deps/calibration-1c74e036a6eda7fe)
+
+running 2 tests
+test capacity_only_retreats_on_explicit_rejection_and_keeps_exact_lower_bound ... ok
+test rust_owns_admit_release_measure_select_sequence_and_freezes_microbatch ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

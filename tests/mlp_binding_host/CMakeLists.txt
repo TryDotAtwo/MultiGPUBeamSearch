@@ -1,0 +1,5 @@
+cmake_minimum_required(VERSION 3.22)
+project(beam_mlp_binding_host LANGUAGES CXX)
+enable_testing()
+include("${CMAKE_CURRENT_LIST_DIR}/../../cmake/BeamMlpBindingTests.cmake")
+beam_add_mlp_binding_tests()

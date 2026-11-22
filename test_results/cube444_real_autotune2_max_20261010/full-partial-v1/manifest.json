@@ -1,0 +1,470 @@
+{
+  "bytes": 88572,
+  "sha256": "9d684b849289b66cd6095ca72b3cc55821b2fa4d9b333f8cb1d470cc61e5ca24",
+  "parts": [
+    {
+      "name": "part-000",
+      "bytes": 75000,
+      "sha256": "577bdf7b561992a869c99b62d739735e8ce6a8f9c68d7a3ade5b2f6a6d601f98"
+    },
+    {
+      "name": "part-001",
+      "bytes": 13572,
+      "sha256": "f163727f5edc35fcbd8f3bb556570d4fd09801058e6e388d00d60f971cfd7d3f"
+    }
+  ],
+  "files": [
+    {
+      "path": "bootstrap.py",
+      "bytes": 4273,
+      "sha256": "1ca9fed89e9a7e5e4f91fbf79371956ae19b07a84c1ec26e5c4a439514291e8c"
+    },
+    {
+      "path": "bundle/blend.json",
+      "bytes": 18021,
+      "sha256": "8346586b1ef183e25d2bcbfeec571ced2ffa02eadf31d273525dcff1b5f24a78"
+    },
+    {
+      "path": "bundle/tensors.tsv",
+      "bytes": 12238,
+      "sha256": "69bb79be355a07c727ad0d83cbb202b8b517395fe4d5e267ee46735ce676f29e"
+    },
+    {
+      "path": "export_cube444_blend.py",
+      "bytes": 2186,
+      "sha256": "8fd8342c1dfd607ce9059ff2b8723170d0b9f8a2b8bb313a6adf628e6dc6ab57"
+    },
+    {
+      "path": "fixture-gen.py",
+      "bytes": 2267,
+      "sha256": "ce45cb12a951bd68ef62010d584ec938be4de8795716c2c8eb23070183e538ae"
+    },
+    {
+      "path": "freeze-completed.py",
+      "bytes": 2905,
+      "sha256": "6f46d1f40f808e3bc08f368b5437d3f7a996ef6918ca6b22748d9826d5d6d47e"
+    },
+    {
+      "path": "full-verification.py",
+      "bytes": 9429,
+      "sha256": "80db043a9bc57efc65ea485cb547839535ea9bd553ec47cf7e40d0e5f10a60aa"
+    },
+    {
+      "path": "maximum-control.json",
+      "bytes": 78,
+      "sha256": "6c60051a4d37f6e7ded5ca767fc8d9bf4ff54f625cb3f6f461b03505f6414b30"
+    },
+    {
+      "path": "maximum-run.py",
+      "bytes": 14143,
+      "sha256": "95cc9bec7c0d340602b0703ca07ad140c33077a2cc002c9ad88b20f746ebcf7e"
+    },
+    {
+      "path": "public-api-search.py",
+      "bytes": 4070,
+      "sha256": "d755c10d68a20e91129cb366fa1866663d82a5d1a9c2921666c8530d66d639cc"
+    },
+    {
+      "path": "public-calibration.py",
+      "bytes": 6158,
+      "sha256": "c5ffab28ebcadc4515f4f9648c7d435ee42fbbf3c91a305d445a13ee2d80de62"
+    },
+    {
+      "path": "results/full-verification/1048576/component-probes/1/components.json",
+      "bytes": 2593,
+      "sha256": "bd9adca661dde928c218500925c59d3e2fe3181503473db7de636a5e7ad09ab3"
+    },
+    {
+      "path": "results/full-verification/1048576/component-probes/1/gpu-telemetry.json",
+      "bytes": 781,
+      "sha256": "832dc426b8abfae2cc80780dfafc5c7434161f77c9ea99c1734f3f0205b97ca0"
+    },
+    {
+      "path": "results/full-verification/1048576/component-probes/2/components.json",
+      "bytes": 2599,
+      "sha256": "f3f74712be1a01bd50ac1287bdb18a31c42c652c20412792a107ca3cc4bfb371"
+    },
+    {
+      "path": "results/full-verification/1048576/component-probes/2/gpu-telemetry.json",
+      "bytes": 781,
+      "sha256": "a011992435bc9ead9349f27f36307fc77585ab841c19ca175de55fca4593abd9"
+    },
+    {
+      "path": "results/full-verification/1048576/component-probes/3/components.json",
+      "bytes": 2600,
+      "sha256": "359b179246abe5c8a2be20a1859b5ee5dfe6dad24d74b0e7c5125c3e66ae6794"
+    },
+    {
+      "path": "results/full-verification/1048576/component-probes/3/gpu-telemetry.json",
+      "bytes": 781,
+      "sha256": "bb299ab8bfcd53308cdf15db2686db4030c16cb4c90d74d36979d3113afbc0a8"
+    },
+    {
+      "path": "results/full-verification/1048576/component-probes/4/components.json",
+      "bytes": 2605,
+      "sha256": "e5eb0e58c9db21d03eec05465f87f806e02f956cff44855ac238f08810470689"
+    },
+    {
+      "path": "results/full-verification/1048576/component-probes/4/gpu-telemetry.json",
+      "bytes": 781,
+      "sha256": "debdfa3203d85380ca633095308d455a136195d987b4c658727cbb09d5014345"
+    },
+    {
+      "path": "results/full-verification/1048576/component-probes/5/components.json",
+      "bytes": 2600,
+      "sha256": "1b6ec1ec9a69404d327fd7792f5a7f3175f85c8f6d63b8f74f725bbf46a75937"
+    },
+    {
+      "path": "results/full-verification/1048576/component-probes/5/gpu-telemetry.json",
+      "bytes": 781,
+      "sha256": "7ff8bd995b05df76462845d49dd20a998e889e531a9a1e480a3431509822163f"
+    },
+    {
+      "path": "results/full-verification/1048576/component-probes/6/components.json",
+      "bytes": 2607,
+      "sha256": "589d0edbfb881b218566839f429113cfc7a151b175230d0320bf205fd56a17d6"
+    },
+    {
+      "path": "results/full-verification/1048576/component-probes/6/gpu-telemetry.json",
+      "bytes": 781,
+      "sha256": "debdfa3203d85380ca633095308d455a136195d987b4c658727cbb09d5014345"
+    },
+    {
+      "path": "results/full-verification/1048576/component-selection.json",
+      "bytes": 32842,
+      "sha256": "efdf8a4c56b09ec1826197d8f2add990abe22ba134b2a1735865a743db1eac34"
+    },
+    {
+      "path": "results/full-verification/1048576/components/nccl-id.bin",
+      "bytes": 192,
+      "sha256": "3a9b35cff07d16c3665255207fc37c2f8ccc803adb06a79faf151b6165588c4c"
+    },
+    {
+      "path": "results/full-verification/1048576/components/rank-0.log",
+      "bytes": 8511,
+      "sha256": "a5dba1aa8af75aa8105d56a42d109705398a26a8c5580ab051d42a0f51d3a41d"
+    },
+    {
+      "path": "results/full-verification/1048576/components/rank-1.log",
+      "bytes": 8501,
+      "sha256": "7a902e5ae3fa01eb2458c3e53eb3a48b33bd7c2acc61e731062322b94c2f60b6"
+    },
+    {
+      "path": "results/full-verification/1048576/fixture-generation.log",
+      "bytes": 66,
+      "sha256": "cebe4c3939dd2023865d4a0e8f6d5ff16e796ed4c25bc3f356947ec8e9a879ea"
+    },
+    {
+      "path": "results/full-verification/1048576/full/env0.json",
+      "bytes": 1503,
+      "sha256": "e0e1b70ec2ce21bb0fec2330ee05966e445d23fcc1bae9862804818c101e12a7"
+    },
+    {
+      "path": "results/full-verification/1048576/full/env1.json",
+      "bytes": 1503,
+      "sha256": "27b8421b486e40e06ad4cba628d4d724611492b49980d2977b4111d50c4be891"
+    },
+    {
+      "path": "results/full-verification/1048576/full/exit.json",
+      "bytes": 475,
+      "sha256": "361b712ad0cdcf953d6dc54e178aff365a8268ea238ae374a9f93a57d6bf8bef"
+    },
+    {
+      "path": "results/full-verification/1048576/full/nccl",
+      "bytes": 179,
+      "sha256": "231eef0262b42cb2567c9890a6ce11cf1894776d16cb8028ce8c7f3d3d4b2db8"
+    },
+    {
+      "path": "results/full-verification/1048576/full/rank0.log",
+      "bytes": 8739,
+      "sha256": "d1317440de5a277769e84ad681236ef1798f93c46d8bce7e283e85368d6b882c"
+    },
+    {
+      "path": "results/full-verification/1048576/full/rank1.log",
+      "bytes": 8739,
+      "sha256": "a8c14ef23581568587b94326003a121edc12a24c022eab29f4371ad3d70182e4"
+    },
+    {
+      "path": "results/full-verification/1048576/full/test_results/unsolved_run_1791585791784197170_r1_0/no_solution_p0_d6_b1048576.log",
+      "bytes": 328,
+      "sha256": "a244f4f45d960d280131b2a28c7b9924a3c7e294e5b58cf5531b49c433417422"
+    },
+    {
+      "path": "results/full-verification/1048576/full/test_results/unsolved_run_1791585791784211019_r0_0/no_solution_p0_d6_b1048576.log",
+      "bytes": 328,
+      "sha256": "2b8c0dcf0e93ce9265e82181efc24ac7e6d8d446cc8f55e30b2a8e1048695312"
+    },
+    {
+      "path": "results/full-verification/1048576/matched-receipts.json",
+      "bytes": 2280,
+      "sha256": "92a901c8f91d89ec80a1995bc0afac9596952ea86d67994f60e986d44513b1fb"
+    },
+    {
+      "path": "results/full-verification/1048576/report.json",
+      "bytes": 39619,
+      "sha256": "a46a274930b0c79b34c8636f92eba4b4c0b3b0ed5d19207b4d0ddd80d3fa4f92"
+    },
+    {
+      "path": "results/full-verification/1048576/stream1/inputs-0/ensemble.json",
+      "bytes": 744,
+      "sha256": "ac04eef7533aa0bbc1233b6714cb973244af3288d9cfdc93ba7aa052e73af6cc"
+    },
+    {
+      "path": "results/full-verification/1048576/stream1/inputs-1/ensemble.json",
+      "bytes": 744,
+      "sha256": "3a93ab3fcdf9a6fb5b0e62f5d26e89509aa80e0f8bb39361f141da4d32787053"
+    },
+    {
+      "path": "results/full-verification/1048576/stream1/rank0.log",
+      "bytes": 398,
+      "sha256": "ca52f3a9fe31dae36adfe883603132e0191c85b14bbf5c84db484a8bf418a049"
+    },
+    {
+      "path": "results/full-verification/1048576/stream1/rank1.log",
+      "bytes": 399,
+      "sha256": "59e616ff220cba87d5c70f458ee89c8ceaa33666ec9e71cccae71231824e035c"
+    },
+    {
+      "path": "results/full-verification/1048576/stream1/receipt.json",
+      "bytes": 1230,
+      "sha256": "a63bb8eed3352c2b431ad1bf95b40525781967f26e0839d84fcdc1ebb49ca9c1"
+    },
+    {
+      "path": "results/hardware.json",
+      "bytes": 4605,
+      "sha256": "21ad5445e6b242fe396118dde8e1d291f509b74d317cae0cc70f538c2e585d80"
+    },
+    {
+      "path": "results/preparation.json",
+      "bytes": 1351,
+      "sha256": "c73b9ba9e8ca1b801c5ed0e193ebbbc9c740b489e62fb32908f6d2c43c746b73"
+    },
+    {
+      "path": "results/public-calibration-attempt3/prepared/weights/ensemble.json",
+      "bytes": 612,
+      "sha256": "5b32bf60af95fd072a1198da136508d6e4d7cb9d7392de96b46d07c86d57e0d3"
+    },
+    {
+      "path": "results/public-calibration-attempt3/report.json",
+      "bytes": 4699,
+      "sha256": "93c88c99f185a04c1c6065ecff6e4115497e9b1784e59bd85d6b037aad2def38"
+    },
+    {
+      "path": "results/public-calibration-attempt3/w2-beam1048576/admit-8192/nccl-id.bin",
+      "bytes": 192,
+      "sha256": "2bf575e378208e0f1bfcd0938dbab633b4c1f94044ae281a2576796559931e57"
+    },
+    {
+      "path": "results/public-calibration-attempt3/w2-beam1048576/admit-8192/rank-0.log",
+      "bytes": 791,
+      "sha256": "df73a2bf3e2ea27a44ca8be561a8642449b47a2e4d10f5ac89b3bd5f0dfe2fc6"
+    },
+    {
+      "path": "results/public-calibration-attempt3/w2-beam1048576/admit-8192/rank-1.log",
+      "bytes": 791,
+      "sha256": "d3b71ec861229943051480caadafe84677070401e98bb3e064c3f0c0c4992536"
+    },
+    {
+      "path": "results/public-calibration-attempt3/w2-beam1048576/calibration/batch-1024-receipt.json",
+      "bytes": 3625,
+      "sha256": "03653d9987f2804e39f0e2f541938395e54fd43aca2ef34115b1c9a34325d099"
+    },
+    {
+      "path": "results/public-calibration-attempt3/w2-beam1048576/calibration/batch-128-receipt.json",
+      "bytes": 3623,
+      "sha256": "eeb575b10c0e1d6715ad79497bdbfcf84a9b7ee004b504bee0e242abec77902d"
+    },
+    {
+      "path": "results/public-calibration-attempt3/w2-beam1048576/calibration/batch-2048-receipt.json",
+      "bytes": 3630,
+      "sha256": "4d12ec3bb29bce0c9dd89656e1b092d0d9cc4f57a0b7d1648ec22cd889c7b48b"
+    },
+    {
+      "path": "results/public-calibration-attempt3/w2-beam1048576/calibration/batch-256-receipt.json",
+      "bytes": 3966,
+      "sha256": "bf04ef1c2eae15159838a21cacc14e0e90fd46892623f6ece26014f378f0359d"
+    },
+    {
+      "path": "results/public-calibration-attempt3/w2-beam1048576/calibration/batch-32-receipt.json",
+      "bytes": 3940,
+      "sha256": "8cf75607142d16110ac6947faea4e99759c7ae2200a574dd3263327fe7ada27d"
+    },
+    {
+      "path": "results/public-calibration-attempt3/w2-beam1048576/calibration/batch-4096-receipt.json",
+      "bytes": 3624,
+      "sha256": "3c2c640b9bf6129300301f0446f9027cab66e9ec58ba3b652a414e9b6b6b2e33"
+    },
+    {
+      "path": "results/public-calibration-attempt3/w2-beam1048576/calibration/batch-512-receipt.json",
+      "bytes": 3617,
+      "sha256": "12d2b5175e6ae0a5e67c55a3cb83996794074818be9eb133226c4fd53647318f"
+    },
+    {
+      "path": "results/public-calibration-attempt3/w2-beam1048576/calibration/batch-5120-receipt.json",
+      "bytes": 3968,
+      "sha256": "2c99f9d0d4d015d7b86768525987c35edf01c8278767ece295fd016061c7842f"
+    },
+    {
+      "path": "results/public-calibration-attempt3/w2-beam1048576/calibration/batch-6144-receipt.json",
+      "bytes": 3966,
+      "sha256": "fc1eb13f0585d30036094ce7ff4d0d04724d9338d4235f7d8f2aef36e8442954"
+    },
+    {
+      "path": "results/public-calibration-attempt3/w2-beam1048576/calibration/batch-64-receipt.json",
+      "bytes": 3617,
+      "sha256": "cc3075d30cc6cfbd4c9d426ed0a66fe958e21b14c123cf04f87a7b30ea5aa528"
+    },
+    {
+      "path": "results/public-calibration-attempt3/w2-beam1048576/calibration/batch-7168-receipt.json",
+      "bytes": 3966,
+      "sha256": "d2d3e112b1835488474dbc067378f0349d01cf0ac4a7c3a37d6693bee96944a2"
+    },
+    {
+      "path": "results/public-calibration-attempt3/w2-beam1048576/calibration/batch-8192-receipt.json",
+      "bytes": 3972,
+      "sha256": "ceed1a4a8a5a06a209bdf182911f25106871a4ac70cce3a457cc615c7d71f5dd"
+    },
+    {
+      "path": "results/public-calibration-attempt3/w2-beam1048576/calibration/inference-selection.json",
+      "bytes": 29943,
+      "sha256": "1ec27eb1d9ec7521e7d21c1b41f9356ccc81a9076c77a83bd1c18f8ef239af5c"
+    },
+    {
+      "path": "results/public-calibration-attempt3/w2-beam1048576/calibration/inputs/ensemble.json",
+      "bytes": 46851,
+      "sha256": "a1038121bf0f9a581c16291a3a47edd99b16d646a7cd18d1261b0a2d9872b1d4"
+    },
+    {
+      "path": "results/public-calibration-attempt3/w2-beam1048576/calibration/session-1-rank-0.log",
+      "bytes": 4987,
+      "sha256": "eaf78c9f3894a17a1c176b1e107e0a5060e066393b9a68fa194b9547e51b2f5b"
+    },
+    {
+      "path": "results/public-calibration-attempt3/w2-beam1048576/calibration/session-2-rank-1.log",
+      "bytes": 5002,
+      "sha256": "63b29794f65b98ed04a6ca25e1559f25626eb754b79bf9ce54d3a813172ee0c2"
+    },
+    {
+      "path": "results/public-calibration-attempt3/w2-beam1048576/report.json",
+      "bytes": 1815,
+      "sha256": "544e679e6f2ab47582690fce0848add2d68f9c0121d3284dea718542f6d214d0"
+    },
+    {
+      "path": "results/public-calibration-attempt3/w2-beam8388608/admit-8192/nccl-id.bin",
+      "bytes": 192,
+      "sha256": "7de3ed5b7bb593f3d9d3477756ac58a71a78059218ad4657c126a7c18be81469"
+    },
+    {
+      "path": "results/public-calibration-attempt3/w2-beam8388608/admit-8192/rank-0.log",
+      "bytes": 793,
+      "sha256": "4074d92a142cd9d4bef5211f0b0d705a4e8728825a11ae1df0b3702870dd22f2"
+    },
+    {
+      "path": "results/public-calibration-attempt3/w2-beam8388608/admit-8192/rank-1.log",
+      "bytes": 793,
+      "sha256": "2460e50b103d552e57ed625b978b3647d97744bb4f01432c644e3d264441e93f"
+    },
+    {
+      "path": "results/public-calibration-attempt3/w2-beam8388608/calibration/batch-1024-receipt.json",
+      "bytes": 3628,
+      "sha256": "393e8691733995ec7db3eecc3f319218a27ca55c08d0c717bd7ea8c10d3a27a5"
+    },
+    {
+      "path": "results/public-calibration-attempt3/w2-beam8388608/calibration/batch-128-receipt.json",
+      "bytes": 3623,
+      "sha256": "1e4bfeb36e656073980756bfa2ad1df9125057dc2b932a0279b8cd2e04f160ae"
+    },
+    {
+      "path": "results/public-calibration-attempt3/w2-beam8388608/calibration/batch-2048-receipt.json",
+      "bytes": 3627,
+      "sha256": "e9bc6dd1020083e225806f560677b17fd65f6c27e12990ec588e9928a9198c4c"
+    },
+    {
+      "path": "results/public-calibration-attempt3/w2-beam8388608/calibration/batch-256-receipt.json",
+      "bytes": 3959,
+      "sha256": "9621c08ece1615be7506de3393ddb5941d687da971b0800f88898e3701e051cf"
+    },
+    {
+      "path": "results/public-calibration-attempt3/w2-beam8388608/calibration/batch-32-receipt.json",
+      "bytes": 3953,
+      "sha256": "d401afb54b5832e8a2fd09432ff2b32c6b804fb88cf51d7639b667c172560e2b"
+    },
+    {
+      "path": "results/public-calibration-attempt3/w2-beam8388608/calibration/batch-4096-receipt.json",
+      "bytes": 3614,
+      "sha256": "ab97d4b0b40fb6d5fa3362c3b498b5b52c0d1c9b3bba98253087bfc52719eeaf"
+    },
+    {
+      "path": "results/public-calibration-attempt3/w2-beam8388608/calibration/batch-512-receipt.json",
+      "bytes": 3619,
+      "sha256": "5bd4a51e2c7e1792e815378ece2f8cb9368d2a57c97f114be6103002f1e275b6"
+    },
+    {
+      "path": "results/public-calibration-attempt3/w2-beam8388608/calibration/batch-5120-receipt.json",
+      "bytes": 3964,
+      "sha256": "f08c06885119cbc6a2baccc698477bba6c5ac635eae8c9a4fb04dab9b71a518c"
+    },
+    {
+      "path": "results/public-calibration-attempt3/w2-beam8388608/calibration/batch-6144-receipt.json",
+      "bytes": 3962,
+      "sha256": "bc816646eb4f4b6ba62c14d9ac5d52707c0c7bb9a3645e9faa4544def1f50905"
+    },
+    {
+      "path": "results/public-calibration-attempt3/w2-beam8388608/calibration/batch-64-receipt.json",
+      "bytes": 3617,
+      "sha256": "bf9c16f82603be63981d7246b85a23a161c4926aa972e02193a04dcd09acfad8"
+    },
+    {
+      "path": "results/public-calibration-attempt3/w2-beam8388608/calibration/batch-7168-receipt.json",
+      "bytes": 3968,
+      "sha256": "52810d4ba704a0a7c87c60f436d8f60593011455a95cf94a25149601803f2b1a"
+    },
+    {
+      "path": "results/public-calibration-attempt3/w2-beam8388608/calibration/batch-8192-receipt.json",
+      "bytes": 3972,
+      "sha256": "f64a7e09bb2e22e2571a6cfeac3defd47e493a9bdcfe891824cbf48108c303b8"
+    },
+    {
+      "path": "results/public-calibration-attempt3/w2-beam8388608/calibration/inference-selection.json",
+      "bytes": 29932,
+      "sha256": "f3a827d77ed308504300178d1e2d048ff1c0acf69809674de7aa28f36b11ef2a"
+    },
+    {
+      "path": "results/public-calibration-attempt3/w2-beam8388608/calibration/inputs/ensemble.json",
+      "bytes": 46851,
+      "sha256": "a1038121bf0f9a581c16291a3a47edd99b16d646a7cd18d1261b0a2d9872b1d4"
+    },
+    {
+      "path": "results/public-calibration-attempt3/w2-beam8388608/calibration/session-1-rank-0.log",
+      "bytes": 4984,
+      "sha256": "c7a6ed9329b42bf4c2ed3db0b337db7c1e6f1d14bede4b606e37482a056622e6"
+    },
+    {
+      "path": "results/public-calibration-attempt3/w2-beam8388608/calibration/session-2-rank-1.log",
+      "bytes": 4997,
+      "sha256": "f847823ccececca8b488981d21ea17d598bcb054dacb516a327e7f5ed463a4e4"
+    },
+    {
+      "path": "results/public-calibration-attempt3/w2-beam8388608/report.json",
+      "bytes": 1811,
+      "sha256": "25bdd9de6e111ffabc4da261ccab7ca72df7d316420072aee3131f7780f30642"
+    },
+    {
+      "path": "resume-full.py",
+      "bytes": 2402,
+      "sha256": "3d7f46ceee97712a058e2d57c4d5f200c2b95c8c5c1d34215344ea176979551d"
+    },
+    {
+      "path": "runtime-receipt.json",
+      "bytes": 1265,
+      "sha256": "b9e0d8a290e5dbf1e01bb178fcef03102f57cfc0f23a65ec8abbd15cb9696b8d"
+    },
+    {
+      "path": "setup.json",
+      "bytes": 201,
+      "sha256": "77b37a4adea9cefbf840b61284f3032c58051b7c25d39c556fa9d66f8bfc7747"
+    }
+  ],
+  "snapshot": "completed cases only, immutable copied bytes",
+  "created_utc_epoch": 1791588456.0796652
+}

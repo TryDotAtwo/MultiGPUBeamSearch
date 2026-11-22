@@ -1,0 +1,90 @@
+[  0%] Building CXX object CMakeFiles/beam_core.dir/src/config.cpp.o
+[  6%] Building CXX object CMakeFiles/beam_core.dir/src/state.cpp.o
+[  6%] Building CXX object CMakeFiles/beam_core.dir/src/hash.cpp.o
+[ 12%] Building CXX object CMakeFiles/beam_core.dir/src/history.cpp.o
+[ 12%] Building CXX object CMakeFiles/beam_core.dir/src/history_budget.cpp.o
+[ 18%] Building CXX object CMakeFiles/beam_core.dir/src/native_input.cpp.o
+[ 18%] Building CXX object CMakeFiles/beam_core.dir/src/stream3.cpp.o
+[ 25%] Building CXX object CMakeFiles/beam_core.dir/src/stream4.cpp.o
+In file included from /usr/include/c++/13/bits/stl_algo.h:61,
+                 from /usr/include/c++/13/algorithm:61,
+                 from /root/gnn-beam-source/src/stream4.cpp:5:
+/usr/include/c++/13/bits/stl_heap.h: In function ‘constexpr void std::__adjust_heap(_RandomAccessIterator, _Distance, _Distance, _Tp, _Compare) [with _RandomAccessIterator = __gnu_cxx::__normal_iterator<beam::CandidateMeta*, vector<beam::CandidateMeta> >; _Distance = long int; _Tp = beam::CandidateMeta; _Compare = __gnu_cxx::__ops::_Iter_comp_iter<beam::stream4_threshold_sort_dedup(const std::vector<CandidateMeta>&, uint32_t)::<lambda(const beam::CandidateMeta&, const beam::CandidateMeta&)> >]’:
+/usr/include/c++/13/bits/stl_heap.h:224:5: note: the ABI for passing parameters with 32-byte alignment has changed in GCC 4.6
+  224 |     __adjust_heap(_RandomAccessIterator __first, _Distance __holeIndex,
+      |     ^~~~~~~~~~~~~
+[ 25%] Building CXX object CMakeFiles/beam_core.dir/src/frontier_cpu.cpp.o
+In file included from /usr/include/c++/13/bits/stl_algo.h:61,
+                 from /usr/include/c++/13/algorithm:61,
+                 from /root/gnn-beam-source/src/frontier_cpu.cpp:3:
+/usr/include/c++/13/bits/stl_heap.h: In function ‘constexpr void std::__adjust_heap(_RandomAccessIterator, _Distance, _Distance, _Tp, _Compare) [with _RandomAccessIterator = __gnu_cxx::__normal_iterator<beam::CandidateMeta*, vector<beam::CandidateMeta> >; _Distance = long int; _Tp = beam::CandidateMeta; _Compare = __gnu_cxx::__ops::_Iter_comp_iter<beam::expand_depth_cpu_reference(const std::vector<StatePacked>&, const std::vector<std::array<unsigned char, 16> >&, const State128&, const ZobristTable&, uint32_t, uint64_t)::<lambda(const beam::CandidateMeta&, const beam::CandidateMeta&)> >]’:
+/usr/include/c++/13/bits/stl_heap.h:224:5: note: the ABI for passing parameters with 32-byte alignment has changed in GCC 4.6
+  224 |     __adjust_heap(_RandomAccessIterator __first, _Distance __holeIndex,
+      |     ^~~~~~~~~~~~~
+[ 31%] Linking CXX static library libbeam_core.a
+[ 31%] Built target beam_core
+[ 31%] Building CUDA object CMakeFiles/beam_cuda.dir/cuda/stream1.cu.o
+[ 37%] Building CUDA object CMakeFiles/beam_cuda.dir/cuda/stream1_transformer.cu.o
+[ 37%] Building CUDA object CMakeFiles/beam_cuda.dir/cuda/stream1_blend_readout.cu.o
+[ 43%] Building CUDA object CMakeFiles/beam_cuda.dir/cuda/stream1_ensemble_readout.cu.o
+[ 50%] Building CUDA object CMakeFiles/beam_cuda.dir/cuda/stream1_gnn_projection.cu.o
+[ 50%] Building CUDA object CMakeFiles/beam_cuda.dir/cuda/stream1_transformer_fmha.cu.o
+[ 56%] Building CUDA object CMakeFiles/beam_cuda.dir/cuda/stream2.cu.o
+[ 56%] Building CUDA object CMakeFiles/beam_cuda.dir/cuda/stream3.cu.o
+/root/gnn-beam-source/cuda/stream3.cu(129): warning #177-D: function "beam::<unnamed>::stream3_debug_store_count_kernel" was declared but never referenced
+  __attribute__((global)) void stream3_debug_store_count_kernel(
+                               ^
+
+Remark: The warnings can be suppressed with "-diag-suppress <warning-number>"
+
+[ 62%] Building CUDA object CMakeFiles/beam_cuda.dir/cuda/stream4.cu.o
+[ 62%] Building CUDA object CMakeFiles/beam_cuda.dir/cuda/stream5.cu.o
+[ 68%] Building CUDA object CMakeFiles/beam_cuda.dir/cuda/threshold.cu.o
+[ 68%] Building CUDA object CMakeFiles/beam_cuda.dir/cuda/final_materialize.cu.o
+[ 75%] Building CUDA object CMakeFiles/beam_cuda.dir/cuda/dispatcher.cu.o
+[ 75%] Building CUDA object CMakeFiles/beam_cuda.dir/cuda/static_memory.cu.o
+[ 81%] Building CXX object CMakeFiles/beam_cuda.dir/cuda/runtime_config.cpp.o
+[ 81%] Linking CXX static library libbeam_cuda.a
+[ 81%] Built target beam_cuda
+[ 87%] Building CUDA object CMakeFiles/production_runner_libtorch_stream1.dir/tools/production_runner.cu.o
+[ 93%] Building CXX object CMakeFiles/production_runner_libtorch_stream1.dir/tools/stream1_libtorch_ring_slot_launcher.cpp.o
+/root/gnn-beam-source/tools/production_runner.cu(4751): warning #177-D: variable "tracked_solution" was declared but never referenced
+      TrackedSolutionPrefix tracked_solution;
+                            ^
+
+Remark: The warnings can be suppressed with "-diag-suppress <warning-number>"
+
+/root/gnn-beam-source/tools/production_runner.cu(513): warning #177-D: function "<unnamed>::parse_next_u32" was declared but never referenced
+  std::uint32_t parse_next_u32(const std::string& text, std::size_t& pos, const char* context) {
+                ^
+
+/root/gnn-beam-source/tools/production_runner.cu(1283): warning #177-D: function "<unnamed>::build_solved_neighborhood_runtime" was declared but never referenced
+  SolvedNeighborhoodRuntime build_solved_neighborhood_runtime(
+                            ^
+
+/root/gnn-beam-source/tools/production_runner.cu(1326): warning #177-D: function "<unnamed>::RepairSolvedNeighborhoodPrefetch::enabled" was declared but never referenced
+      bool enabled() const {
+           ^
+
+/root/gnn-beam-source/tools/production_runner.cu(1582): warning #177-D: function "<unnamed>::track_location_name" was declared but never referenced
+  const char* track_location_name(std::uint32_t location) {
+              ^
+
+/root/gnn-beam-source/tools/production_runner.cu(1599): warning #177-D: function "<unnamed>::track_stream4_phase_name" was declared but never referenced
+  const char* track_stream4_phase_name(std::uint32_t phase) {
+              ^
+
+/root/gnn-beam-source/tools/production_runner.cu(4004): warning #177-D: function "<unnamed>::NcclRuntime::operator=(<unnamed>::NcclRuntime &&) noexcept" was declared but never referenced
+      NcclRuntime& operator=(NcclRuntime&& other) noexcept {
+                   ^
+
+[ 93%] Building CXX object CMakeFiles/production_runner_libtorch_stream1.dir/tools/stream1_transformer_libtorch_backend.cpp.o
+[100%] Building CXX object CMakeFiles/production_runner_libtorch_stream1.dir/tools/stream1_gnn_projection_libtorch.cpp.o
+[100%] Linking CXX executable production_runner_libtorch_stream1
+[100%] Built target production_runner_libtorch_stream1
+[ 35%] Built target beam_core
+[ 92%] Built target beam_cuda
+[100%] Building CXX object CMakeFiles/stream1_ensemble_benchmark.dir/tools/stream1_gnn_projection_libtorch.cpp.o
+[100%] Building CXX object CMakeFiles/stream1_ensemble_benchmark.dir/tools/stream1_ensemble_benchmark.cpp.o
+[100%] Linking CXX executable stream1_ensemble_benchmark
+[100%] Built target stream1_ensemble_benchmark

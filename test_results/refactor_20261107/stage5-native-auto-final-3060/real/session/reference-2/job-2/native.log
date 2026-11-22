@@ -1,0 +1,100 @@
+[rank 0]
+GLOBAL_BEAM_WIDTH_EFFECTIVE=64
+candidate_history_dir=/workspace/beam-results/native-auto/real/session/reference-2/job-2/history/rank-0
+candidate_history_mode=disk
+candidate_history_prune_enabled=0
+candidate_history_slots=3
+candidate_history_workers=1
+candidate_history_ram_budget_total=16777216
+candidate_history_disk_budget_total=1048576
+candidate_history_ram_budget_per_rank=8388608
+candidate_history_disk_budget_per_rank=524288
+candidate_history_pinned_slot_bytes=3072
+candidate_history_slot_staging_bytes=1536
+candidate_history_static_ram_arena_bytes=0
+candidate_history_static_disk_arena_bytes=0
+candidate_history_budget_formula=all_expansion_depths_fixed_reservations
+candidate_history_ram_reserved_entries=0
+candidate_history_disk_reserved_entries=0
+candidate_history_prefull_estimator=move_count_upper_bound
+candidate_history_effective_depth=0
+candidate_history_target_beam_depth=0
+candidate_history_states_before_target_beam=0
+candidate_history_required_entries=0
+candidate_history_required_bytes=0
+runtime_depth_start=0 frontier_size=1
+runtime_depth_done=0 depth_sec=0.0289352
+runtime_depth_start=1 frontier_size=12
+runtime_depth_done=1 depth_sec=0.00405229
+runtime_depth_start=2 frontier_size=32
+runtime_depth_done=2 depth_sec=0.00389206
+runtime_depth_start=3 frontier_size=32
+runtime_depth_done=3 depth_sec=0.00365625
+elapsed_sec=0.0412576
+avg_depth_sec=0.0103144
+completed_depths=4
+last_final_frontier_size=32
+last_final_threshold=9216
+threshold_updates=0
+solution_found=0
+history_mode=disk
+history_depth_count=4
+history_bytes_received=3456
+history_bytes_stored=1728
+history_bytes_stored_ram=0
+history_bytes_stored_disk=1728
+history_bytes_pruned=0
+history_flush_sec=9.9904e-05
+puzzle_solved=0 puzzle_id=0 seconds=0.0412576 solution_length=-1 solution=
+no_solution_log=test_results/unsolved_run_1794091357870130760_r0_0/no_solution_p0_d4_b64.log
+
+[rank 1]
+GLOBAL_BEAM_WIDTH_EFFECTIVE=64
+candidate_history_dir=/workspace/beam-results/native-auto/real/session/reference-2/job-2/history/rank-1
+candidate_history_mode=disk
+candidate_history_prune_enabled=0
+candidate_history_slots=3
+candidate_history_workers=1
+candidate_history_ram_budget_total=16777216
+candidate_history_disk_budget_total=1048576
+candidate_history_ram_budget_per_rank=8388608
+candidate_history_disk_budget_per_rank=524288
+candidate_history_pinned_slot_bytes=3072
+candidate_history_slot_staging_bytes=1536
+candidate_history_static_ram_arena_bytes=0
+candidate_history_static_disk_arena_bytes=0
+candidate_history_budget_formula=all_expansion_depths_fixed_reservations
+candidate_history_ram_reserved_entries=0
+candidate_history_disk_reserved_entries=0
+candidate_history_prefull_estimator=move_count_upper_bound
+candidate_history_effective_depth=0
+candidate_history_target_beam_depth=0
+candidate_history_states_before_target_beam=0
+candidate_history_required_entries=0
+candidate_history_required_bytes=0
+runtime_depth_start=0 frontier_size=0
+runtime_depth_done=0 depth_sec=0.0296506
+runtime_depth_start=1 frontier_size=12
+runtime_depth_done=1 depth_sec=0.00405519
+runtime_depth_start=2 frontier_size=32
+runtime_depth_done=2 depth_sec=0.00390253
+runtime_depth_start=3 frontier_size=32
+runtime_depth_done=3 depth_sec=0.00366739
+elapsed_sec=0.0419935
+avg_depth_sec=0.0104984
+completed_depths=4
+last_final_frontier_size=32
+last_final_threshold=9216
+threshold_updates=0
+solution_found=0
+history_mode=disk
+history_depth_count=4
+history_bytes_received=3456
+history_bytes_stored=1728
+history_bytes_stored_ram=0
+history_bytes_stored_disk=1728
+history_bytes_pruned=0
+history_flush_sec=0.000100885
+puzzle_solved=0 puzzle_id=0 seconds=0.0419935 solution_length=-1 solution=
+no_solution_log=test_results/unsolved_run_1794091357870126198_r1_0/no_solution_p0_d4_b64.log
+

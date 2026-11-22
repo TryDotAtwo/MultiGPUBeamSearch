@@ -1,0 +1,9 @@
+   Compiling beam-native-sys v0.1.0 (/workspace/beam-work/rust/beam-native-sys)
+error[E0599]: no method named `run_with_history` found for struct `NativeLibrary` in the current scope
+  --> rust/beam-native-sys/tests/context.rs:88:24
+   |
+88 |     assert_eq!(library.run_with_history(&["test".into()],Box::new(Sink(observations.clone()))).unwrap(),7);
+   |                        ^^^^^^^^^^^^^^^^ method not found in `NativeLibrary`
+
+For more information about this error, try `rustc --explain E0599`.
+error: could not compile `beam-native-sys` (test "context") due to 1 previous error

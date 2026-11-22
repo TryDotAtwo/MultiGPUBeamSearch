@@ -1,0 +1,46 @@
+   Compiling proc-macro2 v1.0.107
+   Compiling target-lexicon v0.13.5
+   Compiling quote v1.0.47
+   Compiling unicode-ident v1.0.27
+   Compiling pyo3-build-config v0.24.2
+   Compiling once_cell v1.21.4
+   Compiling version_check v0.9.5
+   Compiling generic-array v0.14.7
+   Compiling syn v3.0.9
+   Compiling serde_core v1.0.229
+   Compiling typenum v1.20.1
+   Compiling libc v0.2.191
+   Compiling zmij v1.0.23
+   Compiling serde_json v1.0.154
+   Compiling cfg-if v1.0.5
+   Compiling thiserror v2.0.21
+   Compiling serde v1.0.229
+   Compiling serde_derive v1.0.229
+   Compiling thiserror-impl v2.0.21
+   Compiling memchr v2.8.3
+   Compiling itoa v1.0.18
+   Compiling block-buffer v0.10.4
+   Compiling crypto-common v0.1.7
+   Compiling pyo3-ffi v0.24.2
+   Compiling pyo3-macros-backend v0.24.2
+   Compiling autocfg v1.5.1
+   Compiling rustix v1.1.6
+   Compiling memoffset v0.9.1
+   Compiling digest v0.10.7
+   Compiling beam-core v0.1.0 (/workspace/beam-work/rust/beam-core)
+   Compiling libloading v0.8.9
+   Compiling syn v2.0.119
+   Compiling bitflags v2.13.2
+   Compiling cpufeatures v0.2.17
+   Compiling heck v0.5.0
+   Compiling linux-raw-sys v0.12.1
+   Compiling sha2 v0.10.9
+   Compiling beam-native-sys v0.1.0 (/workspace/beam-work/rust/beam-native-sys)
+   Compiling pyo3 v0.24.2
+   Compiling beam-runtime v0.1.0 (/workspace/beam-work/rust/beam-runtime)
+   Compiling pyo3-macros v0.24.2
+   Compiling indoc v2.0.8
+   Compiling unindent v0.2.4
+   Compiling beam-cli v0.1.0 (/workspace/beam-work/rust/beam-cli)
+   Compiling beam-python v0.1.0 (/workspace/beam-work/rust/beam-python)
+    Finished `release` profile [optimized] target(s) in 45.86s

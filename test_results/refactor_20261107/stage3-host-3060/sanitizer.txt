@@ -1,0 +1,8 @@
+========= COMPUTE-SANITIZER
+reference world=1 seconds=8.278
+rust world=1 seconds=8.217
+reference world=2 seconds=15.535
+rust world=2 seconds=13.707
+NATIVE_SESSION_GPU_OK
+========= LEAK SUMMARY: 0 bytes leaked in 0 allocations
+========= ERROR SUMMARY: 0 errors

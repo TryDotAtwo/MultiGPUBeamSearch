@@ -1,0 +1,15 @@
+{
+  "instance": 60743283,
+  "label": "codex-beam-synccheck-20261115-f317",
+  "before": {
+    "id": 60743283,
+    "label": "codex-beam-synccheck-20261115-f317",
+    "actual_status": "running",
+    "duration": 1704.2959179878235,
+    "dph_total": 0.13688888888888887,
+    "start_date": 1794719752.5713418
+  },
+  "destroy_returncode": 0,
+  "provider_absence_verified": true,
+  "unix_time": 1794721492.43739
+}

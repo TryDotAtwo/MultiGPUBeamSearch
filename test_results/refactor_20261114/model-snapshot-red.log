@@ -1,0 +1,168 @@
+EEEEEEEFFFE                                                              [100%]
+=================================== ERRORS ====================================
+_ ERROR at setup of test_opt_in_reuses_validated_private_snapshot_without_copy[python] _
+
+self = WindowsPath('D:/100XH100/.local/cache/session-snapshot/pytest-red-20261114')
+mode = 448, parents = False, exist_ok = False
+
+    def mkdir(self, mode=0o777, parents=False, exist_ok=False):
+        """
+        Create a new directory at this given path.
+        """
+        try:
+>           os.mkdir(self, mode)
+E           FileNotFoundError: [WinError 3] ������� �� ������� ����� ��������� ����: 'D:\\100XH100\\.local\\cache\\session-snapshot\\pytest-red-20261114'
+
+C:\Users\���� ������\AppData\Local\Programs\Python\Python311\Lib\pathlib.py:1116: FileNotFoundError
+_ ERROR at setup of test_opt_in_reuses_validated_private_snapshot_without_copy[rust] _
+
+self = WindowsPath('D:/100XH100/.local/cache/session-snapshot/pytest-red-20261114')
+mode = 448, parents = False, exist_ok = False
+
+    def mkdir(self, mode=0o777, parents=False, exist_ok=False):
+        """
+        Create a new directory at this given path.
+        """
+        try:
+>           os.mkdir(self, mode)
+E           FileNotFoundError: [WinError 3] ������� �� ������� ����� ��������� ����: 'D:\\100XH100\\.local\\cache\\session-snapshot\\pytest-red-20261114'
+
+C:\Users\���� ������\AppData\Local\Programs\Python\Python311\Lib\pathlib.py:1116: FileNotFoundError
+__________ ERROR at setup of test_source_change_creates_new_snapshot __________
+
+self = WindowsPath('D:/100XH100/.local/cache/session-snapshot/pytest-red-20261114')
+mode = 448, parents = False, exist_ok = False
+
+    def mkdir(self, mode=0o777, parents=False, exist_ok=False):
+        """
+        Create a new directory at this given path.
+        """
+        try:
+>           os.mkdir(self, mode)
+E           FileNotFoundError: [WinError 3] ������� �� ������� ����� ��������� ����: 'D:\\100XH100\\.local\\cache\\session-snapshot\\pytest-red-20261114'
+
+C:\Users\���� ������\AppData\Local\Programs\Python\Python311\Lib\pathlib.py:1116: FileNotFoundError
+_ ERROR at setup of test_changed_or_missing_private_snapshot_fails_before_launch[change] _
+
+self = WindowsPath('D:/100XH100/.local/cache/session-snapshot/pytest-red-20261114')
+mode = 448, parents = False, exist_ok = False
+
+    def mkdir(self, mode=0o777, parents=False, exist_ok=False):
+        """
+        Create a new directory at this given path.
+        """
+        try:
+>           os.mkdir(self, mode)
+E           FileNotFoundError: [WinError 3] ������� �� ������� ����� ��������� ����: 'D:\\100XH100\\.local\\cache\\session-snapshot\\pytest-red-20261114'
+
+C:\Users\���� ������\AppData\Local\Programs\Python\Python311\Lib\pathlib.py:1116: FileNotFoundError
+_ ERROR at setup of test_changed_or_missing_private_snapshot_fails_before_launch[missing] _
+
+self = WindowsPath('D:/100XH100/.local/cache/session-snapshot/pytest-red-20261114')
+mode = 448, parents = False, exist_ok = False
+
+    def mkdir(self, mode=0o777, parents=False, exist_ok=False):
+        """
+        Create a new directory at this given path.
+        """
+        try:
+>           os.mkdir(self, mode)
+E           FileNotFoundError: [WinError 3] ������� �� ������� ����� ��������� ����: 'D:\\100XH100\\.local\\cache\\session-snapshot\\pytest-red-20261114'
+
+C:\Users\���� ������\AppData\Local\Programs\Python\Python311\Lib\pathlib.py:1116: FileNotFoundError
+_ ERROR at setup of test_same_valid_content_from_another_source_reuses_snapshot _
+
+self = WindowsPath('D:/100XH100/.local/cache/session-snapshot/pytest-red-20261114')
+mode = 448, parents = False, exist_ok = False
+
+    def mkdir(self, mode=0o777, parents=False, exist_ok=False):
+        """
+        Create a new directory at this given path.
+        """
+        try:
+>           os.mkdir(self, mode)
+E           FileNotFoundError: [WinError 3] ������� �� ������� ����� ��������� ����: 'D:\\100XH100\\.local\\cache\\session-snapshot\\pytest-red-20261114'
+
+C:\Users\���� ������\AppData\Local\Programs\Python\Python311\Lib\pathlib.py:1116: FileNotFoundError
+_ ERROR at setup of test_default_session_still_creates_a_private_snapshot_per_call _
+
+self = WindowsPath('D:/100XH100/.local/cache/session-snapshot/pytest-red-20261114')
+mode = 448, parents = False, exist_ok = False
+
+    def mkdir(self, mode=0o777, parents=False, exist_ok=False):
+        """
+        Create a new directory at this given path.
+        """
+        try:
+>           os.mkdir(self, mode)
+E           FileNotFoundError: [WinError 3] ������� �� ������� ����� ��������� ����: 'D:\\100XH100\\.local\\cache\\session-snapshot\\pytest-red-20261114'
+
+C:\Users\���� ������\AppData\Local\Programs\Python\Python311\Lib\pathlib.py:1116: FileNotFoundError
+_ ERROR at setup of test_session_cannot_close_while_model_preparation_owns_snapshot_cache _
+
+self = WindowsPath('D:/100XH100/.local/cache/session-snapshot/pytest-red-20261114')
+mode = 448, parents = False, exist_ok = False
+
+    def mkdir(self, mode=0o777, parents=False, exist_ok=False):
+        """
+        Create a new directory at this given path.
+        """
+        try:
+>           os.mkdir(self, mode)
+E           FileNotFoundError: [WinError 3] ������� �� ������� ����� ��������� ����: 'D:\\100XH100\\.local\\cache\\session-snapshot\\pytest-red-20261114'
+
+C:\Users\���� ������\AppData\Local\Programs\Python\Python311\Lib\pathlib.py:1116: FileNotFoundError
+================================== FAILURES ===================================
+__________________ test_snapshot_opt_in_requires_boolean[1] ___________________
+
+invalid = 1
+
+    @pytest.mark.parametrize('invalid', [1, 'yes', None])
+    def test_snapshot_opt_in_requires_boolean(invalid):
+        with pytest.raises(ValueError, match='experimental_reuse_model_snapshot'):
+>           NativeSession(experimental_reuse_model_snapshot=invalid)
+E           TypeError: NativeSession.__init__() got an unexpected keyword argument 'experimental_reuse_model_snapshot'
+
+integrations\cayleypy_native\tests\test_session_model_snapshot.py:104: TypeError
+_________________ test_snapshot_opt_in_requires_boolean[yes] __________________
+
+invalid = 'yes'
+
+    @pytest.mark.parametrize('invalid', [1, 'yes', None])
+    def test_snapshot_opt_in_requires_boolean(invalid):
+        with pytest.raises(ValueError, match='experimental_reuse_model_snapshot'):
+>           NativeSession(experimental_reuse_model_snapshot=invalid)
+E           TypeError: NativeSession.__init__() got an unexpected keyword argument 'experimental_reuse_model_snapshot'
+
+integrations\cayleypy_native\tests\test_session_model_snapshot.py:104: TypeError
+_________________ test_snapshot_opt_in_requires_boolean[None] _________________
+
+invalid = None
+
+    @pytest.mark.parametrize('invalid', [1, 'yes', None])
+    def test_snapshot_opt_in_requires_boolean(invalid):
+        with pytest.raises(ValueError, match='experimental_reuse_model_snapshot'):
+>           NativeSession(experimental_reuse_model_snapshot=invalid)
+E           TypeError: NativeSession.__init__() got an unexpected keyword argument 'experimental_reuse_model_snapshot'
+
+integrations\cayleypy_native\tests\test_session_model_snapshot.py:104: TypeError
+============================== warnings summary ===============================
+C:\Users\���� ������\AppData\Local\Programs\Python\Python311\Lib\site-packages\asttokens\util.py:202
+C:\Users\���� ������\AppData\Local\Programs\Python\Python311\Lib\site-packages\asttokens\util.py:202
+  C:\Users\���� ������\AppData\Local\Programs\Python\Python311\Lib\site-packages\asttokens\util.py:202: DeprecationWarning: importing 'Const' from 'astroid' is deprecated and will be removed in v5, import it from 'astroid.nodes' instead
+    from astroid import Const
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+FAILED integrations\cayleypy_native\tests\test_session_model_snapshot.py::test_snapshot_opt_in_requires_boolean[1]
+FAILED integrations\cayleypy_native\tests\test_session_model_snapshot.py::test_snapshot_opt_in_requires_boolean[yes]
+FAILED integrations\cayleypy_native\tests\test_session_model_snapshot.py::test_snapshot_opt_in_requires_boolean[None]
+ERROR integrations\cayleypy_native\tests\test_session_model_snapshot.py::test_opt_in_reuses_validated_private_snapshot_without_copy[python]
+ERROR integrations\cayleypy_native\tests\test_session_model_snapshot.py::test_opt_in_reuses_validated_private_snapshot_without_copy[rust]
+ERROR integrations\cayleypy_native\tests\test_session_model_snapshot.py::test_source_change_creates_new_snapshot
+ERROR integrations\cayleypy_native\tests\test_session_model_snapshot.py::test_changed_or_missing_private_snapshot_fails_before_launch[change]
+ERROR integrations\cayleypy_native\tests\test_session_model_snapshot.py::test_changed_or_missing_private_snapshot_fails_before_launch[missing]
+ERROR integrations\cayleypy_native\tests\test_session_model_snapshot.py::test_same_valid_content_from_another_source_reuses_snapshot
+ERROR integrations\cayleypy_native\tests\test_session_model_snapshot.py::test_default_session_still_creates_a_private_snapshot_per_call
+ERROR integrations\cayleypy_native\tests\test_session_model_snapshot.py::test_session_cannot_close_while_model_preparation_owns_snapshot_cache
+3 failed, 2 warnings, 8 errors in 18.93s

@@ -1,0 +1,70 @@
+F                                                                        [100%]
+================================== FAILURES ===================================
+_________ test_direct_run_never_refreshes_a_different_prepared_model __________
+
+fixture = (WindowsPath('D:/100XH100/.local/cache/session-snapshot/pytest-model-binding-red-20261114/test_direct_run_never_refres...4ce4be91c992b27616266f038d13980d6b7e6dc40bf7eb927fcb0c502f'), <function fixture.<locals>.search at 0x0000027B7F6147C0>)
+tmp_path = WindowsPath('D:/100XH100/.local/cache/session-snapshot/pytest-model-binding-red-20261114/test_direct_run_never_refreshe0')
+
+    def test_direct_run_never_refreshes_a_different_prepared_model(fixture, tmp_path):
+        source, predictor, contract, _ = fixture
+        options = NativeOptions(cache_dir=tmp_path / 'cache', autotune=False)
+        alternate = tmp_path / 'different-source'
+        shutil.copytree(source, alternate)
+        (alternate / 'output_bias.fp16').write_bytes(b'\x00\x3c')
+        with NativeSession(experimental_reuse_model_snapshot=True) as session:
+            with session.prepare_model_snapshot() as cache:
+                models.prepare_model(predictor, contract, options, tmp_path / 'run-a', _snapshot_cache=cache)
+                models.prepare_model(predictor, contract, options, tmp_path / 'run-a-repeat', _snapshot_cache=cache)
+                assert cache.last['reused']
+            different = models.prepare_model(NativeModel(alternate, contract.graph_hash), contract,
+                                             options, tmp_path / 'run-b')
+            class Workers:
+                pids = [123]
+                sequence = 1
+                def close(self):
+                    pass
+            observed = []
+            def execute(contract, prepared, options, width, depth, run_dir, devices, *, runtime):
+                observed.append(prepared.artifact_hash)
+                session._workers = Workers()
+                return NativeOutcome(None, .01, width, run_dir,
+                                     {'requested_beam_width': width, 'profile': {}, 'terminal_records': 1})
+            run_dir = tmp_path / 'run-b'
+>           session.run(execute, contract, different, options, 64, 4, run_dir, (0,))
+
+integrations\cayleypy_native\tests\test_session_model_snapshot.py:267: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+integrations\cayleypy_native\multigpubeamsearch\persistent.py:199: in run
+    model = self.model_snapshot_cache.refresh_for_worker(contract, run_dir)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+integrations\cayleypy_native\multigpubeamsearch\model_snapshot.py:52: in refresh_for_worker
+    snapshot = _snapshot_artifact(self._source, contract, run_dir)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+model = PreparedModel(weights_dir=WindowsPath('D:/100XH100/.local/cache/session-snapshot/pytest-model-binding-red-20261114/tes...residual0_fc1_bias.fp16', 'residual0_fc1_weight_hxk.fp16', 'residual0_fc2_bias.fp16', 'residual0_fc2_weight_hxk.fp16'))
+contract = GraphContract(state_len=4, num_classes=4, generators=((1, 2, 3, 0), (3, 0, 1, 2), (1, 0, 2, 3)), generator_names=('L',...center=(0, 1, 2, 3), start=(1, 0, 2, 3), graph_hash='b412a54ce4be91c992b27616266f038d13980d6b7e6dc40bf7eb927fcb0c502f')
+run_dir = WindowsPath('D:/100XH100/.local/cache/session-snapshot/pytest-model-binding-red-20261114/test_direct_run_never_refreshe0/run-b')
+
+    def _snapshot_artifact(model: PreparedModel, contract: GraphContract, run_dir: Path) -> PreparedModel:
+        """Copy only verified runtime inputs into a private, immutable-by-caller run path."""
+        run_dir = Path(run_dir).resolve()
+        run_dir.mkdir(parents=True, exist_ok=True)
+        target = run_dir / "weights"
+        if model.weights_dir == target:
+            return model
+        if target.exists() or target.is_symlink():
+>           raise NativeBackendError(f"private native weight snapshot already exists at {target}")
+E           multigpubeamsearch.errors.NativeBackendError: private native weight snapshot already exists at D:\100XH100\.local\cache\session-snapshot\pytest-model-binding-red-20261114\test_direct_run_never_refreshe0\run-b\weights
+
+integrations\cayleypy_native\multigpubeamsearch\models.py:312: NativeBackendError
+============================== warnings summary ===============================
+C:\Users\���� ������\AppData\Local\Programs\Python\Python311\Lib\site-packages\asttokens\util.py:202
+C:\Users\���� ������\AppData\Local\Programs\Python\Python311\Lib\site-packages\asttokens\util.py:202
+  C:\Users\���� ������\AppData\Local\Programs\Python\Python311\Lib\site-packages\asttokens\util.py:202: DeprecationWarning: importing 'Const' from 'astroid' is deprecated and will be removed in v5, import it from 'astroid.nodes' instead
+    from astroid import Const
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+FAILED integrations\cayleypy_native\tests\test_session_model_snapshot.py::test_direct_run_never_refreshes_a_different_prepared_model
+1 failed, 2 warnings in 10.97s

@@ -1,0 +1,22 @@
+{
+  "case_counts": {
+    "cutlass": 28,
+    "libtorch": 28
+  },
+  "legal_paths_checked": true,
+  "pair_rows": 16,
+  "paired_repeats_per_mode": 5,
+  "median_seconds": {
+    "baseline": {
+      "wall_seconds": 0.41377286799252033,
+      "worker_seconds": 0.222066227,
+      "slow_rank_reported_avg_depth_seconds": 0.0348016
+    },
+    "index": {
+      "wall_seconds": 0.393923764990177,
+      "worker_seconds": 0.211925042,
+      "slow_rank_reported_avg_depth_seconds": 0.0333029
+    }
+  },
+  "scope": "five alternating public calls; reported average depth includes startup and frontier growth, and is not an isolated saturated-step measurement"
+}

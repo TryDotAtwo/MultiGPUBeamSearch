@@ -1,0 +1,10 @@
+   Compiling beam-core v0.1.0 (/workspace/beam-work/rust/beam-core)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.40s
+     Running tests/inference.rs (/workspace/target/debug/deps/inference-85be6a2eec0c8180)
+
+running 2 tests
+test bounded_inference_candidates_preserve_non_power_of_two_cap ... ok
+test noisy_baseline_does_not_disqualify_complete_stable_inference_cohort ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

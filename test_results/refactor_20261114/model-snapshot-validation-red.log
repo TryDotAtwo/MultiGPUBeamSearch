@@ -1,0 +1,37 @@
+F                                                                        [100%]
+================================== FAILURES ===================================
+_____________ test_reuse_validates_source_twice_and_snapshot_once _____________
+
+fixture = (WindowsPath('D:/100XH100/.local/cache/session-snapshot/pytest-dedup-validation-red-20261114/test_reuse_validates_sour...4ce4be91c992b27616266f038d13980d6b7e6dc40bf7eb927fcb0c502f'), <function fixture.<locals>.search at 0x000002C5F1353920>)
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x000002C5F129F490>
+
+    def test_reuse_validates_source_twice_and_snapshot_once(fixture, monkeypatch):
+        source, _, _, search = fixture
+        with NativeSession(experimental_reuse_model_snapshot=True) as session:
+            first = search(session)
+            snapshot = Path(first.native_metadata['model_snapshot']['snapshot_dir'])
+            original = models._validate_artifact
+            checked = []
+            def validate(path, contract, backend):
+                checked.append(Path(path))
+                return original(path, contract, backend)
+            monkeypatch.setattr(models, '_validate_artifact', validate)
+            second = search(session)
+            assert second.native_metadata['model_snapshot']['reused']
+            assert checked.count(source) == 2
+>           assert checked.count(snapshot) == 1
+E           AssertionError: assert 2 == 1
+E            +  where 2 = <built-in method count of list object at 0x000002C5F127BCC0>(WindowsPath('D:/100XH100/.local/cache/session-snapshot/pytest-dedup-validation-red-20261114/test_reuse_validates_source_tw0/cache/runs/7a6f140c9896464e941bc44da3167f25/weights'))
+E            +    where <built-in method count of list object at 0x000002C5F127BCC0> = [WindowsPath('D:/100XH100/.local/cache/session-snapshot/pytest-dedup-validation-red-20261114/test_reuse_validates_sour...st-dedup-validation-red-20261114/test_reuse_validates_source_tw0/cache/runs/7a6f140c9896464e941bc44da3167f25/weights')].count
+
+integrations\cayleypy_native\tests\test_session_model_snapshot.py:120: AssertionError
+============================== warnings summary ===============================
+C:\Users\���� ������\AppData\Local\Programs\Python\Python311\Lib\site-packages\asttokens\util.py:202
+C:\Users\���� ������\AppData\Local\Programs\Python\Python311\Lib\site-packages\asttokens\util.py:202
+  C:\Users\���� ������\AppData\Local\Programs\Python\Python311\Lib\site-packages\asttokens\util.py:202: DeprecationWarning: importing 'Const' from 'astroid' is deprecated and will be removed in v5, import it from 'astroid.nodes' instead
+    from astroid import Const
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+FAILED integrations\cayleypy_native\tests\test_session_model_snapshot.py::test_reuse_validates_source_twice_and_snapshot_once
+1 failed, 2 warnings in 12.54s

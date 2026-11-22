@@ -1,0 +1,22 @@
+   Compiling beam-runtime v0.1.0 (/workspace/beam-work/rust/beam-runtime)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.33s
+     Running tests/inference.rs (/workspace/target/debug/deps/inference-02038fc53ac3fe8d)
+
+running 1 test
+test readiness_oom_reduces_workspace_but_bad_quality_receipt_is_not_capacity_evidence ... FAILED
+
+failures:
+
+---- readiness_oom_reduces_workspace_but_bad_quality_receipt_is_not_capacity_evidence stdout ----
+
+thread 'readiness_oom_reduces_workspace_but_bad_quality_receipt_is_not_capacity_evidence' (36147) panicked at rust/beam-runtime/tests/inference.rs:122:38:
+assertion failed: bad.failures.iter().all(|failure| !failure.capacity)
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    readiness_oom_reduces_workspace_but_bad_quality_receipt_is_not_capacity_evidence
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.10s
+
+error: test failed, to rerun pass `-p beam-runtime --test inference`

@@ -1,0 +1,506 @@
+name: Installed Python wheel validation
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - "codex/beam-*"
+    paths:
+      - .github/workflows/installed-wheel-validation.yml
+      - .github/workflows/vast-cnot-control-collectives.yml
+      - integrations/cayleypy_native/tests/installed_wheel_smoke.py
+      - integrations/cayleypy_native/tests/installed_inference_backend_policy.py
+      - integrations/cayleypy_native/tests/test_rust_persistent_search.py
+      - integrations/cayleypy_native/multigpubeamsearch/persistent.py
+      - integrations/cayleypy_native/multigpubeamsearch/rust_control.py
+      - rust/beam-runtime/src/search_session.rs
+      - rust/beam-runtime/tests/session_preparation_identity.rs
+      - rust/beam-python/src/search_session.rs
+      - integrations/cayleypy_native/tests/test_cluster_rust.py
+      - integrations/cayleypy_native/tests/test_cluster_worker.py
+      - integrations/cayleypy_native/tests/installed_cnot_handoff_endpoint.py
+      - integrations/cnot_scorer/handoff.py
+      - integrations/cnot_scorer/test_handoff.py
+      - integrations/cayleypy_native/tests/installed_cnot_dtype_contract.py
+      - integrations/cayleypy_native/tests/installed_cnot_backend_admission.py
+      - integrations/cayleypy_native/tests/installed_cnot_phase_boundaries.py
+      - integrations/cayleypy_native/tests/installed_verify_cnot_gloo_lifecycle.py
+      - integrations/cayleypy_native/tests/installed_cnot_dispatch_consensus.py
+      - tools/cnot_gloo_lifecycle.py
+      - tools/test_cnot_gloo_lifecycle.py
+      - integrations/cayleypy_native/tests/test_build.py
+      - integrations/cayleypy_native/tests/test_public_index_sort_build.py
+      - integrations/cayleypy_native/multigpubeamsearch/native_source_manifest.json
+      - tools/cnot_acceptance_events.py
+      - tools/test_cnot_acceptance_events.py
+      - tools/verify_cnot_gpu_pair.py
+      - tools/test_verify_cnot_gpu_pair.py
+      - CMakeLists.txt
+      - tools/production_runner.cu
+      - tools/verify_permutation_cuda.py
+      - tools/vast_cnot_gpu_acceptance.sh
+      - tools/permutation_acceptance.py
+      - tools/test_permutation_acceptance.py
+      - tools/test_cnot_gpu_identity.py
+      - tools/vast_campaign_guard.py
+      - tools/test_vast_campaign_guard.py
+      - tools/vast_campaign_watchdog.py
+      - tools/test_vast_campaign_watchdog.py
+      - tools/test_vast_campaign_workflow.py
+      - .github/workflows/vast-campaign-watchdog.yml
+      - integrations/cayleypy_native/multigpubeamsearch/gpu_identity.py
+      - tools/fixtures/cnot_acceptance_event_v1.jsonl
+      - integrations/cayleypy_native/tests/cnot_device_domain_admission_fixture.c
+      - tools/verify_cnot.py
+      - tools/cnot_panel_snapshot.py
+      - tools/test_cnot_panel_snapshot.py
+      - tools/vast_cnot_panel_cli_args.sh
+      - tools/test_vast_cnot_panel_cli_args.py
+      - tools/validate_cnot_handoff.py
+      - tools/test_cnot_reference_order.py
+      - integrations/cayleypy_native/multigpubeamsearch/cnot_acceptance.py
+      - integrations/cayleypy_native/pyproject.toml
+      - integrations/cayleypy_native/build_backend.py
+      - integrations/cayleypy_native/multigpubeamsearch/**
+      - integrations/cayleypy_native/cayleypy_native/**
+      - Cargo.toml
+      - Cargo.lock
+      - rust/beam-**
+
+permissions:
+  contents: read
+
+jobs:
+  installed-wheel:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      CARGO_TERM_COLOR: always
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install Rust toolchain
+        id: rust_toolchain
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+      - name: Install CPU runtime dependencies
+        id: dependencies
+        run: |
+          set -o pipefail
+          mkdir -p test_results/refactor_20261120/installed-wheel
+          python -m pip install --upgrade pip > "${RUNNER_TEMP}/mgbs-private-dependencies.log" 2>&1
+          python -m pip install numpy cayleypy==0.1.0 cmake ninja pytest >> "${RUNNER_TEMP}/mgbs-private-dependencies.log" 2>&1
+          python -m pip install torch==2.9.0 --index-url https://download.pytorch.org/whl/cpu >> "${RUNNER_TEMP}/mgbs-private-dependencies.log" 2>&1
+      - name: Build the PEP 517 wheel
+        id: wheel_build
+        working-directory: integrations/cayleypy_native
+        run: |
+          set -o pipefail
+          mkdir -p "$RUNNER_TEMP/mgbs-wheel-dist"
+          python -m pip wheel --verbose --no-deps --wheel-dir "$RUNNER_TEMP/mgbs-wheel-dist" . > "${RUNNER_TEMP}/mgbs-private-build.log" 2>&1
+      - name: Install wheel and validate from outside the checkout
+        id: wheel_smoke
+        run: |
+          set -o pipefail
+          wheel="$(find "$RUNNER_TEMP/mgbs-wheel-dist" -maxdepth 1 -type f -name 'multigpubeamsearch-*.whl' -print -quit)"
+          test -n "$wheel"
+          python -m pip install "$wheel" > "${RUNNER_TEMP}/mgbs-private-install.log" 2>&1
+          python -m pip check > "${RUNNER_TEMP}/mgbs-private-pip-check.log" 2>&1
+          mkdir -p "$RUNNER_TEMP/mgbs-wheel-smoke"
+          cd "$RUNNER_TEMP/mgbs-wheel-smoke"
+          env -u PYTHONPATH python "$GITHUB_WORKSPACE/integrations/cayleypy_native/tests/installed_wheel_smoke.py" > "${RUNNER_TEMP}/mgbs-private-smoke.log" 2>&1
+      - name: Validate panel acceptance CLI before process startup
+        id: cnot_panel_cli
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/mgbs-wheel-smoke"
+          env -u PYTHONPATH python "$GITHUB_WORKSPACE/tools/test_vast_cnot_panel_cli_args.py" -v
+      - uses: actions/checkout@v4
+        id: cnot_emitter_checkout
+        with:
+          repository: TryDotAtwo/cnot-neural-synth-frontier6
+          ref: 42ed72f587ab70fc74a85cf0a25001efb29cb994
+          path: cnot-emitter
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Count full dataset reads at the CNOT handoff boundary
+        if: always()
+        id: cnot_handoff_snapshot_reads
+        run: |
+          set -euo pipefail
+          python3 "$GITHUB_WORKSPACE/tools/test_cnot_panel_snapshot.py"
+      - name: Verify receipt-driven CNOT panel endpoint with the installed CPU wheel
+        if: always() && steps.wheel_smoke.outcome == 'success' && steps.cnot_emitter_checkout.outcome == 'success' && steps.cnot_handoff_snapshot_reads.outcome == 'success'
+        id: cnot_handoff_endpoint
+        env:
+          CNOT103_PRODUCER_CHECKOUT: ${{ github.workspace }}/cnot-emitter
+          CNOT103_PRODUCER_SOURCE_SHA: 42ed72f587ab70fc74a85cf0a25001efb29cb994
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/mgbs-wheel-smoke"
+          log="$RUNNER_TEMP/mgbs-private-cnot-handoff-endpoint.log"
+          if env -u PYTHONPATH python "$GITHUB_WORKSPACE/integrations/cayleypy_native/tests/installed_cnot_handoff_endpoint.py" > "$log" 2>&1; then
+            echo "CNOT_HANDOFF_ENDPOINT=passed"
+          else
+            status=$?
+            echo "CNOT_HANDOFF_ENDPOINT=failed"
+            exit "$status"
+          fi
+      - name: Verify inference backend policy in the installed wheel
+        if: always() && steps.wheel_smoke.outcome == 'success'
+        id: inference_backend_policy
+        run: |
+          set -o pipefail
+          cd "$RUNNER_TEMP/mgbs-wheel-smoke"
+          env -u PYTHONPATH python "$GITHUB_WORKSPACE/integrations/cayleypy_native/tests/installed_inference_backend_policy.py" \
+            > "${RUNNER_TEMP}/mgbs-private-inference-backend-policy.log" 2>&1
+      - name: Verify installed Rust session identity and reuse
+        if: always() && steps.wheel_smoke.outcome == 'success'
+        id: installed_rust_session_identity
+        env:
+          REQUIRE_RUST_PREPARATION_IDENTITY: "1"
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/mgbs-wheel-smoke"
+          log="$GITHUB_WORKSPACE/test_results/refactor_20261122/rust-session/installed-plan-reuse.log"
+          mkdir -p "$(dirname "$log")"
+          if env -u PYTHONPATH python -m pytest -q \
+            "$GITHUB_WORKSPACE/integrations/cayleypy_native/tests/test_rust_persistent_search.py" \
+            -k "compiled_rust_preparation_identity_uses_structured_options or rust_session_reuses_and_releases_rank_owner" \
+            > "$log" 2>&1; then
+            cat "$log"
+          else
+            status=$?
+            cat "$log"
+            exit "$status"
+          fi
+      - name: Verify Rust inference backend policy
+        if: always()
+        id: rust_inference_backend_runtime
+        run: |
+          set -o pipefail
+          cargo test --locked -p beam-runtime --test inference_backend_policy \
+            > "${RUNNER_TEMP}/mgbs-private-inference-backend-rust.log" 2>&1
+      - name: Verify installed scheduler worker and Rust rank supervisor
+        id: cluster_worker_installed
+        env:
+          REQUIRE_RUST_CLUSTER: "1"
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/mgbs-wheel-smoke"
+          env -u PYTHONPATH REQUIRE_RUST_CLUSTER=1 python -m pytest -q \
+            "$GITHUB_WORKSPACE/integrations/cayleypy_native/tests/test_cluster_worker.py" \
+            "$GITHUB_WORKSPACE/integrations/cayleypy_native/tests/test_cluster_rust.py"
+      - name: Verify rank-consistent CNOT dispatch on installed wheel
+        id: cnot_dispatch_consensus
+        env:
+          PYTHONWARNINGS: error::DeprecationWarning
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/mgbs-wheel-smoke"
+          log="${RUNNER_TEMP}/mgbs-private-cnot-dispatch-consensus.log"
+          if timeout --signal=TERM --kill-after=15s 180s \
+            env -u PYTHONPATH python -m torch.distributed.run --standalone --nproc_per_node=2 \
+            "$GITHUB_WORKSPACE/integrations/cayleypy_native/tests/installed_cnot_dispatch_consensus.py" \
+            > "$log" 2>&1; then
+            grep -oE 'CNOT_RUST_PUBLIC_DISPATCH_DIGEST_PASS|CNOT_RUST_SELECTOR_SINGLE_PARSE_PASS|INSTALLED_CNOT_DISPATCH_CONSENSUS_PASS' "$log" | sort -u
+          else
+            status=$?
+            marker="$(grep -oE 'CNOT_DISPATCH_CONSENSUS_FAILURE phase=[A-Za-z0-9_]+ type=[A-Za-z0-9_]+' "$log" | tail -n 1 || true)"
+            if [ -n "$marker" ]; then
+              printf '%s\n' "$marker"
+            else
+              printf '%s\n' "CNOT_DISPATCH_CONSENSUS_FAILURE diagnostic=unavailable"
+            fi
+            exit "$status"
+          fi
+      - name: Verify vendored source headers invalidate the installed native fingerprint
+        id: vendor_source_fingerprint
+        run: |
+          set -o pipefail
+          mkdir -p "$GITHUB_WORKSPACE/test_results/refactor_20261121/vast-source-archive"
+          cd "$RUNNER_TEMP/mgbs-wheel-smoke"
+          env -u PYTHONPATH python -m pytest -vv \
+            "$GITHUB_WORKSPACE/integrations/cayleypy_native/tests/test_build.py" \
+            -k 'vendored_headers or native_source_bundle' > "${RUNNER_TEMP}/mgbs-private-fingerprint-test.log" 2>&1
+      - name: Check Rust serde output against the shared CNOT event fixture
+        id: event_serde
+        run: |
+          set -o pipefail
+          mkdir -p "$GITHUB_WORKSPACE/test_results/refactor_20261121/rust-cnot-admission"
+          cargo test --locked -p beam-python --no-default-features cnot_acceptance::tests::rust_serde_record_matches_the_shared_jsonl_producer_fixture -- --exact \
+            > "${RUNNER_TEMP}/mgbs-private-cnot-event-serde.log" 2>&1
+      - name: Verify CNOT PyO3 dtype contracts with warnings as errors
+        id: dtype
+        env:
+          PYTHONWARNINGS: error::DeprecationWarning
+        run: |
+          set -o pipefail
+          cd "$RUNNER_TEMP/mgbs-wheel-smoke"
+          env -u PYTHONPATH python "$GITHUB_WORKSPACE/integrations/cayleypy_native/tests/installed_cnot_dtype_contract.py" > "${RUNNER_TEMP}/mgbs-private-cnot-dtype.log" 2>&1
+      - name: Verify strict CNOT backend admission on CPU Gloo
+        id: backend_admission
+        env:
+          PYTHONWARNINGS: error::DeprecationWarning
+        run: |
+          set -o pipefail
+          cd "$RUNNER_TEMP/mgbs-wheel-smoke"
+          env -u PYTHONPATH python "$GITHUB_WORKSPACE/integrations/cayleypy_native/tests/installed_cnot_backend_admission.py" > "${RUNNER_TEMP}/mgbs-private-cnot-backend-admission.log" 2>&1
+      - name: Verify CNOT Gloo phase failures and live-group reuse
+        id: phase_boundaries
+        env:
+          PYTHONWARNINGS: error::DeprecationWarning
+        run: |
+          set -o pipefail
+          cd "$RUNNER_TEMP/mgbs-wheel-smoke"
+          if timeout --signal=TERM --kill-after=15s 180s \
+            env -u PYTHONPATH python "$GITHUB_WORKSPACE/integrations/cayleypy_native/tests/installed_cnot_phase_boundaries.py" \
+            > "${RUNNER_TEMP}/mgbs-private-cnot-phase-boundaries.log" 2>&1; then
+            :
+          else
+            status=$?
+            marker="$(grep -E '^CNOT_PHASE_FAILURE case=[A-Za-z0-9._-]+ type=[A-Za-z0-9_]+' \
+              "${RUNNER_TEMP}/mgbs-private-cnot-phase-boundaries.log" | tail -n 1 || true)"
+            if [ -n "$marker" ]; then
+              printf '%s\n' "$marker"
+            else
+              printf '%s\n' "CNOT_PHASE_FAILURE diagnostic=unavailable"
+            fi
+            exit "$status"
+          fi
+      - name: Verify run-scoped CNOT backend event receipts
+        id: acceptance_events
+        run: |
+          set -o pipefail
+          python "$GITHUB_WORKSPACE/tools/test_cnot_acceptance_events.py" -v > "${RUNNER_TEMP}/mgbs-private-cnot-acceptance-events.log" 2>&1
+      - name: Verify CNOT reference-score ordering and boundary ties
+        id: cnot_reference_order
+        run: |
+          set -o pipefail
+          mkdir -p "$GITHUB_WORKSPACE/test_results/refactor_20261121/rust-cnot-admission"
+          python -m py_compile "$GITHUB_WORKSPACE/tools/test_cnot_reference_order.py"
+          env -u PYTHONPATH python "$GITHUB_WORKSPACE/tools/test_cnot_reference_order.py" -v > "${RUNNER_TEMP}/mgbs-private-cnot-reference-order.log" 2>&1
+      - name: Verify paired CNOT acceptance result binding on CPU
+        id: cnot_pair_verifier
+        run: |
+          set -o pipefail
+          python "$GITHUB_WORKSPACE/tools/test_verify_cnot_gpu_pair.py" -v > "${RUNNER_TEMP}/mgbs-private-cnot-pair-verifier.log" 2>&1
+      - name: Verify saturated permutation acceptance contracts on CPU
+        id: permutation_acceptance_cpu
+        run: |
+          set -o pipefail
+          mkdir -p "$GITHUB_WORKSPACE/test_results/refactor_20261121/permutation-acceptance"
+          python -m py_compile "$GITHUB_WORKSPACE/tools/permutation_acceptance.py" "$GITHUB_WORKSPACE/tools/test_permutation_acceptance.py" "$GITHUB_WORKSPACE/tools/verify_permutation_cuda.py"
+          bash -n "$GITHUB_WORKSPACE/tools/vast_cnot_gpu_acceptance.sh"
+          python "$GITHUB_WORKSPACE/tools/test_permutation_acceptance.py" -v > "${RUNNER_TEMP}/mgbs-private-cpu-contract.log" 2>&1
+      - name: Verify the installed wheel packages CUDA identity helper
+        id: wheel_gpu_identity
+        working-directory: ${{ runner.temp }}
+        run: |
+          python - <<'PY'
+          import multigpubeamsearch.gpu_identity as identity
+          assert callable(identity.observe_current_cuda_uuid)
+          print("INSTALLED_GPU_IDENTITY_HELPER=" + identity.__file__)
+          PY
+          python "$GITHUB_WORKSPACE/tools/test_cnot_gpu_identity.py" -v
+      - name: Verify CNOT Gloo receipt contract on hosted CPU
+        id: gloo_receipt_contract
+        run: |
+          set -o pipefail
+          python "$GITHUB_WORKSPACE/tools/test_cnot_gloo_lifecycle.py" -v \
+            > "${RUNNER_TEMP}/mgbs-private-cnot-gloo-receipt-contract.log" 2>&1
+      - name: Exercise verify_cnot World lifecycle with two Gloo ranks
+        id: verify_cnot_lifecycle
+        env:
+          GITHUB_WORKSPACE: ${{ github.workspace }}
+          RUNNER_TEMP: ${{ runner.temp }}
+        run: |
+          set -o pipefail
+          cd "$RUNNER_TEMP/mgbs-wheel-smoke"
+          timeout --signal=TERM --kill-after=15s 180s \
+            env -u PYTHONPATH python -m torch.distributed.run --standalone --nproc_per_node=2 \
+            "$GITHUB_WORKSPACE/integrations/cayleypy_native/tests/installed_verify_cnot_gloo_lifecycle.py" \
+            > "${RUNNER_TEMP}/mgbs-private-verify-cnot-gloo-lifecycle.log" 2>&1
+          python "$GITHUB_WORKSPACE/tools/cnot_gloo_lifecycle.py" "$RUNNER_TEMP" \
+            >> "${RUNNER_TEMP}/mgbs-private-verify-cnot-gloo-lifecycle.log" 2>&1
+      - name: Summarize synthetic CNOT Gloo lifecycle diagnostic
+        if: always()
+        env:
+          RUNNER_TEMP: ${{ runner.temp }}
+        run: |
+          python - "${RUNNER_TEMP}" <<'PY'
+          import json
+          from pathlib import Path
+          import sys
+
+          root = Path(sys.argv[1])
+          found = False
+          for rank in (0, 1):
+              path = root / f"verify-cnot-gloo-diagnostic-rank-{rank}.json"
+              if not path.is_file():
+                  print(f"CNOT_GLOO_LIFECYCLE_DIAGNOSTIC missing-rank={rank}")
+                  continue
+              try:
+                  events = json.loads(path.read_text(encoding="utf-8"))
+              except (OSError, json.JSONDecodeError):
+                  print(f"CNOT_GLOO_LIFECYCLE_DIAGNOSTIC invalid-rank={rank}")
+                  continue
+              if not isinstance(events, list):
+                  print(f"CNOT_GLOO_LIFECYCLE_DIAGNOSTIC invalid-rank={rank}")
+                  continue
+              for event in events:
+                  if not isinstance(event, dict) or event.get("rank") != rank or not isinstance(event.get("phase"), str):
+                      print(f"CNOT_GLOO_LIFECYCLE_DIAGNOSTIC invalid-event-rank={rank}")
+                      continue
+                  print("CNOT_GLOO_LIFECYCLE_DIAGNOSTIC " + json.dumps(event, sort_keys=True))
+                  found = True
+          if not found:
+              print("CNOT_GLOO_LIFECYCLE_DIAGNOSTIC no-events")
+          PY
+      - name: Compare wide CNOT search on one and two Gloo ranks
+        id: cnot_gloo_wide_one_vs_two_rank
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/mgbs-wheel-smoke"
+          env -u PYTHONPATH python "$GITHUB_WORKSPACE/tools/verify_cnot.py" \
+            --case wide --backend gloo --engine rust --width 2 \
+            --output "$RUNNER_TEMP/cnot-gloo-wide-world-1.json" \
+            > "$RUNNER_TEMP/mgbs-private-cnot-gloo-wide-world-1.log" 2>&1
+          timeout --signal=TERM --kill-after=15s 180s \
+            env -u PYTHONPATH python -m torch.distributed.run --standalone --nproc_per_node=2 \
+            "$GITHUB_WORKSPACE/tools/verify_cnot.py" \
+            --case wide --backend gloo --engine rust --width 2 \
+            --output "$RUNNER_TEMP/cnot-gloo-wide-world-2.json" \
+            > "$RUNNER_TEMP/mgbs-private-cnot-gloo-wide-world-2.log" 2>&1
+          python - "$RUNNER_TEMP/cnot-gloo-wide-world-1.json" "$RUNNER_TEMP/cnot-gloo-wide-world-2.json" <<'PY'
+          import json
+          import sys
+
+          with open(sys.argv[1], encoding="utf-8") as stream:
+              one = json.load(stream)
+          with open(sys.argv[2], encoding="utf-8") as stream:
+              two = json.load(stream)
+          core = (
+              "n", "width", "shortlist", "mode", "engine", "status", "length",
+              "root_sha256", "physical_ids", "directed_gates", "bitwise_replay",
+          )
+          if any(one.get(key) != two.get(key) for key in core):
+              raise SystemExit("one-rank and two-rank public CNOT results differ")
+          if one.get("world") != 1 or two.get("world") != 2:
+              raise SystemExit("public Gloo runs did not use one and two ranks")
+          if one.get("n") != 144 or one.get("width") != 2 or one.get("shortlist") != 3:
+              raise SystemExit("wide public CNOT parity fixture used the wrong geometry")
+          if one.get("scorer") != "WireFixture" or one.get("status") != "solved" or not one.get("bitwise_replay"):
+              raise SystemExit("wide public CNOT parity fixture did not replay")
+          if not any(
+              layer["distinct"] > one["width"] and layer["retained"] == one["width"]
+              for layer in one["layers"]
+          ):
+              raise SystemExit("wide public CNOT fixture missed the saturated global cutoff")
+          print("cnot_gloo_wide_one_vs_two_rank=passed")
+          PY
+      - name: Compare CNOT topology deduplication and ties on one and two Gloo ranks
+        id: cnot_gloo_topology_one_vs_two_rank
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/mgbs-wheel-smoke"
+          env -u PYTHONPATH python "$GITHUB_WORKSPACE/tools/verify_cnot.py" \
+            --case topology --backend gloo --engine rust \
+            --output "$RUNNER_TEMP/cnot-gloo-topology-world-1.json" \
+            > "$RUNNER_TEMP/mgbs-private-cnot-gloo-topology-world-1.log" 2>&1
+          timeout --signal=TERM --kill-after=15s 180s \
+            env -u PYTHONPATH python -m torch.distributed.run --standalone --nproc_per_node=2 \
+            "$GITHUB_WORKSPACE/tools/verify_cnot.py" \
+            --case topology --backend gloo --engine rust \
+            --output "$RUNNER_TEMP/cnot-gloo-topology-world-2.json" \
+            > "$RUNNER_TEMP/mgbs-private-cnot-gloo-topology-world-2.log" 2>&1
+          python - "$RUNNER_TEMP/cnot-gloo-topology-world-1.json" "$RUNNER_TEMP/cnot-gloo-topology-world-2.json" <<'PY'
+          import json
+          import sys
+
+          with open(sys.argv[1], encoding="utf-8") as stream:
+              one = json.load(stream)
+          with open(sys.argv[2], encoding="utf-8") as stream:
+              two = json.load(stream)
+          core = ("n", "width", "shortlist", "mode", "engine", "status")
+          if any(one.get(key) != two.get(key) for key in core):
+              raise SystemExit("one-rank and two-rank topology results differ")
+          if one.get("world") != 1 or two.get("world") != 2:
+              raise SystemExit("topology Gloo runs did not use one and two ranks")
+          if (one.get("n"), one.get("width"), one.get("shortlist")) != (6, 17, 25):
+              raise SystemExit("topology fixture used the wrong search geometry")
+          fields = (
+              "depth", "distinct", "retained", "raw_legal_candidates", "duplicate_children",
+              "winners_sha256", "selection_oracle", "reference_order_status",
+              "reference_boundary_gap", "reference_ordered_winners_sha256",
+          )
+          if len(one.get("layers", [])) != len(two.get("layers", [])) or not one.get("layers"):
+              raise SystemExit("one-rank and two-rank topology layer counts differ")
+          observed_duplicate = False
+          observed_tie = False
+          for left, right in zip(one["layers"], two["layers"]):
+              if any(left.get(key) != right.get(key) for key in fields):
+                  raise SystemExit("one-rank and two-rank topology selections differ")
+              if left["duplicate_children"] > 0:
+                  observed_duplicate = True
+              if left["reference_order_status"] == "exact_tie_full_word":
+                  observed_tie = True
+          if not observed_duplicate:
+              raise SystemExit("topology fixture missed a cross-parent duplicate")
+          if not observed_tie:
+              raise SystemExit("topology fixture missed an exact full-word cutoff tie")
+          print("cnot_gloo_topology_dedup_ties_one_vs_two_rank=passed")
+          PY
+      - name: Lint the new-host acceptance workflow
+        id: vast_workflow_lint
+        if: always()
+        run: |
+          set -o pipefail
+          mkdir -p "$GITHUB_WORKSPACE/test_results/refactor_20261121/rust-cnot-admission"
+          go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12 \
+            .github/workflows/vast-cnot-control-collectives.yml \
+            .github/workflows/vast-campaign-watchdog.yml \
+            > "${RUNNER_TEMP}/mgbs-private-vast-workflow-actionlint.log" 2>&1
+      - name: Write redacted hosted validation status
+        if: always()
+        env:
+          SOURCE_OUTCOME: ${{ job.status }}
+        shell: bash
+        run: |
+          python3 tools/vast_public_status.py \
+            --source-outcome "$SOURCE_OUTCOME" \
+            --inventory-query not_run \
+            --preflight-outcome skipped \
+            --gpu-outcome skipped \
+            --cleanup-outcome skipped \
+            --watchdog-outcome skipped \
+            --output "${RUNNER_TEMP}/cnot-public-status.json" \
+            --summary "$GITHUB_STEP_SUMMARY"
+      - name: Upload redacted hosted validation status
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cnot-installed-wheel-status-${{ github.run_id }}
+          path: ${{ runner.temp }}/cnot-public-status.json
+          if-no-files-found: error
+          retention-days: 7
+      - name: Upload installed Rust session diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rust-session-plan-reuse-${{ github.run_id }}
+          path: ${{ github.workspace }}/test_results/refactor_20261122/rust-session/installed-plan-reuse.log
+          if-no-files-found: ignore
+          retention-days: 14
+      - name: Upload synthetic panel endpoint diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cnot-panel-v2-endpoint-test-${{ github.run_id }}
+          path: ${{ runner.temp }}/mgbs-private-cnot-handoff-endpoint.log
+          if-no-files-found: ignore
+          retention-days: 14

@@ -1,0 +1,5 @@
+Traceback (most recent call last):
+  File "/workspace/beam-work/rust/beam-python/tests/interrupt.py", line 26, in <module>
+    try:owner.run()
+        ^^^^^^^^^^^
+RuntimeError: inference calibration cancelled or closed

@@ -1,0 +1,9 @@
+[rank 0]
+GLOBAL_BEAM_WIDTH_EFFECTIVE=65
+history_provider=rust
+puzzle_solved=1 puzzle_id=0 seconds=0.807296 solution_length=3 found_depth=3 touch_depth=0 solution=m0.m1.m2
+
+[rank 1]
+GLOBAL_BEAM_WIDTH_EFFECTIVE=65
+history_provider=rust
+

@@ -1,0 +1,15 @@
+{
+  "instance": 60635813,
+  "label": "codex-beam-public-index-20261114-9b53",
+  "before": {
+    "id": 60635813,
+    "label": "codex-beam-public-index-20261114-9b53",
+    "actual_status": "running",
+    "duration": 635.1210613250732,
+    "dph_total": 0.13481481481481483,
+    "start_date": 1794654062.6670432
+  },
+  "destroy_returncode": 0,
+  "provider_absence_verified": true,
+  "unix_time": 1794654716.8471038
+}

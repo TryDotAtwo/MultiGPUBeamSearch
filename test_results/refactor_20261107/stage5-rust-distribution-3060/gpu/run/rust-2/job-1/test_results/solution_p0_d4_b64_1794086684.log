@@ -1,0 +1,15 @@
+solution_found=1
+solution_valid=1
+solution_depth=4
+solution_path=m0.m1.m2.m3
+solution_state="0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5"
+history_mode=disk
+history_dir=/workspace/beam-results/rust-wheel/gpu/run/rust-2/job-1/history/rank-0
+history_depth_count=3
+history_bytes_received=2432
+history_bytes_stored=1216
+history_bytes_stored_ram=0
+history_bytes_stored_disk=1216
+history_bytes_pruned=0
+solved_count=4
+solved_overflow=0

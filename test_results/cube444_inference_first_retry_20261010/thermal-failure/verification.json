@@ -1,0 +1,11 @@
+{
+  "status": "PASS",
+  "artifact_commit": "c9b13d9905c6febbdcd0712c474ac3f2e50ee4d0",
+  "prefix": "test_results/cube444_inference_first_retry_20261010/thermal-failure/",
+  "archive_sha256": "5fa18d7afbf19467965c39a069a704f4a1bd8eb1d7cdd18401d9a3d47341c8bf",
+  "bytes": 214994,
+  "parts_verified": 3,
+  "files_verified": 92,
+  "gpu_acceptance": "PARTIAL",
+  "reason": "NVML thermal slowdown invalidated exact-width winner; provider denied power change"
+}

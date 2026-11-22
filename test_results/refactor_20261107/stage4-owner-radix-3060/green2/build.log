@@ -1,0 +1,4 @@
+[1/4] Building CUDA object CMakeFiles/stream3_owner_scatter_cuda_tests.dir/tests/stream3_owner_scatter_cuda_tests.cu.o
+[2/4] Linking CXX executable stream3_owner_scatter_cuda_tests
+[3/4] Building CUDA object CMakeFiles/stream3_owner_radix_cuda_tests.dir/tests/stream3_owner_scatter_cuda_tests.cu.o
+[4/4] Linking CXX executable stream3_owner_radix_cuda_tests

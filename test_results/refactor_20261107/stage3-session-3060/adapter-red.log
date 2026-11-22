@@ -1,0 +1,5 @@
+Traceback (most recent call last):
+  File "/workspace/beam-work/rust/beam-python/tests/search_session.py", line 12, in <module>
+    assert hasattr(runtime,'SearchSession'), 'Rust search session adapter is missing'
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: Rust search session adapter is missing

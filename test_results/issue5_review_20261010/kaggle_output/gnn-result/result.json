@@ -1,0 +1,7 @@
+{
+  "libtorch_max_error": 0.00048828125,
+  "cutlass": "NOT_RUN: requires SM80+",
+  "gpu": "Tesla T4",
+  "libtorch": "PASS",
+  "scope": "native GNN features; not full beam search or trained quality"
+}

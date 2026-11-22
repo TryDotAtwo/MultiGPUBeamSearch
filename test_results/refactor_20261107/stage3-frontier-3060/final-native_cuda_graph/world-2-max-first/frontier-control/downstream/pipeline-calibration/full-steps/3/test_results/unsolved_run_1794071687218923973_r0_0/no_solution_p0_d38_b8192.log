@@ -1,0 +1,12 @@
+rank=0
+world_size=2
+solution_found=0
+completed_depths=10
+history_mode=ram
+history_dir=/workspace/beam-results/frontier/final-native_cuda_graph/world-2-max-first/frontier-control/downstream/pipeline-calibration/full-steps/3/history/rank-0
+history_depth_count=10
+history_bytes_received=955104
+history_bytes_stored=477552
+history_bytes_stored_ram=477552
+history_bytes_stored_disk=0
+history_bytes_pruned=0

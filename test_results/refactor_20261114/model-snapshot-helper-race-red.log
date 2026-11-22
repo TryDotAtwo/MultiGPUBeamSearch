@@ -1,0 +1,722 @@
+FFFFFF                                                                   [100%]
+================================== FAILURES ===================================
+_ test_foreign_session_entry_is_rejected_during_public_search[prepare_model_snapshot] _
+
+fixture = (WindowsPath('D:/100XH100/.local/cache/session-snapshot/pytest-helper-race-red-20261114/test_foreign_session_entry_is_...4ce4be91c992b27616266f038d13980d6b7e6dc40bf7eb927fcb0c502f'), <function fixture.<locals>.search at 0x0000020DE76C2E80>)
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x0000020DE77F1610>
+entry = 'prepare_model_snapshot'
+
+    @pytest.mark.parametrize('entry', ['prepare_model_snapshot', 'prepare_nccl_identity', 'launch'])
+    def test_foreign_session_entry_is_rejected_during_public_search(fixture, monkeypatch, entry):
+        import threading
+    
+        _, _, _, search = fixture
+        entered, resume = threading.Event(), threading.Event()
+        errors = []
+        with NativeSession(experimental_reuse_model_snapshot=True) as session:
+            def prepare(*args, **kwargs):
+                entered.set()
+                assert resume.wait(timeout=10)
+                return SimpleNamespace(build_metadata={'inference_backend': 'cutlass'})
+            monkeypatch.setattr(dispatch, 'prepare_runtime', prepare)
+            def work():
+                try:search(session)
+                except BaseException as error:errors.append(error)
+            thread = threading.Thread(target=work)
+            thread.start()
+            try:
+                assert entered.wait(timeout=10)
+>               with pytest.raises(RuntimeError, match='concurrent native session searches'):
+E               Failed: DID NOT RAISE <class 'RuntimeError'>
+
+integrations\cayleypy_native\tests\test_session_model_snapshot.py:232: Failed
+_ test_foreign_session_entry_is_rejected_during_public_search[prepare_nccl_identity] _
+
+fixture = (WindowsPath('D:/100XH100/.local/cache/session-snapshot/pytest-helper-race-red-20261114/test_foreign_session_entry_is_...4ce4be91c992b27616266f038d13980d6b7e6dc40bf7eb927fcb0c502f'), <function fixture.<locals>.search at 0x0000020DE77E8860>)
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x0000020DE7617690>
+entry = 'prepare_nccl_identity'
+
+    @pytest.mark.parametrize('entry', ['prepare_model_snapshot', 'prepare_nccl_identity', 'launch'])
+    def test_foreign_session_entry_is_rejected_during_public_search(fixture, monkeypatch, entry):
+        import threading
+    
+        _, _, _, search = fixture
+        entered, resume = threading.Event(), threading.Event()
+        errors = []
+        with NativeSession(experimental_reuse_model_snapshot=True) as session:
+            def prepare(*args, **kwargs):
+                entered.set()
+                assert resume.wait(timeout=10)
+                return SimpleNamespace(build_metadata={'inference_backend': 'cutlass'})
+            monkeypatch.setattr(dispatch, 'prepare_runtime', prepare)
+            def work():
+                try:search(session)
+                except BaseException as error:errors.append(error)
+            thread = threading.Thread(target=work)
+            thread.start()
+            try:
+                assert entered.wait(timeout=10)
+>               with pytest.raises(RuntimeError, match='concurrent native session searches'):
+E               Failed: DID NOT RAISE <class 'RuntimeError'>
+
+integrations\cayleypy_native\tests\test_session_model_snapshot.py:232: Failed
+_____ test_foreign_session_entry_is_rejected_during_public_search[launch] _____
+
+fixture = (WindowsPath('D:/100XH100/.local/cache/session-snapshot/pytest-helper-race-red-20261114/test_foreign_session_entry_is_...4ce4be91c992b27616266f038d13980d6b7e6dc40bf7eb927fcb0c502f'), <function fixture.<locals>.search at 0x0000020DE76C2340>)
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x0000020DE76FF050>
+entry = 'launch'
+
+    @pytest.mark.parametrize('entry', ['prepare_model_snapshot', 'prepare_nccl_identity', 'launch'])
+    def test_foreign_session_entry_is_rejected_during_public_search(fixture, monkeypatch, entry):
+        import threading
+    
+        _, _, _, search = fixture
+        entered, resume = threading.Event(), threading.Event()
+        errors = []
+        with NativeSession(experimental_reuse_model_snapshot=True) as session:
+            def prepare(*args, **kwargs):
+                entered.set()
+                assert resume.wait(timeout=10)
+                return SimpleNamespace(build_metadata={'inference_backend': 'cutlass'})
+            monkeypatch.setattr(dispatch, 'prepare_runtime', prepare)
+            def work():
+                try:search(session)
+                except BaseException as error:errors.append(error)
+            thread = threading.Thread(target=work)
+            thread.start()
+            try:
+                assert entered.wait(timeout=10)
+                with pytest.raises(RuntimeError, match='concurrent native session searches'):
+                    if entry == 'launch':
+>                       session.launch(['unused'], contract=None, run_dir=Path('.'), env={}, world=1, timeout=1)
+
+integrations\cayleypy_native\tests\test_session_model_snapshot.py:234: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+integrations\cayleypy_native\multigpubeamsearch\persistent.py:175: in launch
+    probe=subprocess.run([command[0],'--resident-protocol-info'],env=env,cwd=run_dir,
+C:\Users\���� ������\AppData\Local\Programs\Python\Python311\Lib\subprocess.py:548: in run
+    with Popen(*popenargs, **kwargs) as process:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\���� ������\AppData\Local\Programs\Python\Python311\Lib\subprocess.py:1026: in __init__
+    self._execute_child(args, executable, preexec_fn, close_fds,
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <Popen: returncode: None args: ['unused', '--resident-protocol-info']>
+args = 'unused --resident-protocol-info', executable = None, preexec_fn = None
+close_fds = False, pass_fds = (), cwd = '.', env = {}
+startupinfo = <subprocess.STARTUPINFO object at 0x0000020DE7536F10>
+creationflags = 0, shell = False, p2cread = Handle(500), p2cwrite = -1
+c2pread = 11, c2pwrite = Handle(2232), errread = 12, errwrite = Handle(2532)
+unused_restore_signals = True, unused_gid = None, unused_gids = None
+unused_uid = None, unused_umask = -1, unused_start_new_session = False
+unused_process_group = -1
+
+    def _execute_child(self, args, executable, preexec_fn, close_fds,
+                       pass_fds, cwd, env,
+                       startupinfo, creationflags, shell,
+                       p2cread, p2cwrite,
+                       c2pread, c2pwrite,
+                       errread, errwrite,
+                       unused_restore_signals,
+                       unused_gid, unused_gids, unused_uid,
+                       unused_umask,
+                       unused_start_new_session, unused_process_group):
+        """Execute program (MS Windows version)"""
+    
+        assert not pass_fds, "pass_fds not supported on Windows."
+    
+        if isinstance(args, str):
+            pass
+        elif isinstance(args, bytes):
+            if shell:
+                raise TypeError('bytes args is not allowed on Windows')
+            args = list2cmdline([args])
+        elif isinstance(args, os.PathLike):
+            if shell:
+                raise TypeError('path-like args is not allowed when '
+                                'shell is true')
+            args = list2cmdline([args])
+        else:
+            args = list2cmdline(args)
+    
+        if executable is not None:
+            executable = os.fsdecode(executable)
+    
+        # Process startup details
+        if startupinfo is None:
+            startupinfo = STARTUPINFO()
+        else:
+            # bpo-34044: Copy STARTUPINFO since it is modified above,
+            # so the caller can reuse it multiple times.
+            startupinfo = startupinfo.copy()
+    
+        use_std_handles = -1 not in (p2cread, c2pwrite, errwrite)
+        if use_std_handles:
+            startupinfo.dwFlags |= _winapi.STARTF_USESTDHANDLES
+            startupinfo.hStdInput = p2cread
+            startupinfo.hStdOutput = c2pwrite
+            startupinfo.hStdError = errwrite
+    
+        attribute_list = startupinfo.lpAttributeList
+        have_handle_list = bool(attribute_list and
+                                "handle_list" in attribute_list and
+                                attribute_list["handle_list"])
+    
+        # If we were given an handle_list or need to create one
+        if have_handle_list or (use_std_handles and close_fds):
+            if attribute_list is None:
+                attribute_list = startupinfo.lpAttributeList = {}
+            handle_list = attribute_list["handle_list"] = \
+                list(attribute_list.get("handle_list", []))
+    
+            if use_std_handles:
+                handle_list += [int(p2cread), int(c2pwrite), int(errwrite)]
+    
+            handle_list[:] = self._filter_handle_list(handle_list)
+    
+            if handle_list:
+                if not close_fds:
+                    warnings.warn("startupinfo.lpAttributeList['handle_list'] "
+                                  "overriding close_fds", RuntimeWarning)
+    
+                # When using the handle_list we always request to inherit
+                # handles but the only handles that will be inherited are
+                # the ones in the handle_list
+                close_fds = False
+    
+        if shell:
+            startupinfo.dwFlags |= _winapi.STARTF_USESHOWWINDOW
+            startupinfo.wShowWindow = _winapi.SW_HIDE
+            if not executable:
+                # gh-101283: without a fully-qualified path, before Windows
+                # checks the system directories, it first looks in the
+                # application directory, and also the current directory if
+                # NeedCurrentDirectoryForExePathW(ExeName) is true, so try
+                # to avoid executing unqualified "cmd.exe".
+                comspec = os.environ.get('ComSpec')
+                if not comspec:
+                    system_root = os.environ.get('SystemRoot', '')
+                    comspec = os.path.join(system_root, 'System32', 'cmd.exe')
+                    if not os.path.isabs(comspec):
+                        raise FileNotFoundError('shell not found: neither %ComSpec% nor %SystemRoot% is set')
+                if os.path.isabs(comspec):
+                    executable = comspec
+            else:
+                comspec = executable
+    
+            args = '{} /c "{}"'.format (comspec, args)
+    
+        if cwd is not None:
+            cwd = os.fsdecode(cwd)
+    
+        sys.audit("subprocess.Popen", executable, args, cwd, env)
+    
+        # Start the process
+        try:
+>           hp, ht, pid, tid = _winapi.CreateProcess(executable, args,
+                                     # no special security
+                                     None, None,
+                                     int(not close_fds),
+                                     creationflags,
+                                     env,
+                                     cwd,
+                                     startupinfo)
+E                                    FileNotFoundError: [WinError 2] �� ������� ����� ��������� ����
+
+C:\Users\���� ������\AppData\Local\Programs\Python\Python311\Lib\subprocess.py:1538: FileNotFoundError
+_____________ test_closed_or_forked_session_cannot_launch[closed] _____________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x0000020DE74ED410>
+tmp_path = WindowsPath('D:/100XH100/.local/cache/session-snapshot/pytest-helper-race-red-20261114/test_closed_or_forked_session_0')
+state = 'closed'
+
+    @pytest.mark.parametrize('state', ['closed', 'forked'])
+    def test_closed_or_forked_session_cannot_launch(monkeypatch, tmp_path, state):
+        import multigpubeamsearch.persistent as module
+        session = NativeSession()
+        if state == 'closed':
+            session.close()
+        else:
+            monkeypatch.setattr(module.os, 'getpid', lambda: session._owner_pid + 1)
+        with pytest.raises(RuntimeError, match='closed' if state == 'closed' else 'Python processes'):
+>           session.launch(['unused'], contract=None, run_dir=tmp_path, env={}, world=1, timeout=1)
+
+integrations\cayleypy_native\tests\test_persistent_search.py:57: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+integrations\cayleypy_native\multigpubeamsearch\persistent.py:175: in launch
+    probe=subprocess.run([command[0],'--resident-protocol-info'],env=env,cwd=run_dir,
+C:\Users\���� ������\AppData\Local\Programs\Python\Python311\Lib\subprocess.py:548: in run
+    with Popen(*popenargs, **kwargs) as process:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\���� ������\AppData\Local\Programs\Python\Python311\Lib\subprocess.py:1026: in __init__
+    self._execute_child(args, executable, preexec_fn, close_fds,
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <Popen: returncode: None args: ['unused', '--resident-protocol-info']>
+args = 'unused --resident-protocol-info', executable = None, preexec_fn = None
+close_fds = False, pass_fds = ()
+cwd = 'D:\\100XH100\\.local\\cache\\session-snapshot\\pytest-helper-race-red-20261114\\test_closed_or_forked_session_0'
+env = {}, startupinfo = <subprocess.STARTUPINFO object at 0x0000020DE74ECF10>
+creationflags = 0, shell = False, p2cread = Handle(2632), p2cwrite = -1
+c2pread = 11, c2pwrite = Handle(2492), errread = 12, errwrite = Handle(2400)
+unused_restore_signals = True, unused_gid = None, unused_gids = None
+unused_uid = None, unused_umask = -1, unused_start_new_session = False
+unused_process_group = -1
+
+    def _execute_child(self, args, executable, preexec_fn, close_fds,
+                       pass_fds, cwd, env,
+                       startupinfo, creationflags, shell,
+                       p2cread, p2cwrite,
+                       c2pread, c2pwrite,
+                       errread, errwrite,
+                       unused_restore_signals,
+                       unused_gid, unused_gids, unused_uid,
+                       unused_umask,
+                       unused_start_new_session, unused_process_group):
+        """Execute program (MS Windows version)"""
+    
+        assert not pass_fds, "pass_fds not supported on Windows."
+    
+        if isinstance(args, str):
+            pass
+        elif isinstance(args, bytes):
+            if shell:
+                raise TypeError('bytes args is not allowed on Windows')
+            args = list2cmdline([args])
+        elif isinstance(args, os.PathLike):
+            if shell:
+                raise TypeError('path-like args is not allowed when '
+                                'shell is true')
+            args = list2cmdline([args])
+        else:
+            args = list2cmdline(args)
+    
+        if executable is not None:
+            executable = os.fsdecode(executable)
+    
+        # Process startup details
+        if startupinfo is None:
+            startupinfo = STARTUPINFO()
+        else:
+            # bpo-34044: Copy STARTUPINFO since it is modified above,
+            # so the caller can reuse it multiple times.
+            startupinfo = startupinfo.copy()
+    
+        use_std_handles = -1 not in (p2cread, c2pwrite, errwrite)
+        if use_std_handles:
+            startupinfo.dwFlags |= _winapi.STARTF_USESTDHANDLES
+            startupinfo.hStdInput = p2cread
+            startupinfo.hStdOutput = c2pwrite
+            startupinfo.hStdError = errwrite
+    
+        attribute_list = startupinfo.lpAttributeList
+        have_handle_list = bool(attribute_list and
+                                "handle_list" in attribute_list and
+                                attribute_list["handle_list"])
+    
+        # If we were given an handle_list or need to create one
+        if have_handle_list or (use_std_handles and close_fds):
+            if attribute_list is None:
+                attribute_list = startupinfo.lpAttributeList = {}
+            handle_list = attribute_list["handle_list"] = \
+                list(attribute_list.get("handle_list", []))
+    
+            if use_std_handles:
+                handle_list += [int(p2cread), int(c2pwrite), int(errwrite)]
+    
+            handle_list[:] = self._filter_handle_list(handle_list)
+    
+            if handle_list:
+                if not close_fds:
+                    warnings.warn("startupinfo.lpAttributeList['handle_list'] "
+                                  "overriding close_fds", RuntimeWarning)
+    
+                # When using the handle_list we always request to inherit
+                # handles but the only handles that will be inherited are
+                # the ones in the handle_list
+                close_fds = False
+    
+        if shell:
+            startupinfo.dwFlags |= _winapi.STARTF_USESHOWWINDOW
+            startupinfo.wShowWindow = _winapi.SW_HIDE
+            if not executable:
+                # gh-101283: without a fully-qualified path, before Windows
+                # checks the system directories, it first looks in the
+                # application directory, and also the current directory if
+                # NeedCurrentDirectoryForExePathW(ExeName) is true, so try
+                # to avoid executing unqualified "cmd.exe".
+                comspec = os.environ.get('ComSpec')
+                if not comspec:
+                    system_root = os.environ.get('SystemRoot', '')
+                    comspec = os.path.join(system_root, 'System32', 'cmd.exe')
+                    if not os.path.isabs(comspec):
+                        raise FileNotFoundError('shell not found: neither %ComSpec% nor %SystemRoot% is set')
+                if os.path.isabs(comspec):
+                    executable = comspec
+            else:
+                comspec = executable
+    
+            args = '{} /c "{}"'.format (comspec, args)
+    
+        if cwd is not None:
+            cwd = os.fsdecode(cwd)
+    
+        sys.audit("subprocess.Popen", executable, args, cwd, env)
+    
+        # Start the process
+        try:
+>           hp, ht, pid, tid = _winapi.CreateProcess(executable, args,
+                                     # no special security
+                                     None, None,
+                                     int(not close_fds),
+                                     creationflags,
+                                     env,
+                                     cwd,
+                                     startupinfo)
+E                                    FileNotFoundError: [WinError 2] �� ������� ����� ��������� ����
+
+C:\Users\���� ������\AppData\Local\Programs\Python\Python311\Lib\subprocess.py:1538: FileNotFoundError
+_____________ test_closed_or_forked_session_cannot_launch[forked] _____________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x0000020DE751B350>
+tmp_path = WindowsPath('D:/100XH100/.local/cache/session-snapshot/pytest-helper-race-red-20261114/test_closed_or_forked_session_1')
+state = 'forked'
+
+    @pytest.mark.parametrize('state', ['closed', 'forked'])
+    def test_closed_or_forked_session_cannot_launch(monkeypatch, tmp_path, state):
+        import multigpubeamsearch.persistent as module
+        session = NativeSession()
+        if state == 'closed':
+            session.close()
+        else:
+            monkeypatch.setattr(module.os, 'getpid', lambda: session._owner_pid + 1)
+        with pytest.raises(RuntimeError, match='closed' if state == 'closed' else 'Python processes'):
+>           session.launch(['unused'], contract=None, run_dir=tmp_path, env={}, world=1, timeout=1)
+
+integrations\cayleypy_native\tests\test_persistent_search.py:57: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+integrations\cayleypy_native\multigpubeamsearch\persistent.py:175: in launch
+    probe=subprocess.run([command[0],'--resident-protocol-info'],env=env,cwd=run_dir,
+C:\Users\���� ������\AppData\Local\Programs\Python\Python311\Lib\subprocess.py:548: in run
+    with Popen(*popenargs, **kwargs) as process:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\���� ������\AppData\Local\Programs\Python\Python311\Lib\subprocess.py:1026: in __init__
+    self._execute_child(args, executable, preexec_fn, close_fds,
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <Popen: returncode: None args: ['unused', '--resident-protocol-info']>
+args = 'unused --resident-protocol-info', executable = None, preexec_fn = None
+close_fds = False, pass_fds = ()
+cwd = 'D:\\100XH100\\.local\\cache\\session-snapshot\\pytest-helper-race-red-20261114\\test_closed_or_forked_session_1'
+env = {}, startupinfo = <subprocess.STARTUPINFO object at 0x0000020DE74CAB10>
+creationflags = 0, shell = False, p2cread = Handle(2644), p2cwrite = -1
+c2pread = 11, c2pwrite = Handle(2648), errread = 12, errwrite = Handle(2660)
+unused_restore_signals = True, unused_gid = None, unused_gids = None
+unused_uid = None, unused_umask = -1, unused_start_new_session = False
+unused_process_group = -1
+
+    def _execute_child(self, args, executable, preexec_fn, close_fds,
+                       pass_fds, cwd, env,
+                       startupinfo, creationflags, shell,
+                       p2cread, p2cwrite,
+                       c2pread, c2pwrite,
+                       errread, errwrite,
+                       unused_restore_signals,
+                       unused_gid, unused_gids, unused_uid,
+                       unused_umask,
+                       unused_start_new_session, unused_process_group):
+        """Execute program (MS Windows version)"""
+    
+        assert not pass_fds, "pass_fds not supported on Windows."
+    
+        if isinstance(args, str):
+            pass
+        elif isinstance(args, bytes):
+            if shell:
+                raise TypeError('bytes args is not allowed on Windows')
+            args = list2cmdline([args])
+        elif isinstance(args, os.PathLike):
+            if shell:
+                raise TypeError('path-like args is not allowed when '
+                                'shell is true')
+            args = list2cmdline([args])
+        else:
+            args = list2cmdline(args)
+    
+        if executable is not None:
+            executable = os.fsdecode(executable)
+    
+        # Process startup details
+        if startupinfo is None:
+            startupinfo = STARTUPINFO()
+        else:
+            # bpo-34044: Copy STARTUPINFO since it is modified above,
+            # so the caller can reuse it multiple times.
+            startupinfo = startupinfo.copy()
+    
+        use_std_handles = -1 not in (p2cread, c2pwrite, errwrite)
+        if use_std_handles:
+            startupinfo.dwFlags |= _winapi.STARTF_USESTDHANDLES
+            startupinfo.hStdInput = p2cread
+            startupinfo.hStdOutput = c2pwrite
+            startupinfo.hStdError = errwrite
+    
+        attribute_list = startupinfo.lpAttributeList
+        have_handle_list = bool(attribute_list and
+                                "handle_list" in attribute_list and
+                                attribute_list["handle_list"])
+    
+        # If we were given an handle_list or need to create one
+        if have_handle_list or (use_std_handles and close_fds):
+            if attribute_list is None:
+                attribute_list = startupinfo.lpAttributeList = {}
+            handle_list = attribute_list["handle_list"] = \
+                list(attribute_list.get("handle_list", []))
+    
+            if use_std_handles:
+                handle_list += [int(p2cread), int(c2pwrite), int(errwrite)]
+    
+            handle_list[:] = self._filter_handle_list(handle_list)
+    
+            if handle_list:
+                if not close_fds:
+                    warnings.warn("startupinfo.lpAttributeList['handle_list'] "
+                                  "overriding close_fds", RuntimeWarning)
+    
+                # When using the handle_list we always request to inherit
+                # handles but the only handles that will be inherited are
+                # the ones in the handle_list
+                close_fds = False
+    
+        if shell:
+            startupinfo.dwFlags |= _winapi.STARTF_USESHOWWINDOW
+            startupinfo.wShowWindow = _winapi.SW_HIDE
+            if not executable:
+                # gh-101283: without a fully-qualified path, before Windows
+                # checks the system directories, it first looks in the
+                # application directory, and also the current directory if
+                # NeedCurrentDirectoryForExePathW(ExeName) is true, so try
+                # to avoid executing unqualified "cmd.exe".
+                comspec = os.environ.get('ComSpec')
+                if not comspec:
+                    system_root = os.environ.get('SystemRoot', '')
+                    comspec = os.path.join(system_root, 'System32', 'cmd.exe')
+                    if not os.path.isabs(comspec):
+                        raise FileNotFoundError('shell not found: neither %ComSpec% nor %SystemRoot% is set')
+                if os.path.isabs(comspec):
+                    executable = comspec
+            else:
+                comspec = executable
+    
+            args = '{} /c "{}"'.format (comspec, args)
+    
+        if cwd is not None:
+            cwd = os.fsdecode(cwd)
+    
+        sys.audit("subprocess.Popen", executable, args, cwd, env)
+    
+        # Start the process
+        try:
+>           hp, ht, pid, tid = _winapi.CreateProcess(executable, args,
+                                     # no special security
+                                     None, None,
+                                     int(not close_fds),
+                                     creationflags,
+                                     env,
+                                     cwd,
+                                     startupinfo)
+E                                    FileNotFoundError: [WinError 2] �� ������� ����� ��������� ����
+
+C:\Users\���� ������\AppData\Local\Programs\Python\Python311\Lib\subprocess.py:1538: FileNotFoundError
+_________ test_public_scope_rejects_a_direct_run_already_in_progress __________
+
+tmp_path = WindowsPath('D:/100XH100/.local/cache/session-snapshot/pytest-helper-race-red-20261114/test_public_scope_rejects_a_di0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x0000020DE745B210>
+
+    def test_public_scope_rejects_a_direct_run_already_in_progress(tmp_path, monkeypatch):
+        import threading
+        from types import SimpleNamespace
+        from multigpubeamsearch import models
+        from multigpubeamsearch.options import NativeOptions, NativeOutcome
+    
+        monkeypatch.setattr(models, 'verify_prepared_model', lambda *args: None)
+        session = NativeSession()
+        entered, resume = threading.Event(), threading.Event()
+        errors = []
+        class Workers:
+            pids = [123]
+            sequence = 1
+            def close(self):pass
+        def execute(*args, **kwargs):
+            entered.set()
+            assert resume.wait(timeout=10)
+            session._workers = Workers()
+            return NativeOutcome(None, .01, 1, tmp_path,
+                                 {'requested_beam_width': 1, 'profile': {}, 'terminal_records': 1})
+        def work():
+            try:
+                session.run(execute, SimpleNamespace(graph_hash='graph'),
+                            SimpleNamespace(artifact_hash='model', backend='mlp'),
+                            NativeOptions(), 1, 1, tmp_path, (0,))
+            except BaseException as error:
+                errors.append(error)
+        thread = threading.Thread(target=work)
+        thread.start()
+        try:
+            assert entered.wait(timeout=10)
+            with pytest.raises(RuntimeError, match='concurrent native session searches'):
+                with session.search_scope():
+                    pass
+            with pytest.raises(RuntimeError, match='concurrent native session searches'):
+>               session.launch(['unused'], contract=None, run_dir=tmp_path, env={}, world=1, timeout=1)
+
+integrations\cayleypy_native\tests\test_persistent_search.py:235: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+integrations\cayleypy_native\multigpubeamsearch\persistent.py:175: in launch
+    probe=subprocess.run([command[0],'--resident-protocol-info'],env=env,cwd=run_dir,
+C:\Users\���� ������\AppData\Local\Programs\Python\Python311\Lib\subprocess.py:548: in run
+    with Popen(*popenargs, **kwargs) as process:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\���� ������\AppData\Local\Programs\Python\Python311\Lib\subprocess.py:1026: in __init__
+    self._execute_child(args, executable, preexec_fn, close_fds,
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <Popen: returncode: None args: ['unused', '--resident-protocol-info']>
+args = 'unused --resident-protocol-info', executable = None, preexec_fn = None
+close_fds = False, pass_fds = ()
+cwd = 'D:\\100XH100\\.local\\cache\\session-snapshot\\pytest-helper-race-red-20261114\\test_public_scope_rejects_a_di0'
+env = {}, startupinfo = <subprocess.STARTUPINFO object at 0x0000020DE745B410>
+creationflags = 0, shell = False, p2cread = Handle(2408), p2cwrite = -1
+c2pread = 11, c2pwrite = Handle(6188), errread = 12, errwrite = Handle(2616)
+unused_restore_signals = True, unused_gid = None, unused_gids = None
+unused_uid = None, unused_umask = -1, unused_start_new_session = False
+unused_process_group = -1
+
+    def _execute_child(self, args, executable, preexec_fn, close_fds,
+                       pass_fds, cwd, env,
+                       startupinfo, creationflags, shell,
+                       p2cread, p2cwrite,
+                       c2pread, c2pwrite,
+                       errread, errwrite,
+                       unused_restore_signals,
+                       unused_gid, unused_gids, unused_uid,
+                       unused_umask,
+                       unused_start_new_session, unused_process_group):
+        """Execute program (MS Windows version)"""
+    
+        assert not pass_fds, "pass_fds not supported on Windows."
+    
+        if isinstance(args, str):
+            pass
+        elif isinstance(args, bytes):
+            if shell:
+                raise TypeError('bytes args is not allowed on Windows')
+            args = list2cmdline([args])
+        elif isinstance(args, os.PathLike):
+            if shell:
+                raise TypeError('path-like args is not allowed when '
+                                'shell is true')
+            args = list2cmdline([args])
+        else:
+            args = list2cmdline(args)
+    
+        if executable is not None:
+            executable = os.fsdecode(executable)
+    
+        # Process startup details
+        if startupinfo is None:
+            startupinfo = STARTUPINFO()
+        else:
+            # bpo-34044: Copy STARTUPINFO since it is modified above,
+            # so the caller can reuse it multiple times.
+            startupinfo = startupinfo.copy()
+    
+        use_std_handles = -1 not in (p2cread, c2pwrite, errwrite)
+        if use_std_handles:
+            startupinfo.dwFlags |= _winapi.STARTF_USESTDHANDLES
+            startupinfo.hStdInput = p2cread
+            startupinfo.hStdOutput = c2pwrite
+            startupinfo.hStdError = errwrite
+    
+        attribute_list = startupinfo.lpAttributeList
+        have_handle_list = bool(attribute_list and
+                                "handle_list" in attribute_list and
+                                attribute_list["handle_list"])
+    
+        # If we were given an handle_list or need to create one
+        if have_handle_list or (use_std_handles and close_fds):
+            if attribute_list is None:
+                attribute_list = startupinfo.lpAttributeList = {}
+            handle_list = attribute_list["handle_list"] = \
+                list(attribute_list.get("handle_list", []))
+    
+            if use_std_handles:
+                handle_list += [int(p2cread), int(c2pwrite), int(errwrite)]
+    
+            handle_list[:] = self._filter_handle_list(handle_list)
+    
+            if handle_list:
+                if not close_fds:
+                    warnings.warn("startupinfo.lpAttributeList['handle_list'] "
+                                  "overriding close_fds", RuntimeWarning)
+    
+                # When using the handle_list we always request to inherit
+                # handles but the only handles that will be inherited are
+                # the ones in the handle_list
+                close_fds = False
+    
+        if shell:
+            startupinfo.dwFlags |= _winapi.STARTF_USESHOWWINDOW
+            startupinfo.wShowWindow = _winapi.SW_HIDE
+            if not executable:
+                # gh-101283: without a fully-qualified path, before Windows
+                # checks the system directories, it first looks in the
+                # application directory, and also the current directory if
+                # NeedCurrentDirectoryForExePathW(ExeName) is true, so try
+                # to avoid executing unqualified "cmd.exe".
+                comspec = os.environ.get('ComSpec')
+                if not comspec:
+                    system_root = os.environ.get('SystemRoot', '')
+                    comspec = os.path.join(system_root, 'System32', 'cmd.exe')
+                    if not os.path.isabs(comspec):
+                        raise FileNotFoundError('shell not found: neither %ComSpec% nor %SystemRoot% is set')
+                if os.path.isabs(comspec):
+                    executable = comspec
+            else:
+                comspec = executable
+    
+            args = '{} /c "{}"'.format (comspec, args)
+    
+        if cwd is not None:
+            cwd = os.fsdecode(cwd)
+    
+        sys.audit("subprocess.Popen", executable, args, cwd, env)
+    
+        # Start the process
+        try:
+>           hp, ht, pid, tid = _winapi.CreateProcess(executable, args,
+                                     # no special security
+                                     None, None,
+                                     int(not close_fds),
+                                     creationflags,
+                                     env,
+                                     cwd,
+                                     startupinfo)
+E                                    FileNotFoundError: [WinError 2] �� ������� ����� ��������� ����
+
+C:\Users\���� ������\AppData\Local\Programs\Python\Python311\Lib\subprocess.py:1538: FileNotFoundError
+============================== warnings summary ===============================
+C:\Users\���� ������\AppData\Local\Programs\Python\Python311\Lib\site-packages\asttokens\util.py:202
+C:\Users\���� ������\AppData\Local\Programs\Python\Python311\Lib\site-packages\asttokens\util.py:202
+  C:\Users\���� ������\AppData\Local\Programs\Python\Python311\Lib\site-packages\asttokens\util.py:202: DeprecationWarning: importing 'Const' from 'astroid' is deprecated and will be removed in v5, import it from 'astroid.nodes' instead
+    from astroid import Const
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+FAILED integrations\cayleypy_native\tests\test_session_model_snapshot.py::test_foreign_session_entry_is_rejected_during_public_search[prepare_model_snapshot]
+FAILED integrations\cayleypy_native\tests\test_session_model_snapshot.py::test_foreign_session_entry_is_rejected_during_public_search[prepare_nccl_identity]
+FAILED integrations\cayleypy_native\tests\test_session_model_snapshot.py::test_foreign_session_entry_is_rejected_during_public_search[launch]
+FAILED integrations\cayleypy_native\tests\test_persistent_search.py::test_closed_or_forked_session_cannot_launch[closed]
+FAILED integrations\cayleypy_native\tests\test_persistent_search.py::test_closed_or_forked_session_cannot_launch[forked]
+FAILED integrations\cayleypy_native\tests\test_persistent_search.py::test_public_scope_rejects_a_direct_run_already_in_progress
+6 failed, 2 warnings in 11.97s

@@ -1,0 +1,10 @@
+GLOBAL_BEAM_WIDTH_EFFECTIVE=64
+history_provider=rust
+runtime_depth_start=0 frontier_size=1
+runtime_depth_done=0 depth_sec=0.0307901
+runtime_depth_start=1 frontier_size=12
+runtime_depth_done=1 depth_sec=0.00400924
+runtime_depth_start=2 frontier_size=32
+runtime_depth_done=2 depth_sec=0.00379421
+runtime_depth_start=3 frontier_size=32
+puzzle_solved=1 puzzle_id=0 seconds=0.0405201 solution_length=4 found_depth=4 touch_depth=0 solution=m0.m1.m2.m3

@@ -1,0 +1,7 @@
+-- Beam state logical bytes: 96
+-- Beam state physical bytes: 112
+-- Beam state alignment: 16
+-- Beam move count: 24
+-- Configuring done (0.0s)
+-- Generating done (0.3s)
+-- Build files have been written to: /workspace/beam-results/native-library/actual/build/cache/builds/781fea7ede40aa0238becdd7943374a36f32606b7ea29b4cac7ea86a5b687985

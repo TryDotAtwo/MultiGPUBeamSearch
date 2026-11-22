@@ -1,0 +1,511 @@
+{
+  "scope": "planner/protocol correctness; no performance promotion",
+  "results": [
+    {
+      "world": 1,
+      "beam": 5,
+      "plans": [
+        {
+          "BEAM_WIDTH_ALIGNMENT": 1024,
+          "B_MICRO": 32,
+          "GLOBAL_BEAM_WIDTH_EFFECTIVE": 5,
+          "LOCAL_RANK": 0,
+          "RING_COUNT": 2,
+          "SHARD_CAPACITY_CANDIDATES": 7168,
+          "SHARD_COUNT": 1,
+          "STREAM3_RING_SLOTS": 8,
+          "STREAM4_ACTIVE_SORT_SLOTS": 4,
+          "STREAM4_BATCH_ALIGNMENT": 1024,
+          "STREAM4_BATCH_CANDIDATES": 1024,
+          "WORLD_SIZE": 1,
+          "estimated_required_device_bytes": 20404674,
+          "frontier_state_capacity": 5,
+          "gpu_budget_bytes": 11564613632
+        }
+      ],
+      "pids": [
+        23270
+      ]
+    },
+    {
+      "world": 1,
+      "beam": 64,
+      "plans": [
+        {
+          "BEAM_WIDTH_ALIGNMENT": 1024,
+          "B_MICRO": 32,
+          "GLOBAL_BEAM_WIDTH_EFFECTIVE": 64,
+          "LOCAL_RANK": 0,
+          "RING_COUNT": 2,
+          "SHARD_CAPACITY_CANDIDATES": 7168,
+          "SHARD_COUNT": 1,
+          "STREAM3_RING_SLOTS": 8,
+          "STREAM4_ACTIVE_SORT_SLOTS": 4,
+          "STREAM4_BATCH_ALIGNMENT": 1024,
+          "STREAM4_BATCH_CANDIDATES": 1024,
+          "WORLD_SIZE": 1,
+          "estimated_required_device_bytes": 20411074,
+          "frontier_state_capacity": 64,
+          "gpu_budget_bytes": 11564613632
+        }
+      ],
+      "pids": [
+        23270
+      ]
+    },
+    {
+      "world": 1,
+      "beam": 65,
+      "plans": [
+        {
+          "BEAM_WIDTH_ALIGNMENT": 1024,
+          "B_MICRO": 32,
+          "GLOBAL_BEAM_WIDTH_EFFECTIVE": 65,
+          "LOCAL_RANK": 0,
+          "RING_COUNT": 2,
+          "SHARD_CAPACITY_CANDIDATES": 7168,
+          "SHARD_COUNT": 1,
+          "STREAM3_RING_SLOTS": 8,
+          "STREAM4_ACTIVE_SORT_SLOTS": 4,
+          "STREAM4_BATCH_ALIGNMENT": 1024,
+          "STREAM4_BATCH_CANDIDATES": 1024,
+          "WORLD_SIZE": 1,
+          "estimated_required_device_bytes": 20411330,
+          "frontier_state_capacity": 65,
+          "gpu_budget_bytes": 11564613632
+        }
+      ],
+      "pids": [
+        23270
+      ]
+    },
+    {
+      "world": 1,
+      "components": [
+        {
+          "component_calibration": true,
+          "correctness_passed": true,
+          "full_step_verified": false,
+          "outer_candidates": 6144,
+          "rank": 0,
+          "scope": "synthetic_unique_metadata_at_exact_admitted_capacities",
+          "shard_capacity": 7168,
+          "sort_jobs_concurrent": 2,
+          "stream3_seconds": [
+            9.855999797582626e-05,
+            9.600000083446504e-05,
+            9.632000327110292e-05,
+            9.638399630784988e-05,
+            9.625600278377532e-05
+          ],
+          "stream4_group_seconds": [
+            0.00033977600932121277,
+            0.00034201601147651673,
+            0.00033689600229263304,
+            0.00035820800065994264,
+            0.0003461120128631592
+          ],
+          "transport": [],
+          "union_seconds": [
+            0.00026419198513031006,
+            0.00026214399933815005,
+            0.0002611199915409088,
+            0.0002631680071353912,
+            0.0002631680071353912
+          ]
+        }
+      ]
+    },
+    {
+      "world": 1,
+      "components": [
+        {
+          "component_calibration": true,
+          "correctness_passed": true,
+          "full_step_verified": false,
+          "outer_candidates": 6144,
+          "rank": 0,
+          "scope": "synthetic_unique_metadata_at_exact_admitted_capacities",
+          "shard_capacity": 7168,
+          "sort_jobs_concurrent": 2,
+          "stream3_seconds": [
+            9.625600278377532e-05,
+            9.622400254011156e-05,
+            9.523200243711472e-05,
+            0.00010019200295209884,
+            9.756799787282943e-05
+          ],
+          "stream4_group_seconds": [
+            0.0003275200128555298,
+            0.0003256320059299469,
+            0.00032767999172210693,
+            0.0003530240058898926,
+            0.0003266560137271881
+          ],
+          "transport": [],
+          "union_seconds": [
+            0.0002446399927139282,
+            0.00024268800020217895,
+            0.00024166400730609897,
+            0.00024246400594711304,
+            0.00024371199309825895
+          ]
+        }
+      ]
+    },
+    {
+      "world": 2,
+      "beam": 5,
+      "plans": [
+        {
+          "BEAM_WIDTH_ALIGNMENT": 2048,
+          "B_MICRO": 32,
+          "GLOBAL_BEAM_WIDTH_EFFECTIVE": 5,
+          "LOCAL_RANK": 0,
+          "RING_COUNT": 2,
+          "SHARD_CAPACITY_CANDIDATES": 19456,
+          "SHARD_COUNT": 1,
+          "STREAM3_RING_SLOTS": 8,
+          "STREAM4_ACTIVE_SORT_SLOTS": 4,
+          "STREAM4_BATCH_ALIGNMENT": 1024,
+          "STREAM4_BATCH_CANDIDATES": 1024,
+          "WORLD_SIZE": 2,
+          "estimated_required_device_bytes": 30236354,
+          "frontier_state_capacity": 3,
+          "gpu_budget_bytes": 11482824704
+        },
+        {
+          "BEAM_WIDTH_ALIGNMENT": 2048,
+          "B_MICRO": 32,
+          "GLOBAL_BEAM_WIDTH_EFFECTIVE": 5,
+          "LOCAL_RANK": 1,
+          "RING_COUNT": 2,
+          "SHARD_CAPACITY_CANDIDATES": 19456,
+          "SHARD_COUNT": 1,
+          "STREAM3_RING_SLOTS": 8,
+          "STREAM4_ACTIVE_SORT_SLOTS": 4,
+          "STREAM4_BATCH_ALIGNMENT": 1024,
+          "STREAM4_BATCH_CANDIDATES": 1024,
+          "WORLD_SIZE": 2,
+          "estimated_required_device_bytes": 30236354,
+          "frontier_state_capacity": 3,
+          "gpu_budget_bytes": 11484921856
+        }
+      ],
+      "pids": [
+        23295,
+        23297
+      ]
+    },
+    {
+      "world": 2,
+      "beam": 64,
+      "plans": [
+        {
+          "BEAM_WIDTH_ALIGNMENT": 2048,
+          "B_MICRO": 32,
+          "GLOBAL_BEAM_WIDTH_EFFECTIVE": 64,
+          "LOCAL_RANK": 0,
+          "RING_COUNT": 2,
+          "SHARD_CAPACITY_CANDIDATES": 19456,
+          "SHARD_COUNT": 1,
+          "STREAM3_RING_SLOTS": 8,
+          "STREAM4_ACTIVE_SORT_SLOTS": 4,
+          "STREAM4_BATCH_ALIGNMENT": 1024,
+          "STREAM4_BATCH_CANDIDATES": 1024,
+          "WORLD_SIZE": 2,
+          "estimated_required_device_bytes": 30239426,
+          "frontier_state_capacity": 32,
+          "gpu_budget_bytes": 11482824704
+        },
+        {
+          "BEAM_WIDTH_ALIGNMENT": 2048,
+          "B_MICRO": 32,
+          "GLOBAL_BEAM_WIDTH_EFFECTIVE": 64,
+          "LOCAL_RANK": 1,
+          "RING_COUNT": 2,
+          "SHARD_CAPACITY_CANDIDATES": 19456,
+          "SHARD_COUNT": 1,
+          "STREAM3_RING_SLOTS": 8,
+          "STREAM4_ACTIVE_SORT_SLOTS": 4,
+          "STREAM4_BATCH_ALIGNMENT": 1024,
+          "STREAM4_BATCH_CANDIDATES": 1024,
+          "WORLD_SIZE": 2,
+          "estimated_required_device_bytes": 30239426,
+          "frontier_state_capacity": 32,
+          "gpu_budget_bytes": 11484921856
+        }
+      ],
+      "pids": [
+        23295,
+        23297
+      ]
+    },
+    {
+      "world": 2,
+      "beam": 65,
+      "plans": [
+        {
+          "BEAM_WIDTH_ALIGNMENT": 2048,
+          "B_MICRO": 32,
+          "GLOBAL_BEAM_WIDTH_EFFECTIVE": 65,
+          "LOCAL_RANK": 0,
+          "RING_COUNT": 2,
+          "SHARD_CAPACITY_CANDIDATES": 19456,
+          "SHARD_COUNT": 1,
+          "STREAM3_RING_SLOTS": 8,
+          "STREAM4_ACTIVE_SORT_SLOTS": 4,
+          "STREAM4_BATCH_ALIGNMENT": 1024,
+          "STREAM4_BATCH_CANDIDATES": 1024,
+          "WORLD_SIZE": 2,
+          "estimated_required_device_bytes": 30239682,
+          "frontier_state_capacity": 33,
+          "gpu_budget_bytes": 11482824704
+        },
+        {
+          "BEAM_WIDTH_ALIGNMENT": 2048,
+          "B_MICRO": 32,
+          "GLOBAL_BEAM_WIDTH_EFFECTIVE": 65,
+          "LOCAL_RANK": 1,
+          "RING_COUNT": 2,
+          "SHARD_CAPACITY_CANDIDATES": 19456,
+          "SHARD_COUNT": 1,
+          "STREAM3_RING_SLOTS": 8,
+          "STREAM4_ACTIVE_SORT_SLOTS": 4,
+          "STREAM4_BATCH_ALIGNMENT": 1024,
+          "STREAM4_BATCH_CANDIDATES": 1024,
+          "WORLD_SIZE": 2,
+          "estimated_required_device_bytes": 30239682,
+          "frontier_state_capacity": 33,
+          "gpu_budget_bytes": 11484921856
+        }
+      ],
+      "pids": [
+        23295,
+        23297
+      ]
+    },
+    {
+      "world": 2,
+      "components": [
+        {
+          "component_calibration": true,
+          "correctness_passed": true,
+          "full_step_verified": false,
+          "outer_candidates": 6144,
+          "rank": 0,
+          "scope": "synthetic_unique_metadata_at_exact_admitted_capacities",
+          "shard_capacity": 19456,
+          "sort_jobs_concurrent": 2,
+          "stream3_seconds": [
+            0.0001045759990811348,
+            0.0001014079973101616,
+            0.00011488000303506852,
+            0.00010444799810647964,
+            0.00010444799810647964
+          ],
+          "stream4_group_seconds": [
+            0.0004454399943351746,
+            0.00043724799156188965,
+            0.0004611200094223022,
+            0.0004433920085430145,
+            0.0004435519874095917
+          ],
+          "transport": [
+            {
+              "items": 3072,
+              "seconds": [
+                3.7888001650571824e-05,
+                4.1951999068260195e-05,
+                3.993599861860275e-05,
+                3.686400130391121e-05,
+                3.993599861860275e-05
+              ]
+            },
+            {
+              "items": 6144,
+              "seconds": [
+                5.0175998359918594e-05,
+                6.348799914121628e-05,
+                4.902400076389313e-05,
+                5.318399891257286e-05,
+                6.553599983453751e-05
+              ]
+            }
+          ],
+          "union_seconds": [
+            0.00038092800974845887,
+            0.000379584014415741,
+            0.0003799040019512176,
+            0.00037887999415397647,
+            0.0003778559863567352
+          ]
+        },
+        {
+          "component_calibration": true,
+          "correctness_passed": true,
+          "full_step_verified": false,
+          "outer_candidates": 6144,
+          "rank": 1,
+          "scope": "synthetic_unique_metadata_at_exact_admitted_capacities",
+          "shard_capacity": 19456,
+          "sort_jobs_concurrent": 2,
+          "stream3_seconds": [
+            0.00010115200281143188,
+            0.0001002880036830902,
+            0.00011366400122642516,
+            0.0001032319962978363,
+            0.00010342399775981904
+          ],
+          "stream4_group_seconds": [
+            0.0004156799912452698,
+            0.000419840008020401,
+            0.0004995520114898682,
+            0.00041574400663375855,
+            0.00041280001401901246
+          ],
+          "transport": [
+            {
+              "items": 3072,
+              "seconds": [
+                4.095999896526337e-05,
+                4.089599847793579e-05,
+                3.8816001266241075e-05,
+                4.076800122857094e-05,
+                3.686400130391121e-05
+              ]
+            },
+            {
+              "items": 6144,
+              "seconds": [
+                5.119999870657921e-05,
+                5.836800113320351e-05,
+                5.2223999053239826e-05,
+                4.9855999648571016e-05,
+                6.633599847555161e-05
+              ]
+            }
+          ],
+          "union_seconds": [
+            0.0003819519877433777,
+            0.0003797760009765625,
+            0.00038092800974845887,
+            0.000379615992307663,
+            0.0003837119936943054
+          ]
+        }
+      ]
+    },
+    {
+      "world": 2,
+      "components": [
+        {
+          "component_calibration": true,
+          "correctness_passed": true,
+          "full_step_verified": false,
+          "outer_candidates": 6144,
+          "rank": 0,
+          "scope": "synthetic_unique_metadata_at_exact_admitted_capacities",
+          "shard_capacity": 19456,
+          "sort_jobs_concurrent": 2,
+          "stream3_seconds": [
+            0.00010342399775981904,
+            0.0001013759970664978,
+            9.942399710416794e-05,
+            0.0001003519967198372,
+            0.00011980800330638886
+          ],
+          "stream4_group_seconds": [
+            0.0004195199906826019,
+            0.00043084800243377687,
+            0.00043929600715637206,
+            0.0004184960126876831,
+            0.0004177919924259186
+          ],
+          "transport": [
+            {
+              "items": 3072,
+              "seconds": [
+                4.095999896526337e-05,
+                3.7888001650571824e-05,
+                3.891199827194214e-05,
+                3.3792000263929365e-05,
+                4.5056000351905825e-05
+              ]
+            },
+            {
+              "items": 6144,
+              "seconds": [
+                5.001600086688996e-05,
+                5.119999870657921e-05,
+                5.0175998359918594e-05,
+                5.119999870657921e-05,
+                5.011200159788131e-05
+              ]
+            }
+          ],
+          "union_seconds": [
+            0.00037887999415397647,
+            0.00037971198558807374,
+            0.00037852799892425536,
+            0.00037856000661849976,
+            0.00037887999415397647
+          ]
+        },
+        {
+          "component_calibration": true,
+          "correctness_passed": true,
+          "full_step_verified": false,
+          "outer_candidates": 6144,
+          "rank": 1,
+          "scope": "synthetic_unique_metadata_at_exact_admitted_capacities",
+          "shard_capacity": 19456,
+          "sort_jobs_concurrent": 2,
+          "stream3_seconds": [
+            9.932799637317656e-05,
+            0.00010009600222110748,
+            9.932799637317656e-05,
+            9.830400347709655e-05,
+            0.00011296000331640244
+          ],
+          "stream4_group_seconds": [
+            0.0004126720130443573,
+            0.0004116480052471161,
+            0.00042803201079368594,
+            0.00041363200545310974,
+            0.000413567990064621
+          ],
+          "transport": [
+            {
+              "items": 3072,
+              "seconds": [
+                3.8784001022577287e-05,
+                3.993599861860275e-05,
+                3.686400130391121e-05,
+                4.095999896526337e-05,
+                3.1647998839616774e-05
+              ]
+            },
+            {
+              "items": 6144,
+              "seconds": [
+                5.119999870657921e-05,
+                5.091200023889542e-05,
+                5.2223999053239826e-05,
+                4.902400076389313e-05,
+                5.190400034189224e-05
+              ]
+            }
+          ],
+          "union_seconds": [
+            0.0003799999952316285,
+            0.00037974399328231814,
+            0.0003809919953346253,
+            0.00038185599446296695,
+            0.0003811840116977692
+          ]
+        }
+      ]
+    }
+  ]
+}

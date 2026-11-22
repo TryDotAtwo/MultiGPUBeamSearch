@@ -1,0 +1,10 @@
+{
+  "status": "PASS",
+  "artifact_commit": "d4e14e3650b4434420881c85df83facf07f05e04",
+  "archive_sha256": "5efd161169232c77de018ae455d75cc2f2b013d6d9d52ee98d6348839c242366",
+  "parts_verified": 209,
+  "files_verified": 943,
+  "bytes": 15652906,
+  "verified_epoch": 1791594759.1173525,
+  "scope": "immutable GitHub roundtrip including completed real GPU isolation, causal ring A/B and raw Nsight traces; no active maximum/public API phases"
+}

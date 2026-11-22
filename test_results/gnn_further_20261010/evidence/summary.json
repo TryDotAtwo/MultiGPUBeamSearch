@@ -1,0 +1,1 @@
+{"medians_ms": {"baseline": 179.02693939208984, "candidate": 164.36428833007812, "softmax": 156.8115997314453, "tile": 160.48878479003906}, "norm_speedup": 1.0892082532707228, "tile_vs_softmax": 0.9770875886224419, "accepted": "candidate normalization-only", "rejected": ["softmax", "tile"]}

@@ -1,0 +1,34 @@
+{
+  "archive_sha256": "8ff9206432a538451e7af182d64cefe19834a5beecf9ed4202b61f345a00cd00",
+  "records": 1761,
+  "blobs": 542,
+  "omitted": 962,
+  "extracted": [
+    "beam-results/mlp-binding-20261114/base-commit.txt",
+    "beam-results/mlp-binding-20261114/ctest-build.log",
+    "beam-results/mlp-binding-20261114/ctest-configure.log",
+    "beam-results/mlp-binding-20261114/ctest.log",
+    "beam-results/mlp-binding-20261114/cutlass-commit.txt",
+    "beam-results/mlp-binding-20261114/gpu.log",
+    "beam-results/mlp-binding-20261114/gpu/results.json",
+    "beam-results/mlp-binding-20261114/gpus.csv",
+    "beam-results/mlp-binding-20261114/inputs-after.txt",
+    "beam-results/mlp-binding-20261114/overlay.log",
+    "beam-results/mlp-binding-20261114/python-tests.log",
+    "beam-results/mlp-binding-20261114/software.txt",
+    "beam-results/mlp-binding-20261114/source-digest.txt",
+    "beam-results/mlp-binding-20261114/status.txt",
+    "mlp-binding-continue-driver.log",
+    "mlp-binding-continue.sh",
+    "mlp-binding-driver.log",
+    "mlp-binding-offline-driver.log",
+    "mlp-binding-offline-run.sh",
+    "mlp-binding-restore.py"
+  ],
+  "restored_samples": [
+    "beam-results/mlp-binding-20261114/cache/runs/0686eeda12df493aa9f570cc44eeec08/weights/hidden_bias.fp16",
+    "beam-results/mlp-binding-20261114/cache/runs/01e5116b2f134b76bd7225ae1a6a7e1d/native.log",
+    "beam-results/mlp-binding-20261114/cache/builds/d9a5cf6822bb57a94e098ad9719d789ebd4eb2d424b322502da12f9eb4c9adbe/native-build.json",
+    "beam-work/integrations/cayleypy_native/multigpubeamsearch/_bin/beam-runner"
+  ]
+}

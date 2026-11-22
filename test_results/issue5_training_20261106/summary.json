@@ -1,0 +1,142 @@
+{
+  "unique_test_states": 100,
+  "model_seeds": [
+    42,
+    43,
+    44
+  ],
+  "sum_optimal_distances": 857,
+  "train_test_overlap": 0,
+  "per_seed": {
+    "42": {
+      "pilgrim": {
+        "instances": 100,
+        "solved": 100,
+        "replay_verified": 100,
+        "optimal_paths": 74,
+        "mean_length_solved": 8.84,
+        "mean_excess_solved": 0.27
+      },
+      "value_graph": {
+        "instances": 100,
+        "solved": 100,
+        "replay_verified": 100,
+        "optimal_paths": 87,
+        "mean_length_solved": 8.7,
+        "mean_excess_solved": 0.13
+      },
+      "transformer": {
+        "instances": 100,
+        "solved": 94,
+        "replay_verified": 94,
+        "optimal_paths": 31,
+        "mean_length_solved": 9.73404255319149,
+        "mean_excess_solved": 1.2446808510638299
+      }
+    },
+    "43": {
+      "pilgrim": {
+        "instances": 100,
+        "solved": 100,
+        "replay_verified": 100,
+        "optimal_paths": 73,
+        "mean_length_solved": 8.9,
+        "mean_excess_solved": 0.33
+      },
+      "value_graph": {
+        "instances": 100,
+        "solved": 100,
+        "replay_verified": 100,
+        "optimal_paths": 89,
+        "mean_length_solved": 8.68,
+        "mean_excess_solved": 0.11
+      },
+      "transformer": {
+        "instances": 100,
+        "solved": 100,
+        "replay_verified": 100,
+        "optimal_paths": 48,
+        "mean_length_solved": 9.2,
+        "mean_excess_solved": 0.63
+      }
+    },
+    "44": {
+      "pilgrim": {
+        "instances": 100,
+        "solved": 100,
+        "replay_verified": 100,
+        "optimal_paths": 72,
+        "mean_length_solved": 8.87,
+        "mean_excess_solved": 0.3
+      },
+      "value_graph": {
+        "instances": 100,
+        "solved": 100,
+        "replay_verified": 100,
+        "optimal_paths": 92,
+        "mean_length_solved": 8.65,
+        "mean_excess_solved": 0.08
+      },
+      "transformer": {
+        "instances": 100,
+        "solved": 100,
+        "replay_verified": 100,
+        "optimal_paths": 28,
+        "mean_length_solved": 10.11,
+        "mean_excess_solved": 1.54
+      }
+    }
+  },
+  "aggregate": {
+    "pilgrim": {
+      "instances": 300,
+      "solved": 300,
+      "replay_verified": 300,
+      "optimal_paths": 219,
+      "mean_length_solved": 8.87,
+      "mean_excess_solved": 0.3
+    },
+    "value_graph": {
+      "instances": 300,
+      "solved": 300,
+      "replay_verified": 300,
+      "optimal_paths": 268,
+      "mean_length_solved": 8.676666666666666,
+      "mean_excess_solved": 0.10666666666666667
+    },
+    "transformer": {
+      "instances": 300,
+      "solved": 294,
+      "replay_verified": 294,
+      "optimal_paths": 107,
+      "mean_length_solved": 9.680272108843537,
+      "mean_excess_solved": 1.1360544217687074
+    }
+  },
+  "solved_by_all_three": {
+    "pilgrim": {
+      "instances": 294,
+      "solved": 294,
+      "replay_verified": 294,
+      "optimal_paths": 216,
+      "mean_length_solved": 8.83673469387755,
+      "mean_excess_solved": 0.2925170068027211
+    },
+    "value_graph": {
+      "instances": 294,
+      "solved": 294,
+      "replay_verified": 294,
+      "optimal_paths": 263,
+      "mean_length_solved": 8.649659863945578,
+      "mean_excess_solved": 0.1054421768707483
+    },
+    "transformer": {
+      "instances": 294,
+      "solved": 294,
+      "replay_verified": 294,
+      "optimal_paths": 107,
+      "mean_length_solved": 9.680272108843537,
+      "mean_excess_solved": 1.1360544217687074
+    }
+  }
+}

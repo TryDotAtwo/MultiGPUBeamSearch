@@ -1,0 +1,12 @@
+rank=0
+world_size=1
+solution_found=0
+completed_depths=10
+history_mode=ram
+history_dir=/workspace/beam-results/cub-init/session-pairs1/pair-world1/control/3/history
+history_depth_count=10
+history_bytes_received=992672
+history_bytes_stored=207840
+history_bytes_stored_ram=496336
+history_bytes_stored_disk=0
+history_bytes_pruned=288496

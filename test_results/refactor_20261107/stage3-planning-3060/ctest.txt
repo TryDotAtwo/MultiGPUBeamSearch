@@ -1,0 +1,134 @@
+Test project /workspace/build-work
+      Start  1: stream1_chunk_plan_tests
+ 1/60 Test  #1: stream1_chunk_plan_tests .................................   Passed    0.00 sec
+      Start  2: stream1_kernel_description_tests
+ 2/60 Test  #2: stream1_kernel_description_tests .........................   Passed    0.00 sec
+      Start  3: stream1_nonfinite_score_finite
+ 3/60 Test  #3: stream1_nonfinite_score_finite ...........................   Passed    0.56 sec
+      Start  4: stream1_nonfinite_graph_job_score_finite
+ 4/60 Test  #4: stream1_nonfinite_graph_job_score_finite .................   Passed    0.62 sec
+      Start  5: stream1_nonfinite_score_nan
+ 5/60 Test  #5: stream1_nonfinite_score_nan ..............................   Passed    0.48 sec
+      Start  6: stream1_nonfinite_graph_job_score_nan
+ 6/60 Test  #6: stream1_nonfinite_graph_job_score_nan ....................   Passed    0.62 sec
+      Start  7: stream1_nonfinite_score_posinf
+ 7/60 Test  #7: stream1_nonfinite_score_posinf ...........................   Passed    0.50 sec
+      Start  8: stream1_nonfinite_graph_job_score_posinf
+ 8/60 Test  #8: stream1_nonfinite_graph_job_score_posinf .................   Passed    0.47 sec
+      Start  9: stream1_nonfinite_score_neginf
+ 9/60 Test  #9: stream1_nonfinite_score_neginf ...........................   Passed    0.64 sec
+      Start 10: stream1_nonfinite_graph_job_score_neginf
+10/60 Test #10: stream1_nonfinite_graph_job_score_neginf .................   Passed    0.49 sec
+      Start 11: native_abi_tests
+11/60 Test #11: native_abi_tests .........................................   Passed    0.03 sec
+      Start 12: production_score_request_tests
+12/60 Test #12: production_score_request_tests ...........................   Passed    0.01 sec
+      Start 13: stream1_loaded_execution_admission_tests
+13/60 Test #13: stream1_loaded_execution_admission_tests .................   Passed    0.00 sec
+      Start 14: stream1_execution_contract_tests
+14/60 Test #14: stream1_execution_contract_tests .........................   Passed    0.00 sec
+      Start 15: stream1_resolved_gemm_tests
+15/60 Test #15: stream1_resolved_gemm_tests ..............................   Passed    0.00 sec
+      Start 16: stream1_policy_snapshot_tests
+16/60 Test #16: stream1_policy_snapshot_tests ............................   Passed    0.00 sec
+      Start 17: stream1_layout_metadata_tests
+17/60 Test #17: stream1_layout_metadata_tests ............................   Passed    0.00 sec
+      Start 18: contract_tests
+18/60 Test #18: contract_tests ...........................................   Passed    0.03 sec
+      Start 19: history_tests
+19/60 Test #19: history_tests ............................................   Passed    0.00 sec
+      Start 20: history_budget_tests
+20/60 Test #20: history_budget_tests .....................................   Passed    0.00 sec
+      Start 21: history_prefault_tests
+21/60 Test #21: history_prefault_tests ...................................   Passed    0.00 sec
+      Start 22: native_input_tests
+22/60 Test #22: native_input_tests .......................................   Passed    0.01 sec
+      Start 23: native_manifest_tests
+23/60 Test #23: native_manifest_tests ....................................   Passed    0.01 sec
+      Start 24: production_runner_build_info
+24/60 Test #24: production_runner_build_info .............................   Passed    0.00 sec
+      Start 25: tensor_binding_tests
+25/60 Test #25: tensor_binding_tests .....................................   Passed    0.00 sec
+      Start 26: config_limits_tests
+26/60 Test #26: config_limits_tests ......................................   Passed    0.00 sec
+      Start 27: cluster_rank_tests
+27/60 Test #27: cluster_rank_tests .......................................   Passed    0.00 sec
+      Start 28: cluster_cuda_device_tests
+28/60 Test #28: cluster_cuda_device_tests ................................   Passed    0.55 sec
+      Start 29: cnot_domain_contract_tests
+29/60 Test #29: cnot_domain_contract_tests ...............................   Passed    0.07 sec
+      Start 30: unique_frontier_tests
+30/60 Test #30: unique_frontier_tests ....................................   Passed    0.03 sec
+      Start 31: stream1_cuda_tests
+31/60 Test #31: stream1_cuda_tests .......................................   Passed    0.41 sec
+      Start 32: stream1_transformer_cuda_tests
+32/60 Test #32: stream1_transformer_cuda_tests ...........................***Skipped   0.00 sec
+      Start 33: device_weight_verification_cuda_tests
+33/60 Test #33: device_weight_verification_cuda_tests ....................   Passed    0.41 sec
+      Start 34: stream1_transformer_dual_ln_cuda_tests
+34/60 Test #34: stream1_transformer_dual_ln_cuda_tests ...................   Passed    0.56 sec
+      Start 35: stream1_transformer_gemm_policy_tests
+35/60 Test #35: stream1_transformer_gemm_policy_tests ....................   Passed    0.00 sec
+      Start 36: stream1_transformer_attention_policy_tests
+36/60 Test #36: stream1_transformer_attention_policy_tests ...............   Passed    0.00 sec
+      Start 37: stream1_transformer_shape_tests
+37/60 Test #37: stream1_transformer_shape_tests ..........................   Passed    0.00 sec
+      Start 38: stream1_transformer_final_cls_cuda_tests
+38/60 Test #38: stream1_transformer_final_cls_cuda_tests .................   Passed    0.00 sec
+      Start 39: stream1_transformer_layernorm_policy_tests
+39/60 Test #39: stream1_transformer_layernorm_policy_tests ...............   Passed    0.00 sec
+      Start 40: stream1_transformer_layernorm_split_slots_policy_tests
+40/60 Test #40: stream1_transformer_layernorm_split_slots_policy_tests ...   Passed    0.00 sec
+      Start 41: stream1_transformer_autotune_contract_tests
+41/60 Test #41: stream1_transformer_autotune_contract_tests ..............   Passed    0.00 sec
+      Start 42: stream2_cuda_tests
+42/60 Test #42: stream2_cuda_tests .......................................   Passed    0.46 sec
+      Start 43: stream3_cuda_tests
+43/60 Test #43: stream3_cuda_tests .......................................   Passed    0.56 sec
+      Start 44: stream4_cuda_tests
+44/60 Test #44: stream4_cuda_tests .......................................   Passed    0.49 sec
+      Start 45: stream4_logical_union_cuda_tests
+45/60 Test #45: stream4_logical_union_cuda_tests .........................   Passed    0.93 sec
+      Start 46: stream4_bounded_graph_cuda_tests
+46/60 Test #46: stream4_bounded_graph_cuda_tests .........................   Passed    0.81 sec
+      Start 47: final_snapshot_validation_cuda_tests
+47/60 Test #47: final_snapshot_validation_cuda_tests .....................   Passed    0.01 sec
+      Start 48: final_single_partial_count_cuda_tests
+48/60 Test #48: final_single_partial_count_cuda_tests ....................   Passed    0.56 sec
+      Start 49: final_single_full_count_cuda_tests
+49/60 Test #49: final_single_full_count_cuda_tests .......................   Passed    0.42 sec
+      Start 50: stream1_execution_shape_tests
+50/60 Test #50: stream1_execution_shape_tests ............................   Passed    0.00 sec
+      Start 51: stream1_executor_contract_tests
+51/60 Test #51: stream1_executor_contract_tests ..........................   Passed    0.00 sec
+      Start 52: union_memory_cuda_tests
+52/60 Test #52: union_memory_cuda_tests ..................................   Passed    0.50 sec
+      Start 53: runtime_arithmetic_tests
+53/60 Test #53: runtime_arithmetic_tests .................................   Passed    1.46 sec
+      Start 54: stream5_cuda_tests
+54/60 Test #54: stream5_cuda_tests .......................................   Passed    1.25 sec
+      Start 55: final_cuda_tests
+55/60 Test #55: final_cuda_tests .........................................   Passed    0.48 sec
+      Start 56: threshold_cuda_tests
+56/60 Test #56: threshold_cuda_tests .....................................   Passed    1.49 sec
+      Start 57: threshold_union_cuda_tests
+57/60 Test #57: threshold_union_cuda_tests ...............................   Passed    1.90 sec
+      Start 58: stitched_cuda_tests
+58/60 Test #58: stitched_cuda_tests ......................................   Passed    0.43 sec
+      Start 59: dispatcher_cuda_tests
+59/60 Test #59: dispatcher_cuda_tests ....................................   Passed    0.53 sec
+      Start 60: static_memory_cuda_tests
+60/60 Test #60: static_memory_cuda_tests .................................   Passed    0.43 sec
+
+100% tests passed, 0 tests failed out of 60
+
+Label Time Summary:
+cuda_linked    =   0.01 sec*proc (1 test)
+gpu            =   4.31 sec*proc (5 tests)
+host           =   0.01 sec*proc (3 tests)
+multi_gpu      =   2.83 sec*proc (2 tests)
+
+Total Test time (real) =  19.32 sec
+
+The following tests did not run:
+	 32 - stream1_transformer_cuda_tests (Skipped)

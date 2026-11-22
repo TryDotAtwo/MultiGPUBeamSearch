@@ -1,0 +1,9 @@
+Processing /workspace/beam-work/integrations/cayleypy_native
+  Preparing metadata (pyproject.toml): started
+  Preparing metadata (pyproject.toml): finished with status 'done'
+Building wheels for collected packages: multigpubeamsearch
+  Building wheel for multigpubeamsearch (pyproject.toml): started
+  Building wheel for multigpubeamsearch (pyproject.toml): finished with status 'done'
+  Created wheel for multigpubeamsearch: filename=multigpubeamsearch-0.1.0.dev1-cp310-abi3-linux_x86_64.whl size=2453842 sha256=c17324a7b0f200e35a6e756e59741b9e4013c72cebf6676da0da813111c42033
+  Stored in directory: /workspace/tmp/pip-ephem-wheel-cache-a9314mxb/wheels/7a/94/d5/056fa2adfeed94e672e3240ce88e800fc0956fb28700d04c19
+Successfully built multigpubeamsearch

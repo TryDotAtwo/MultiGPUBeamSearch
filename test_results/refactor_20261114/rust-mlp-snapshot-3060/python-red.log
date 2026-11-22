@@ -1,0 +1,27 @@
+FF                                                                       [100%]
+=================================== FAILURES ===================================
+_________ test_rust_session_delegates_snapshot_copy_reuse_and_refresh __________
+integrations/cayleypy_native/tests/test_rust_model_snapshot.py:45: in test_rust_session_delegates_snapshot_copy_reuse_and_refresh
+    first = cache.prepare(model, contract, tmp_path / 'run1', cache_dir)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+integrations/cayleypy_native/multigpubeamsearch/model_snapshot.py:48: in prepare
+    snapshot = _snapshot_artifact(model, contract, run_dir)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+integrations/cayleypy_native/tests/test_rust_model_snapshot.py:41: in <lambda>
+    monkeypatch.setattr(models, '_snapshot_artifact', lambda *a, **k: pytest.fail('Python copied weights'))
+                                                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   Failed: Python copied weights
+_________ test_rust_snapshot_failure_is_not_silently_retried_in_python _________
+integrations/cayleypy_native/tests/test_rust_model_snapshot.py:78: in test_rust_snapshot_failure_is_not_silently_retried_in_python
+    session.model_snapshot_cache.prepare(model, contract, tmp_path / 'run', tmp_path)
+integrations/cayleypy_native/multigpubeamsearch/model_snapshot.py:48: in prepare
+    snapshot = _snapshot_artifact(model, contract, run_dir)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+integrations/cayleypy_native/tests/test_rust_model_snapshot.py:75: in <lambda>
+    monkeypatch.setattr(models, '_snapshot_artifact', lambda *a, **k: pytest.fail('fallback after Rust failure'))
+                                                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   Failed: fallback after Rust failure
+=========================== short test summary info ============================
+FAILED integrations/cayleypy_native/tests/test_rust_model_snapshot.py::test_rust_session_delegates_snapshot_copy_reuse_and_refresh
+FAILED integrations/cayleypy_native/tests/test_rust_model_snapshot.py::test_rust_snapshot_failure_is_not_silently_retried_in_python
+2 failed in 1.98s

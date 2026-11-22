@@ -1,0 +1,12 @@
+rank=0
+world_size=2
+solution_found=0
+completed_depths=4
+history_mode=disk
+history_dir=/workspace/beam-results/owner-radix/session1/session/rust-2/job-2/history/rank-0
+history_depth_count=4
+history_bytes_received=3456
+history_bytes_stored=1728
+history_bytes_stored_ram=0
+history_bytes_stored_disk=1728
+history_bytes_pruned=0

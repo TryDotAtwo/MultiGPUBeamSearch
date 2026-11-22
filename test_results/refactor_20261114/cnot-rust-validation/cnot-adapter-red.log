@@ -1,0 +1,90 @@
+FF                                                                       [100%]
+================================== FAILURES ===================================
+______ test_explicit_rust_validation_owns_input_and_checks_returned_path ______
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x0000026BB3BE0E50>
+
+    def test_explicit_rust_validation_owns_input_and_checks_returned_path(monkeypatch):
+        from types import SimpleNamespace
+        from multigpubeamsearch import rust_control
+    
+        calls = []
+    
+        class Matrix:
+            def __init__(self, n, raw):
+                self.n = n
+                width = 8 * ((n + 63) // 64)
+                self.rows = tuple(int.from_bytes(raw[i:i + width], "little")
+                                  for i in range(0, len(raw), width))
+                calls.append(("load", n, len(raw)))
+    
+            def verifies_construction(self, gates):
+                calls.append(("replay", tuple(gates)))
+                return replay_cnot(self.n, gates) == self.rows
+    
+        monkeypatch.setattr(rust_control, "extension", lambda: SimpleNamespace(CnotMatrix=Matrix))
+        rows = replay_cnot(144, (20591,))
+>       result = search_cnot(pack_rows(rows), object(), width=1, shortlist=1, max_depth=1,
+                             validation="rust")
+
+integrations\cayleypy_native\tests\test_cnot_search.py:81: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+C:\Users\���� ������\AppData\Local\Programs\Python\Python311\Lib\site-packages\torch\utils\_contextlib.py:120: in decorate_context
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+args = (tensor([[[                   1,                    0,                    0],
+         [                   2,         ...
+         [                   0,                    0,                32768]]]), <object object at 0x0000026BB4882900>)
+kwargs = {'max_depth': 1, 'shortlist': 1, 'validation': 'rust', 'width': 1}
+
+    @functools.wraps(func)
+    def decorate_context(*args, **kwargs):
+        with ctx_factory():
+>           return func(*args, **kwargs)
+                   ^^^^^^^^^^^^^^^^^^^^^
+E           TypeError: search_cnot() got an unexpected keyword argument 'validation'
+
+C:\Users\���� ������\AppData\Local\Programs\Python\Python311\Lib\site-packages\torch\utils\_contextlib.py:120: TypeError
+________ test_explicit_rust_validation_fails_closed_for_old_extension _________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x0000026BB4C38410>
+
+    def test_explicit_rust_validation_fails_closed_for_old_extension(monkeypatch):
+        from types import SimpleNamespace
+        from multigpubeamsearch import rust_control
+        from multigpubeamsearch.errors import NativeUnavailable
+    
+        monkeypatch.setattr(rust_control, "extension", lambda: SimpleNamespace())
+        with pytest.raises(NativeUnavailable, match="CNOT"):
+>           search_cnot(pack_rows((1, 2)), object(), width=1, shortlist=1, max_depth=1,
+                        validation="rust")
+
+integrations\cayleypy_native\tests\test_cnot_search.py:99: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+C:\Users\���� ������\AppData\Local\Programs\Python\Python311\Lib\site-packages\torch\utils\_contextlib.py:120: in decorate_context
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+args = (tensor([[[1],
+         [2]]]), <object object at 0x0000026BB4883900>)
+kwargs = {'max_depth': 1, 'shortlist': 1, 'validation': 'rust', 'width': 1}
+
+    @functools.wraps(func)
+    def decorate_context(*args, **kwargs):
+        with ctx_factory():
+>           return func(*args, **kwargs)
+                   ^^^^^^^^^^^^^^^^^^^^^
+E           TypeError: search_cnot() got an unexpected keyword argument 'validation'
+
+C:\Users\���� ������\AppData\Local\Programs\Python\Python311\Lib\site-packages\torch\utils\_contextlib.py:120: TypeError
+=========================== short test summary info ===========================
+FAILED integrations\cayleypy_native\tests\test_cnot_search.py::test_explicit_rust_validation_owns_input_and_checks_returned_path
+FAILED integrations\cayleypy_native\tests\test_cnot_search.py::test_explicit_rust_validation_fails_closed_for_old_extension
+2 failed, 7 deselected in 4.85s
+Exception ignored in: <function Console.__del__ at 0x0000026BA3220680>
+Traceback (most recent call last):
+  File "C:\Users\���� ������\AppData\Local\Programs\Python\Python311\Lib\site-packages\pyreadline3\console\console.py", line 255, in __del__
+OSError: [WinError -1073741816] Windows Error 0xc0000008

@@ -1,0 +1,213 @@
+{
+  "metadata": {
+    "source_commit": "83e46be081cae82c071128713bb93c47178f9cf3",
+    "binary_sha256": "52d62d16076a70fb9864d5153b67c6004517d55bf63c8508b6f236c2ac79872a",
+    "arch_flags": "8.6",
+    "gpu": "NVIDIA GeForce RTX 3060",
+    "cc": [
+      8,
+      6
+    ],
+    "torch": "2.11.0+cu128",
+    "cuda": "12.8",
+    "driver": "610.43.02",
+    "model": {
+      "n": 100,
+      "d_model": 256,
+      "layers": 2,
+      "hops": 2,
+      "max_neighbors": 75,
+      "neighbor_counts": [
+        75,
+        38
+      ],
+      "cap": 100000,
+      "parameters": 2983268
+    },
+    "artifact_hash": "e029480ae1d89e0615fb19e04a8b0c7dd0b7f603acb5e29912d56f99fe282669",
+    "seed": 42,
+    "precision": "FP16 body + common FP32 scalar readout",
+    "scope": "one GNN forward including both levels; excludes beam streams, host transfers, loading and compilation",
+    "slots": 1,
+    "streams": 1,
+    "warmup": 2,
+    "repeats": 5,
+    "trained_quality": false
+  },
+  "records": [
+    {
+      "batch": 1,
+      "backend": "python_pytorch",
+      "status": "PASS",
+      "max_error": 0.0,
+      "wall_ms": [
+        241.80313386023045,
+        241.72858987003565,
+        241.93923408165574,
+        242.13625583797693,
+        242.10580298677087
+      ],
+      "gpu_ms": [
+        241.74899291992188,
+        241.6913299560547,
+        241.902587890625,
+        242.1002197265625,
+        242.0712890625
+      ],
+      "median_ms": 241.93923408165574,
+      "p95_ms": 242.13625583797693,
+      "items_per_second": 4.133269264060309,
+      "allocated_peak": 3238141952,
+      "reserved_peak": 3370123264,
+      "output_sha": "e0c7d0014fa5bb8b5884e94f02137ddfeac933f4a0895153b0d0e05c8b2ee8a9"
+    },
+    {
+      "batch": 1,
+      "backend": "native_libtorch",
+      "status": "PASS",
+      "max_error": 7.981061935424805e-05,
+      "wall_ms": [
+        189.2738500609994,
+        189.40900266170502,
+        189.48334315791726,
+        189.46541333571076,
+        189.57230588421226
+      ],
+      "gpu_ms": [
+        189.22189331054688,
+        189.37344360351562,
+        189.4502410888672,
+        189.42874145507812,
+        189.53919982910156
+      ],
+      "median_ms": 189.46541333571076,
+      "p95_ms": 189.57230588421226,
+      "items_per_second": 5.278008172542372,
+      "allocated_peak": 3139202560,
+      "reserved_peak": 3368026112,
+      "output_sha": "053d6df8d4d55fb4381547d55e100b8e38857c7edaf9deb4af979a86f81b88fe"
+    },
+    {
+      "batch": 1,
+      "backend": "native_cutlass",
+      "status": "PASS",
+      "max_error": 9.576976299285889e-05,
+      "wall_ms": [
+        261.60596031695604,
+        260.92115975916386,
+        261.57113118097186,
+        289.4394430331886,
+        262.1434140019119
+      ],
+      "gpu_ms": [
+        261.5538330078125,
+        260.885498046875,
+        261.53472900390625,
+        289.40289306640625,
+        262.1080322265625
+      ],
+      "median_ms": 261.60596031695604,
+      "p95_ms": 289.4394430331886,
+      "items_per_second": 3.8225428762724745,
+      "allocated_peak": 3139202560,
+      "reserved_peak": 3368026112,
+      "output_sha": "361fa945f106a8f95ce21e48e89369f192bb29664efdfbe86bf0dc91b16748bb"
+    },
+    {
+      "batch": 2,
+      "backend": "python_pytorch",
+      "status": "PASS",
+      "max_error": 0.0,
+      "wall_ms": [
+        468.707368709147,
+        468.764771707356,
+        468.8134677708149,
+        469.4829899817705,
+        469.811774790287
+      ],
+      "gpu_ms": [
+        468.6628723144531,
+        468.7265930175781,
+        468.7779846191406,
+        469.4486999511719,
+        469.7743225097656
+      ],
+      "median_ms": 468.8134677708149,
+      "p95_ms": 469.811774790287,
+      "items_per_second": 4.26608904712124,
+      "allocated_peak": 6444230144,
+      "reserved_peak": 6689914880,
+      "output_sha": "34e8d55d390aed0f8c74bfe7a95b46a65bdf8fea6fd89e0ef312b8f761d92551"
+    },
+    {
+      "batch": 2,
+      "backend": "native_libtorch",
+      "status": "PASS",
+      "max_error": 4.149973392486572e-05,
+      "wall_ms": [
+        368.2914939709008,
+        369.33230282738805,
+        369.14660735055804,
+        368.7114380300045,
+        368.66518994793296
+      ],
+      "gpu_ms": [
+        368.21600341796875,
+        369.2776184082031,
+        369.1100158691406,
+        368.6727600097656,
+        368.63079833984375
+      ],
+      "median_ms": 368.7114380300045,
+      "p95_ms": 369.33230282738805,
+      "items_per_second": 5.42429605841858,
+      "allocated_peak": 7243819520,
+      "reserved_peak": 8371830784,
+      "output_sha": "33538416a181d8419bca670512f9d03ef6f7751337e241be5de8997dfe5f6ac1"
+    },
+    {
+      "batch": 2,
+      "backend": "native_cutlass",
+      "status": "PASS",
+      "max_error": 0.00019761919975280762,
+      "wall_ms": [
+        467.40682795643806,
+        468.1538441218436,
+        468.52146834135056,
+        470.15001624822617,
+        467.91910426691175
+      ],
+      "gpu_ms": [
+        467.3515625,
+        468.1181945800781,
+        468.4847717285156,
+        470.1142272949219,
+        467.88507080078125
+      ],
+      "median_ms": 468.1538441218436,
+      "p95_ms": 470.15001624822617,
+      "items_per_second": 4.272099919955954,
+      "allocated_peak": 7243819520,
+      "reserved_peak": 8371830784,
+      "output_sha": "687a0b0fc4e6503dff53992f1c9d8590b94d08926c98f115366ff17fecfd09bb"
+    },
+    {
+      "batch": 4,
+      "backend": "python_pytorch",
+      "status": "OOM",
+      "error": "CUDA out of memory. Tried to allocate 2.03 GiB. GPU 0 has a total capacity of 11.63 GiB of which 1.45 GiB is free. Process 103312 has 10.17 GiB memory in use. Of the allocated memory 9.94 GiB is allocated by PyTorch, and 90.33 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation. "
+    },
+    {
+      "batch": 4,
+      "backend": "native_libtorch",
+      "status": "OOM",
+      "error": "The following operation failed in the TorchScript interpreter.\nTraceback of TorchScript, serialized code (most recent call last):\n  File \"code/__torch__/multigpubeamsearch/pancake_gnn.py\", line 118, in fallback_function\n      state_encoder1 = self.state_encoder\n      _47 = torch.slice(children0, 0, start0, torch.add(start0, 12000))\n      child0 = (state_encoder1).forward(_47, )\n                ~~~"
+    },
+    {
+      "batch": 4,
+      "backend": "native_cutlass",
+      "status": "OOM",
+      "error": "The following operation failed in the TorchScript interpreter.\nTraceback of TorchScript, serialized code (most recent call last):\n  File \"code/__torch__/multigpubeamsearch/pancake_gnn.py\", line 118, in fallback_function\n      state_encoder1 = self.state_encoder\n      _47 = torch.slice(children0, 0, start0, torch.add(start0, 12000))\n      child0 = (state_encoder1).forward(_47, )\n                ~~~"
+    }
+  ]
+}

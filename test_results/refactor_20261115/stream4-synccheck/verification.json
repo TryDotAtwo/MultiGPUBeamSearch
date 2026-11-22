@@ -1,0 +1,235 @@
+{
+  "archive_sha256": "0e5e6fa20f053c035dd26cc314e440575674595c122e8f442b2e4f721a65653c",
+  "base_commit": "26fb7ed824e17a78d0b286f7197e4faa647f6254",
+  "files": 72,
+  "outcomes": {
+    "fixture-bounded-direct": {
+      "barrier_errors": 0,
+      "diagnostic_ok": false,
+      "exit": 0,
+      "summaries": []
+    },
+    "fixture-bounded-memcheck": {
+      "barrier_errors": 0,
+      "diagnostic_ok": false,
+      "exit": 0,
+      "summaries": [
+        "0 errors"
+      ]
+    },
+    "fixture-bounded-synccheck": {
+      "barrier_errors": 100,
+      "diagnostic_ok": false,
+      "exit": 86,
+      "summaries": [
+        "256 errors",
+        "156 errors were not printed. Use --print-limit option to adjust the number of printed errors"
+      ]
+    },
+    "fixture-build": {
+      "barrier_errors": 0,
+      "diagnostic_ok": false,
+      "exit": 0,
+      "summaries": []
+    },
+    "fixture-unbounded-direct": {
+      "barrier_errors": 0,
+      "diagnostic_ok": false,
+      "exit": 0,
+      "summaries": []
+    },
+    "fixture-unbounded-memcheck": {
+      "barrier_errors": 0,
+      "diagnostic_ok": false,
+      "exit": 0,
+      "summaries": [
+        "0 errors"
+      ]
+    },
+    "fixture-unbounded-synccheck": {
+      "barrier_errors": 0,
+      "diagnostic_ok": false,
+      "exit": 0,
+      "summaries": [
+        "0 errors"
+      ]
+    },
+    "minimal-conditional-1-direct": {
+      "barrier_errors": 0,
+      "diagnostic_ok": true,
+      "exit": 0,
+      "summaries": []
+    },
+    "minimal-conditional-1-memcheck": {
+      "barrier_errors": 0,
+      "diagnostic_ok": true,
+      "exit": 0,
+      "summaries": [
+        "0 errors"
+      ]
+    },
+    "minimal-conditional-1-synccheck": {
+      "barrier_errors": 0,
+      "diagnostic_ok": true,
+      "exit": 0,
+      "summaries": [
+        "0 errors"
+      ]
+    },
+    "minimal-conditional-1025-direct": {
+      "barrier_errors": 0,
+      "diagnostic_ok": true,
+      "exit": 0,
+      "summaries": []
+    },
+    "minimal-conditional-1025-memcheck": {
+      "barrier_errors": 0,
+      "diagnostic_ok": true,
+      "exit": 0,
+      "summaries": [
+        "0 errors"
+      ]
+    },
+    "minimal-conditional-1025-synccheck": {
+      "barrier_errors": 0,
+      "diagnostic_ok": true,
+      "exit": 0,
+      "summaries": [
+        "0 errors"
+      ]
+    },
+    "minimal-first-1-direct": {
+      "barrier_errors": 0,
+      "diagnostic_ok": true,
+      "exit": 0,
+      "summaries": []
+    },
+    "minimal-first-1-memcheck": {
+      "barrier_errors": 0,
+      "diagnostic_ok": true,
+      "exit": 0,
+      "summaries": [
+        "0 errors"
+      ]
+    },
+    "minimal-first-1-synccheck": {
+      "barrier_errors": 0,
+      "diagnostic_ok": true,
+      "exit": 0,
+      "summaries": [
+        "0 errors"
+      ]
+    },
+    "minimal-first-1025-direct": {
+      "barrier_errors": 0,
+      "diagnostic_ok": true,
+      "exit": 0,
+      "summaries": []
+    },
+    "minimal-first-1025-memcheck": {
+      "barrier_errors": 0,
+      "diagnostic_ok": true,
+      "exit": 0,
+      "summaries": [
+        "0 errors"
+      ]
+    },
+    "minimal-first-1025-synccheck": {
+      "barrier_errors": 0,
+      "diagnostic_ok": true,
+      "exit": 0,
+      "summaries": [
+        "0 errors"
+      ]
+    },
+    "minimal-last-1-direct": {
+      "barrier_errors": 0,
+      "diagnostic_ok": true,
+      "exit": 0,
+      "summaries": []
+    },
+    "minimal-last-1-memcheck": {
+      "barrier_errors": 0,
+      "diagnostic_ok": true,
+      "exit": 0,
+      "summaries": [
+        "0 errors"
+      ]
+    },
+    "minimal-last-1-synccheck": {
+      "barrier_errors": 0,
+      "diagnostic_ok": true,
+      "exit": 0,
+      "summaries": [
+        "0 errors"
+      ]
+    },
+    "minimal-last-1025-direct": {
+      "barrier_errors": 0,
+      "diagnostic_ok": true,
+      "exit": 0,
+      "summaries": []
+    },
+    "minimal-last-1025-memcheck": {
+      "barrier_errors": 0,
+      "diagnostic_ok": true,
+      "exit": 0,
+      "summaries": [
+        "0 errors"
+      ]
+    },
+    "minimal-last-1025-synccheck": {
+      "barrier_errors": 0,
+      "diagnostic_ok": true,
+      "exit": 0,
+      "summaries": [
+        "0 errors"
+      ]
+    },
+    "minimal-plain-1-direct": {
+      "barrier_errors": 0,
+      "diagnostic_ok": true,
+      "exit": 0,
+      "summaries": []
+    },
+    "minimal-plain-1-memcheck": {
+      "barrier_errors": 0,
+      "diagnostic_ok": true,
+      "exit": 0,
+      "summaries": [
+        "0 errors"
+      ]
+    },
+    "minimal-plain-1-synccheck": {
+      "barrier_errors": 0,
+      "diagnostic_ok": true,
+      "exit": 0,
+      "summaries": [
+        "0 errors"
+      ]
+    },
+    "minimal-plain-1025-direct": {
+      "barrier_errors": 0,
+      "diagnostic_ok": true,
+      "exit": 0,
+      "summaries": []
+    },
+    "minimal-plain-1025-memcheck": {
+      "barrier_errors": 0,
+      "diagnostic_ok": true,
+      "exit": 0,
+      "summaries": [
+        "0 errors"
+      ]
+    },
+    "minimal-plain-1025-synccheck": {
+      "barrier_errors": 0,
+      "diagnostic_ok": true,
+      "exit": 0,
+      "summaries": [
+        "0 errors"
+      ]
+    }
+  },
+  "source_files": 192
+}

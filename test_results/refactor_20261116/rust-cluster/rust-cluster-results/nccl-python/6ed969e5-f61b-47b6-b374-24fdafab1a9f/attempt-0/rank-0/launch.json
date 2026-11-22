@@ -1,0 +1,13 @@
+{
+  "argv": [
+    "/opt/conda/bin/python3.11",
+    "/workspace/rust-cluster-src/integrations/cayleypy_native/tests/cluster_rank_nccl.py",
+    "--payload"
+  ],
+  "rank": 0,
+  "world_size": 2,
+  "node": 0,
+  "local_rank": 0,
+  "local_world_size": 2,
+  "cuda_visible_devices": null
+}

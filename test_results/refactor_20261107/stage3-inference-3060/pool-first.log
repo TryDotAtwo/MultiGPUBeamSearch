@@ -1,0 +1,10 @@
+   Compiling beam-runtime v0.1.0 (/workspace/beam-work/rust/beam-runtime)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.34s
+     Running tests/inference.rs (/workspace/target/debug/deps/inference-02038fc53ac3fe8d)
+
+running 2 tests
+test one_shot_inference_validates_receipts_and_reaps_helpers ... ok
+test inference_starts_all_ranks_before_requests_and_restarts_only_failed_rank ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s
+

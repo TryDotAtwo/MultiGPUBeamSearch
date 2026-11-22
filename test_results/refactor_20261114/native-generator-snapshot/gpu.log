@@ -1,0 +1,5 @@
+RUST_GRAPH_GPU world=1 moves=3 replay=ok
+RUST_GRAPH_GPU world=1 moves=4 replay=ok
+RUST_GRAPH_GPU world=2 moves=3 replay=ok
+RUST_GRAPH_GPU world=2 moves=4 replay=ok
+RUST_GRAPH_GPU_OK

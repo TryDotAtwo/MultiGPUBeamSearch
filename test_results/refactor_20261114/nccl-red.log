@@ -1,0 +1,136 @@
+FFFFFFFFFFF                                                              [100%]
+================================== FAILURES ===================================
+______________ test_repeated_digest_is_the_conventional_sha256[] ______________
+
+tmp_path = WindowsPath('D:/100XH100/.local/tmp/nccl-red-01/test_repeated_digest_is_the_co0')
+contents = b''
+
+    @pytest.mark.parametrize("contents", [b"", b"a", b"abcd", b"abcde", b"abcdefghijklmnopq"])
+    def test_repeated_digest_is_the_conventional_sha256(tmp_path, contents):
+>       from multigpubeamsearch.nccl_digest import ChunkDigestCache
+E       ModuleNotFoundError: No module named 'multigpubeamsearch.nccl_digest'
+
+integrations\cayleypy_native\tests\test_nccl_chunk_digest.py:9: ModuleNotFoundError
+_____________ test_repeated_digest_is_the_conventional_sha256[a] ______________
+
+tmp_path = WindowsPath('D:/100XH100/.local/tmp/nccl-red-01/test_repeated_digest_is_the_co1')
+contents = b'a'
+
+    @pytest.mark.parametrize("contents", [b"", b"a", b"abcd", b"abcde", b"abcdefghijklmnopq"])
+    def test_repeated_digest_is_the_conventional_sha256(tmp_path, contents):
+>       from multigpubeamsearch.nccl_digest import ChunkDigestCache
+E       ModuleNotFoundError: No module named 'multigpubeamsearch.nccl_digest'
+
+integrations\cayleypy_native\tests\test_nccl_chunk_digest.py:9: ModuleNotFoundError
+____________ test_repeated_digest_is_the_conventional_sha256[abcd] ____________
+
+tmp_path = WindowsPath('D:/100XH100/.local/tmp/nccl-red-01/test_repeated_digest_is_the_co2')
+contents = b'abcd'
+
+    @pytest.mark.parametrize("contents", [b"", b"a", b"abcd", b"abcde", b"abcdefghijklmnopq"])
+    def test_repeated_digest_is_the_conventional_sha256(tmp_path, contents):
+>       from multigpubeamsearch.nccl_digest import ChunkDigestCache
+E       ModuleNotFoundError: No module named 'multigpubeamsearch.nccl_digest'
+
+integrations\cayleypy_native\tests\test_nccl_chunk_digest.py:9: ModuleNotFoundError
+___________ test_repeated_digest_is_the_conventional_sha256[abcde] ____________
+
+tmp_path = WindowsPath('D:/100XH100/.local/tmp/nccl-red-01/test_repeated_digest_is_the_co3')
+contents = b'abcde'
+
+    @pytest.mark.parametrize("contents", [b"", b"a", b"abcd", b"abcde", b"abcdefghijklmnopq"])
+    def test_repeated_digest_is_the_conventional_sha256(tmp_path, contents):
+>       from multigpubeamsearch.nccl_digest import ChunkDigestCache
+E       ModuleNotFoundError: No module named 'multigpubeamsearch.nccl_digest'
+
+integrations\cayleypy_native\tests\test_nccl_chunk_digest.py:9: ModuleNotFoundError
+_____ test_repeated_digest_is_the_conventional_sha256[abcdefghijklmnopq] ______
+
+tmp_path = WindowsPath('D:/100XH100/.local/tmp/nccl-red-01/test_repeated_digest_is_the_co4')
+contents = b'abcdefghijklmnopq'
+
+    @pytest.mark.parametrize("contents", [b"", b"a", b"abcd", b"abcde", b"abcdefghijklmnopq"])
+    def test_repeated_digest_is_the_conventional_sha256(tmp_path, contents):
+>       from multigpubeamsearch.nccl_digest import ChunkDigestCache
+E       ModuleNotFoundError: No module named 'multigpubeamsearch.nccl_digest'
+
+integrations\cayleypy_native\tests\test_nccl_chunk_digest.py:9: ModuleNotFoundError
+_______ test_same_size_mutation_with_restored_mtime_is_not_a_cache_hit ________
+
+tmp_path = WindowsPath('D:/100XH100/.local/tmp/nccl-red-01/test_same_size_mutation_with_r0')
+
+    def test_same_size_mutation_with_restored_mtime_is_not_a_cache_hit(tmp_path):
+>       from multigpubeamsearch.nccl_digest import ChunkDigestCache
+E       ModuleNotFoundError: No module named 'multigpubeamsearch.nccl_digest'
+
+integrations\cayleypy_native\tests\test_nccl_chunk_digest.py:20: ModuleNotFoundError
+_______________ test_size_change_never_reuses_the_old_digest[a] _______________
+
+tmp_path = WindowsPath('D:/100XH100/.local/tmp/nccl-red-01/test_size_change_never_reuses_0')
+contents = b'a'
+
+    @pytest.mark.parametrize("contents", [b"a", b"abcdefghijklmnopq--extended"])
+    def test_size_change_never_reuses_the_old_digest(tmp_path, contents):
+>       from multigpubeamsearch.nccl_digest import ChunkDigestCache
+E       ModuleNotFoundError: No module named 'multigpubeamsearch.nccl_digest'
+
+integrations\cayleypy_native\tests\test_nccl_chunk_digest.py:34: ModuleNotFoundError
+__ test_size_change_never_reuses_the_old_digest[abcdefghijklmnopq--extended] __
+
+tmp_path = WindowsPath('D:/100XH100/.local/tmp/nccl-red-01/test_size_change_never_reuses_1')
+contents = b'abcdefghijklmnopq--extended'
+
+    @pytest.mark.parametrize("contents", [b"a", b"abcdefghijklmnopq--extended"])
+    def test_size_change_never_reuses_the_old_digest(tmp_path, contents):
+>       from multigpubeamsearch.nccl_digest import ChunkDigestCache
+E       ModuleNotFoundError: No module named 'multigpubeamsearch.nccl_digest'
+
+integrations\cayleypy_native\tests\test_nccl_chunk_digest.py:34: ModuleNotFoundError
+_______________ test_atomic_replacement_of_library_is_detected ________________
+
+tmp_path = WindowsPath('D:/100XH100/.local/tmp/nccl-red-01/test_atomic_replacement_of_lib0')
+
+    def test_atomic_replacement_of_library_is_detected(tmp_path):
+>       from multigpubeamsearch.nccl_digest import ChunkDigestCache
+E       ModuleNotFoundError: No module named 'multigpubeamsearch.nccl_digest'
+
+integrations\cayleypy_native\tests\test_nccl_chunk_digest.py:45: ModuleNotFoundError
+_____________ test_nccl_discovery_revalidates_library_and_header ______________
+
+tmp_path = WindowsPath('D:/100XH100/.local/tmp/nccl-red-01/test_nccl_discovery_revalidate0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x00000224AC2BFA50>
+
+    def test_nccl_discovery_revalidates_library_and_header(tmp_path, monkeypatch):
+        from multigpubeamsearch import build
+>       from multigpubeamsearch.nccl_digest import ChunkDigestCache
+E       ModuleNotFoundError: No module named 'multigpubeamsearch.nccl_digest'
+
+integrations\cayleypy_native\tests\test_nccl_chunk_digest.py:60: ModuleNotFoundError
+__________________ test_parallel_digest_is_explicitly_opt_in __________________
+
+    def test_parallel_digest_is_explicitly_opt_in():
+        from multigpubeamsearch.persistent import NativeSession
+    
+        with NativeSession() as ordinary:
+>           assert ordinary.nccl_digest_cache is None
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^
+E           AttributeError: 'NativeSession' object has no attribute 'nccl_digest_cache'
+
+integrations\cayleypy_native\tests\test_nccl_chunk_digest.py:85: AttributeError
+=========================== short test summary info ===========================
+FAILED integrations\cayleypy_native\tests\test_nccl_chunk_digest.py::test_repeated_digest_is_the_conventional_sha256[]
+FAILED integrations\cayleypy_native\tests\test_nccl_chunk_digest.py::test_repeated_digest_is_the_conventional_sha256[a]
+FAILED integrations\cayleypy_native\tests\test_nccl_chunk_digest.py::test_repeated_digest_is_the_conventional_sha256[abcd]
+FAILED integrations\cayleypy_native\tests\test_nccl_chunk_digest.py::test_repeated_digest_is_the_conventional_sha256[abcde]
+FAILED integrations\cayleypy_native\tests\test_nccl_chunk_digest.py::test_repeated_digest_is_the_conventional_sha256[abcdefghijklmnopq]
+FAILED integrations\cayleypy_native\tests\test_nccl_chunk_digest.py::test_same_size_mutation_with_restored_mtime_is_not_a_cache_hit
+FAILED integrations\cayleypy_native\tests\test_nccl_chunk_digest.py::test_size_change_never_reuses_the_old_digest[a]
+FAILED integrations\cayleypy_native\tests\test_nccl_chunk_digest.py::test_size_change_never_reuses_the_old_digest[abcdefghijklmnopq--extended]
+FAILED integrations\cayleypy_native\tests\test_nccl_chunk_digest.py::test_atomic_replacement_of_library_is_detected
+FAILED integrations\cayleypy_native\tests\test_nccl_chunk_digest.py::test_nccl_discovery_revalidates_library_and_header
+FAILED integrations\cayleypy_native\tests\test_nccl_chunk_digest.py::test_parallel_digest_is_explicitly_opt_in
+11 failed in 0.19s
+Exception ignored in: <function Console.__del__ at 0x00000224AA7234C0>
+Traceback (most recent call last):
+  File "C:\Users\���� ������\AppData\Local\Programs\Python\Python311\Lib\site-packages\pyreadline3\console\console.py", line 255, in __del__
+OSError: [WinError -1073741816] Windows Error 0xc0000008

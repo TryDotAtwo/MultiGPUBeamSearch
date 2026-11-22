@@ -1,0 +1,22 @@
+   Compiling beam-core v0.1.0 (/workspace/beam-work/rust/beam-core)
+error[E0432]: unresolved import `beam_core::search`
+ --> rust/beam-core/tests/search.rs:1:16
+  |
+1 | use beam_core::search::{PermutationGraph,TerminalParser,search_budget};
+  |                ^^^^^^ could not find `search` in `beam_core`
+
+error[E0433]: cannot find module or crate `serde_json` in this scope
+  --> rust/beam-core/tests/search.rs:41:89
+   |
+41 |     let result=parse(text);assert_eq!(result.metadata["collected_solutions"][0]["path"],serde_json::json!([1]));
+   |                                                                                         ^^^^^^^^^^ use of unresolved module or unlinked crate `serde_json`
+
+error[E0433]: cannot find `search` in `beam_core`
+ --> rust/beam-core/tests/search.rs:3:33
+  |
+3 | fn parse(text:&str)->beam_core::search::TerminalResult {
+  |                                 ^^^^^^ could not find `search` in `beam_core`
+
+Some errors have detailed explanations: E0432, E0433.
+For more information about an error, try `rustc --explain E0432`.
+error: could not compile `beam-core` (test "search") due to 3 previous errors

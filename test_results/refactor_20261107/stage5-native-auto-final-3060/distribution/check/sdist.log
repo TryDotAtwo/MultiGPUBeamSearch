@@ -1,0 +1,29 @@
+* Getting build dependencies for sdist...
+* Building sdist...
+Running `maturin pep517 write-sdist --sdist-directory /workspace/beam-results/native-auto/distribution/check/sdist`
+⚠️  Warning: `build-backend` in pyproject.toml is not set to `maturin`, packaging tools such as pip will not use maturin to build this project.
+🍹 Building a mixed python/rust project
+🔗 Found pyo3 bindings with abi3-py3.10 support
+📡 Using build options locked, bindings from pyproject.toml
+From `cargo package --list --allow-dirty --manifest-path /workspace/tmp/multigpubeamsearch-build-l9qtb3rq/repository/rust/beam-runtime/Cargo.toml`:
+warning: manifest has no description, documentation, homepage or repository
+  |
+  = note: see https://doc.rust-lang.org/cargo/reference/manifest.html#package-metadata for more info
+From `cargo package --list --allow-dirty --manifest-path /workspace/tmp/multigpubeamsearch-build-l9qtb3rq/repository/rust/beam-native-sys/Cargo.toml`:
+warning: manifest has no description, documentation, homepage or repository
+  |
+  = note: see https://doc.rust-lang.org/cargo/reference/manifest.html#package-metadata for more info
+From `cargo package --list --allow-dirty --manifest-path /workspace/tmp/multigpubeamsearch-build-l9qtb3rq/repository/rust/beam-core/Cargo.toml`:
+warning: manifest has no description, documentation, homepage or repository
+  |
+  = note: see https://doc.rust-lang.org/cargo/reference/manifest.html#package-metadata for more info
+From `cargo package --list --allow-dirty --manifest-path /workspace/tmp/multigpubeamsearch-build-l9qtb3rq/repository/rust/beam-python/Cargo.toml`:
+warning: manifest has no description, documentation, homepage or repository
+  |
+  = note: see https://doc.rust-lang.org/cargo/reference/manifest.html#package-metadata for more info
+📦 Including files matching "build_backend.py"
+📦 Including files matching "multigpubeamsearch/_native_source/**/*"
+📦 Including files matching "multigpubeamsearch/_bin/*"
+📦 Built source distribution to /workspace/beam-results/native-auto/distribution/check/sdist/multigpubeamsearch-0.1.0.dev1.tar.gz
+multigpubeamsearch-0.1.0.dev1.tar.gz
+Successfully built multigpubeamsearch-0.1.0.dev1.tar.gz

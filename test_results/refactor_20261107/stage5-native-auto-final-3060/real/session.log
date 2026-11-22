@@ -1,0 +1,5 @@
+reference world=1 seconds=0.911
+rust world=1 seconds=0.694
+reference world=2 seconds=1.454
+rust world=2 seconds=1.430
+NATIVE_SESSION_GPU_OK

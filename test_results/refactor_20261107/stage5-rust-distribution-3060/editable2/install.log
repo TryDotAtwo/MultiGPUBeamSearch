@@ -1,0 +1,13 @@
+Obtaining file:///workspace/beam-results/rust-wheel/editable2/repository/integrations/cayleypy_native
+  Checking if build backend supports build_editable: started
+  Checking if build backend supports build_editable: finished with status 'done'
+  Preparing editable metadata (pyproject.toml): started
+  Preparing editable metadata (pyproject.toml): finished with status 'done'
+Building wheels for collected packages: multigpubeamsearch
+  Building editable for multigpubeamsearch (pyproject.toml): started
+  Building editable for multigpubeamsearch (pyproject.toml): finished with status 'done'
+  Created wheel for multigpubeamsearch: filename=multigpubeamsearch-0.1.0.dev1-cp310-abi3-linux_x86_64.whl size=26699 sha256=0bbc7415b7f4d2c469d4c9f81742b6c02c6d5909a0dcbc904b54def75f4041cd
+  Stored in directory: /workspace/tmp/pip-ephem-wheel-cache-mj2frkdg/wheels/cf/3b/ac/718e9acd4cc40268ddbb45b5f7d6a11cef681e80161bb0ca72
+Successfully built multigpubeamsearch
+Installing collected packages: multigpubeamsearch
+Successfully installed multigpubeamsearch-0.1.0.dev1

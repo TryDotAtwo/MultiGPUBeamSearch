@@ -1,0 +1,16 @@
+FF                                                                       [100%]
+================================== FAILURES ===================================
+_ test_session_restarts_when_entering_or_leaving_bound_snapshot_mode[python] __
+integrations\cayleypy_native\tests\test_persistent_search.py:190: in test_session_restarts_when_entering_or_leaving_bound_snapshot_mode
+    assert len(allocations) == 2 and allocations[0].closed
+E   assert (1 == 2)
+E    +  where 1 = len([<test_persistent_search.test_session_restarts_when_entering_or_leaving_bound_snapshot_mode.<locals>.Workers object at 0x000001ECA00FAC50>])
+__ test_session_restarts_when_entering_or_leaving_bound_snapshot_mode[rust] ___
+integrations\cayleypy_native\tests\test_persistent_search.py:190: in test_session_restarts_when_entering_or_leaving_bound_snapshot_mode
+    assert len(allocations) == 2 and allocations[0].closed
+E   assert (1 == 2)
+E    +  where 1 = len([<test_persistent_search.test_session_restarts_when_entering_or_leaving_bound_snapshot_mode.<locals>.Workers object at 0x000001ECA254B610>])
+=========================== short test summary info ===========================
+FAILED integrations\cayleypy_native\tests\test_persistent_search.py::test_session_restarts_when_entering_or_leaving_bound_snapshot_mode[python]
+FAILED integrations\cayleypy_native\tests\test_persistent_search.py::test_session_restarts_when_entering_or_leaving_bound_snapshot_mode[rust]
+2 failed in 0.32s

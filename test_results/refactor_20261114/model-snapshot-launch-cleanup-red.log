@@ -1,0 +1,33 @@
+F                                                                        [100%]
+================================== FAILURES ===================================
+________ test_direct_launch_failure_releases_only_its_new_worker_group ________
+
+tmp_path = WindowsPath('D:/100XH100/.local/cache/session-snapshot/pytest-launch-cleanup-red-20261114/test_direct_launch_failure_rel0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x000002352117EAD0>
+
+    def test_direct_launch_failure_releases_only_its_new_worker_group(tmp_path, monkeypatch):
+        import subprocess
+        from types import SimpleNamespace
+        from multigpubeamsearch.errors import NativeBackendError
+        from multigpubeamsearch import resident_transport
+    
+        monkeypatch.setattr(subprocess, 'run', lambda *a, **k: subprocess.CompletedProcess(
+            a[0], 0, '{"protocol":"resident-search-v1"}', ''))
+        workers = []
+        class Workers:
+            closed = False
+            def __init__(self, *args, **kwargs):workers.append(self)
+            def submit(self, *args, **kwargs):return .01
+            def close(self):self.closed = True
+        monkeypatch.setattr(resident_transport, 'ResidentWorkers', Workers)
+        with NativeSession() as session:
+            with pytest.raises(AttributeError):
+                session.launch(['runner'], contract=None, run_dir=tmp_path, env={}, world=1, timeout=1)
+>           assert workers[0].closed and session._workers is None
+E           assert (False)
+E            +  where False = <test_persistent_search.test_direct_launch_failure_releases_only_its_new_worker_group.<locals>.Workers object at 0x000002352117FC90>.closed
+
+integrations\cayleypy_native\tests\test_persistent_search.py:175: AssertionError
+=========================== short test summary info ===========================
+FAILED integrations\cayleypy_native\tests\test_persistent_search.py::test_direct_launch_failure_releases_only_its_new_worker_group
+1 failed in 0.20s

@@ -1,0 +1,30 @@
+{
+  "archive_sha256": "0935555814637bdebc474a59a14f602248a2026a94248affedc5361e24852d2e",
+  "records": 1308,
+  "blobs": 408,
+  "omitted": 14,
+  "extracted": [
+    "beam-results/model-snapshot-20261114/commit.txt",
+    "beam-results/model-snapshot-20261114/cpu-tests.log",
+    "beam-results/model-snapshot-20261114/cutlass-commit.txt",
+    "beam-results/model-snapshot-20261114/gpu-probe.log",
+    "beam-results/model-snapshot-20261114/gpu.log",
+    "beam-results/model-snapshot-20261114/gpu/results.json",
+    "beam-results/model-snapshot-20261114/gpus.csv",
+    "beam-results/model-snapshot-20261114/inputs-after.sha256",
+    "beam-results/model-snapshot-20261114/inputs-before.sha256",
+    "beam-results/model-snapshot-20261114/restore.log",
+    "beam-results/model-snapshot-20261114/software.txt",
+    "beam-results/model-snapshot-20261114/source-digest.txt",
+    "beam-results/model-snapshot-20261114/status.txt",
+    "model-snapshot-restore.py",
+    "model-snapshot-run.log",
+    "model-snapshot-vast-run.sh"
+  ],
+  "restored_samples": [
+    "beam-results/model-snapshot-20261114/gpu/alternate/hidden_bias.fp16",
+    "beam-results/public-index-20261114/cache-cutlass/runs/099033e71f7b41fe898c377a4f7121db/native.log",
+    "beam-results/public-index-20261114/cache-cutlass/builds/160663ff9d431a48f00ab8a45cf0a9f64f66a672237e1146c36ad939b61dc446/native-build.json",
+    "beam-work/integrations/cayleypy_native/multigpubeamsearch/_bin/beam-runner"
+  ]
+}

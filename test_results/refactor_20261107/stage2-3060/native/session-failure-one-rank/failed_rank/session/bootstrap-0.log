@@ -1,0 +1,2 @@
+native_host_memory_available_bytes=88347942912 native_host_memory_history_budget=0 native_host_memory_headroom=4294967296
+communicator_rank=0 world_size=2 node_local_rank=0 local_world_size=2 cuda_ordinal=0

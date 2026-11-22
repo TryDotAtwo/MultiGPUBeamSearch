@@ -1,0 +1,20 @@
+[workspace]
+resolver = "2"
+members = ["rust/beam-core", "rust/beam-native-sys", "rust/beam-runtime", "rust/beam-cli", "rust/beam-python"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+
+[workspace.dependencies]
+serde = { version = "1", features = ["derive"] }
+# Timing receipts and content-bound cache identities must survive f64 JSON I/O.
+serde_json = { version = "1", features = ["float_roundtrip"] }
+thiserror = "2"
+sha2 = "=0.10.9"
+libloading = "0.8"
+pyo3 = { version = "0.24", features = ["abi3-py310"] }
+beam-core = { path = "rust/beam-core" }
+beam-native-sys = { path = "rust/beam-native-sys" }
+beam-runtime = { path = "rust/beam-runtime" }

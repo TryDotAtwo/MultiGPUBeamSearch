@@ -1,0 +1,819 @@
+{
+  "scope": "Rust pipeline/control correctness; tiny fixture is not a production performance profile",
+  "records": [
+    {
+      "world": 1,
+      "mode": "fixture",
+      "reference": [
+        {
+          "profile": "",
+          "parents": 64,
+          "seconds_by_rank": [
+            0.0302653
+          ],
+          "correctness_passed": true,
+          "memory_admitted": true,
+          "throttled": false
+        },
+        {
+          "profile": "",
+          "parents": 64,
+          "seconds_by_rank": [
+            0.0305139
+          ],
+          "correctness_passed": true,
+          "memory_admitted": true,
+          "throttled": false
+        },
+        {
+          "profile": "",
+          "parents": 64,
+          "seconds_by_rank": [
+            0.0301702
+          ],
+          "correctness_passed": true,
+          "memory_admitted": true,
+          "throttled": false
+        },
+        {
+          "profile": "",
+          "parents": 64,
+          "seconds_by_rank": [
+            0.0305459
+          ],
+          "correctness_passed": true,
+          "memory_admitted": true,
+          "throttled": false
+        },
+        {
+          "profile": "",
+          "parents": 64,
+          "seconds_by_rank": [
+            0.0309115
+          ],
+          "correctness_passed": true,
+          "memory_admitted": true,
+          "throttled": false
+        }
+      ],
+      "rust": [
+        {
+          "profile": "",
+          "parents": 64,
+          "seconds_by_rank": [
+            0.0283594
+          ],
+          "correctness_passed": true,
+          "memory_admitted": true,
+          "throttled": false
+        },
+        {
+          "profile": "",
+          "parents": 64,
+          "seconds_by_rank": [
+            0.0285318
+          ],
+          "correctness_passed": true,
+          "memory_admitted": true,
+          "throttled": false
+        },
+        {
+          "profile": "",
+          "parents": 64,
+          "seconds_by_rank": [
+            0.0284389
+          ],
+          "correctness_passed": true,
+          "memory_admitted": true,
+          "throttled": false
+        },
+        {
+          "profile": "",
+          "parents": 64,
+          "seconds_by_rank": [
+            0.0285359
+          ],
+          "correctness_passed": true,
+          "memory_admitted": true,
+          "throttled": false
+        },
+        {
+          "profile": "",
+          "parents": 64,
+          "seconds_by_rank": [
+            0.02884
+          ],
+          "correctness_passed": true,
+          "memory_admitted": true,
+          "throttled": false
+        }
+      ],
+      "frontier_receipt": {
+        "schema": 1,
+        "graph_hash": "4a84bc138375332f3e4b8a32372b3be797aecdc4f1faf66ed044c79ecf695ccc",
+        "global_parents": 64,
+        "unique_states": 64,
+        "seed": 20261009,
+        "walk_length": 64,
+        "walk_length_min": 32,
+        "state_len": 96,
+        "storage_len": 112,
+        "excluded_center_and_predecessors": true,
+        "files": [
+          {
+            "rank": 0,
+            "parents": 64,
+            "path": "/workspace/beam-results/planning/pipeline-gpu-final/world-1/frontiers/frontier-rank-0.bin",
+            "sha256": "cadc9d060c82b9e9e240324a592d5d5c23a28d6b5d8d4c2b2627d7abef2a5a7c",
+            "bytes": 7168
+          }
+        ]
+      }
+    },
+    {
+      "world": 1,
+      "mode": "growth",
+      "reference": [
+        {
+          "profile": "",
+          "parents": 64,
+          "seconds_by_rank": [
+            0.0301069
+          ],
+          "correctness_passed": true,
+          "memory_admitted": true,
+          "throttled": false
+        },
+        {
+          "profile": "",
+          "parents": 64,
+          "seconds_by_rank": [
+            0.0300793
+          ],
+          "correctness_passed": true,
+          "memory_admitted": true,
+          "throttled": false
+        },
+        {
+          "profile": "",
+          "parents": 64,
+          "seconds_by_rank": [
+            0.02989
+          ],
+          "correctness_passed": true,
+          "memory_admitted": true,
+          "throttled": false
+        },
+        {
+          "profile": "",
+          "parents": 64,
+          "seconds_by_rank": [
+            0.0293952
+          ],
+          "correctness_passed": true,
+          "memory_admitted": true,
+          "throttled": false
+        },
+        {
+          "profile": "",
+          "parents": 64,
+          "seconds_by_rank": [
+            0.0295556
+          ],
+          "correctness_passed": true,
+          "memory_admitted": true,
+          "throttled": false
+        }
+      ],
+      "rust": [
+        {
+          "profile": "",
+          "parents": 64,
+          "seconds_by_rank": [
+            0.030267
+          ],
+          "correctness_passed": true,
+          "memory_admitted": true,
+          "throttled": false
+        },
+        {
+          "profile": "",
+          "parents": 64,
+          "seconds_by_rank": [
+            0.0297066
+          ],
+          "correctness_passed": true,
+          "memory_admitted": true,
+          "throttled": false
+        },
+        {
+          "profile": "",
+          "parents": 64,
+          "seconds_by_rank": [
+            0.0298354
+          ],
+          "correctness_passed": true,
+          "memory_admitted": true,
+          "throttled": false
+        },
+        {
+          "profile": "",
+          "parents": 64,
+          "seconds_by_rank": [
+            0.0296135
+          ],
+          "correctness_passed": true,
+          "memory_admitted": true,
+          "throttled": false
+        },
+        {
+          "profile": "",
+          "parents": 64,
+          "seconds_by_rank": [
+            0.0293653
+          ],
+          "correctness_passed": true,
+          "memory_admitted": true,
+          "throttled": false
+        }
+      ],
+      "frontier_receipt": {
+        "schema": 1,
+        "graph_hash": "4a84bc138375332f3e4b8a32372b3be797aecdc4f1faf66ed044c79ecf695ccc",
+        "global_parents": 64,
+        "unique_states": 64,
+        "seed": 20261009,
+        "walk_length": 64,
+        "walk_length_min": 32,
+        "state_len": 96,
+        "storage_len": 112,
+        "excluded_center_and_predecessors": true,
+        "files": [
+          {
+            "rank": 0,
+            "parents": 64,
+            "path": "/workspace/beam-results/planning/pipeline-gpu-final/world-1/frontiers/frontier-rank-0.bin",
+            "sha256": "cadc9d060c82b9e9e240324a592d5d5c23a28d6b5d8d4c2b2627d7abef2a5a7c",
+            "bytes": 7168
+          }
+        ]
+      }
+    },
+    {
+      "world": 1,
+      "selection": {
+        "environment": {
+          "BEAM_B_MICRO": "768",
+          "BEAM_ENSEMBLE_INFERENCE_MICRO": "32"
+        },
+        "estimate": {
+          "profile": "baseline",
+          "median": 0.000467109375,
+          "low": 0.000460246875,
+          "high": 0.0004714703125,
+          "relative_mad": 0.002977086469309209,
+          "repeats": 5
+        },
+        "rejected": {
+          "outer-double": "no statistically separated material gain"
+        },
+        "effective_beam": 64,
+        "workload_parents": 64,
+        "world_size": 1,
+        "measurements": [
+          {
+            "profile": "baseline",
+            "parents": 64,
+            "seconds_by_rank": [
+              0.0301741
+            ],
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "throttled": false
+          },
+          {
+            "profile": "baseline",
+            "parents": 64,
+            "seconds_by_rank": [
+              0.029984
+            ],
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "throttled": false
+          },
+          {
+            "profile": "baseline",
+            "parents": 64,
+            "seconds_by_rank": [
+              0.029895
+            ],
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "throttled": false
+          },
+          {
+            "profile": "baseline",
+            "parents": 64,
+            "seconds_by_rank": [
+              0.0294558
+            ],
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "throttled": false
+          },
+          {
+            "profile": "baseline",
+            "parents": 64,
+            "seconds_by_rank": [
+              0.0298555
+            ],
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "throttled": false
+          },
+          {
+            "profile": "outer-double",
+            "parents": 64,
+            "seconds_by_rank": [
+              0.0306918
+            ],
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "throttled": false
+          },
+          {
+            "profile": "outer-double",
+            "parents": 64,
+            "seconds_by_rank": [
+              0.0304323
+            ],
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "throttled": false
+          },
+          {
+            "profile": "outer-double",
+            "parents": 64,
+            "seconds_by_rank": [
+              0.0298916
+            ],
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "throttled": false
+          },
+          {
+            "profile": "outer-double",
+            "parents": 64,
+            "seconds_by_rank": [
+              0.0296538
+            ],
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "throttled": false
+          },
+          {
+            "profile": "outer-double",
+            "parents": 64,
+            "seconds_by_rank": [
+              0.0293987
+            ],
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "throttled": false
+          }
+        ],
+        "planning_scope": "exact_requested_frontier",
+        "search_policy": "rust-full-step-shortlist-v1"
+      }
+    },
+    {
+      "world": 2,
+      "mode": "fixture",
+      "reference": [
+        {
+          "profile": "",
+          "parents": 64,
+          "seconds_by_rank": [
+            0.00632415,
+            0.00634088
+          ],
+          "correctness_passed": true,
+          "memory_admitted": true,
+          "throttled": false
+        },
+        {
+          "profile": "",
+          "parents": 64,
+          "seconds_by_rank": [
+            0.0065273,
+            0.00665134
+          ],
+          "correctness_passed": true,
+          "memory_admitted": true,
+          "throttled": false
+        },
+        {
+          "profile": "",
+          "parents": 64,
+          "seconds_by_rank": [
+            0.00506622,
+            0.00508231
+          ],
+          "correctness_passed": true,
+          "memory_admitted": true,
+          "throttled": false
+        },
+        {
+          "profile": "",
+          "parents": 64,
+          "seconds_by_rank": [
+            0.0055632,
+            0.0055708
+          ],
+          "correctness_passed": true,
+          "memory_admitted": true,
+          "throttled": false
+        },
+        {
+          "profile": "",
+          "parents": 64,
+          "seconds_by_rank": [
+            0.00526462,
+            0.00527042
+          ],
+          "correctness_passed": true,
+          "memory_admitted": true,
+          "throttled": false
+        }
+      ],
+      "rust": [
+        {
+          "profile": "",
+          "parents": 64,
+          "seconds_by_rank": [
+            0.00448813,
+            0.0044898
+          ],
+          "correctness_passed": true,
+          "memory_admitted": true,
+          "throttled": false
+        },
+        {
+          "profile": "",
+          "parents": 64,
+          "seconds_by_rank": [
+            0.00445948,
+            0.00445559
+          ],
+          "correctness_passed": true,
+          "memory_admitted": true,
+          "throttled": false
+        },
+        {
+          "profile": "",
+          "parents": 64,
+          "seconds_by_rank": [
+            0.00442497,
+            0.00442736
+          ],
+          "correctness_passed": true,
+          "memory_admitted": true,
+          "throttled": false
+        },
+        {
+          "profile": "",
+          "parents": 64,
+          "seconds_by_rank": [
+            0.00443317,
+            0.00443558
+          ],
+          "correctness_passed": true,
+          "memory_admitted": true,
+          "throttled": false
+        },
+        {
+          "profile": "",
+          "parents": 64,
+          "seconds_by_rank": [
+            0.00443004,
+            0.00443947
+          ],
+          "correctness_passed": true,
+          "memory_admitted": true,
+          "throttled": false
+        }
+      ],
+      "frontier_receipt": {
+        "schema": 1,
+        "graph_hash": "4a84bc138375332f3e4b8a32372b3be797aecdc4f1faf66ed044c79ecf695ccc",
+        "global_parents": 64,
+        "unique_states": 64,
+        "seed": 20261009,
+        "walk_length": 64,
+        "walk_length_min": 32,
+        "state_len": 96,
+        "storage_len": 112,
+        "excluded_center_and_predecessors": true,
+        "files": [
+          {
+            "rank": 0,
+            "parents": 32,
+            "path": "/workspace/beam-results/planning/pipeline-gpu-final/world-2/frontiers/frontier-rank-0.bin",
+            "sha256": "bbb38dd73cbd0c59b574e90097c8e16d1c6e3d4cbb252986ebaec6b5e89007db",
+            "bytes": 3584
+          },
+          {
+            "rank": 1,
+            "parents": 32,
+            "path": "/workspace/beam-results/planning/pipeline-gpu-final/world-2/frontiers/frontier-rank-1.bin",
+            "sha256": "0a1a02c732c8bea6ffe5ace9c6df43ce92faf7bf8613d3624a845ef9d14c83cf",
+            "bytes": 3584
+          }
+        ]
+      }
+    },
+    {
+      "world": 2,
+      "mode": "growth",
+      "reference": [
+        {
+          "profile": "",
+          "parents": 64,
+          "seconds_by_rank": [
+            0.00654063,
+            0.00653527
+          ],
+          "correctness_passed": true,
+          "memory_admitted": true,
+          "throttled": false
+        },
+        {
+          "profile": "",
+          "parents": 64,
+          "seconds_by_rank": [
+            0.00636413,
+            0.00636095
+          ],
+          "correctness_passed": true,
+          "memory_admitted": true,
+          "throttled": false
+        },
+        {
+          "profile": "",
+          "parents": 64,
+          "seconds_by_rank": [
+            0.00608232,
+            0.00607959
+          ],
+          "correctness_passed": true,
+          "memory_admitted": true,
+          "throttled": false
+        },
+        {
+          "profile": "",
+          "parents": 64,
+          "seconds_by_rank": [
+            0.00591211,
+            0.00590175
+          ],
+          "correctness_passed": true,
+          "memory_admitted": true,
+          "throttled": false
+        },
+        {
+          "profile": "",
+          "parents": 64,
+          "seconds_by_rank": [
+            0.00567872,
+            0.00567587
+          ],
+          "correctness_passed": true,
+          "memory_admitted": true,
+          "throttled": false
+        }
+      ],
+      "rust": [
+        {
+          "profile": "",
+          "parents": 64,
+          "seconds_by_rank": [
+            0.00659395,
+            0.00658382
+          ],
+          "correctness_passed": true,
+          "memory_admitted": true,
+          "throttled": false
+        },
+        {
+          "profile": "",
+          "parents": 64,
+          "seconds_by_rank": [
+            0.00677409,
+            0.00677813
+          ],
+          "correctness_passed": true,
+          "memory_admitted": true,
+          "throttled": false
+        },
+        {
+          "profile": "",
+          "parents": 64,
+          "seconds_by_rank": [
+            0.00611311,
+            0.00611004
+          ],
+          "correctness_passed": true,
+          "memory_admitted": true,
+          "throttled": false
+        },
+        {
+          "profile": "",
+          "parents": 64,
+          "seconds_by_rank": [
+            0.00600539,
+            0.00599776
+          ],
+          "correctness_passed": true,
+          "memory_admitted": true,
+          "throttled": false
+        },
+        {
+          "profile": "",
+          "parents": 64,
+          "seconds_by_rank": [
+            0.00564348,
+            0.00564521
+          ],
+          "correctness_passed": true,
+          "memory_admitted": true,
+          "throttled": false
+        }
+      ],
+      "frontier_receipt": {
+        "schema": 1,
+        "graph_hash": "4a84bc138375332f3e4b8a32372b3be797aecdc4f1faf66ed044c79ecf695ccc",
+        "global_parents": 64,
+        "unique_states": 64,
+        "seed": 20261009,
+        "walk_length": 64,
+        "walk_length_min": 32,
+        "state_len": 96,
+        "storage_len": 112,
+        "excluded_center_and_predecessors": true,
+        "files": [
+          {
+            "rank": 0,
+            "parents": 32,
+            "path": "/workspace/beam-results/planning/pipeline-gpu-final/world-2/frontiers/frontier-rank-0.bin",
+            "sha256": "bbb38dd73cbd0c59b574e90097c8e16d1c6e3d4cbb252986ebaec6b5e89007db",
+            "bytes": 3584
+          },
+          {
+            "rank": 1,
+            "parents": 32,
+            "path": "/workspace/beam-results/planning/pipeline-gpu-final/world-2/frontiers/frontier-rank-1.bin",
+            "sha256": "0a1a02c732c8bea6ffe5ace9c6df43ce92faf7bf8613d3624a845ef9d14c83cf",
+            "bytes": 3584
+          }
+        ]
+      }
+    },
+    {
+      "world": 2,
+      "selection": {
+        "environment": {
+          "BEAM_B_MICRO": "768",
+          "BEAM_ENSEMBLE_INFERENCE_MICRO": "32"
+        },
+        "estimate": {
+          "profile": "baseline",
+          "median": 9.63034375e-05,
+          "low": 8.866984375e-05,
+          "high": 0.00010215875,
+          "relative_mad": 0.04333957445703847,
+          "repeats": 5
+        },
+        "rejected": {
+          "outer-double": "no statistically separated material gain"
+        },
+        "effective_beam": 64,
+        "workload_parents": 64,
+        "world_size": 2,
+        "measurements": [
+          {
+            "profile": "baseline",
+            "parents": 64,
+            "seconds_by_rank": [
+              0.00653816,
+              0.00653514
+            ],
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "throttled": false
+          },
+          {
+            "profile": "baseline",
+            "parents": 64,
+            "seconds_by_rank": [
+              0.00635471,
+              0.0063588
+            ],
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "throttled": false
+          },
+          {
+            "profile": "baseline",
+            "parents": 64,
+            "seconds_by_rank": [
+              0.00615945,
+              0.00616342
+            ],
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "throttled": false
+          },
+          {
+            "profile": "baseline",
+            "parents": 64,
+            "seconds_by_rank": [
+              0.0058963,
+              0.0058946
+            ],
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "throttled": false
+          },
+          {
+            "profile": "baseline",
+            "parents": 64,
+            "seconds_by_rank": [
+              0.0056721,
+              0.00567487
+            ],
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "throttled": false
+          },
+          {
+            "profile": "outer-double",
+            "parents": 64,
+            "seconds_by_rank": [
+              0.00676235,
+              0.00675368
+            ],
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "throttled": false
+          },
+          {
+            "profile": "outer-double",
+            "parents": 64,
+            "seconds_by_rank": [
+              0.00648223,
+              0.00648133
+            ],
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "throttled": false
+          },
+          {
+            "profile": "outer-double",
+            "parents": 64,
+            "seconds_by_rank": [
+              0.00632673,
+              0.00632077
+            ],
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "throttled": false
+          },
+          {
+            "profile": "outer-double",
+            "parents": 64,
+            "seconds_by_rank": [
+              0.00606669,
+              0.00606195
+            ],
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "throttled": false
+          },
+          {
+            "profile": "outer-double",
+            "parents": 64,
+            "seconds_by_rank": [
+              0.00584308,
+              0.00584474
+            ],
+            "correctness_passed": true,
+            "memory_admitted": true,
+            "throttled": false
+          }
+        ],
+        "planning_scope": "exact_requested_frontier",
+        "search_policy": "rust-full-step-shortlist-v1"
+      }
+    }
+  ]
+}

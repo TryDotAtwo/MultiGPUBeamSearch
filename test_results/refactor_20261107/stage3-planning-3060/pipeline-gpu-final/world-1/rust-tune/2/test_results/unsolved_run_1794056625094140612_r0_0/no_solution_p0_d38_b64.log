@@ -1,0 +1,12 @@
+rank=0
+world_size=1
+solution_found=0
+completed_depths=8
+history_mode=ram
+history_dir=/workspace/beam-results/planning/pipeline-gpu-final/world-1/rust-tune/2/history
+history_depth_count=8
+history_bytes_received=15104
+history_bytes_stored=3936
+history_bytes_stored_ram=7552
+history_bytes_stored_disk=0
+history_bytes_pruned=3616

@@ -1,0 +1,16 @@
+..FF                                                                     [100%]
+================================== FAILURES ===================================
+_ test_session_restarts_when_entering_or_leaving_bound_snapshot_mode[libtorch-python] _
+integrations\cayleypy_native\tests\test_persistent_search.py:197: in test_session_restarts_when_entering_or_leaving_bound_snapshot_mode
+    assert len(allocations) == 1 and outputs[-1].metadata['persistent_session']['reused']
+E   assert (2 == 1)
+E    +  where 2 = len([<test_persistent_search.test_session_restarts_when_entering_or_leaving_bound_snapshot_mode.<locals>.Workers object at...arch.test_session_restarts_when_entering_or_leaving_bound_snapshot_mode.<locals>.Workers object at 0x000001A6B7E43210>])
+_ test_session_restarts_when_entering_or_leaving_bound_snapshot_mode[libtorch-rust] _
+integrations\cayleypy_native\tests\test_persistent_search.py:197: in test_session_restarts_when_entering_or_leaving_bound_snapshot_mode
+    assert len(allocations) == 1 and outputs[-1].metadata['persistent_session']['reused']
+E   assert (2 == 1)
+E    +  where 2 = len([<test_persistent_search.test_session_restarts_when_entering_or_leaving_bound_snapshot_mode.<locals>.Workers object at...arch.test_session_restarts_when_entering_or_leaving_bound_snapshot_mode.<locals>.Workers object at 0x000001A6B7EEACD0>])
+=========================== short test summary info ===========================
+FAILED integrations\cayleypy_native\tests\test_persistent_search.py::test_session_restarts_when_entering_or_leaving_bound_snapshot_mode[libtorch-python]
+FAILED integrations\cayleypy_native\tests\test_persistent_search.py::test_session_restarts_when_entering_or_leaving_bound_snapshot_mode[libtorch-rust]
+2 failed, 2 passed in 0.37s

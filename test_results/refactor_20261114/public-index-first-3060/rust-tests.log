@@ -1,0 +1,358 @@
+    Updating crates.io index
+ Downloading crates ...
+  Downloaded cpufeatures v0.2.17
+  Downloaded crypto-common v0.1.7
+  Downloaded cfg-if v1.0.5
+  Downloaded autocfg v1.5.1
+  Downloaded block-buffer v0.10.4
+  Downloaded unindent v0.2.4
+  Downloaded sha2 v0.10.9
+  Downloaded version_check v0.9.5
+  Downloaded generic-array v0.14.7
+  Downloaded unicode-ident v1.0.27
+  Downloaded memoffset v0.9.1
+  Downloaded itoa v1.0.18
+  Downloaded pyo3-macros v0.24.2
+  Downloaded thiserror-impl v2.0.21
+  Downloaded heck v0.5.0
+  Downloaded indoc v2.0.8
+  Downloaded zmij v1.0.23
+  Downloaded rustversion v1.0.23
+  Downloaded quote v1.0.47
+  Downloaded target-lexicon v0.13.5
+  Downloaded thiserror v2.0.21
+  Downloaded digest v0.10.7
+  Downloaded pyo3-build-config v0.24.2
+  Downloaded libloading v0.8.9
+  Downloaded once_cell v1.21.4
+  Downloaded serde_core v1.0.229
+  Downloaded proc-macro2 v1.0.107
+  Downloaded serde_derive v1.0.229
+  Downloaded pyo3-ffi v0.24.2
+  Downloaded serde v1.0.229
+  Downloaded pyo3-macros-backend v0.24.2
+  Downloaded memchr v2.8.3
+  Downloaded typenum v1.20.1
+  Downloaded serde_json v1.0.154
+  Downloaded syn v3.0.9
+  Downloaded syn v2.0.119
+  Downloaded libc v0.2.191
+  Downloaded pyo3 v0.24.2
+   Compiling proc-macro2 v1.0.107
+   Compiling quote v1.0.47
+   Compiling unicode-ident v1.0.27
+   Compiling serde_core v1.0.229
+   Compiling zmij v1.0.23
+   Compiling syn v3.0.9
+   Compiling serde_json v1.0.154
+   Compiling thiserror v2.0.21
+   Compiling serde v1.0.229
+   Compiling thiserror-impl v2.0.21
+   Compiling serde_derive v1.0.229
+   Compiling memchr v2.8.3
+   Compiling itoa v1.0.18
+   Compiling libc v0.2.191
+   Compiling cfg-if v1.0.5
+   Compiling version_check v0.9.5
+   Compiling beam-core v0.1.0 (/workspace/beam-work/rust/beam-core)
+   Compiling generic-array v0.14.7
+   Compiling typenum v1.20.1
+   Compiling libloading v0.8.9
+   Compiling beam-native-sys v0.1.0 (/workspace/beam-work/rust/beam-native-sys)
+   Compiling crypto-common v0.1.7
+   Compiling block-buffer v0.10.4
+   Compiling digest v0.10.7
+   Compiling cpufeatures v0.2.17
+   Compiling sha2 v0.10.9
+   Compiling beam-runtime v0.1.0 (/workspace/beam-work/rust/beam-runtime)
+   Compiling target-lexicon v0.13.5
+   Compiling pyo3-build-config v0.24.2
+   Compiling once_cell v1.21.4
+   Compiling pyo3-macros-backend v0.24.2
+   Compiling pyo3-ffi v0.24.2
+   Compiling autocfg v1.5.1
+   Compiling memoffset v0.9.1
+   Compiling syn v2.0.119
+   Compiling heck v0.5.0
+   Compiling pyo3 v0.24.2
+   Compiling pyo3-macros v0.24.2
+   Compiling unindent v0.2.4
+   Compiling indoc v2.0.8
+   Compiling beam-python v0.1.0 (/workspace/beam-work/rust/beam-python)
+   Compiling beam-cli v0.1.0 (/workspace/beam-work/rust/beam-cli)
+    Finished `release` profile [optimized] target(s) in 31.09s
+     Running unittests src/main.rs (/workspace/rust-target/release/build/beam-cli/61e56b1360941d7c/out/beam_runner-61e56b1360941d7c)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (/workspace/rust-target/release/build/beam-core/d282b04f05a7f907/out/beam_core-d282b04f05a7f907)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/calibration.rs (/workspace/rust-target/release/build/beam-core/c95074026f3f19b5/out/calibration-c95074026f3f19b5)
+
+running 2 tests
+test complete_slow_rank_cohorts_select_stable_gains_only ... ok
+test optimization_promotion_needs_five_matching_pairs_and_material_full_step_gain ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/capacity.rs (/workspace/rust-target/release/build/beam-core/702754384f2638be/out/capacity-702754384f2638be)
+
+running 3 tests
+test finite_multiset_bound_excludes_unique_inverse_neighbors ... ok
+test large_factorial_is_clamped_without_overflow_or_false_reachability ... ok
+test width_mode_is_exact_integer_or_explicit_maximum ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/components.rs (/workspace/rust-target/release/build/beam-core/262f93b3030c3ecf/out/components-262f93b3030c3ecf)
+
+running 1 test
+test exact_service_contracts_and_reference_proxy ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/config.rs (/workspace/rust-target/release/build/beam-core/21d394a79c2181cd/out/config-21d394a79c2181cd)
+
+running 1 test
+test public_options_roundtrip_and_validation ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/contracts.rs (/workspace/rust-target/release/build/beam-core/c29214c74740110d/out/contracts-c29214c74740110d)
+
+running 3 tests
+test binary_layout_and_complete_hash_order ... ok
+test domains_do_not_confuse_matrix_words_and_permutation_padding ... ok
+test exact_global_width_and_overflow_diagnostics ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/history.rs (/workspace/rust-target/release/build/beam-core/6de2ef75ce780b27/out/history-6de2ef75ce780b27)
+
+running 2 tests
+test exact_history_reservations_and_tail_fallback ... ok
+test full_depth_placement_zero_and_arithmetic_limits ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/inference.rs (/workspace/rust-target/release/build/beam-core/9119dd0852a9c572/out/inference-9119dd0852a9c572)
+
+running 2 tests
+test bounded_inference_candidates_preserve_non_power_of_two_cap ... ok
+test noisy_baseline_does_not_disqualify_complete_stable_inference_cohort ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/planning.rs (/workspace/rust-target/release/build/beam-core/6b3c45e7fa323e89/out/planning-6b3c45e7fa323e89)
+
+running 2 tests
+test admission_requires_every_rank_and_identical_protocol ... ok
+test exact_width_quotas_do_not_overflow_or_include_spare_slots ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/profile_policy.rs (/workspace/rust-target/release/build/beam-core/a356e49b69f9bb17/out/profile_policy-a356e49b69f9bb17)
+
+running 1 test
+test proposals_preserve_frozen_inference_and_semantic_controls ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/search.rs (/workspace/rust-target/release/build/beam-core/32469967c2e532da/out/search-32469967c2e532da)
+
+running 3 tests
+test collection_is_complete_unique_and_independently_replayed ... ok
+test malformed_incomplete_contradictory_and_invalid_paths_never_become_not_found ... ok
+test terminal_replays_original_gather_moves_and_preserves_public_metadata ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (/workspace/rust-target/release/build/beam-native-sys/faa131212e448884/out/beam_native_sys-faa131212e448884)
+
+running 3 tests
+test history::tests::views_empty_alignment_and_panic_boundary ... ok
+test tests::c_layout ... ok
+test tests::absent_library_is_an_error_not_a_cuda_import ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/context.rs (/workspace/rust-target/release/build/beam-native-sys/4387ecdbd47b255e/out/context-4387ecdbd47b255e)
+
+running 1 test
+test real_ffi_context_reuses_copied_jobs_and_propagates_errors ... ignored, requires BEAM_TEST_LIBRARY built from the CPU ABI fixture
+
+test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (/workspace/rust-target/release/build/beam-python/b35459aee869be93/out/_beam_runtime-b35459aee869be93)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (/workspace/rust-target/release/build/beam-runtime/62de4d053d8ed27b/out/beam_runtime-62de4d053d8ed27b)
+
+running 1 test
+test history::tests::disk_error_fallback_cannot_overwrite_future_ram_layer ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/calibration.rs (/workspace/rust-target/release/build/beam-runtime/2cee55695e79df0e/out/calibration-2cee55695e79df0e)
+
+running 2 tests
+test capacity_only_retreats_on_explicit_rejection_and_keeps_exact_lower_bound ... ok
+test rust_owns_admit_release_measure_select_sequence_and_freezes_microbatch ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/component_tuning.rs (/workspace/rust-target/release/build/beam-runtime/ae1b8793f4c3d9f8/out/component_tuning-ae1b8793f4c3d9f8)
+
+running 4 tests
+test bounded_component_tuning_keeps_exact_admission_raw_receipts_and_no_full_step_claim ... ok
+test scalar_scorer_keeps_row_batch_distinct_from_parent_batch ... ok
+test cancellation_or_rank_failure_does_not_become_capacity_and_bad_cohorts_never_select ... ok
+test component_cache_recomputes_evidence_and_readmits_exact_geometry ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/downstream_job.rs (/workspace/rust-target/release/build/beam-runtime/f8cd106b7e4ed720/out/downstream_job-f8cd106b7e4ed720)
+
+running 1 test
+test downstream_identity_binds_quality_graph_geometry_and_semantic_environment ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/frontier_policy.rs (/workspace/rust-target/release/build/beam-runtime/3fe4c808d8e084f2/out/frontier_policy-3fe4c808d8e084f2)
+
+running 5 tests
+test fixture_state_budget_does_not_silently_cap_symbolic_maximum ... ok
+test unsafe_or_incomplete_inference_cohorts_are_not_capacity_candidates ... ok
+test maximum_rebinds_exact_width_after_inference_reserve_changes ... ok
+test working_width_requires_measured_same_profile_and_saturated_reference ... ok
+test admission_changes_only_measured_batch_never_requested_width ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/history.rs (/workspace/rust-target/release/build/beam-runtime/63995daf97920b26/out/history-63995daf97920b26)
+
+running 3 tests
+test ram_pruning_preserves_reconstructed_routes ... ok
+test invalid_parent_and_memory_budget_fail_explicitly ... ok
+test formats_bounds_and_out_of_order_batches ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/inference.rs (/workspace/rust-target/release/build/beam-runtime/e31f10f9879e0002/out/inference-e31f10f9879e0002)
+
+running 3 tests
+test one_shot_inference_validates_receipts_and_reaps_helpers ... ok
+test readiness_oom_reduces_workspace_but_bad_quality_receipt_is_not_capacity_evidence ... ok
+test inference_starts_all_ranks_before_requests_and_restarts_only_failed_rank ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.22s
+
+     Running tests/inference_job.rs (/workspace/rust-target/release/build/beam-runtime/d6bed98845e54bde/out/inference_job-d6bed98845e54bde)
+
+running 1 test
+test request_owns_bounds_cache_identity_and_legal_samples ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/inference_tuning.rs (/workspace/rust-target/release/build/beam-runtime/624ed0cbb3a6d3d5/out/inference_tuning-624ed0cbb3a6d3d5)
+
+running 3 tests
+test shared_proposal_and_capacity_seed_require_fresh_verified_cohorts ... ok
+test inference_control_owns_coarse_refinement_reserve_and_complete_rank_statistics ... ok
+test explicit_capacity_rejection_uses_smaller_rows_and_throttling_rejects_entire_selection ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/maximum_beam.rs (/workspace/rust-target/release/build/beam-runtime/87e4d2cfcb40ecd2/out/maximum_beam-87e4d2cfcb40ecd2)
+
+running 1 test
+test every_shard_profile_has_its_own_frozen_search_and_only_capacity_rejection_is_a_bound ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/pipeline.rs (/workspace/rust-target/release/build/beam-runtime/04b922f117f30d07/out/pipeline-04b922f117f30d07)
+
+running 3 tests
+test complete_depth_parser_rejects_missing_reordered_and_changed_workloads ... ok
+test normal_pipeline_cleanup_does_not_cancel_parent_job ... ok
+test native_capacity_diagnostics_survive_coarse_rank_failure ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.28s
+
+     Running tests/planning.rs (/workspace/rust-target/release/build/beam-runtime/6f42d4021b5fd365/out/planning-6f42d4021b5fd365)
+
+running 2 tests
+test planning_preserves_exact_width_freezes_inference_and_cancels_all_preparations ... ok
+test external_cancellation_reaps_ranks_during_planner_startup ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.21s
+
+     Running tests/probes.rs (/workspace/rust-target/release/build/beam-runtime/364a47d261696297/out/probes-364a47d261696297)
+
+running 4 tests
+test retained_probe_ignores_logs_and_reuses_process ... ok
+test one_shot_cohort_drains_json_logs_and_fails_fast_on_any_rank ... ok
+test cancellation_interrupts_a_wait_without_holding_the_session_lock ... ok
+test deadline_and_one_rank_failure_close_owned_cohort ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.06s
+
+     Running tests/profile_cache.rs (/workspace/rust-target/release/build/beam-runtime/fb688757756a5773/out/profile_cache-fb688757756a5773)
+
+running 2 tests
+test native_timing_receipts_keep_float_bits_and_content_keys_across_json_cache ... ok
+test artifacts_hash_bound_and_cache_requires_complete_evidence ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+
+     Running tests/resident.rs (/workspace/rust-target/release/build/beam-runtime/8db8f910cd74c2ef/out/resident-8db8f910cd74c2ef)
+
+running 3 tests
+test a_failed_rank_closes_the_entire_owned_group ... ok
+test repeated_jobs_keep_rank_pids_and_merge_logs ... ok
+test timeout_and_cancellation_are_terminal ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.13s
+
+     Running tests/search_session.rs (/workspace/rust-target/release/build/beam-runtime/2e703277eb547a9e/out/search_session-2e703277eb547a9e)
+
+running 2 tests
+test session_reuses_compatible_jobs_and_releases_before_model_or_geometry_change ... ok
+test session_timeout_includes_protocol_preparation_and_reaps_delayed_workers ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.65s
+
+     Running tests/telemetry.rs (/workspace/rust-target/release/build/beam-runtime/7a8584d0cdb18e01/out/telemetry-7a8584d0cdb18e01)
+
+running 1 test
+test telemetry_requires_selected_cohorts_and_rejects_missing_or_throttled_rows ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests beam_core
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests beam_native_sys
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests beam_runtime
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

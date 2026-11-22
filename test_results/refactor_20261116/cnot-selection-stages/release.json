@@ -1,0 +1,15 @@
+{
+  "instance": 60948975,
+  "label": "codex-cnot-goal-native-20261116-e940",
+  "before": {
+    "id": 60948975,
+    "label": "codex-cnot-goal-native-20261116-e940",
+    "actual_status": "exited",
+    "duration": 4290.109912395477,
+    "dph_total": 0.16148148148148148,
+    "start_date": 1794847379.839064
+  },
+  "destroy_returncode": 0,
+  "provider_absence_verified": true,
+  "unix_time": 1794851711.5423088
+}

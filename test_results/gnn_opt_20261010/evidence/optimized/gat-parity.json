@@ -1,0 +1,198 @@
+[
+  {
+    "n": 4,
+    "channels": 4,
+    "graph": "value",
+    "kernel_error": 0.000244140625,
+    "combined_error": 0.000244140625
+  },
+  {
+    "n": 4,
+    "channels": 4,
+    "graph": "position",
+    "kernel_error": 0.00048828125,
+    "combined_error": 0.00048828125
+  },
+  {
+    "n": 4,
+    "channels": 8,
+    "graph": "value",
+    "kernel_error": 0.00048828125,
+    "combined_error": 0.00048828125
+  },
+  {
+    "n": 4,
+    "channels": 8,
+    "graph": "position",
+    "kernel_error": 0.000244140625,
+    "combined_error": 0.00048828125
+  },
+  {
+    "n": 4,
+    "channels": 16,
+    "graph": "value",
+    "kernel_error": 0.000244140625,
+    "combined_error": 0.0002593994140625
+  },
+  {
+    "n": 4,
+    "channels": 16,
+    "graph": "position",
+    "kernel_error": 0.000244140625,
+    "combined_error": 0.00048828125
+  },
+  {
+    "n": 4,
+    "channels": 64,
+    "graph": "value",
+    "kernel_error": 0.000244140625,
+    "combined_error": 0.00048828125
+  },
+  {
+    "n": 4,
+    "channels": 64,
+    "graph": "position",
+    "kernel_error": 0.00048828125,
+    "combined_error": 0.00048828125
+  },
+  {
+    "n": 4,
+    "channels": 128,
+    "graph": "value",
+    "kernel_error": 0.00048828125,
+    "combined_error": 0.00048828125
+  },
+  {
+    "n": 4,
+    "channels": 128,
+    "graph": "position",
+    "kernel_error": 0.00048828125,
+    "combined_error": 0.00048828125
+  },
+  {
+    "n": 4,
+    "channels": 256,
+    "graph": "value",
+    "kernel_error": 0.00048828125,
+    "combined_error": 0.00048828125
+  },
+  {
+    "n": 4,
+    "channels": 256,
+    "graph": "position",
+    "kernel_error": 0.00048828125,
+    "combined_error": 0.00048828125
+  },
+  {
+    "n": 4,
+    "channels": 1024,
+    "graph": "value",
+    "kernel_error": 0.0006103515625,
+    "combined_error": 0.0006103515625
+  },
+  {
+    "n": 4,
+    "channels": 1024,
+    "graph": "position",
+    "kernel_error": 0.00048828125,
+    "combined_error": 0.000732421875
+  },
+  {
+    "n": 100,
+    "channels": 4,
+    "graph": "value",
+    "kernel_error": 0.00048828125,
+    "combined_error": 0.00048828125
+  },
+  {
+    "n": 100,
+    "channels": 4,
+    "graph": "position",
+    "kernel_error": 0.00048828125,
+    "combined_error": 0.00048828125
+  },
+  {
+    "n": 100,
+    "channels": 8,
+    "graph": "value",
+    "kernel_error": 0.00048828125,
+    "combined_error": 0.00048828125
+  },
+  {
+    "n": 100,
+    "channels": 8,
+    "graph": "position",
+    "kernel_error": 0.00048828125,
+    "combined_error": 0.000518798828125
+  },
+  {
+    "n": 100,
+    "channels": 16,
+    "graph": "value",
+    "kernel_error": 0.00048828125,
+    "combined_error": 0.00048828125
+  },
+  {
+    "n": 100,
+    "channels": 16,
+    "graph": "position",
+    "kernel_error": 0.00048828125,
+    "combined_error": 0.00048828125
+  },
+  {
+    "n": 100,
+    "channels": 64,
+    "graph": "value",
+    "kernel_error": 0.00048828125,
+    "combined_error": 0.0009765625
+  },
+  {
+    "n": 100,
+    "channels": 64,
+    "graph": "position",
+    "kernel_error": 0.00048828125,
+    "combined_error": 0.000732421875
+  },
+  {
+    "n": 100,
+    "channels": 128,
+    "graph": "value",
+    "kernel_error": 0.00048828125,
+    "combined_error": 0.00048828125
+  },
+  {
+    "n": 100,
+    "channels": 128,
+    "graph": "position",
+    "kernel_error": 0.00048828125,
+    "combined_error": 0.0009765625
+  },
+  {
+    "n": 100,
+    "channels": 256,
+    "graph": "value",
+    "kernel_error": 0.00048828125,
+    "combined_error": 0.0008544921875
+  },
+  {
+    "n": 100,
+    "channels": 256,
+    "graph": "position",
+    "kernel_error": 0.00048828125,
+    "combined_error": 0.000732421875
+  },
+  {
+    "n": 100,
+    "channels": 1024,
+    "graph": "value",
+    "kernel_error": 0.000732421875,
+    "combined_error": 0.0009765625
+  },
+  {
+    "n": 100,
+    "channels": 1024,
+    "graph": "position",
+    "kernel_error": 0.00048828125,
+    "combined_error": 0.0009765625
+  }
+]

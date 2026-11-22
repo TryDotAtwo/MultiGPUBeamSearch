@@ -1,0 +1,39 @@
+    Updating crates.io index
+     Locking 32 packages to highest compatible versions
+      Adding libloading v0.8.9 (available: v0.9.0)
+      Adding pyo3 v0.24.2 (available: v0.30.1)
+ Downloading crates ...
+  Downloaded proc-macro2 v1.0.107
+  Downloaded serde_core v1.0.229
+  Downloaded quote v1.0.47
+  Downloaded thiserror v2.0.21
+  Downloaded thiserror-impl v2.0.21
+  Downloaded serde_derive v1.0.229
+  Downloaded unicode-ident v1.0.27
+  Downloaded serde v1.0.229
+  Downloaded syn v3.0.9
+   Compiling proc-macro2 v1.0.107
+   Compiling unicode-ident v1.0.27
+   Compiling quote v1.0.47
+   Compiling serde_core v1.0.229
+   Compiling thiserror v2.0.21
+   Compiling serde v1.0.229
+   Compiling syn v3.0.9
+   Compiling thiserror-impl v2.0.21
+   Compiling serde_derive v1.0.229
+   Compiling beam-core v0.1.0 (/workspace/beam-work/rust/beam-core)
+error[E0432]: unresolved imports `beam_core::CandidateMeta`, `beam_core::Domain`, `beam_core::Hash128`, `beam_core::Rank`, `beam_core::SearchConfig`, `beam_core::require_capacity`
+ --> rust/beam-core/tests/contracts.rs:1:17
+  |
+1 | use beam_core::{CandidateMeta, Domain, Hash128, Rank, SearchConfig, require_capacity};
+  |                 ^^^^^^^^^^^^^  ^^^^^^  ^^^^^^^  ^^^^  ^^^^^^^^^^^^  ^^^^^^^^^^^^^^^^ no `require_capacity` in the root
+  |                 |              |       |        |     |
+  |                 |              |       |        |     no `SearchConfig` in the root
+  |                 |              |       |        no `Rank` in the root
+  |                 |              |       no `Hash128` in the root
+  |                 |              no `Domain` in the root
+  |                 no `CandidateMeta` in the root
+
+For more information about this error, try `rustc --explain E0432`.
+error: could not compile `beam-core` (test "contracts") due to 1 previous error
+warning: build failed, waiting for other jobs to finish...

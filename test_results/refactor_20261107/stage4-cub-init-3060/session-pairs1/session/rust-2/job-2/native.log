@@ -1,0 +1,26 @@
+[rank 0]
+GLOBAL_BEAM_WIDTH_EFFECTIVE=64
+history_provider=rust
+runtime_depth_start=0 frontier_size=1
+runtime_depth_done=0 depth_sec=0.0285727
+runtime_depth_start=1 frontier_size=12
+runtime_depth_done=1 depth_sec=0.00404798
+runtime_depth_start=2 frontier_size=32
+runtime_depth_done=2 depth_sec=0.00386661
+runtime_depth_start=3 frontier_size=32
+runtime_depth_done=3 depth_sec=0.00369336
+puzzle_solved=0 puzzle_id=0 seconds=0.0407657 solution_length=-1 solution=
+
+[rank 1]
+GLOBAL_BEAM_WIDTH_EFFECTIVE=64
+history_provider=rust
+runtime_depth_start=0 frontier_size=0
+runtime_depth_done=0 depth_sec=0.0288049
+runtime_depth_start=1 frontier_size=12
+runtime_depth_done=1 depth_sec=0.00404972
+runtime_depth_start=2 frontier_size=32
+runtime_depth_done=2 depth_sec=0.00387506
+runtime_depth_start=3 frontier_size=32
+runtime_depth_done=3 depth_sec=0.00369737
+puzzle_solved=0 puzzle_id=0 seconds=0.0410641 solution_length=-1 solution=
+

@@ -1,0 +1,57 @@
+{
+  "commit": "84f8d308ea26dd6842c08f4973fe155d1919628e",
+  "before_equals_after": true,
+  "inputs": {
+    "CMakeLists.txt": {
+      "sha256": "91f58d962e73d52c37552aaa8f5f35dc45da85ca439cdf463c9d9c9aad1b31e5",
+      "source": "pinned Git blob"
+    },
+    "Cargo.toml": {
+      "sha256": "81d4ddc0acfb8544b47418920413e871149184cd068fd917afa2e9b1d0ecd299",
+      "source": "pinned Git blob"
+    },
+    "Cargo.lock": {
+      "sha256": "c5845a01c6adfc094969e1282880f2844723cfe4af2eff7795df90f8071fef98",
+      "source": "pinned Git blob"
+    },
+    "rust/beam-core/src/config.rs": {
+      "sha256": "576cd6f2d8a73e45f7d6dde36affbe6f1e7dc1e247bbb837d6905fa1e4c7e0d4",
+      "source": "pinned Git blob"
+    },
+    "integrations/cayleypy_native/multigpubeamsearch/options.py": {
+      "sha256": "532b5fc736631650d139e69f62f64636042c875851818c37b93a0607962c46ad",
+      "source": "pinned Git blob"
+    },
+    "integrations/cayleypy_native/multigpubeamsearch/build.py": {
+      "sha256": "e1f12476b3f38d44b16a421739b4b692901a7b85762f3d9dc077ef5ce6ab4c4a",
+      "source": "pinned Git blob"
+    },
+    "integrations/cayleypy_native/multigpubeamsearch/native_library.py": {
+      "sha256": "fa08356736b5d2c20fc6b9cec35a3145e5225b3ddcbadb4c24402c84993859c8",
+      "source": "pinned Git blob"
+    },
+    "integrations/cayleypy_native/multigpubeamsearch/rust_control.py": {
+      "sha256": "aea24f698e6aea953e866ae1462a3e03c77880eca134225756af7812d8dfdf71",
+      "source": "pinned Git blob"
+    },
+    "integrations/cayleypy_native/multigpubeamsearch/_beam_runtime.abi3.so": {
+      "sha256": "aa503ccb6a98366c89223e084ad32d7222acabe652662b07407e0bb9c5368707",
+      "source": "verified archived binary"
+    },
+    "integrations/cayleypy_native/multigpubeamsearch/_bin/beam-runner": {
+      "sha256": "befe0900a286c56bd150a0bd0b6a479e31d7b3f7901f7ef4b7819e86fe7b469b",
+      "source": "verified archived binary"
+    },
+    "tests/public_rust_session_gpu.py": {
+      "sha256": "05399d5cf650efb8a175ce7780304350af4118fe2105b04a77babfa49ee12760",
+      "source": "pinned Git blob"
+    },
+    "tests/public_index_sort_pair_gpu.py": {
+      "sha256": "9ca49ba2517f4914846c6888e0475815099fbe0311e6a5f4c2dfae8313ee6784",
+      "source": "pinned Git blob"
+    }
+  },
+  "native_source_digest": "91c6a96c34a894f97d84964cf25f4f98ae4f4618d2be9f3063d30648fff37557",
+  "native_source_files": 239,
+  "build_receipts_verified": 4
+}

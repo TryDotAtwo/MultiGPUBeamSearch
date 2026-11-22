@@ -1,0 +1,9 @@
+[rank 0]
+GLOBAL_BEAM_WIDTH_EFFECTIVE=64
+runtime_depth_start=0 frontier_size=1
+runtime_depth_done=0 depth_sec=0.0612515
+runtime_depth_start=1 frontier_size=24
+runtime_depth_done=1 depth_sec=0.0291776
+runtime_depth_start=2 frontier_size=64
+puzzle_solved=1 puzzle_id=0 seconds=0.0923467 solution_length=3 found_depth=3 touch_depth=0 solution=m0.m1.m2
+

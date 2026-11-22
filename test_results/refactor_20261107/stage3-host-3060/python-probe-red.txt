@@ -1,0 +1,6 @@
+PYO3_RESIDENT_OK
+Traceback (most recent call last):
+  File "/workspace/beam-work/rust/beam-python/tests/adapter.py", line 44, in <module>
+    probe=runtime.ProbeSession([sys.executable,str(worker)],root,dict(os.environ),root/'probe.log',5.)
+          ^^^^^^^^^^^^^^^^^^^^
+AttributeError: module '_beam_runtime' has no attribute 'ProbeSession'

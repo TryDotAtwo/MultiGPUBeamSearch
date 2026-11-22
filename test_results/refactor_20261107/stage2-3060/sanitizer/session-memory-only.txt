@@ -1,0 +1,7 @@
+========= COMPUTE-SANITIZER
+reference world=1 seconds=7.688
+rust world=1 seconds=7.498
+reference world=2 seconds=15.217
+rust world=2 seconds=13.848
+NATIVE_SESSION_GPU_OK
+========= ERROR SUMMARY: 0 errors

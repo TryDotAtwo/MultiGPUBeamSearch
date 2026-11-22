@@ -1,0 +1,10 @@
+{
+  "status": "PASS",
+  "artifact_commit": "b48284ddaa70bb6b40db4fb45bd25f186b75f985",
+  "prefix": "test_results/cube444_real_autotune8_recovery_20261010/matched32m-v1/",
+  "archive_sha256": "ab3ccf3477ecc18b6ea2c41f4704c11bc6d466a98229e6c7f66e9beb61fe87d1",
+  "parts_verified": 6,
+  "files_verified": 439,
+  "scope": "all completed fixed-frontier 1M/8M/32M matched receipts; maximum and diagnostics pending",
+  "checked_utc_epoch": 1791591630.3305318
+}

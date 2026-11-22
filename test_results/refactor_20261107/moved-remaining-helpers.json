@@ -1,0 +1,92 @@
+[
+  {
+    "source": "D:\\100XH100\\parity-patch-stage",
+    "archive": "D:\\100XH100\\.local\\archived-checkouts\\20261107\\root-extra\\parity-patch-stage",
+    "files": {
+      "tools\\stream1_transformer_libtorch_benchmark.cpp": "00051d4d12a63b33d826200da45048bd1d8dc67adf1fdbdbf4b1fcf91612a5aa",
+      "tools\\stream1_transformer_torch_benchmark.py": "ba5886f2a1be35174a23df938b10df3eea92bda1846c5bdd577def770b57984a",
+      "tools\\stream_benchmark.cu": "95d05318966c5b1e57387f0ced9178b723aaf51dd6836eaa4bf0bcb870f5d3b9",
+      "tools\\stream_benchmark_common.hpp": "bbb231dde08d919ebdf870047ce0c6a3535333876915f2f3e4e358755410c04d"
+    }
+  },
+  {
+    "source": "D:\\100XH100\\plugin-deep-audit-stage-20260828",
+    "archive": "D:\\100XH100\\.local\\archived-checkouts\\20261107\\root-extra\\plugin-deep-audit-stage-20260828",
+    "files": {
+      "gpu-beam-search\\.codex-plugin\\plugin.json": "5c000e86efddc9d060676ab87d0a692d0111656c9e2bc7d6eff58cc9af08a3ed",
+      "gpu-beam-search\\skills\\design-gpu-beam-pipelines\\SKILL.md": "0d0e334243271bceeb75f2347d6ff690df79f612e8afcc508ba4603c017610b8",
+      "gpu-beam-search\\skills\\design-gpu-beam-pipelines\\references\\beam-experiment-ledger.md": "662a5b5e95a2b0343d2dd9c06b63c27dd1e2b889c62ee3f3a8d44a9165e86473",
+      "gpu-beam-search\\skills\\design-gpu-beam-pipelines\\references\\beam-failure-catalog.md": "34dc3afa7aaafdecfc1f607a4fdfa0d3bcbbc64ff0fd041450822e5448ca2006",
+      "gpu-beam-search\\skills\\design-gpu-beam-pipelines\\references\\beam-pipeline-patterns.md": "758684e693d80374571c0cd1f99afcd013c4333a96aebb74b0a56678bd5d6788",
+      "gpu-beam-search\\skills\\design-gpu-beam-pipelines\\references\\cayleypy-stream-contract.md": "a96bca55beedd75214a007615dd5a8d14129c02ba43eea00b11d705833ae7338",
+      "gpu-beam-search\\skills\\gpu-beam-search\\SKILL.md": "279f81a3da26a6557a5217e994b3fed71e70ea5a08e7b1c7221076ed49704a16",
+      "gpu-beam-search\\skills\\plan-beam-memory\\SKILL.md": "d53d58f5de06e47dfca48f1f442e754b370c854f5147075bc00645d94b7d41f8",
+      "gpu-beam-search\\skills\\tune-gpu-beam-profiles\\SKILL.md": "e6180851f7a64028e2461f5c16252d0d791811c85251182fb76f71fb091734d0",
+      "gpu-beam-search\\skills\\validate-beam-search-results\\SKILL.md": "205ec8635ba9e22830cb69f09efd04ee89e2ecd17e9c00e3293c6a36b356e692",
+      "gpu-neural-inference\\.codex-plugin\\plugin.json": "57eda23e887f9965c9fee02a6d7409552e3a859880b4519b897f4ae48c6b6103",
+      "gpu-neural-inference\\skills\\benchmark-gpu-inference\\SKILL.md": "774735e1046191be6e96b008627500c290fbc3979d655a443963305c83bb65d4",
+      "gpu-neural-inference\\skills\\benchmark-gpu-inference\\references\\inference-benchmark-contract.md": "9910c48b0d709d3fcb55b1ca252fff2293d179f550e4cdeab04c8070c553747e",
+      "gpu-neural-inference\\skills\\build-blockscaled-inference\\SKILL.md": "6bee397b193cc5c92fc83b3f48e58b5cd059ef5d628ff900d0de8e61dcba73db",
+      "gpu-neural-inference\\skills\\build-blockscaled-inference\\references\\rejected-paths-and-open-gates.md": "a2fc9c2ae1490659c2e884162d445aa7f4239fc5d823a3bbf7bd78d4073a917f",
+      "gpu-neural-inference\\skills\\build-blockscaled-inference\\references\\sm120-blockscaled-inference.md": "2ee8db657c1590a1d1e5dadf3d01dc0ef53f504dbe5e053a8f59e8ab78eb815d",
+      "gpu-neural-inference\\skills\\build-blockscaled-inference\\references\\sm120-case-study.md": "aecde1d70e75d245ba76e0b390c6f6e03057de0a4cfef30431025b0281107c48",
+      "gpu-neural-inference\\skills\\build-blockscaled-inference\\references\\sm120-low-precision-experiment-ledger.md": "ce859e68355cc726ed382ada1268194c6751a501bdf038adbfacba9dea36f179",
+      "gpu-neural-inference\\skills\\gpu-neural-inference\\SKILL.md": "fa36774315569911545dc93106b56f202b1c30f19e526de665c050ee9e926543",
+      "gpu-neural-inference\\skills\\optimize-transformer-hot-paths\\SKILL.md": "7d10eb9e5032181271325018465087181213aa3cd7e42adc31c49642f5cb9b16",
+      "gpu-neural-inference\\skills\\optimize-transformer-hot-paths\\references\\fixed-shape-transformer.md": "878047aafa17c7a97aff8ece76664698ae62b66530fa7a243d9b91ee1d8fe724",
+      "gpu-neural-inference\\skills\\optimize-transformer-hot-paths\\references\\transformer-hot-path-experiment-ledger.md": "1a1ca157e707c39de3024f744fc275be8870254ab68c3f75eb1ab438f103fd32",
+      "gpu-neural-inference\\skills\\validate-inference-quality\\SKILL.md": "c02d4ae8be731eb7d2c628df04124e106661483f9fe720e53b292ba7aa21e774",
+      "highload-gpu\\.codex-plugin\\plugin.json": "c3fd49cbd89db00b83912b5d25c5585e684d7f19749d6efff2b72a14f191226b",
+      "highload-gpu\\skills\\benchmark-and-sweep-gpu-configs\\SKILL.md": "2ef2624e9a741c15041f097f40df9ad1c6f1c6cab1dcfa57c7f58b971fb919af",
+      "highload-gpu\\skills\\choose-stack-boundaries\\SKILL.md": "524a57b1caab040e04a63046676c7bdb9e630b8514768f701b7d7715f1057624",
+      "highload-gpu\\skills\\design-multigpu-systems\\SKILL.md": "dc1338e32ab84f07ddd0453b19552cd81680f368686871c3abc45985d950be3d",
+      "highload-gpu\\skills\\design-multigpu-systems\\references\\multigpu-patterns.md": "7cf7f2779a50dfcec73cf0b0eb3ef209269cb5d0286b6a5687c7db55d0062bf3",
+      "highload-gpu\\skills\\highload-gpu\\SKILL.md": "956b07460e9bde389c9b64c4c61b13ba78be0f8f556f54d54bebab24f2cec170",
+      "highload-gpu\\skills\\profile-remote-gpu-runs\\SKILL.md": "18957289746c1c5a198e913cf4c3dfd60eb81432791265b9dbf857cbdcc387f5",
+      "highload-gpu\\skills\\reason-about-gpu-throughput\\SKILL.md": "b23e01d02f132e033ff026950f7d20a9f05523e4b1b2c706f795f50eaf11fb21",
+      "highload-gpu\\skills\\use-compute-sanitizer\\SKILL.md": "3a2cf862acb0d715f319517f84f00081adabcb4a49980e63115a00cc61753f77",
+      "highload-gpu\\skills\\use-nsight-compute\\SKILL.md": "c9b4cfaf289af1b132410ba735f18f688543b8b9bb9eff98541323505a4d6f71",
+      "highload-gpu\\skills\\use-nsight-systems\\SKILL.md": "25d5455cf1f79b1ceb937446dcbe36776fff13281c56c1becc8b412ee9392648",
+      "highload-gpu\\skills\\use-nvidia-docs\\SKILL.md": "fddafd095083802a7431889e551d707daebfe1cb0c45ca78c599a7734dc13485",
+      "highload-gpu\\skills\\use-nvidia-docs\\references\\nvidia-docs-map.md": "4b0f38e54ede446c96c437c0fbb5024c0788630e9387eb8a68482650cc23c4c7",
+      "highload-gpu\\skills\\work-with-sm120-blackwell\\SKILL.md": "090183b350bb98226720be259b0d77df67fcf4bbc70f5d980539f0091030890b",
+      "highload-gpu\\skills\\work-with-sm120-blackwell\\references\\experiment-method-and-failure-taxonomy.md": "2032bd95ace525628f798d0e0e6693c46fde6e86f2d5d76f79a9b8d313a6dff3",
+      "highload-gpu\\skills\\work-with-sm120-blackwell\\references\\sm120-rtx-pro-6000-blackwell.md": "ad6399d36dce04035f91f306c4e160b2d7216220bea2a52bf2143cb2ec5ad8f9",
+      "highload-gpu\\skills\\write-cuda-hot-paths\\SKILL.md": "b89bcb5451d9ea02585dd9672316b61ae392154881b9529e3bf90eab0adacc7b",
+      "molab\\.codex-plugin\\plugin.json": "e971dc981c9e176d5784a7c5fb5bb51ef92031cb92c37a81a9e32a6e173862fd",
+      "molab\\skills\\work-with-molab\\SKILL.md": "98792071419e629b924b870ab275ada33a14f85cc876260d44e6374d170ce601",
+      "molab\\skills\\work-with-molab\\references\\foreground-experiment-runbook.md": "9eb83f204beaff7674c6b7b658df02a005572a75e5541bcf6da2cb267b513b9e",
+      "molab\\skills\\work-with-molab\\references\\gpu-jobs-and-artifacts.md": "1bdce3321d6f3a149231622be5d2e61453df595ebc0e0e1bacda41cab962a489",
+      "molab\\skills\\work-with-molab\\references\\native-pair-and-lifecycle.md": "3730f5d7611ce7bf9ad34b695376bc50efedaf15de319a7b06e21177d5d53882",
+      "molab\\skills\\work-with-molab\\references\\session-failure-chronology.md": "a77d1b52879e2d407fc063e658a12f49043453dd70efe25fb56c8dac65024ffc"
+    }
+  },
+  {
+    "source": "D:\\100XH100\\prompt_history",
+    "archive": "D:\\100XH100\\.local\\archived-checkouts\\20261107\\root-extra\\prompt_history",
+    "files": {
+      "task_2026-05-30_beam_width_compare.md": "e31102032c5ee460e12f08803b5e8d41ecf1bc0c8e5c4fb49c66d6db254a32e6"
+    }
+  },
+  {
+    "source": "D:\\100XH100\\task5_github_app.patch",
+    "archive": "D:\\100XH100\\.local\\archived-checkouts\\20261107\\root-extra\\task5_github_app.patch",
+    "files": {
+      "": "fbdeb2ba2bbb0ad17ea574cc1a27da69fdbb69965432a599e573e6aee3d43869"
+    }
+  },
+  {
+    "source": "D:\\100XH100\\task5_github_app_full.patch",
+    "archive": "D:\\100XH100\\.local\\archived-checkouts\\20261107\\root-extra\\task5_github_app_full.patch",
+    "files": {
+      "": "4f15a0a196da0b4ca412bf3dd339ef8114217ee35cdb09d032ddbab1698fa237"
+    }
+  },
+  {
+    "source": "D:\\100XH100\\task5_writer.patch",
+    "archive": "D:\\100XH100\\.local\\archived-checkouts\\20261107\\root-extra\\task5_writer.patch",
+    "files": {
+      "": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  }
+]

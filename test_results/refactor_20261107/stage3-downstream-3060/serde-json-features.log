@@ -1,0 +1,23 @@
+serde_json v1.0.154
+├── serde_json feature "default"
+│   ├── beam-core v0.1.0 (/workspace/beam-work/rust/beam-core)
+│   │   └── beam-core feature "default" (command-line)
+│   │       ├── beam-native-sys v0.1.0 (/workspace/beam-work/rust/beam-native-sys)
+│   │       │   └── beam-native-sys feature "default" (command-line)
+│   │       │       ├── beam-cli v0.1.0 (/workspace/beam-work/rust/beam-cli)
+│   │       │       │   └── beam-cli feature "default" (command-line)
+│   │       │       └── beam-runtime v0.1.0 (/workspace/beam-work/rust/beam-runtime)
+│   │       │           └── beam-runtime feature "default" (command-line)
+│   │       │               ├── beam-cli v0.1.0 (/workspace/beam-work/rust/beam-cli) (*)
+│   │       │               └── beam-python v0.1.0 (/workspace/beam-work/rust/beam-python)
+│   │       │                   └── beam-python feature "default" (command-line)
+│   │       ├── beam-python v0.1.0 (/workspace/beam-work/rust/beam-python) (*)
+│   │       └── beam-runtime v0.1.0 (/workspace/beam-work/rust/beam-runtime) (*)
+│   ├── beam-python v0.1.0 (/workspace/beam-work/rust/beam-python) (*)
+│   └── beam-runtime v0.1.0 (/workspace/beam-work/rust/beam-runtime) (*)
+├── serde_json feature "float_roundtrip"
+│   ├── beam-core v0.1.0 (/workspace/beam-work/rust/beam-core) (*)
+│   ├── beam-python v0.1.0 (/workspace/beam-work/rust/beam-python) (*)
+│   └── beam-runtime v0.1.0 (/workspace/beam-work/rust/beam-runtime) (*)
+└── serde_json feature "std"
+    └── serde_json feature "default" (*)

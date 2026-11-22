@@ -1,0 +1,36 @@
+{
+  "samples": [
+    [
+      {
+        "index": 0,
+        "uuid": "GPU-a1d72707-5bf6-9fd2-6fa1-d180c01d19fe",
+        "temperature": 38,
+        "throttled": false
+      },
+      {
+        "index": 1,
+        "uuid": "GPU-eea9c6a4-fc70-c3d6-598d-9f4dde6f0632",
+        "temperature": 38,
+        "throttled": false
+      }
+    ],
+    [
+      {
+        "index": 0,
+        "uuid": "GPU-a1d72707-5bf6-9fd2-6fa1-d180c01d19fe",
+        "temperature": 39,
+        "throttled": false
+      },
+      {
+        "index": 1,
+        "uuid": "GPU-eea9c6a4-fc70-c3d6-598d-9f4dde6f0632",
+        "temperature": 38,
+        "throttled": false
+      }
+    ]
+  ],
+  "errors": [],
+  "interval_seconds": 5.0,
+  "throttled": false,
+  "scope": "sampled visible GPUs; transient events may be missed"
+}

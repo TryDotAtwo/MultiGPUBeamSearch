@@ -1,0 +1,24 @@
+{
+  "states": 17,
+  "source_sha256": "fed40964a215d3b6f1f514fe01eb5221b9be3e92fcdca902e0db5a68e971ea75",
+  "gpu": "NVIDIA GeForce RTX 3070 Laptop GPU",
+  "torch": "2.8.0+cu128",
+  "results": {
+    "value_graph": {
+      "strict_state_dict": true,
+      "tensors": 83,
+      "element_max_abs": 0.0,
+      "value_max_abs": 0.0,
+      "exported_vs_eager_fp16_cuda_max_abs": 0.0078125,
+      "exported_cuda_vs_author_fp32_max_abs": 0.007597923278808594
+    },
+    "transformer": {
+      "strict_state_dict": true,
+      "tensors": 59,
+      "element_max_abs": 0.0,
+      "value_max_abs": 0.0,
+      "exported_vs_eager_fp16_cuda_max_abs": 0.0,
+      "exported_cuda_vs_author_fp32_max_abs": 0.0070590972900390625
+    }
+  }
+}

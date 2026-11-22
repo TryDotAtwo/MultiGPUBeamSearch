@@ -1,0 +1,17 @@
+Traceback (most recent call last):
+  File "/workspace/beam-work/tests/native_generator_snapshot_fifo.py", line 45, in <module>
+    main()
+  File "/workspace/beam-work/tests/native_generator_snapshot_fifo.py", line 35, in main
+    result = subprocess.run([str(args.binary.resolve()), "--snapshot", str(fifo)],
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/conda/lib/python3.11/subprocess.py", line 550, in run
+    stdout, stderr = process.communicate(input, timeout=timeout)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/conda/lib/python3.11/subprocess.py", line 1209, in communicate
+    stdout, stderr = self._communicate(input, endtime, timeout)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/conda/lib/python3.11/subprocess.py", line 2116, in _communicate
+    self._check_timeout(endtime, orig_timeout, stdout, stderr)
+  File "/opt/conda/lib/python3.11/subprocess.py", line 1253, in _check_timeout
+    raise TimeoutExpired(
+subprocess.TimeoutExpired: Command '['/workspace/tmp/input-old-shim', '--snapshot', '/workspace/tmp/tmpxr1v318j/moves.fifo']' timed out after 10 seconds

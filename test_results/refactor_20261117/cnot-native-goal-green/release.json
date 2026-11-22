@@ -1,0 +1,15 @@
+{
+  "instance": 60984269,
+  "label": "codex-cnot-native-goal-20261117",
+  "before": {
+    "id": 60984269,
+    "label": "codex-cnot-native-goal-20261117",
+    "actual_status": "running",
+    "duration": 1180.43949508667,
+    "dph_total": 0.13481481481481483,
+    "start_date": 1794869170.9447236
+  },
+  "destroy_returncode": 0,
+  "provider_absence_verified": true,
+  "unix_time": 1794870367.2572823
+}

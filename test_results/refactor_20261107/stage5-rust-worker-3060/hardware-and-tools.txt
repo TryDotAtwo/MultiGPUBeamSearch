@@ -1,0 +1,15 @@
+2026-11-07T21:44:49Z
+index, name, uuid, memory.total [MiB], driver_version
+0, NVIDIA GeForce RTX 3060, GPU-a1d72707-5bf6-9fd2-6fa1-d180c01d19fe, 12288 MiB, 595.91.07
+1, NVIDIA GeForce RTX 3060, GPU-eea9c6a4-fc70-c3d6-598d-9f4dde6f0632, 12288 MiB, 595.91.07
+rustc 1.99.1 (58cf8f9c3 2026-10-13)
+cargo 1.99.1 (5f94df478 2026-08-27)
+maturin 1.16.0
+nvcc: NVIDIA (R) Cuda compiler driver
+Copyright (c) 2005-2025 NVIDIA Corporation
+Built on Fri_Feb_21_20:23:50_PST_2025
+Cuda compilation tools, release 12.8, V12.8.93
+Build cuda_12.8.r12.8/compiler.35583870_0
+worker=/workspace/beam-results/rust-runner-wheel/final/check/checkout/installed/multigpubeamsearch/_bin/beam-runner
+torch=2.9.0+cu128
+visible_gpus=2

@@ -1,0 +1,22 @@
+   Compiling beam-core v0.1.0 (/workspace/beam-work/rust/beam-core)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.27s
+     Running tests/search.rs (/workspace/target/debug/deps/search-b78c915029b0294f)
+
+running 1 test
+test collection_is_complete_unique_and_independently_replayed ... FAILED
+
+failures:
+
+---- collection_is_complete_unique_and_independently_replayed stdout ----
+
+thread 'collection_is_complete_unique_and_independently_replayed' (42689) panicked at rust/beam-core/tests/search.rs:12:27:
+called `Result::unwrap()` on an `Err` value: Invalid("malformed native terminal record")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    collection_is_complete_unique_and_independently_replayed
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `-p beam-core --test search`

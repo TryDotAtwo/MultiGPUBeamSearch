@@ -1,0 +1,7 @@
+   Compiling serde_json v1.0.154
+   Compiling beam-core v0.1.0 (/workspace/beam-work/rust/beam-core)
+   Compiling beam-native-sys v0.1.0 (/workspace/beam-work/rust/beam-native-sys)
+   Compiling beam-runtime v0.1.0 (/workspace/beam-work/rust/beam-runtime)
+   Compiling beam-python v0.1.0 (/workspace/beam-work/rust/beam-python)
+   Compiling beam-cli v0.1.0 (/workspace/beam-work/rust/beam-cli)
+    Finished `release` profile [optimized] target(s) in 14.25s

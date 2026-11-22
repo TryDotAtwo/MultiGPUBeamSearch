@@ -1,0 +1,4 @@
+========= COMPUTE-SANITIZER
+gpu=0 scan_graph_replay_and_block_prefix=pass
+gpu=1 scan_graph_replay_and_block_prefix=pass
+========= RACECHECK SUMMARY: 0 hazards displayed (0 errors, 0 warnings)

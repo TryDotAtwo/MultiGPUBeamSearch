@@ -1,0 +1,5 @@
+#!/opt/conda/bin/python
+import os,time
+from pathlib import Path
+Path('/workspace/beam-results/downstream/gpu-native_cuda_graph',"blocked-"+os.environ["RANK"]).write_text(str(os.getpid()))
+time.sleep(30)

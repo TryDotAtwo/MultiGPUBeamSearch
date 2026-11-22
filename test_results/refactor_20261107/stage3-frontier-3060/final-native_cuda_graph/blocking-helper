@@ -1,0 +1,5 @@
+#!/opt/conda/bin/python
+import os,sys,time
+from pathlib import Path
+Path('/workspace/beam-results/frontier/final-native_cuda_graph',"blocked-"+sys.argv[4]).write_text(str(os.getpid()))
+time.sleep(30)

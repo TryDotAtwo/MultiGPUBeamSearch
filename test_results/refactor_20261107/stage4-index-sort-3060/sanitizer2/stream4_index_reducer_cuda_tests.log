@@ -1,0 +1,5 @@
+========= COMPUTE-SANITIZER
+gpu=0 index_reducer=pass
+gpu=1 index_reducer=pass
+========= LEAK SUMMARY: 0 bytes leaked in 0 allocations
+========= ERROR SUMMARY: 0 errors

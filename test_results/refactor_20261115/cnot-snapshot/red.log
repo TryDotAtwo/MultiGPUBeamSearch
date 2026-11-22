@@ -1,0 +1,262 @@
+FFFF                                                                     [100%]
+================================== FAILURES ===================================
+___ test_validated_cnot_snapshot_is_the_matrix_used_by_search[False-python] ___
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x00000172D9FC6210>
+validation = 'python', original_gate = False
+
+    @pytest.mark.parametrize("validation", ["python", "rust"])
+    @pytest.mark.parametrize("original_gate", [False, True])
+    def test_validated_cnot_snapshot_is_the_matrix_used_by_search(monkeypatch, validation, original_gate):
+        from types import SimpleNamespace
+        from multigpubeamsearch import rust_control
+    
+        class Matrix:
+            def __init__(self, n, raw):
+                self.n = n
+                self.rows = tuple(int.from_bytes(raw[i:i + 8], "little") for i in range(0, len(raw), 8))
+    
+            def verifies_construction(self, gates):
+                return replay_cnot(self.n, gates) == self.rows
+    
+        monkeypatch.setattr(rust_control, "extension", lambda: SimpleNamespace(CnotMatrix=Matrix))
+        gate = 0
+        original = replay_cnot(4, (gate,) if original_gate else ())
+        replacement = replay_cnot(4, () if original_gate else (gate,))
+        root = pack_rows(original)
+        gather_fixed = World.gather_fixed
+        changed = False
+    
+        def mutate_caller_tensor_after_validation(world, tensor):
+            nonlocal changed
+            if not changed:
+                root.copy_(pack_rows(replacement))
+                changed = True
+            return gather_fixed(world, tensor)
+    
+        monkeypatch.setattr(World, "gather_fixed", mutate_caller_tensor_after_validation)
+>       result = search_cnot(root, object(), width=1, shortlist=1, max_depth=1, validation=validation)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+integrations\cayleypy_native\tests\test_cnot_search.py:136: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+C:\Users\���� ������\AppData\Local\Programs\Python\Python311\Lib\site-packages\torch\utils\_contextlib.py:120: in decorate_context
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+C:\Users\���� ������\AppData\Local\Programs\Python\Python311\Lib\site-packages\torch\utils\_contextlib.py:120: in decorate_context
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+integrations\cayleypy_native\multigpubeamsearch\cnot.py:209: in search_cnot
+    return _search(world, root, identity, input_matrix, scorer, width, shortlist, max_depth, mode, audit)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+integrations\cayleypy_native\multigpubeamsearch\cnot.py:224: in _search
+    gates, routes = _reconstruct(world, history, final, input_matrix)
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+world = <multigpubeamsearch.cnot_collectives.World object at 0x00000172DA327950>
+history = [], final = (0, 0)
+input_matrix = _InputMatrix(n=4, raw=b'\x01\x00\x00\x00\x00\x00\x00\x00\x02\x00\x00\x00\x00\x00\x00\x00\x04\x00\x00\x00\x00\x00\x00\x00\x08\x00\x00\x00\x00\x00\x00\x00', rows=(1, 2, 4, 8), rust_matrix=None)
+
+    def _reconstruct(world, history, final, input_matrix):
+        slot, last_move = final
+        moves, routes = [last_move], []
+        for count, previous_count, records in reversed(history):
+            target = slot * world.size // count
+            edge = world.longs([0, 0, 0])
+            if target == world.rank:
+                begin = (target * count + world.size - 1) // world.size
+                edge.copy_(records[slot - begin])
+            if world.size > 1:
+                dist.broadcast(edge, target)
+            slot, route, owner = edge.tolist()
+            source, move = divmod(route, 1 << 16)
+            if source != slot * world.size // previous_count:
+                raise RuntimeError("CNOT history disagrees with parent world rank")
+            moves.append(move)
+            routes.append(dict(source=source, hash_owner=owner, target=target, move=move))
+        gates = tuple(moves)  # backtracking reversed the reduction, including its terminal gate
+        if slot != 0 or not input_matrix.verifies_construction(gates):
+>           raise RuntimeError("CNOT construction failed bitwise replay from the identity")
+E           RuntimeError: CNOT construction failed bitwise replay from the identity
+
+integrations\cayleypy_native\multigpubeamsearch\cnot.py:176: RuntimeError
+____ test_validated_cnot_snapshot_is_the_matrix_used_by_search[False-rust] ____
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x00000172DA30BE50>
+validation = 'rust', original_gate = False
+
+    @pytest.mark.parametrize("validation", ["python", "rust"])
+    @pytest.mark.parametrize("original_gate", [False, True])
+    def test_validated_cnot_snapshot_is_the_matrix_used_by_search(monkeypatch, validation, original_gate):
+        from types import SimpleNamespace
+        from multigpubeamsearch import rust_control
+    
+        class Matrix:
+            def __init__(self, n, raw):
+                self.n = n
+                self.rows = tuple(int.from_bytes(raw[i:i + 8], "little") for i in range(0, len(raw), 8))
+    
+            def verifies_construction(self, gates):
+                return replay_cnot(self.n, gates) == self.rows
+    
+        monkeypatch.setattr(rust_control, "extension", lambda: SimpleNamespace(CnotMatrix=Matrix))
+        gate = 0
+        original = replay_cnot(4, (gate,) if original_gate else ())
+        replacement = replay_cnot(4, () if original_gate else (gate,))
+        root = pack_rows(original)
+        gather_fixed = World.gather_fixed
+        changed = False
+    
+        def mutate_caller_tensor_after_validation(world, tensor):
+            nonlocal changed
+            if not changed:
+                root.copy_(pack_rows(replacement))
+                changed = True
+            return gather_fixed(world, tensor)
+    
+        monkeypatch.setattr(World, "gather_fixed", mutate_caller_tensor_after_validation)
+>       result = search_cnot(root, object(), width=1, shortlist=1, max_depth=1, validation=validation)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+integrations\cayleypy_native\tests\test_cnot_search.py:136: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+C:\Users\���� ������\AppData\Local\Programs\Python\Python311\Lib\site-packages\torch\utils\_contextlib.py:120: in decorate_context
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+C:\Users\���� ������\AppData\Local\Programs\Python\Python311\Lib\site-packages\torch\utils\_contextlib.py:120: in decorate_context
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+integrations\cayleypy_native\multigpubeamsearch\cnot.py:209: in search_cnot
+    return _search(world, root, identity, input_matrix, scorer, width, shortlist, max_depth, mode, audit)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+integrations\cayleypy_native\multigpubeamsearch\cnot.py:224: in _search
+    gates, routes = _reconstruct(world, history, final, input_matrix)
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+world = <multigpubeamsearch.cnot_collectives.World object at 0x00000172DA30BE10>
+history = [], final = (0, 0)
+input_matrix = _InputMatrix(n=4, raw=b'\x01\x00\x00\x00\x00\x00\x00\x00\x02\x00\x00\x00\x00\x00\x00\x00\x04\x00\x00\x00\x00\x00\x00\x...st_cnot_search.test_validated_cnot_snapshot_is_the_matrix_used_by_search.<locals>.Matrix object at 0x00000172D9D8AE90>)
+
+    def _reconstruct(world, history, final, input_matrix):
+        slot, last_move = final
+        moves, routes = [last_move], []
+        for count, previous_count, records in reversed(history):
+            target = slot * world.size // count
+            edge = world.longs([0, 0, 0])
+            if target == world.rank:
+                begin = (target * count + world.size - 1) // world.size
+                edge.copy_(records[slot - begin])
+            if world.size > 1:
+                dist.broadcast(edge, target)
+            slot, route, owner = edge.tolist()
+            source, move = divmod(route, 1 << 16)
+            if source != slot * world.size // previous_count:
+                raise RuntimeError("CNOT history disagrees with parent world rank")
+            moves.append(move)
+            routes.append(dict(source=source, hash_owner=owner, target=target, move=move))
+        gates = tuple(moves)  # backtracking reversed the reduction, including its terminal gate
+        if slot != 0 or not input_matrix.verifies_construction(gates):
+>           raise RuntimeError("CNOT construction failed bitwise replay from the identity")
+E           RuntimeError: CNOT construction failed bitwise replay from the identity
+
+integrations\cayleypy_native\multigpubeamsearch\cnot.py:176: RuntimeError
+___ test_validated_cnot_snapshot_is_the_matrix_used_by_search[True-python] ____
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x00000172DB48C250>
+validation = 'python', original_gate = True
+
+    @pytest.mark.parametrize("validation", ["python", "rust"])
+    @pytest.mark.parametrize("original_gate", [False, True])
+    def test_validated_cnot_snapshot_is_the_matrix_used_by_search(monkeypatch, validation, original_gate):
+        from types import SimpleNamespace
+        from multigpubeamsearch import rust_control
+    
+        class Matrix:
+            def __init__(self, n, raw):
+                self.n = n
+                self.rows = tuple(int.from_bytes(raw[i:i + 8], "little") for i in range(0, len(raw), 8))
+    
+            def verifies_construction(self, gates):
+                return replay_cnot(self.n, gates) == self.rows
+    
+        monkeypatch.setattr(rust_control, "extension", lambda: SimpleNamespace(CnotMatrix=Matrix))
+        gate = 0
+        original = replay_cnot(4, (gate,) if original_gate else ())
+        replacement = replay_cnot(4, () if original_gate else (gate,))
+        root = pack_rows(original)
+        gather_fixed = World.gather_fixed
+        changed = False
+    
+        def mutate_caller_tensor_after_validation(world, tensor):
+            nonlocal changed
+            if not changed:
+                root.copy_(pack_rows(replacement))
+                changed = True
+            return gather_fixed(world, tensor)
+    
+        monkeypatch.setattr(World, "gather_fixed", mutate_caller_tensor_after_validation)
+        result = search_cnot(root, object(), width=1, shortlist=1, max_depth=1, validation=validation)
+        assert changed and result.status == "solved"
+>       assert result.gates == ((gate,) if original_gate else ())
+E       assert () == (0,)
+E         
+E         Right contains one more item: 0
+E         Use -v to get more diff
+
+integrations\cayleypy_native\tests\test_cnot_search.py:138: AssertionError
+____ test_validated_cnot_snapshot_is_the_matrix_used_by_search[True-rust] _____
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x00000172DA337D50>
+validation = 'rust', original_gate = True
+
+    @pytest.mark.parametrize("validation", ["python", "rust"])
+    @pytest.mark.parametrize("original_gate", [False, True])
+    def test_validated_cnot_snapshot_is_the_matrix_used_by_search(monkeypatch, validation, original_gate):
+        from types import SimpleNamespace
+        from multigpubeamsearch import rust_control
+    
+        class Matrix:
+            def __init__(self, n, raw):
+                self.n = n
+                self.rows = tuple(int.from_bytes(raw[i:i + 8], "little") for i in range(0, len(raw), 8))
+    
+            def verifies_construction(self, gates):
+                return replay_cnot(self.n, gates) == self.rows
+    
+        monkeypatch.setattr(rust_control, "extension", lambda: SimpleNamespace(CnotMatrix=Matrix))
+        gate = 0
+        original = replay_cnot(4, (gate,) if original_gate else ())
+        replacement = replay_cnot(4, () if original_gate else (gate,))
+        root = pack_rows(original)
+        gather_fixed = World.gather_fixed
+        changed = False
+    
+        def mutate_caller_tensor_after_validation(world, tensor):
+            nonlocal changed
+            if not changed:
+                root.copy_(pack_rows(replacement))
+                changed = True
+            return gather_fixed(world, tensor)
+    
+        monkeypatch.setattr(World, "gather_fixed", mutate_caller_tensor_after_validation)
+        result = search_cnot(root, object(), width=1, shortlist=1, max_depth=1, validation=validation)
+        assert changed and result.status == "solved"
+>       assert result.gates == ((gate,) if original_gate else ())
+E       assert () == (0,)
+E         
+E         Right contains one more item: 0
+E         Use -v to get more diff
+
+integrations\cayleypy_native\tests\test_cnot_search.py:138: AssertionError
+=========================== short test summary info ===========================
+FAILED integrations\cayleypy_native\tests\test_cnot_search.py::test_validated_cnot_snapshot_is_the_matrix_used_by_search[False-python]
+FAILED integrations\cayleypy_native\tests\test_cnot_search.py::test_validated_cnot_snapshot_is_the_matrix_used_by_search[False-rust]
+FAILED integrations\cayleypy_native\tests\test_cnot_search.py::test_validated_cnot_snapshot_is_the_matrix_used_by_search[True-python]
+FAILED integrations\cayleypy_native\tests\test_cnot_search.py::test_validated_cnot_snapshot_is_the_matrix_used_by_search[True-rust]
+4 failed, 9 deselected in 5.32s
+Exception ignored in: <function Console.__del__ at 0x00000172C7B4F9C0>
+Traceback (most recent call last):
+  File "C:\Users\���� ������\AppData\Local\Programs\Python\Python311\Lib\site-packages\pyreadline3\console\console.py", line 255, in __del__
+OSError: [WinError -1073741816] Windows Error 0xc0000008

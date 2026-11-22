@@ -1,0 +1,10 @@
+{
+  "status": "PASS",
+  "artifact_commit": "972d523bb2870df5053fb8306ac9d5c14195f5a1",
+  "prefix": "test_results/cube444_real_autotune_20261009/",
+  "archive_sha256": "c802cd8b9db8049a4ed8229d9e2d95a1ade16473a1ab6a9deadd7d81ba9ff763",
+  "bytes": 191732,
+  "parts": 3,
+  "verified_files": 228,
+  "verification": "immutable GitHub archive roundtrip and every included file SHA verified on the owned GPU host"
+}

@@ -1,0 +1,1 @@
+{"batch":16,"batch_invariance_max_key_error":0,"correctness_passed":true,"device":0,"executor":"libtorch_eager","model_count":1,"numeric_error":0,"parents":8192,"score_input":"graph_states","seconds":[0.42154290771484376,0.4225001220703125,0.4088359680175781,0.36347088623046875,0.3636602783203125,0.3618785400390625,0.3612648010253906],"torch_reserved_peak_bytes":52428800}

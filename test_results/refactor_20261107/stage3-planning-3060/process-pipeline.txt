@@ -1,0 +1,19 @@
+   Compiling beam-runtime v0.1.0 (/workspace/beam-work/rust/beam-runtime)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.41s
+     Running tests/pipeline.rs (/workspace/target/debug/deps/pipeline-df7a5b0585b7020e)
+
+running 1 test
+test complete_depth_parser_rejects_missing_reordered_and_changed_workloads ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/probes.rs (/workspace/target/debug/deps/probes-9df0617ad1df1b5d)
+
+running 4 tests
+test retained_probe_ignores_logs_and_reuses_process ... ok
+test one_shot_cohort_drains_json_logs_and_fails_fast_on_any_rank ... ok
+test cancellation_interrupts_a_wait_without_holding_the_session_lock ... ok
+test deadline_and_one_rank_failure_close_owned_cohort ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.09s
+

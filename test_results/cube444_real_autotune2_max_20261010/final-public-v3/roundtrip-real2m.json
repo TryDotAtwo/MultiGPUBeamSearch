@@ -1,0 +1,10 @@
+{
+  "status": "PASS",
+  "artifact_commit": "f3debeb1e31fd4da4b955a729b96cff47de5952a",
+  "prefix": "test_results/cube444_real_autotune2_max_20261010/final-public-v3/",
+  "archive_sha256": "db5e22694e81ef858e08850b83020d3d60fde65e33fde63ea2aa1d6e37010fbf",
+  "bytes": 1465771,
+  "parts_verified": 20,
+  "files_verified": 924,
+  "scope": "independent GitHub download, every part and tar file byte verified; no GPU tensors copied to Windows"
+}

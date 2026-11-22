@@ -1,0 +1,36 @@
+{
+  "archive_sha256": "d2878a7258afccdad18fa84fb7cbeb3d292036c454d71ccdd21783ac596978fd",
+  "records": 2371,
+  "blobs": 734,
+  "omitted": 3908,
+  "extracted": [
+    "beam-results/public-index-20261114/commit.txt",
+    "beam-results/public-index-20261114/cpu-tests.log",
+    "beam-results/public-index-20261114/cutlass-commit.txt",
+    "beam-results/public-index-20261114/gpu-cutlass.log",
+    "beam-results/public-index-20261114/gpu-cutlass/results.json",
+    "beam-results/public-index-20261114/gpu-libtorch.log",
+    "beam-results/public-index-20261114/gpu-libtorch/results.json",
+    "beam-results/public-index-20261114/gpu-probe.log",
+    "beam-results/public-index-20261114/gpus.csv",
+    "beam-results/public-index-20261114/inputs-after.sha256",
+    "beam-results/public-index-20261114/inputs-before.sha256",
+    "beam-results/public-index-20261114/legacy-compat-attempt1.log",
+    "beam-results/public-index-20261114/legacy-compat.log",
+    "beam-results/public-index-20261114/paired.log",
+    "beam-results/public-index-20261114/paired/results.json",
+    "beam-results/public-index-20261114/rust-build.log",
+    "beam-results/public-index-20261114/rust-tests.log",
+    "beam-results/public-index-20261114/software.txt",
+    "beam-results/public-index-20261114/status.txt",
+    "public-index-resume.log",
+    "public-index-run.log",
+    "public-index-vast-resume.sh"
+  ],
+  "restored_samples": [
+    "beam-results/public-index-20261114/cache-cutlass/runs/11a30f347c1c43b2910404c31621fe12/weights/hidden_bias.fp16",
+    "beam-results/public-index-20261114/cache-cutlass/runs/11a30f347c1c43b2910404c31621fe12/native.log",
+    "beam-results/public-index-20261114/cache-cutlass/builds/160663ff9d431a48f00ab8a45cf0a9f64f66a672237e1146c36ad939b61dc446/native-build.json",
+    "beam-work/integrations/cayleypy_native/multigpubeamsearch/_bin/beam-runner"
+  ]
+}

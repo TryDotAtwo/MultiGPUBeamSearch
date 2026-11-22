@@ -1,0 +1,22 @@
+   Compiling beam-runtime v0.1.0 (/workspace/beam-work/rust/beam-runtime)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.36s
+     Running tests/pipeline.rs (/workspace/target/debug/deps/pipeline-d7c67769813c9f40)
+
+running 1 test
+test native_capacity_diagnostics_survive_coarse_rank_failure ... FAILED
+
+failures:
+
+---- native_capacity_diagnostics_survive_coarse_rank_failure stdout ----
+
+thread 'native_capacity_diagnostics_survive_coarse_rank_failure' (61896) panicked at rust/beam-runtime/tests/pipeline.rs:100:5:
+rank 0 exited with 1
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    native_capacity_diagnostics_survive_coarse_rank_failure
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.21s
+
+error: test failed, to rerun pass `-p beam-runtime --test pipeline`

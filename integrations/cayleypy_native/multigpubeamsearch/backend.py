@@ -1,0 +1,958 @@
+"""Local native execution. No publication, cluster jobs or runtime fallback."""
+from __future__ import annotations
+
+import json
+import math
+import os
+from pathlib import Path
+import platform
+import re
+import signal
+import shutil
+import subprocess
+import sys
+import time
+from dataclasses import dataclass, replace, field
+
+from .errors import NativeBackendError, NativeUnavailable
+from .models import verify_prepared_model
+from .options import NativeOutcome
+
+
+_RANK_KEYS = {"RANK", "LOCAL_RANK", "WORLD_SIZE", "LOCAL_WORLD_SIZE", "GROUP_RANK", "ROLE_RANK",
+              "ROLE_WORLD_SIZE", "MASTER_ADDR", "MASTER_PORT", "NODE_RANK", "OMP_NUM_THREADS"}
+_NCCL_LOADER_NAME = "libnccl.so.2"
+
+
+@dataclass(frozen=True)
+class PreparedRuntime:
+    runner: Path
+    build_metadata: dict
+    architectures: tuple[int, ...]
+    profile: dict = field(default_factory=dict)
+
+
+def snapshot_runtime_runner(runtime: PreparedRuntime, run_dir: Path) -> Path:
+    """Copy the verified executable into the fresh run directory before exec."""
+    from .build import file_sha256
+
+    run_dir = Path(run_dir).resolve()
+    source = Path(runtime.runner).resolve()
+    target = run_dir / "production_runner"
+    expected = runtime.build_metadata.get("binary_sha256")
+    if not isinstance(expected, str) or re.fullmatch(r"[0-9a-f]{64}", expected) is None:
+        raise NativeBackendError("native build metadata has no valid runner SHA256")
+    if target.exists() or target.is_symlink():
+        raise NativeBackendError(f"private native runner snapshot already exists at {target}")
+
+    staging = run_dir / ".production_runner.tmp"
+    if staging.exists() or staging.is_symlink():
+        raise NativeBackendError(f"private native runner staging path already exists at {staging}")
+    published = False
+    try:
+        shutil.copyfile(source, staging)
+        staging.chmod(0o700)
+        if file_sha256(staging) != expected:
+            raise NativeBackendError("native runner changed while its private snapshot was copied")
+        staging.replace(target)
+        published = True
+        return target
+    except NativeBackendError:
+        raise
+    except OSError as error:
+        raise NativeBackendError(f"could not create private native runner snapshot: {error}") from error
+    finally:
+        if not published and staging.exists():
+            try:
+                staging.unlink()
+            except OSError:
+                pass
+
+
+def snapshot_runtime_nccl(runtime: PreparedRuntime, run_dir: Path) -> Path:
+    """Copy the build-pinned NCCL bytes under the ELF loader-visible name."""
+    from .build import file_sha256
+
+    run_dir = Path(run_dir).resolve()
+    nccl = runtime.build_metadata.get("nccl")
+    if not isinstance(nccl, dict) or not isinstance(nccl.get("library"), str):
+        raise NativeBackendError("native build metadata has no valid NCCL provenance")
+    expected = nccl.get("library_sha256")
+    if not isinstance(expected, str) or re.fullmatch(r"[0-9a-f]{64}", expected) is None:
+        raise NativeBackendError("native build metadata has no valid NCCL library SHA256")
+
+    source = Path(nccl["library"]).resolve()
+    target_dir = run_dir / "runtime-libs"
+    target = target_dir / _NCCL_LOADER_NAME
+    staging = target_dir / ("." + _NCCL_LOADER_NAME + ".tmp")
+    if target_dir.exists() or target_dir.is_symlink():
+        raise NativeBackendError(f"private native runtime library directory already exists at {target_dir}")
+
+    published = False
+    try:
+        target_dir.mkdir()
+        shutil.copyfile(source, staging)
+        staging.chmod(0o500)
+        if file_sha256(staging) != expected:
+            raise NativeBackendError("native NCCL library changed while its private snapshot was copied")
+        staging.replace(target)
+        published = True
+        return target
+    except NativeBackendError:
+        raise
+    except OSError as error:
+        raise NativeBackendError(f"could not create private native NCCL snapshot: {error}") from error
+    finally:
+        if not published:
+            if staging.exists():
+                try:
+                    staging.unlink()
+                except OSError:
+                    pass
+            if target_dir.exists():
+                try:
+                    target_dir.rmdir()
+                except OSError:
+                    pass
+
+
+def touch_bfs_worst_case_entries(move_count: int, radius: int, max_entries: int) -> int:
+    """Return the geometric allocation bound or reject it before native startup."""
+    if type(move_count) is not int or move_count <= 0:
+        raise NativeUnavailable("native touch-BFS requires a positive generator count")
+    if type(radius) is not int or radius < 0:
+        raise ValueError("effective touch_bfs_radius must be a nonnegative integer")
+    if type(max_entries) is not int or max_entries <= 0:
+        raise ValueError("touch_bfs_max_entries must be a positive integer")
+    try:
+        from .rust_control import extension
+
+        native = getattr(extension(), "touch_bfs_worst_case_entries", None)
+    except NativeUnavailable:
+        native = None
+    if (
+        native is not None
+        and move_count <= 255
+        and radius <= 12
+        and max_entries <= (1 << 64) - 1
+    ):
+        try:
+            return native(move_count, radius, max_entries)
+        except ValueError as error:
+            raise NativeUnavailable(
+                f"native touch-BFS worst-case host allocation exceeds the {max_entries:,}-entry budget; "
+                "reduce touch_bfs_radius or increase touch_bfs_max_entries"
+            ) from error
+    total = 1
+    frontier = 1
+    for _ in range(radius):
+        remaining = max_entries - total
+        if remaining < 0 or frontier > remaining // move_count:
+            raise NativeUnavailable(
+                f"native touch-BFS worst-case host allocation exceeds the {max_entries:,}-entry budget; "
+                "reduce touch_bfs_radius or increase touch_bfs_max_entries"
+            )
+        frontier *= move_count
+        total += frontier
+    return total
+
+
+def validate_touch_bfs_contract(contract, radius: int, max_entries: int) -> int:
+    """Reject graph/radius combinations before any CUDA or model preparation."""
+    if radius and contract.move_count > 32:
+        raise NativeUnavailable("native touch-BFS suffix packing supports at most 32 generators")
+    return touch_bfs_worst_case_entries(contract.move_count, radius, max_entries)
+
+
+def _resolve_inference_backend_python(request):
+    """Compatibility policy for extensions built before Rust owns this choice."""
+    requested = request["requested"]
+    model_backend = request["model_backend"]
+    output_dim = request["output_dim"]
+    devices = request["devices"]
+    if requested not in ("auto", "libtorch", "cutlass"):
+        raise NativeUnavailable("inference_backend must be auto, libtorch, or cutlass")
+    if requested == "cutlass" and model_backend == "mlp" and output_dim != 1 and output_dim % 8:
+        raise NativeUnavailable("native MLP Q-head output_dim must be a multiple of 8 for CUTLASS row alignment; scalar output_dim=1 is supported")
+    if not devices:
+        raise NativeUnavailable("inference backend selection requires at least one GPU")
+    if request.get("dtype") == "bf16" and any(device["sm"] < 80 for device in devices):
+        raise NativeUnavailable("native BF16 Stream1 requires SM80+ on every selected GPU; use FP16 on SM75")
+    if request.get("dtype") == "fp16" and any(device["sm"] < 75 for device in devices):
+        raise NativeUnavailable("this native FP16 MLP backend uses SM75+ TensorOp kernels; older GPU executors need a separate adapter")
+    executor = requested
+    if executor == "auto":
+        older_ensemble = model_backend == "ensemble" and any(device["sm"] < 80 for device in devices)
+        has_t4 = any("T4" in device["name"].split() for device in devices)
+        executor = "libtorch" if older_ensemble or has_t4 else "cutlass"
+    if model_backend == "ensemble" and executor == "cutlass" and any(device["sm"] < 80 for device in devices):
+        raise NativeUnavailable("ensemble CUTLASS requires SM80+ on every selected GPU")
+    if executor == "cutlass" and model_backend == "mlp" and output_dim != 1 and output_dim % 8:
+        raise NativeUnavailable("native MLP Q-head output_dim must be a multiple of 8 for CUTLASS row alignment; scalar output_dim=1 is supported")
+    return executor
+
+
+def _resolve_inference_backend(request):
+    """Use the Rust runtime policy; retain a Python policy only for old wheels."""
+    from .rust_control import resolve_inference_backend
+
+    selected = resolve_inference_backend(request)
+    if selected is not None:
+        return selected
+    return _resolve_inference_backend_python(request)
+
+
+def _resolve_inference_plan(request):
+    """Return the selected route and unchanged profile, with old-wheel fallback."""
+    from .rust_control import resolve_inference_plan
+
+    plan = resolve_inference_plan(request)
+    if plan is not None:
+        return plan
+    executor = _resolve_inference_backend(request)
+    if executor == "libtorch":
+        policy, row_limit = "libtorch-conservative-v1", 2048
+    elif executor == "cutlass":
+        policy, row_limit = "cutlass-default-v1", 8192
+    else:
+        raise NativeUnavailable("inference backend resolver returned an invalid selection")
+    return {"backend": executor, "policy": policy, "inference_row_limit": row_limit}
+
+
+def prepare_runtime(contract, model, options, run_dir, devices, *,
+                    touch_bfs_radius: int | None = None, nccl_digest_cache=None) -> PreparedRuntime:
+    """Resolve/build before dispatch closes its capability fallback window."""
+    radius = options.touch_bfs_radius if touch_bfs_radius is None else touch_bfs_radius
+    if type(radius) is not int or radius < 0:
+        raise ValueError("effective touch_bfs_radius must be a nonnegative integer")
+    validate_touch_bfs_contract(contract, radius, options.touch_bfs_max_entries)
+    if model.backend in ("cube444_transformer", "cube444_mlp", "cube555_transformer", "cube555_mlp"):
+        raise NativeUnavailable("Cube heads require NativeEnsemble, including a single-head ensemble")
+    # Stream1's scalar head has a separate kernel. The Q head uses unpadded
+    # row-major CUTLASS GEMM with eight-element B/C/D access alignment.
+    if options.inference_backend == "cutlass" and model.backend == "mlp" and model.manifest["output_dim"] != 1 and model.manifest["output_dim"] % 8:
+        raise NativeUnavailable("native MLP Q-head output_dim must be a multiple of 8 for CUTLASS row alignment; scalar output_dim=1 is supported")
+    import torch
+    try:
+        device_sms = tuple(
+            major * 10 + minor
+            for major, minor in (torch.cuda.get_device_capability(d) for d in devices)
+        )
+    except (RuntimeError, AssertionError) as exc:
+        raise NativeUnavailable(f"cannot inspect requested native CUDA architecture: {exc}") from exc
+    architectures = tuple(sorted(set(device_sms)))
+    device_names = None
+    if options.inference_backend == "auto":
+        device_names = tuple(torch.cuda.get_device_name(d) for d in devices)
+    request = {
+        "requested": options.inference_backend,
+        "model_backend": model.backend,
+        "dtype": model.manifest.get("dtype"),
+        "output_dim": model.manifest["output_dim"],
+        "devices": [
+            {
+                "sm": sm,
+                "name": "" if device_names is None else device_names[index],
+            }
+            for index, sm in enumerate(device_sms)
+        ],
+    }
+    inference_plan = _resolve_inference_plan(request)
+    executor = inference_plan["backend"]
+    options = replace(options, inference_backend=executor)
+    from .build import ensure_runner
+    run_dir = Path(run_dir).resolve()
+    run_dir.mkdir(parents=True, exist_ok=True)
+    if nccl_digest_cache is None:
+        runner, metadata = ensure_runner(contract, model, options, architectures, run_dir)
+    else:
+        runner, metadata = ensure_runner(contract, model, options, architectures, run_dir,
+                                         nccl_digest_cache=nccl_digest_cache)
+    if device_names is None:
+        device_names = tuple(torch.cuda.get_device_name(d) for d in devices)
+    profile = {"policy": inference_plan["policy"],
+               "inference_backend": executor,
+               "inference_row_limit": inference_plan["inference_row_limit"],
+               "cuda_architectures": list(architectures), "gpu_names": list(device_names),
+               "memory_planning": "native_auto", "autotuned": False}
+    return PreparedRuntime(runner, metadata, architectures, profile)
+
+
+def runtime_devices(graph, options) -> tuple[int, ...]:
+    if platform.system() != "Linux":
+        raise NativeUnavailable("native beam currently requires Linux/CUDA/NCCL")
+    if any(key in os.environ for key in ("RANK", "LOCAL_RANK", "WORLD_SIZE", "TORCHELASTIC_RUN_ID")):
+        raise NativeUnavailable("native adapter cannot be invoked inside an existing torchrun rank")
+    import torch
+    if not torch.cuda.is_available():
+        raise NativeUnavailable("native beam requires available CUDA devices")
+    if options.devices is not None:
+        devices = options.devices
+    elif options.num_gpus is not None:
+        if options.num_gpus > torch.cuda.device_count():
+            raise NativeUnavailable("num_gpus exceeds the number of visible CUDA devices")
+        devices = tuple(range(options.num_gpus))
+    else:
+        config = getattr(graph, "device_config", None)
+        if config is None:
+            # CayleyPy 0.1 exposes graph.device instead of device_config.
+            device = getattr(graph, "device", None)
+            configured = () if device is None else (device,)
+        else:
+            configured = getattr(config, "devices", ())
+        if not configured or all(torch.device(d).type == "cpu" for d in configured):
+            # A CPU graph describes the puzzle; native search uses visible GPUs.
+            devices = tuple(range(torch.cuda.device_count()))
+        elif any(torch.device(d).type != "cuda" for d in configured):
+            raise NativeUnavailable("graph mixes CPU and CUDA devices; set explicit native devices")
+        else:
+            devices = tuple(0 if torch.device(d).index is None else torch.device(d).index for d in configured)
+    if not devices or len(set(devices)) != len(devices) or len(devices) > 128 or any(
+        type(d) is not int or d < 0 or d >= torch.cuda.device_count() for d in devices
+    ):
+        raise NativeUnavailable("native devices must be distinct available CUDA indices (at most 128)")
+    return tuple(devices)
+
+
+def cuda_visibility(devices: tuple[int, ...], environ: dict[str, str]) -> str:
+    inherited = environ.get("CUDA_VISIBLE_DEVICES")
+    if inherited is None:
+        return ",".join(map(str, devices))
+    tokens = [token.strip() for token in inherited.split(",")]
+    if any(d >= len(tokens) or not tokens[d] or tokens[d] == "-1" for d in devices):
+        raise NativeUnavailable("cannot map selected devices through inherited CUDA_VISIBLE_DEVICES")
+    return ",".join(tokens[d] for d in devices)
+
+
+def child_environment(devices: tuple[int, ...], run_dir: Path, environ=None) -> dict[str, str]:
+    inherited = dict(os.environ if environ is None else environ)
+    env = {k: v for k, v in inherited.items() if not (
+        k.startswith(("BEAM_", "TORCHELASTIC_", "TORCHRUN_", "CUDA_", "NCCL_", "PUBLISH_", "RESULTS_INGEST_")) or k in _RANK_KEYS
+        or k.startswith(("SHARD_", "STREAM1_", "STREAM3_", "STREAM4_", "GLOBAL_"))
+    )}
+    env["CUDA_VISIBLE_DEVICES"] = cuda_visibility(devices, inherited)
+    if "CUDA_DEVICE_ORDER" in inherited:
+        env["CUDA_DEVICE_ORDER"] = inherited["CUDA_DEVICE_ORDER"]
+    env["BEAM_NCCL_ID_FILE"] = str(run_dir / "nccl-id.bin")
+    return env
+
+
+def microbatch_environment(contract, model, beam_width: int, world_size: int, *, row_limit=8192) -> tuple[dict[str, str], dict]:
+    """Fit one inference slot into a native auto candidate without changing beam.
+
+    Native runtime_config.cpp uses 8192 inference rows, four initial sort slots,
+    alignment 1024 and capacity scale 1.25. At tiny beams it otherwise rejects
+    every candidate when Stream3's one-slot batch exceeds physical shard storage.
+    Only lower the row budget; leave shards, ring count and VRAM planning to native.
+    """
+    default_rows, alignment, initial_sort_slots = row_limit, 1024, 4
+    divisor = world_size * initial_sort_slots * alignment
+    logical_shard = ((beam_width + divisor - 1) // divisor) * alignment
+    scaled_capacity = (logical_shard * 5 + 3) // 4
+    shard_storage = ((scaled_capacity + alignment - 1) // alignment) * alignment
+    rows_per_parent = contract.move_count if model.manifest["output_dim"] == 1 and getattr(model,"backend","mlp") != "ensemble" else 1
+    default_parents = default_rows // rows_per_parent
+    parents = min(default_parents, shard_storage // contract.move_count)
+    row_budget = default_rows if parents == default_parents else parents * rows_per_parent
+    env = {} if row_budget == 8192 else {"BEAM_B_MICRO": str(row_budget)}
+    return env, {"native_default_row_budget": default_rows, "configured_row_budget": row_budget,
+                 "derived_parent_batch": parents, "derived_candidates_per_slot": parents * contract.move_count,
+                 "reference_logical_shard": logical_shard, "reference_shard_storage": shard_storage,
+                 "adjusted_for_small_beam": bool(env)}
+
+
+def _stop_process_tree(process: subprocess.Popen) -> None:
+    if os.name == "posix":
+        # Descendants may outlive an exited torchrun parent, so always target the group.
+        for sig in (signal.SIGTERM, signal.SIGKILL):
+            try:
+                os.killpg(process.pid, sig)
+            except ProcessLookupError:
+                break
+            if sig == signal.SIGTERM:
+                try:
+                    process.wait(timeout=2)
+                except subprocess.TimeoutExpired:
+                    pass
+        process.wait(timeout=5)
+    else:
+        # Windows is supported only for process tests; no native CUDA launch here.
+        subprocess.run(["taskkill", "/PID", str(process.pid), "/T", "/F"], stdout=subprocess.DEVNULL,
+                       stderr=subprocess.DEVNULL, check=False, timeout=10, shell=False)
+        if process.poll() is None:
+            process.kill()
+        process.wait(timeout=5)
+
+
+def run_process(command: list[str], *, cwd: Path, env: dict[str, str], timeout: float, log_path: Path) -> float:
+    """Run shell-free with bounded lifetime; preserve stdout/stderr and command."""
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    log_path.with_suffix(log_path.suffix + ".command.json").write_text(json.dumps(command) + "\n", encoding="utf-8")
+    started = time.monotonic()
+    process = None
+    try:
+        with log_path.open("wb") as log:
+            kwargs = {"start_new_session": True} if os.name == "posix" else {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP}
+            process = subprocess.Popen(command, cwd=cwd, env=env, stdout=log, stderr=subprocess.STDOUT,
+                                       stdin=subprocess.DEVNULL, shell=False, **kwargs)
+            try:
+                code = process.wait(timeout=timeout)
+            except BaseException:
+                _stop_process_tree(process)
+                raise
+        if code:
+            _stop_process_tree(process)
+            raise NativeBackendError(f"native process failed rc={code}; log={log_path}")
+        return time.monotonic() - started
+    except subprocess.TimeoutExpired as exc:
+        raise NativeBackendError(f"native process timed out after {timeout}s; log={log_path}") from exc
+    except OSError as exc:
+        raise NativeBackendError(f"cannot execute native process; log={log_path}: {exc}") from exc
+
+
+def collect_worker_logs(log_dir: Path, launcher_log: Path, combined_log: Path,
+                        world_size: int, *, strict: bool) -> dict:
+    """Merge only the exact torchrun attempt_0/rank/stdout|stderr layout.
+
+    No recursive arbitrary-log discovery and no symlink traversal. A failed
+    launcher still gets a combined diagnostic log; successful runs require both
+    redirected streams from every expected rank and no additional ranks/retries.
+    """
+    issues, streams = [], []
+    root = log_dir.resolve()
+
+    def safe(path, directory=False):
+        return (not path.is_symlink() and path.resolve().is_relative_to(root)
+                and (path.is_dir() if directory else path.is_file()))
+
+    try:
+        sessions = list(log_dir.iterdir())
+        if len(sessions) != 1 or not safe(sessions[0], directory=True):
+            issues.append("expected exactly one torchrun log session directory")
+        else:
+            attempts = list(sessions[0].iterdir())
+            attempt = sessions[0] / "attempt_0"
+            if attempts != [attempt] or not safe(attempt, directory=True):
+                issues.append("expected exactly one torchrun attempt_0 directory")
+            else:
+                ranks = list(attempt.iterdir())
+                if {path.name for path in ranks} != {str(rank) for rank in range(world_size)}:
+                    issues.append("torchrun rank directory set does not match requested world size")
+                for rank in range(world_size):
+                    directory = attempt / str(rank)
+                    if not safe(directory, directory=True):
+                        issues.append(f"missing or unsafe rank directory: {rank}")
+                        continue
+                    for name in ("stdout.log", "stderr.log"):
+                        path = directory / name
+                        if safe(path):
+                            streams.append((f"rank {rank} {name}", path))
+                        else:
+                            issues.append(f"missing or unsafe rank stream: {rank}/{name}")
+    except OSError as error:
+        issues.append(f"cannot enumerate torchrun rank logs: {error}")
+    with combined_log.open("w", encoding="utf-8") as destination:
+        for label, path in [("launcher", launcher_log), *streams]:
+            destination.write(f"[{label}]\n")
+            try:
+                with path.open(encoding="utf-8", errors="replace") as source:
+                    for line in source:
+                        destination.write(line)
+                destination.write("\n")
+            except OSError as error:
+                issues.append(f"cannot read {label}: {error}")
+        if issues:
+            destination.write("[log collection diagnostics]\n" + "\n".join(issues) + "\n")
+    if strict and issues:
+        raise NativeBackendError(f"incomplete native worker logs: {'; '.join(issues)}; log={combined_log}")
+    return {"launcher_log": str(launcher_log), "worker_log_dir": str(log_dir),
+            "worker_streams": [str(path) for _, path in streams], "worker_logs_complete": not issues,
+            "worker_log_diagnostics": issues}
+
+
+def parse_terminal(log_path: Path, contract, *,
+                   max_steps: int | None = None) -> tuple[tuple[int, ...] | None, int | None, dict]:
+    if max_steps is not None and (type(max_steps) is not int or max_steps < 0):
+        raise ValueError("max_steps must be a nonnegative integer")
+    records, effective = [], set()
+    collected, collection_counts, collection_status = [], [], None
+    terminal = re.compile(r"puzzle_solved=([01])\s+puzzle_id=(\d+)\s+seconds=([^\s]+)\s+solution_length=(-?\d+)(.*?)\s+solution=([^\s]*)\s*$")
+    width = re.compile(r"(?:GLOBAL_BEAM_WIDTH_EFFECTIVE|global_beam_width_effective)=(\d+)")
+    batch_values = {"B_MICRO": set(), "STREAM1_ROWS_PER_JOB": set(), "STREAM3_BATCH_CANDIDATES": set()}
+    batches = re.compile(r"\b(B_MICRO|STREAM1_ROWS_PER_JOB|STREAM3_BATCH_CANDIDATES)=(\d+)")
+    with log_path.open(encoding="utf-8", errors="replace") as handle:
+        for line in handle:
+            if line.startswith("solve_bucket_solution=1 "):
+                row = dict(part.split('=', 1) for part in line.strip().split())
+                tokens = row['solution'].split('.') if row['solution'] else []
+                if any(re.fullmatch(r'm\d+', token) is None for token in tokens):
+                    raise NativeBackendError('invalid collected move token')
+                moves = tuple(int(token[1:]) for token in tokens)
+                if (int(row['puzzle_id']) != 0 or len(moves) != int(row['solution_length'])
+                        or (max_steps is not None and len(moves) > max_steps) or not contract.replay(moves)):
+                    raise NativeBackendError('collected solution failed independent replay/depth validation')
+                collected.append(dict(path=list(moves), solved_depth=int(row['found_depth']),
+                                      touch_depth=len(moves)-int(row['found_depth']), owner_rank=int(row['owner_rank'])))
+            if line.startswith('solve_bucket_summary=1 '):
+                collection_counts.append(int(dict(part.split('=',1) for part in line.split())['records']))
+            if line.startswith('collection_status='):
+                collection_status = line.strip().split('=',1)[1]
+            effective.update(int(m.group(1)) for m in width.finditer(line))
+            for match in batches.finditer(line):
+                batch_values[match.group(1)].add(int(match.group(2)))
+            if "puzzle_solved=" not in line:
+                continue
+            match = terminal.search(line.rstrip())
+            if match is None:
+                raise NativeBackendError(f"malformed native terminal record; log={log_path}")
+            found, puzzle, seconds, length, details, path = match.groups()
+            try:
+                elapsed = float(seconds)
+            except ValueError as exc:
+                raise NativeBackendError("native terminal record has invalid time") from exc
+            if puzzle != "0" or not math.isfinite(elapsed) or elapsed < 0:
+                raise NativeBackendError("native terminal record has invalid puzzle/time")
+            if found == "0":
+                if length != "-1" or path:
+                    raise NativeBackendError("native not-found record contains an inconsistent path")
+                parsed = None
+            else:
+                tokens = () if path == "" else tuple(path.split("."))
+                if any(re.fullmatch(r"m\d+", token) is None for token in tokens):
+                    raise NativeBackendError("native path contains unknown synthetic generator names")
+                parsed = tuple(int(token[1:]) for token in tokens)
+                if len(parsed) != int(length) or any(move >= contract.move_count for move in parsed):
+                    raise NativeBackendError("native solution length/generator IDs are invalid")
+                if max_steps is not None and len(parsed) > max_steps:
+                    raise NativeBackendError("native solution exceeds requested max_steps")
+                if not contract.replay(parsed):
+                    raise NativeBackendError("native solution failed independent original-graph replay")
+            records.append((parsed, elapsed))
+    if not records:
+        raise NativeBackendError(f"native process returned without a terminal result; log={log_path}")
+    if any(record[0] != records[0][0] for record in records):
+        raise NativeBackendError("native ranks emitted contradictory terminal results")
+    if len(effective) > 1 or 0 in effective:
+        raise NativeBackendError("native ranks emitted inconsistent effective global beam widths")
+    metadata = {"native_seconds": max(r[1] for r in records), "terminal_records": len(records)}
+    if collection_counts:
+        if collection_counts != [len(collected)] or len({tuple(row['path']) for row in collected}) != len(collected):
+            raise NativeBackendError('collection summary/count/unique-path mismatch')
+        if bool(collected) != (records[0][0] is not None):
+            raise NativeBackendError('collection and terminal result disagree')
+        if collected and list(records[0][0]) not in [row['path'] for row in collected]:
+            raise NativeBackendError('terminal path missing from collection')
+        metadata.update(collected_solutions=collected, collection_status=collection_status or 'depth_reached')
+    for label, name in (("B_MICRO", "observed_parent_batch"), ("STREAM1_ROWS_PER_JOB", "observed_inference_rows"),
+                        ("STREAM3_BATCH_CANDIDATES", "observed_stream3_batch_candidates")):
+        values = batch_values[label]
+        # Preserve rank values when they differ; never invent an effective size.
+        metadata[name] = next(iter(values)) if len(values) == 1 else None
+        if len(values) > 1:
+            metadata[name + "_by_rank_values"] = sorted(values)
+    return records[0][0], next(iter(effective), None), metadata
+
+
+def native_depth_budget(max_steps: int, touch_bfs_radius: int) -> tuple[int, int]:
+    """Reserve room in max_steps for the suffix returned by touch-BFS.
+
+    The solved start is handled before launch. The runner probes its solved
+    neighborhood after generating children, so every nontrivial run retains at
+    least one forward depth.
+    """
+    if type(max_steps) is not int or max_steps < 0:
+        raise ValueError("max_steps must be a nonnegative integer")
+    if type(touch_bfs_radius) is not int or touch_bfs_radius < 0:
+        raise ValueError("touch_bfs_radius must be a nonnegative integer")
+    try:
+        from .rust_control import extension
+
+        native = getattr(extension(), "native_depth_budget", None)
+    except NativeUnavailable:
+        native = None
+    if (
+        native is not None
+        and max_steps <= (1 << 64) - 1
+        and touch_bfs_radius <= (1 << 32) - 1
+    ):
+        return native(max_steps, touch_bfs_radius)
+    if max_steps == 0:
+        return 0, 0
+    effective_radius = min(touch_bfs_radius, max_steps - 1)
+    return max_steps - effective_radius, effective_radius
+
+
+def _persist_native_outcome(run_dir: Path, outcome: NativeOutcome) -> bool:
+    """Persist from Python unless the active Rust owner will finalize this file."""
+    from .persistent import current_session
+
+    session = current_session()
+    defer = getattr(session, "defer_native_outcome_write", None)
+    if callable(defer) and defer():
+        return False
+    Path(run_dir, "native-outcome.json").write_text(json.dumps({
+        "path": outcome.path,
+        "elapsed_seconds": outcome.elapsed_seconds,
+        "effective_beam_width": outcome.effective_beam_width,
+        "metadata": outcome.metadata,
+    }, indent=2) + "\n", encoding="utf-8")
+    return True
+
+
+def run_native(contract, model, options, beam_width, max_steps, run_dir, devices, *, runtime=None) -> NativeOutcome:
+    from .persistent import current_session
+    session=current_session()
+    if session is not None:
+        return session.run(_run_native_once,contract,model,options,beam_width,max_steps,run_dir,devices,runtime=runtime)
+    return _run_native_once(contract,model,options,beam_width,max_steps,run_dir,devices,runtime=runtime)
+
+
+def _verify_mlp_host_binding(run_dir, artifact_hash, world):
+    """Require one receipt from each worker's own startup log."""
+    expected = f"BEAM_MLP_ARTIFACT_VERIFIED={artifact_hash}"
+    for rank in range(world):
+        path = Path(run_dir) / 'resident-session' / f'bootstrap-{rank}.log'
+        count = 0
+        try:
+            with path.open(encoding='utf-8', errors='replace') as source:
+                for line in source:
+                    if line.startswith('BEAM_MLP_ARTIFACT_VERIFIED='):
+                        count += 1
+                        if line.rstrip('\r\n') != expected or count > 1:
+                            raise NativeBackendError(f'MLP host binding receipt invalid for rank {rank}')
+        except OSError as error:
+            raise NativeBackendError(f'MLP host binding receipt unavailable for rank {rank}') from error
+        if count != 1:
+            raise NativeBackendError(f'MLP host binding receipt missing for rank {rank}')
+
+
+def _run_native_once(contract, model, options, beam_width, max_steps, run_dir, devices, *, runtime=None) -> NativeOutcome:
+    maximum_requested=type(beam_width) is str and beam_width=='max'
+    if (not maximum_requested and (type(beam_width) is not int or beam_width <= 0)) or type(max_steps) is not int or max_steps < 0:
+        raise NativeUnavailable("native beam_width must be positive and max_steps nonnegative integers")
+    if maximum_requested:
+        if not options.autotune:raise NativeUnavailable('maximum beam requires autotuning')
+        from .working_capacity import maximum_options
+        options=maximum_options(options)
+        beam_width=1_048_576  # Bounded inference curve; capacity uses actual native plans below.
+    if contract.replay(()):
+        return NativeOutcome((), 0.0, None, None, {"already_solved": True, "replay_valid": True})
+    if max_steps == 0:
+        return NativeOutcome(None, 0.0, None, None, {"budget_exhausted": True})
+    run_dir = Path(run_dir).resolve()
+    run_dir.mkdir(parents=True, exist_ok=True)
+    forward_depth_limit, effective_touch_bfs_radius = native_depth_budget(max_steps, options.touch_bfs_radius)
+    touch_bfs_worst_case = validate_touch_bfs_contract(
+        contract, effective_touch_bfs_radius, options.touch_bfs_max_entries
+    )
+    if runtime is None:
+        runtime = prepare_runtime(contract, model, options, run_dir, devices,
+                                  touch_bfs_radius=effective_touch_bfs_radius)
+    else:
+        from .build import shape_contract
+        if (runtime.build_metadata.get("shape") != shape_contract(contract)
+                or runtime.build_metadata.get("backend") != model.backend):
+            raise NativeBackendError("prepared native runner does not match graph/model")
+    build_metadata = runtime.build_metadata
+    from .build import acceptance_rank_trace_identity
+    acceptance_trace = acceptance_rank_trace_identity()
+    if acceptance_trace is not None:
+        if build_metadata.get("acceptance_rank_trace") is not True:
+            raise NativeBackendError("strict acceptance requested but the selected runner lacks rank-trace instrumentation")
+        build_key = build_metadata.get("build_key")
+        binary_sha256 = build_metadata.get("binary_sha256")
+        if not isinstance(build_key, str) or re.fullmatch(r"[0-9a-f]{64}", build_key) is None:
+            raise NativeBackendError("acceptance runner metadata has no valid native build key")
+        if not isinstance(binary_sha256, str) or re.fullmatch(r"[0-9a-f]{64}", binary_sha256) is None:
+            raise NativeBackendError("acceptance runner metadata has no valid binary SHA256")
+    puzzle = run_dir / "puzzle_info.json"
+    inputs = run_dir / "test.csv"
+    from . import rust_control
+    if not rust_control.write_search_inputs(contract, run_dir):
+        puzzle.write_text(json.dumps(contract.to_puzzle_info()) + "\n", encoding="utf-8")
+        # The native CSV reader requires a bare numeric ID and a quoted state cell.
+        inputs.write_text('initial_state_id,initial_state\n0,"' + ",".join(map(str, contract.start)) + '"\n', encoding="utf-8")
+    env = child_environment(tuple(devices), run_dir)
+    # Native calibration runs may reuse the trace-enabled binary, but only the
+    # actual search gets an acceptance identity or emits rank snapshots.
+    for acceptance_name in tuple(env):
+        if acceptance_name.startswith("MGBS_ACCEPTANCE_"):
+            env.pop(acceptance_name, None)
+    env.update({"BEAM_GENERATOR_PATH": str(puzzle), "BEAM_PUZZLE_INFO_JSON": str(puzzle),
+                "BEAM_TEST_CSV": str(inputs), "BEAM_WEIGHT_DIR": str(model.weights_dir),
+                "BEAM_RUNTIME_CONFIG_MODE": "auto", "BEAM_SOLVED_NEIGHBORHOOD_RADIUS": str(effective_touch_bfs_radius),
+                "BEAM_SOLVED_NEIGHBORHOOD_MAX_ENTRIES": str(options.touch_bfs_max_entries),
+                "BEAM_STREAM2_SUFFIX_RADIUS": "0", "BEAM_SOLVE_BUCKET_MODE": "0", "BEAM_HISTORY_MODE": "disk",
+                "BEAM_HISTORY_DIR": str(run_dir / "history"), "BEAM_HISTORY_DISK_PATH": str(run_dir / "history")})
+    from .persistent import current_session
+    from .model_snapshot import requires_mlp_host_binding
+    resident_session = current_session()
+    snapshot_cache = getattr(resident_session, 'model_snapshot_cache', None)
+    mlp_host_binding = requires_mlp_host_binding(snapshot_cache, model, contract, build_metadata)
+    if mlp_host_binding:
+        env.update(BEAM_MLP_GRAPH_HASH=contract.graph_hash,
+                   BEAM_MLP_ARTIFACT_HASH=model.artifact_hash)
+    if model.backend == "ensemble":
+        env["BEAM_BLEND_DIR"] = str(model.weights_dir)
+        if runtime.build_metadata.get('inference_backend'):
+            env["BEAM_ENSEMBLE_BACKEND"] = runtime.build_metadata['inference_backend']
+        first = model.manifest["ensemble"]["models"][0]
+        env["BEAM_WEIGHT_DIR"] = str(model.weights_dir / first["weights_dir"])
+    microbatch_env, microbatch_metadata = microbatch_environment(contract, model, beam_width, len(devices),
+        row_limit=runtime.profile.get("inference_row_limit", 8192))
+    env.update(microbatch_env)
+    calibrate=options.autotune and (model.backend=='ensemble' or
+        (model.backend=='mlp' and runtime.build_metadata.get('calibration_binary_name') in
+            ('stream1_native_mlp_benchmark','stream1_libtorch_mlp_benchmark')))
+    if calibrate:
+        from .autotune import tune_inference
+        calibration_started=time.monotonic()
+        calibration=tune_inference(contract,model,runtime,options,devices,beam_width,run_dir,env)
+        # Native admission may reject this microbatch under the current beam
+        # footprint. Never silently shrink the winner or the requested beam.
+        rows_per_parent=contract.move_count if model.backend=='mlp' and model.manifest['output_dim']==1 else 1
+        env["BEAM_B_MICRO"]=str(calibration["parent_batch"]*rows_per_parent)
+        env["BEAM_ENSEMBLE_INFERENCE_MICRO"]=str(calibration["parent_batch"])
+        env["BEAM_ENSEMBLE_RESERVE_BYTES"]=str(calibration["reserve_bytes"])
+        runtime.profile.update({"autotuned":False,"inference_autotuned":True,"inference_calibration":calibration,
+                                "pipeline_autotuned":False})
+        microbatch_metadata.update({"configured_row_budget":int(env['BEAM_B_MICRO']),
+                                    "derived_parent_batch":calibration["parent_batch"],
+                                    'derived_candidates_per_slot':calibration['parent_batch']*contract.move_count})
+    search_budget = {"requested_max_steps": max_steps, "native_forward_depth_limit": forward_depth_limit,
+                     "configured_touch_bfs_radius": options.touch_bfs_radius,
+                     "effective_touch_bfs_radius": effective_touch_bfs_radius,
+                     "touch_bfs_max_entries": options.touch_bfs_max_entries,
+                     "touch_bfs_worst_case_entries": touch_bfs_worst_case}
+    (run_dir / "runtime-config.json").write_text(json.dumps(
+        {"mode": "auto", "profile": runtime.profile, "microbatch": microbatch_metadata, "search_budget": search_budget}, indent=2
+    ) + "\n", encoding="utf-8")
+    nccl_library = snapshot_runtime_nccl(runtime, run_dir)
+    # LD_LIBRARY_PATH takes precedence over CMake's build RUNPATH. The runner
+    # therefore loads only the verified private NCCL snapshot under its SONAME.
+    inherited_ld = env.get("LD_LIBRARY_PATH", "")
+    nccl_dir = str(nccl_library.parent)
+    env["LD_LIBRARY_PATH"] = nccl_dir + (os.pathsep + inherited_ld if inherited_ld else "")
+    if runtime.build_metadata.get("inference_backend") == "libtorch" or model.backend in ("piece_transformer", "ensemble"):
+        env["BEAM_STREAM1_EXECUTOR"] = "libtorch_eager"
+    # Legacy production_runner writes its solution/no-solution logs here.
+    legacy_results = run_dir / "test_results"
+    legacy_results.mkdir(exist_ok=True)
+    if legacy_results.is_symlink() or not legacy_results.resolve().is_relative_to(run_dir):
+        raise NativeBackendError("native result directory must remain inside the private run directory")
+    runner = snapshot_runtime_runner(runtime, run_dir)
+    # A capacity probe is diagnostic for a fixed-width request. Keep its
+    # environment and width separate from execution, including when the probe
+    # stopped at its time budget and found only a safe lower bound.
+    if getattr(options,'calibration_discover_capacity',False) and not maximum_requested:
+        if not calibrate:raise NativeUnavailable('capacity discovery requires a supported inference calibrator')
+        from .maximum_beam import discover_capacity,capacity_seed
+        seed=capacity_seed(calibration)
+        capacity_env=dict(env,BEAM_B_MICRO=str(seed['parent_batch']*rows_per_parent),
+            BEAM_ENSEMBLE_INFERENCE_MICRO=str(seed['parent_batch']),
+            BEAM_ENSEMBLE_RESERVE_BYTES=str(seed['reserve_bytes']))
+        capacity=discover_capacity(contract,runtime,devices,capacity_env,runner,run_dir,
+            seconds=min(60.0,options.calibration_pipeline_seconds*.25))
+        capacity.update(requested_execution_beam=beam_width,
+            inference_parent_batch=seed['parent_batch'],execution_width_changed=False,
+            capacity_scope='native memory admission with measured inference reserve; full step verified only at requested width')
+        runtime.profile['maximum_beam']=capacity
+        (run_dir/'maximum-beam.json').write_text(json.dumps(capacity,indent=2))
+    if maximum_requested:
+        if not calibrate:raise NativeUnavailable('maximum beam requires a supported inference calibrator')
+        from .maximum_beam import capacity_seed,discover_capacity,refine_maximum
+        calibration=capacity_seed(calibration)
+        env.update(BEAM_B_MICRO=str(calibration['parent_batch']*rows_per_parent),
+            BEAM_ENSEMBLE_INFERENCE_MICRO=str(calibration['parent_batch']),
+            BEAM_ENSEMBLE_RESERVE_BYTES=str(calibration['reserve_bytes']))
+        capacity=discover_capacity(contract,runtime,devices,env,runner,run_dir,
+            seconds=min(60.0,options.calibration_pipeline_seconds*.25),working=True)
+        def exact_inference(width,index):
+            directory=run_dir/f'maximum-inference-{index}';directory.mkdir()
+            chosen=tune_inference(contract,model,runtime,options,devices,width,directory,env)
+            # A maximum frontier must shrink to accommodate the inference
+            # winner. Fixed-width admission would instead downgrade its batch.
+            return chosen
+        def readmit_inference(chosen,index):
+            env.update(BEAM_B_MICRO=str(chosen['parent_batch']*rows_per_parent),
+                BEAM_ENSEMBLE_INFERENCE_MICRO=str(chosen['parent_batch']),
+                BEAM_ENSEMBLE_RESERVE_BYTES=str(chosen['reserve_bytes']))
+            directory=run_dir/f'maximum-capacity-{index}';directory.mkdir()
+            return discover_capacity(contract,runtime,devices,env,runner,directory,
+                seconds=min(60.0,options.calibration_pipeline_seconds*.25),working=True)
+        capacity,calibration=refine_maximum(capacity,calibration,
+            tune=exact_inference,discover=readmit_inference)
+        runtime.profile['inference_calibration']=calibration
+        env.update(BEAM_ENSEMBLE_INFERENCE_MICRO=str(calibration['parent_batch']),
+                   BEAM_ENSEMBLE_RESERVE_BYTES=str(calibration['reserve_bytes']))
+        microbatch_metadata.update(configured_row_budget=calibration['parent_batch']*rows_per_parent,
+            derived_parent_batch=calibration['parent_batch'],
+            derived_candidates_per_slot=calibration['parent_batch']*contract.move_count)
+        beam_width=capacity['effective_beam'];env.update(capacity['profile'])
+        runtime.profile['maximum_beam']=capacity
+        if options.report_calibration:
+            print(f"[MultiGPUBeamSearch] largest admitted frontier {beam_width:,}; "
+                f"capacity search {capacity['wall_seconds']:.2f}s; full-step verification pending",flush=True)
+    if calibrate:
+        from .pipeline_autotune import tune_downstream
+        if maximum_requested:
+            downstream=tune_downstream(contract,model,runtime,options,devices,beam_width,
+                run_dir,env,runner,calibration)
+        else:
+            from .inference_admission import admit_inference
+            calibration,planning_session=admit_inference(contract,model,runtime,options,devices,
+                beam_width,run_dir,env,runner,calibration,retain_session=True)
+            try:
+                downstream=tune_downstream(contract,model,runtime,options,devices,beam_width,
+                    run_dir,env,runner,calibration,planning_session=planning_session)
+            finally:
+                planning_session.close()
+            microbatch_metadata.update(configured_row_budget=int(env['BEAM_B_MICRO']),
+                derived_parent_batch=calibration['parent_batch'],
+                derived_candidates_per_slot=calibration['parent_batch']*contract.move_count)
+        measured=downstream.get('phase')=='pipeline_measured'
+        selected=measured or downstream.get('phase')=='component_calibrated'
+        if selected:
+            env.update(downstream['environment'])
+            microbatch_metadata['configured_row_budget']=int(env['BEAM_B_MICRO'])
+            microbatch_metadata['derived_parent_batch']=int(env['BEAM_B_MICRO'])//rows_per_parent
+            microbatch_metadata['derived_candidates_per_slot']=microbatch_metadata['derived_parent_batch']*contract.move_count
+            microbatch_metadata['inference_parent_batch']=calibration['parent_batch']
+        runtime.profile.update(autotuned=selected,pipeline_autotuned=selected,
+            pipeline_calibration=downstream,calibration_total_wall_seconds=time.monotonic()-calibration_started)
+        if maximum_requested:
+            if selected:capacity['execution_profile']=dict(downstream['environment'])
+            from .working_capacity import choose_working_capacity,measure_reference
+            try:
+                selected_width,downstream,working=choose_working_capacity(
+                    capacity,downstream,calibration,options.cache_dir,
+                    measure=lambda width,profile:measure_reference(contract,model,runtime,
+                        options,devices,runner,env,profile,width,run_dir))
+                capacity['full_step_boundary_beam']=beam_width
+                capacity['effective_beam']=selected_width
+                capacity['working_capacity']=working
+                beam_width=selected_width
+                env.update(downstream['environment'])
+                runtime.profile['pipeline_calibration']=downstream
+                runtime.profile['calibration_total_wall_seconds']=time.monotonic()-calibration_started
+            except ValueError as error:
+                verified=measured and downstream.get('pipeline_verified') is True and downstream.get('measurement_scope')=='full_requested_frontier'
+                capacity.update(full_step_verified=verified,
+                    capacity_scope='full-step verified; efficiency unconfirmed' if verified else 'native memory admission only',
+                    working_capacity_failure=str(error))
+                (run_dir/'maximum-beam.json').write_text(json.dumps(capacity,indent=2))
+                raise NativeBackendError(str(error)) from error
+            capacity['full_step_verified']=True
+            capacity['capacity_scope']='full-step verified; efficiency has a separate evidence flag'
+            (run_dir/'maximum-beam.json').write_text(json.dumps(capacity,indent=2))
+        if options.report_calibration:
+            report=downstream.get('matched_stream1',{})
+            if report.get('measurement_scope')=='matched_full_frontier':
+                print(f"[MultiGPUBeamSearch] {len(devices)} GPUs, frontier {report['parents']:,}, "
+                    f"inference batch {calibration['parent_batch']}: best admitted Stream1 "
+                    f"{1/calibration['estimate']['median']:,.0f} parents/s; matched frontier Stream1 "
+                    f"{report['stream1_parents_per_second']:,.0f} parents/s; full step "
+                    f"{report['full_step_seconds']:.6f}s, throughput loss "
+                    f"{100*report['throughput_loss_fraction']:.2f}%; calibration "
+                    f"{runtime.profile['calibration_total_wall_seconds']:.2f}s",flush=True)
+            else:
+                print(f"[MultiGPUBeamSearch] best admitted Stream1 {1/calibration['estimate']['median']:,.0f} parents/s, "
+                    f"inference batch {calibration['parent_batch']}; calibration "
+                    f"{runtime.profile['calibration_total_wall_seconds']:.2f}s; "
+                    f"pipeline scope {downstream.get('measurement_scope',downstream.get('phase'))}; "
+                    f"matched throughput loss unavailable",flush=True)
+        (run_dir/'runtime-config.json').write_text(json.dumps(
+            {'mode':'auto','profile':runtime.profile,'microbatch':microbatch_metadata,
+             'search_budget':search_budget},indent=2)+'\n',encoding='utf-8')
+    if acceptance_trace is not None:
+        env.update({
+            "MGBS_ACCEPTANCE_RANK_TRACE": "1",
+            "MGBS_ACCEPTANCE_RUN_ID": acceptance_trace["run_id"],
+            "MGBS_ACCEPTANCE_CASE_ID": acceptance_trace["case_id"],
+            "MGBS_ACCEPTANCE_SOURCE_SHA": acceptance_trace["source_sha"],
+            "MGBS_ACCEPTANCE_WHEEL_SHA256": acceptance_trace["wheel_sha256"],
+            "MGBS_ACCEPTANCE_BUILD_KEY": build_key,
+            "MGBS_ACCEPTANCE_BINARY_SHA256": binary_sha256,
+            "BEAM_SHARD_COUNT": "64",
+        })
+    args = [str(runner), "0", str(forward_depth_limit), str(beam_width)]
+    # Apply search policy only after calibration: probes must not collect solutions.
+    env.update(BEAM_SOLVE_BUCKET_MODE=str(int(options.solution_mode == 'collect')),
+               BEAM_SOLVE_BUCKET_EXTRA_DEPTHS=str(options.collect_extra_depths),
+               BEAM_SOLVE_BUCKET_MAX_SOLUTIONS=str(options.max_collected_solutions),
+               BEAM_SOLVE_BUCKET_RESULT_TSV='collected-solutions.tsv')
+    if calibrate:env['BEAM_RUNTIME_DEPTH_TIMING']='1'
+    log = run_dir / "native.log"
+    process_log = log
+    log_metadata = {}
+    if len(devices) > 1 and resident_session is None:
+        worker_logs = run_dir / "worker-logs"
+        try:
+            worker_logs.mkdir()
+        except FileExistsError as error:
+            raise NativeBackendError("native worker log directory must be fresh") from error
+        process_log = run_dir / "launcher.log"
+    else:
+        args += ["1", "0"]
+    failure = None
+    try:
+        # Runtime preparation may compile for minutes. Rehash the exact model
+        # bytes after that window and immediately before the worker sees them.
+        verify_prepared_model(model, contract)
+        if resident_session is not None:
+            elapsed=resident_session.launch(args[:4],contract=contract,run_dir=run_dir,env=env,
+                world=len(devices),timeout=options.timeout_seconds,runtime=runtime)
+        elif len(devices) > 1:
+            from .local_launcher import run_local_ranks
+            elapsed = run_local_ranks(args, world_size=len(devices), cwd=run_dir, env=env,
+                timeout=options.timeout_seconds, log_path=process_log, worker_logs=worker_logs)
+        else:
+            elapsed = run_process(args, cwd=run_dir, env=env, timeout=options.timeout_seconds, log_path=process_log)
+    except BaseException as error:
+        failure = error
+        raise
+    finally:
+        if len(devices) > 1 and resident_session is None:
+            try:
+                log_metadata = collect_worker_logs(worker_logs, process_log, log, len(devices), strict=failure is None)
+            except Exception as log_error:
+                if failure is None:
+                    raise
+                if hasattr(failure, "add_note"):
+                    failure.add_note(f"native worker log collection also failed: {log_error}")
+    if mlp_host_binding:
+        _verify_mlp_host_binding(run_dir, model.artifact_hash, len(devices))
+    if resident_session is None:
+        path, effective, terminal_metadata = parse_terminal(log, contract, max_steps=max_steps)
+    else:
+        path, effective, terminal_metadata = resident_session.terminal_result(log, contract, max_steps=max_steps)
+    if calibrate and effective is not None:
+        from .runtime_report import observed_depths
+        reports=observed_depths(log.read_text(errors='replace'),len(devices),effective,
+            calibration['estimate']['median'])
+        runtime.profile['observed_saturated_depths']=reports
+        if reports and options.report_calibration:
+            row=reports[0]
+            print(f"[MultiGPUBeamSearch] observed full step {row['full_step_seconds']:.6f}s; "
+                  f"throughput loss versus Stream1 curve {100*row['throughput_loss_fraction']:.2f}% "
+                  f"(normalized reference)",flush=True)
+    if effective is not None and effective != beam_width:
+        raise NativeBackendError("observed logical global beam differs from requested")
+    metadata = {"build": build_metadata, "profile": runtime.profile, "model_artifact_hash": model.artifact_hash,
+                "graph_hash": contract.graph_hash, "devices": list(devices), "requested_beam_width": beam_width,
+                "microbatch": microbatch_metadata, **search_budget,
+                "replay_valid": path is not None, "log_path": str(log), **log_metadata, **terminal_metadata}
+    if mlp_host_binding:
+        metadata['mlp_host_binding'] = {'artifact_hash': model.artifact_hash, 'ranks': len(devices)}
+    import re
+    execution_parameters = {}
+    for file in [log, *run_dir.glob('resident-session/bootstrap-*.log')]:
+        for name, value in re.findall(r'^([A-Z][A-Z0-9_]+)=(\d+)$', file.read_text(errors='replace'), re.M):
+            execution_parameters[name] = int(value)
+    metadata.update(execution_parameters=execution_parameters, model_manifest=model.manifest,
+                    solution_mode=options.solution_mode, collect_extra_depths=options.collect_extra_depths,
+                    max_collected_solutions=options.max_collected_solutions)
+    outcome = NativeOutcome(path, elapsed, effective, run_dir, metadata)
+    _persist_native_outcome(run_dir, outcome)
+    return outcome
+

@@ -1,0 +1,4 @@
+========= COMPUTE-SANITIZER
+stream3_cuda_tests=pass
+========= LEAK SUMMARY: 0 bytes leaked in 0 allocations
+========= ERROR SUMMARY: 0 errors

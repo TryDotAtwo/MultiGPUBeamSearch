@@ -1,0 +1,1135 @@
+{
+  "phase": "partial;32M and largest frontier pending",
+  "reports": [
+    {
+      "report": {
+        "parents": 1048576,
+        "world_size": 8,
+        "measurement_scope": "matched_full_frontier",
+        "stream1_seconds": 8.1826806640625,
+        "full_step_seconds": 9.62429,
+        "stream1_parents_per_second": 128145.7804659589,
+        "full_step_parents_per_second": 108950.99794374441,
+        "throughput_loss_fraction": 0.14978864268818792,
+        "relative_time_overhead": 0.1761781248862493
+      },
+      "inference": {
+        "parents": 1048576,
+        "gpu_uuids": [
+          "GPU-f3cc4337-82f1-115b-9058-58cde88a4124",
+          "GPU-e538a8fd-9699-e5f5-9eda-3323027e9a42",
+          "GPU-c644bd50-9748-c343-f188-a2d7b25f27f2",
+          "GPU-8ec028dd-cd3d-55c3-daf2-066e44491ddd",
+          "GPU-55fbd150-b302-9b67-3a0d-425855d9f47d",
+          "GPU-de41c419-b360-1592-a753-f718bdd5b0ee",
+          "GPU-51ddba98-5c48-69b4-45e7-c132c5079ac9",
+          "GPU-ad3ec44a-a6fd-b599-8c31-65140cda1cc2"
+        ],
+        "frontier_sha256": [
+          "641e160e3e9f1c76b663295e21dcf2a24e2b5a3b171f5fafd04015a97051577d",
+          "c6e4d88b80db181314ae5226f23c061a49215d55007dce6a43c8897bfcca25af",
+          "5faa333272c61d93969ed9517d045263eb9f8fa634a7fabb52c9ac52247f59c4",
+          "6457c9f69c1e57c75ac1f3a67b16fb62bc6c2e3f95792bcbddf4a43f8e28458d",
+          "da052c3992c4882a54b9b3ffdd65a1bd9f247d868f2a3712d1be422ec01d2475",
+          "e5a59ce54bf76f414034915a6d5a5a5ea87b3ea437847d22f6dad67956419339",
+          "5c42af0f4b09c9d30cf705e311e8953bc1acd40321224433e0fe50f328cd1882",
+          "372609e256bee90aa2e1dbbc72826f85a82d71c1a826d97b73d74e7bfe507703"
+        ],
+        "model_sha256": {
+          "manifest": "8346586b1ef183e25d2bcbfeec571ced2ffa02eadf31d273525dcff1b5f24a78",
+          "coefficients": [
+            0.6,
+            0.4
+          ]
+        },
+        "build_sha256": {
+          "runner": "c10cd09d551e10e1c23b36018194c4028cfe719c36892f0e7568576d1ffb495d",
+          "helper": "4fb33cc21be9ec5223b3731d6ee2b6f09c912e27070dc75874d3d6dcf4076803"
+        },
+        "precision": "fp16 weights and activations / fp32 reductions",
+        "executor": "LibTorch backbone / CUTLASS ensemble epilogue",
+        "correctness_passed": true,
+        "seconds_by_rank": [
+          [
+            8.11568115234375,
+            8.1426552734375,
+            8.151861328125,
+            8.1388349609375,
+            8.15925146484375,
+            8.16009521484375,
+            8.1464130859375,
+            8.15955859375
+          ],
+          [
+            8.11516943359375,
+            8.11169189453125,
+            8.14655712890625,
+            8.14260693359375,
+            8.15972021484375,
+            8.16142138671875,
+            8.1547529296875,
+            8.162001953125
+          ],
+          [
+            8.1152470703125,
+            8.10419677734375,
+            8.149376953125,
+            8.14867578125,
+            8.17189697265625,
+            8.18037060546875,
+            8.1561396484375,
+            8.162947265625
+          ],
+          [
+            8.13001123046875,
+            8.1038232421875,
+            8.14953466796875,
+            8.15885888671875,
+            8.18268994140625,
+            8.16789599609375,
+            8.16388720703125,
+            8.16398046875
+          ],
+          [
+            8.132869140625,
+            8.1037158203125,
+            8.14934716796875,
+            8.1600810546875,
+            8.1826806640625,
+            8.16767578125,
+            8.1751220703125,
+            8.1788935546875
+          ],
+          [
+            8.1329814453125,
+            8.10562060546875,
+            8.1623837890625,
+            8.16167529296875,
+            8.1849990234375,
+            8.168701171875,
+            8.17556689453125,
+            8.1804052734375
+          ],
+          [
+            8.13320556640625,
+            8.11808056640625,
+            8.16781201171875,
+            8.17122607421875,
+            8.193353515625,
+            8.18136669921875,
+            8.1763134765625,
+            8.18151171875
+          ]
+        ]
+      },
+      "pipeline": {
+        "parents": 1048576,
+        "gpu_uuids": [
+          "GPU-f3cc4337-82f1-115b-9058-58cde88a4124",
+          "GPU-e538a8fd-9699-e5f5-9eda-3323027e9a42",
+          "GPU-c644bd50-9748-c343-f188-a2d7b25f27f2",
+          "GPU-8ec028dd-cd3d-55c3-daf2-066e44491ddd",
+          "GPU-55fbd150-b302-9b67-3a0d-425855d9f47d",
+          "GPU-de41c419-b360-1592-a753-f718bdd5b0ee",
+          "GPU-51ddba98-5c48-69b4-45e7-c132c5079ac9",
+          "GPU-ad3ec44a-a6fd-b599-8c31-65140cda1cc2"
+        ],
+        "frontier_sha256": [
+          "641e160e3e9f1c76b663295e21dcf2a24e2b5a3b171f5fafd04015a97051577d",
+          "c6e4d88b80db181314ae5226f23c061a49215d55007dce6a43c8897bfcca25af",
+          "5faa333272c61d93969ed9517d045263eb9f8fa634a7fabb52c9ac52247f59c4",
+          "6457c9f69c1e57c75ac1f3a67b16fb62bc6c2e3f95792bcbddf4a43f8e28458d",
+          "da052c3992c4882a54b9b3ffdd65a1bd9f247d868f2a3712d1be422ec01d2475",
+          "e5a59ce54bf76f414034915a6d5a5a5ea87b3ea437847d22f6dad67956419339",
+          "5c42af0f4b09c9d30cf705e311e8953bc1acd40321224433e0fe50f328cd1882",
+          "372609e256bee90aa2e1dbbc72826f85a82d71c1a826d97b73d74e7bfe507703"
+        ],
+        "model_sha256": {
+          "manifest": "8346586b1ef183e25d2bcbfeec571ced2ffa02eadf31d273525dcff1b5f24a78",
+          "coefficients": [
+            0.6,
+            0.4
+          ]
+        },
+        "build_sha256": {
+          "runner": "c10cd09d551e10e1c23b36018194c4028cfe719c36892f0e7568576d1ffb495d",
+          "helper": "4fb33cc21be9ec5223b3731d6ee2b6f09c912e27070dc75874d3d6dcf4076803"
+        },
+        "precision": "fp16 weights and activations / fp32 reductions",
+        "executor": "LibTorch backbone / CUTLASS ensemble epilogue",
+        "correctness_passed": true,
+        "seconds_by_rank": [
+          [
+            9.62097,
+            9.62429,
+            9.62363,
+            9.62285,
+            9.6168,
+            9.62085,
+            9.62268,
+            9.62261
+          ],
+          [
+            9.61265,
+            9.61462,
+            9.61506,
+            9.61371,
+            9.60662,
+            9.61262,
+            9.61362,
+            9.61293
+          ],
+          [
+            9.67015,
+            9.67319,
+            9.67245,
+            9.67172,
+            9.6666,
+            9.67011,
+            9.66656,
+            9.67113
+          ],
+          [
+            9.60661,
+            9.60991,
+            9.60831,
+            9.60811,
+            9.60139,
+            9.60661,
+            9.60574,
+            9.60232
+          ],
+          [
+            9.62762,
+            9.63002,
+            9.63008,
+            9.62898,
+            9.62229,
+            9.62745,
+            9.62882,
+            9.62861
+          ]
+        ]
+      },
+      "matched_ranks": [
+        {
+          "batch": 8192,
+          "correctness_passed": true,
+          "device": 0,
+          "free_bytes_after": 3389849600,
+          "model_count": 2,
+          "numeric_error": 0,
+          "parents": 131072,
+          "readout_oracle_max_key_error": 1,
+          "score_input": "full_frontier_file",
+          "seconds": [
+            8.11568115234375,
+            8.11516943359375,
+            8.1152470703125,
+            8.13001123046875,
+            8.132869140625,
+            8.1329814453125,
+            8.13320556640625
+          ],
+          "torch_allocated_peak_bytes": 4747445248,
+          "torch_reserved_peak_bytes": 8946450432
+        },
+        {
+          "batch": 8192,
+          "correctness_passed": true,
+          "device": 1,
+          "free_bytes_after": 3389849600,
+          "model_count": 2,
+          "numeric_error": 0,
+          "parents": 131072,
+          "readout_oracle_max_key_error": 1,
+          "score_input": "full_frontier_file",
+          "seconds": [
+            8.1426552734375,
+            8.11169189453125,
+            8.10419677734375,
+            8.1038232421875,
+            8.1037158203125,
+            8.10562060546875,
+            8.11808056640625
+          ],
+          "torch_allocated_peak_bytes": 4747445248,
+          "torch_reserved_peak_bytes": 8946450432
+        },
+        {
+          "batch": 8192,
+          "correctness_passed": true,
+          "device": 2,
+          "free_bytes_after": 3389849600,
+          "model_count": 2,
+          "numeric_error": 0,
+          "parents": 131072,
+          "readout_oracle_max_key_error": 1,
+          "score_input": "full_frontier_file",
+          "seconds": [
+            8.151861328125,
+            8.14655712890625,
+            8.149376953125,
+            8.14953466796875,
+            8.14934716796875,
+            8.1623837890625,
+            8.16781201171875
+          ],
+          "torch_allocated_peak_bytes": 4747445248,
+          "torch_reserved_peak_bytes": 8946450432
+        },
+        {
+          "batch": 8192,
+          "correctness_passed": true,
+          "device": 3,
+          "free_bytes_after": 3389849600,
+          "model_count": 2,
+          "numeric_error": 0,
+          "parents": 131072,
+          "readout_oracle_max_key_error": 1,
+          "score_input": "full_frontier_file",
+          "seconds": [
+            8.1388349609375,
+            8.14260693359375,
+            8.14867578125,
+            8.15885888671875,
+            8.1600810546875,
+            8.16167529296875,
+            8.17122607421875
+          ],
+          "torch_allocated_peak_bytes": 4747445248,
+          "torch_reserved_peak_bytes": 8946450432
+        },
+        {
+          "batch": 8192,
+          "correctness_passed": true,
+          "device": 4,
+          "free_bytes_after": 3389849600,
+          "model_count": 2,
+          "numeric_error": 0,
+          "parents": 131072,
+          "readout_oracle_max_key_error": 1,
+          "score_input": "full_frontier_file",
+          "seconds": [
+            8.15925146484375,
+            8.15972021484375,
+            8.17189697265625,
+            8.18268994140625,
+            8.1826806640625,
+            8.1849990234375,
+            8.193353515625
+          ],
+          "torch_allocated_peak_bytes": 4747445248,
+          "torch_reserved_peak_bytes": 8946450432
+        },
+        {
+          "batch": 8192,
+          "correctness_passed": true,
+          "device": 5,
+          "free_bytes_after": 3389849600,
+          "model_count": 2,
+          "numeric_error": 0,
+          "parents": 131072,
+          "readout_oracle_max_key_error": 1,
+          "score_input": "full_frontier_file",
+          "seconds": [
+            8.16009521484375,
+            8.16142138671875,
+            8.18037060546875,
+            8.16789599609375,
+            8.16767578125,
+            8.168701171875,
+            8.18136669921875
+          ],
+          "torch_allocated_peak_bytes": 4747445248,
+          "torch_reserved_peak_bytes": 8946450432
+        },
+        {
+          "batch": 8192,
+          "correctness_passed": true,
+          "device": 6,
+          "free_bytes_after": 3389849600,
+          "model_count": 2,
+          "numeric_error": 0,
+          "parents": 131072,
+          "readout_oracle_max_key_error": 1,
+          "score_input": "full_frontier_file",
+          "seconds": [
+            8.1464130859375,
+            8.1547529296875,
+            8.1561396484375,
+            8.16388720703125,
+            8.1751220703125,
+            8.17556689453125,
+            8.1763134765625
+          ],
+          "torch_allocated_peak_bytes": 4747445248,
+          "torch_reserved_peak_bytes": 8946450432
+        },
+        {
+          "batch": 8192,
+          "correctness_passed": true,
+          "device": 7,
+          "free_bytes_after": 3389849600,
+          "model_count": 2,
+          "numeric_error": 0,
+          "parents": 131072,
+          "readout_oracle_max_key_error": 1,
+          "score_input": "full_frontier_file",
+          "seconds": [
+            8.15955859375,
+            8.162001953125,
+            8.162947265625,
+            8.16398046875,
+            8.1788935546875,
+            8.1804052734375,
+            8.18151171875
+          ],
+          "torch_allocated_peak_bytes": 4747445248,
+          "torch_reserved_peak_bytes": 8946450432
+        }
+      ],
+      "native_plans": [
+        {
+          "BEAM_WIDTH_ALIGNMENT": 65536,
+          "B_MICRO": 8192,
+          "GLOBAL_BEAM_WIDTH_EFFECTIVE": 1048576,
+          "LOCAL_RANK": 0,
+          "RING_COUNT": 1,
+          "SHARD_CAPACITY_CANDIDATES": 1589248,
+          "SHARD_COUNT": 8,
+          "STREAM3_RING_SLOTS": 4,
+          "STREAM4_ACTIVE_SORT_SLOTS": 4,
+          "STREAM4_BATCH_ALIGNMENT": 1024,
+          "STREAM4_BATCH_CANDIDATES": 262144,
+          "WORLD_SIZE": 8,
+          "estimated_required_device_bytes": 2242678768,
+          "frontier_state_capacity": 131072,
+          "gpu_budget_bytes": 2265776128
+        },
+        {
+          "BEAM_WIDTH_ALIGNMENT": 65536,
+          "B_MICRO": 8192,
+          "GLOBAL_BEAM_WIDTH_EFFECTIVE": 1048576,
+          "LOCAL_RANK": 1,
+          "RING_COUNT": 1,
+          "SHARD_CAPACITY_CANDIDATES": 1589248,
+          "SHARD_COUNT": 8,
+          "STREAM3_RING_SLOTS": 4,
+          "STREAM4_ACTIVE_SORT_SLOTS": 4,
+          "STREAM4_BATCH_ALIGNMENT": 1024,
+          "STREAM4_BATCH_CANDIDATES": 262144,
+          "WORLD_SIZE": 8,
+          "estimated_required_device_bytes": 2242678768,
+          "frontier_state_capacity": 131072,
+          "gpu_budget_bytes": 2265776128
+        },
+        {
+          "BEAM_WIDTH_ALIGNMENT": 65536,
+          "B_MICRO": 8192,
+          "GLOBAL_BEAM_WIDTH_EFFECTIVE": 1048576,
+          "LOCAL_RANK": 2,
+          "RING_COUNT": 1,
+          "SHARD_CAPACITY_CANDIDATES": 1589248,
+          "SHARD_COUNT": 8,
+          "STREAM3_RING_SLOTS": 4,
+          "STREAM4_ACTIVE_SORT_SLOTS": 4,
+          "STREAM4_BATCH_ALIGNMENT": 1024,
+          "STREAM4_BATCH_CANDIDATES": 262144,
+          "WORLD_SIZE": 8,
+          "estimated_required_device_bytes": 2242678768,
+          "frontier_state_capacity": 131072,
+          "gpu_budget_bytes": 2265776128
+        },
+        {
+          "BEAM_WIDTH_ALIGNMENT": 65536,
+          "B_MICRO": 8192,
+          "GLOBAL_BEAM_WIDTH_EFFECTIVE": 1048576,
+          "LOCAL_RANK": 3,
+          "RING_COUNT": 1,
+          "SHARD_CAPACITY_CANDIDATES": 1589248,
+          "SHARD_COUNT": 8,
+          "STREAM3_RING_SLOTS": 4,
+          "STREAM4_ACTIVE_SORT_SLOTS": 4,
+          "STREAM4_BATCH_ALIGNMENT": 1024,
+          "STREAM4_BATCH_CANDIDATES": 262144,
+          "WORLD_SIZE": 8,
+          "estimated_required_device_bytes": 2242678768,
+          "frontier_state_capacity": 131072,
+          "gpu_budget_bytes": 2265776128
+        },
+        {
+          "BEAM_WIDTH_ALIGNMENT": 65536,
+          "B_MICRO": 8192,
+          "GLOBAL_BEAM_WIDTH_EFFECTIVE": 1048576,
+          "LOCAL_RANK": 4,
+          "RING_COUNT": 1,
+          "SHARD_CAPACITY_CANDIDATES": 1589248,
+          "SHARD_COUNT": 8,
+          "STREAM3_RING_SLOTS": 4,
+          "STREAM4_ACTIVE_SORT_SLOTS": 4,
+          "STREAM4_BATCH_ALIGNMENT": 1024,
+          "STREAM4_BATCH_CANDIDATES": 262144,
+          "WORLD_SIZE": 8,
+          "estimated_required_device_bytes": 2242678768,
+          "frontier_state_capacity": 131072,
+          "gpu_budget_bytes": 2265776128
+        },
+        {
+          "BEAM_WIDTH_ALIGNMENT": 65536,
+          "B_MICRO": 8192,
+          "GLOBAL_BEAM_WIDTH_EFFECTIVE": 1048576,
+          "LOCAL_RANK": 5,
+          "RING_COUNT": 1,
+          "SHARD_CAPACITY_CANDIDATES": 1589248,
+          "SHARD_COUNT": 8,
+          "STREAM3_RING_SLOTS": 4,
+          "STREAM4_ACTIVE_SORT_SLOTS": 4,
+          "STREAM4_BATCH_ALIGNMENT": 1024,
+          "STREAM4_BATCH_CANDIDATES": 262144,
+          "WORLD_SIZE": 8,
+          "estimated_required_device_bytes": 2242678768,
+          "frontier_state_capacity": 131072,
+          "gpu_budget_bytes": 2265776128
+        },
+        {
+          "BEAM_WIDTH_ALIGNMENT": 65536,
+          "B_MICRO": 8192,
+          "GLOBAL_BEAM_WIDTH_EFFECTIVE": 1048576,
+          "LOCAL_RANK": 6,
+          "RING_COUNT": 1,
+          "SHARD_CAPACITY_CANDIDATES": 1589248,
+          "SHARD_COUNT": 8,
+          "STREAM3_RING_SLOTS": 4,
+          "STREAM4_ACTIVE_SORT_SLOTS": 4,
+          "STREAM4_BATCH_ALIGNMENT": 1024,
+          "STREAM4_BATCH_CANDIDATES": 262144,
+          "WORLD_SIZE": 8,
+          "estimated_required_device_bytes": 2242678768,
+          "frontier_state_capacity": 131072,
+          "gpu_budget_bytes": 2265776128
+        },
+        {
+          "BEAM_WIDTH_ALIGNMENT": 65536,
+          "B_MICRO": 8192,
+          "GLOBAL_BEAM_WIDTH_EFFECTIVE": 1048576,
+          "LOCAL_RANK": 7,
+          "RING_COUNT": 1,
+          "SHARD_CAPACITY_CANDIDATES": 1589248,
+          "SHARD_COUNT": 8,
+          "STREAM3_RING_SLOTS": 4,
+          "STREAM4_ACTIVE_SORT_SLOTS": 4,
+          "STREAM4_BATCH_ALIGNMENT": 1024,
+          "STREAM4_BATCH_CANDIDATES": 262144,
+          "WORLD_SIZE": 8,
+          "estimated_required_device_bytes": 2242678768,
+          "frontier_state_capacity": 131072,
+          "gpu_budget_bytes": 2265776128
+        }
+      ],
+      "selected_environment": {
+        "BEAM_B_MICRO": "8192",
+        "BEAM_SHARD_COUNT": "8",
+        "BEAM_STREAM3_RING_SLOTS": "4",
+        "BEAM_STREAM4_ACTIVE_SORT_SLOTS": "4",
+        "BEAM_STREAM4_BATCH_CANDIDATES": "262144",
+        "BEAM_ENSEMBLE_INFERENCE_MICRO": "8192",
+        "BEAM_ENSEMBLE_RESERVE_BYTES": "9483321344"
+      },
+      "inference_admission": {
+        "unconstrained_batch": 8192,
+        "unconstrained_estimate": {
+          "profile": "8192",
+          "median": 0.00000780884362757206,
+          "low": 0.000007766562514007091,
+          "high": 0.000007821000181138516,
+          "relative_mad": 0.001556767448067784,
+          "repeats": 7
+        },
+        "attempts": [
+          {
+            "parent_batch": 8192,
+            "reserve_bytes": 9483321344,
+            "estimate": {
+              "profile": "8192",
+              "median": 0.00000780884362757206,
+              "low": 0.000007766562514007091,
+              "high": 0.000007821000181138516,
+              "relative_mad": 0.001556767448067784,
+              "repeats": 7
+            },
+            "admitted": true
+          }
+        ]
+      },
+      "wall_seconds": 277.668668030994,
+      "scope": "native internal Cube444 families and real public component tuner; public CubeTransformer adapter not tested",
+      "exact_count_gate": "PASS all8 ranks all6 complete depths"
+    },
+    {
+      "report": {
+        "parents": 8388608,
+        "world_size": 8,
+        "measurement_scope": "matched_full_frontier",
+        "stream1_seconds": 67.17878125,
+        "full_step_seconds": 69.667,
+        "stream1_parents_per_second": 124869.90451319031,
+        "full_step_parents_per_second": 120410.06502361232,
+        "throughput_loss_fraction": 0.03571588772302525,
+        "relative_time_overhead": 0.03703875991349581
+      },
+      "inference": {
+        "parents": 8388608,
+        "gpu_uuids": [
+          "GPU-f3cc4337-82f1-115b-9058-58cde88a4124",
+          "GPU-e538a8fd-9699-e5f5-9eda-3323027e9a42",
+          "GPU-c644bd50-9748-c343-f188-a2d7b25f27f2",
+          "GPU-8ec028dd-cd3d-55c3-daf2-066e44491ddd",
+          "GPU-55fbd150-b302-9b67-3a0d-425855d9f47d",
+          "GPU-de41c419-b360-1592-a753-f718bdd5b0ee",
+          "GPU-51ddba98-5c48-69b4-45e7-c132c5079ac9",
+          "GPU-ad3ec44a-a6fd-b599-8c31-65140cda1cc2"
+        ],
+        "frontier_sha256": [
+          "1645f284e4158cb2ed9029ea3a65c49362e368f718def5d3261fb0ac4e35b1aa",
+          "c54516f0a83d40bcbdf5aed937d780ab6a4153935ba5d1a58a825508a7df93b7",
+          "35b5068757949b94cd19ff40571c24c81c2b73267886172c5e14c3758185c805",
+          "e5d301a7b8f571b7821db9fe958e11e263732b7a8c08be2e997b3b0c44dba47f",
+          "533ad00ff989652d1a6db185844b0ffee254e41a9fbc9eb24b9571da0b800568",
+          "4378b45ba662810f780d4d8004d4d7a214ff05a0c091fb1376667b58a51b6e5a",
+          "fd2476fa686a82a69c0d71526892da5312793b15f6294f8655fa880eabe8742d",
+          "e9a1fa520ba5ee3c71065393ad9cb314e87cb384fbf267c222a9f19e99d8aabc"
+        ],
+        "model_sha256": {
+          "manifest": "8346586b1ef183e25d2bcbfeec571ced2ffa02eadf31d273525dcff1b5f24a78",
+          "coefficients": [
+            0.6,
+            0.4
+          ]
+        },
+        "build_sha256": {
+          "runner": "c10cd09d551e10e1c23b36018194c4028cfe719c36892f0e7568576d1ffb495d",
+          "helper": "4fb33cc21be9ec5223b3731d6ee2b6f09c912e27070dc75874d3d6dcf4076803"
+        },
+        "precision": "fp16 weights and activations / fp32 reductions",
+        "executor": "LibTorch backbone / CUTLASS ensemble epilogue",
+        "correctness_passed": true,
+        "seconds_by_rank": [
+          [
+            65.08240625,
+            64.85971875,
+            65.60825,
+            65.6547421875,
+            66.6073203125,
+            66.0161796875,
+            65.710515625,
+            65.6448125
+          ],
+          [
+            65.2460625,
+            64.95948046875,
+            66.0838046875,
+            67.11090625,
+            67.17746875,
+            67.078796875,
+            65.9085390625,
+            65.955953125
+          ],
+          [
+            65.2862421875,
+            65.05069140625,
+            66.5809609375,
+            66.68771875,
+            67.179,
+            67.0803828125,
+            66.3685390625,
+            66.5241875
+          ],
+          [
+            65.286328125,
+            65.04390625,
+            66.51096875,
+            66.349375,
+            67.1835234375,
+            66.6819140625,
+            66.3571796875,
+            66.534328125
+          ],
+          [
+            65.28154296875,
+            65.03537109375,
+            65.950703125,
+            65.8535625,
+            67.176984375,
+            66.533125,
+            65.92390625,
+            66.1125859375
+          ],
+          [
+            65.2719453125,
+            65.0311953125,
+            65.80384375,
+            65.9746640625,
+            67.1801953125,
+            66.517984375,
+            65.8299375,
+            65.87915625
+          ],
+          [
+            65.2725234375,
+            65.0310234375,
+            65.8122421875,
+            66.4689375,
+            67.17878125,
+            66.5164765625,
+            65.8295546875,
+            65.8787421875
+          ]
+        ]
+      },
+      "pipeline": {
+        "parents": 8388608,
+        "gpu_uuids": [
+          "GPU-f3cc4337-82f1-115b-9058-58cde88a4124",
+          "GPU-e538a8fd-9699-e5f5-9eda-3323027e9a42",
+          "GPU-c644bd50-9748-c343-f188-a2d7b25f27f2",
+          "GPU-8ec028dd-cd3d-55c3-daf2-066e44491ddd",
+          "GPU-55fbd150-b302-9b67-3a0d-425855d9f47d",
+          "GPU-de41c419-b360-1592-a753-f718bdd5b0ee",
+          "GPU-51ddba98-5c48-69b4-45e7-c132c5079ac9",
+          "GPU-ad3ec44a-a6fd-b599-8c31-65140cda1cc2"
+        ],
+        "frontier_sha256": [
+          "1645f284e4158cb2ed9029ea3a65c49362e368f718def5d3261fb0ac4e35b1aa",
+          "c54516f0a83d40bcbdf5aed937d780ab6a4153935ba5d1a58a825508a7df93b7",
+          "35b5068757949b94cd19ff40571c24c81c2b73267886172c5e14c3758185c805",
+          "e5d301a7b8f571b7821db9fe958e11e263732b7a8c08be2e997b3b0c44dba47f",
+          "533ad00ff989652d1a6db185844b0ffee254e41a9fbc9eb24b9571da0b800568",
+          "4378b45ba662810f780d4d8004d4d7a214ff05a0c091fb1376667b58a51b6e5a",
+          "fd2476fa686a82a69c0d71526892da5312793b15f6294f8655fa880eabe8742d",
+          "e9a1fa520ba5ee3c71065393ad9cb314e87cb384fbf267c222a9f19e99d8aabc"
+        ],
+        "model_sha256": {
+          "manifest": "8346586b1ef183e25d2bcbfeec571ced2ffa02eadf31d273525dcff1b5f24a78",
+          "coefficients": [
+            0.6,
+            0.4
+          ]
+        },
+        "build_sha256": {
+          "runner": "c10cd09d551e10e1c23b36018194c4028cfe719c36892f0e7568576d1ffb495d",
+          "helper": "4fb33cc21be9ec5223b3731d6ee2b6f09c912e27070dc75874d3d6dcf4076803"
+        },
+        "precision": "fp16 weights and activations / fp32 reductions",
+        "executor": "LibTorch backbone / CUTLASS ensemble epilogue",
+        "correctness_passed": true,
+        "seconds_by_rank": [
+          [
+            69.0663,
+            69.065,
+            69.0648,
+            69.0657,
+            69.0765,
+            69.074,
+            69.0762,
+            69.0738
+          ],
+          [
+            69.6559,
+            69.6481,
+            69.6522,
+            69.6543,
+            69.6662,
+            69.6606,
+            69.667,
+            69.6608
+          ],
+          [
+            69.6285,
+            69.6273,
+            69.6255,
+            69.6272,
+            69.6365,
+            69.6351,
+            69.6415,
+            69.6395
+          ],
+          [
+            69.6797,
+            69.7149,
+            69.7138,
+            69.715,
+            69.7285,
+            69.7224,
+            69.7287,
+            69.7246
+          ],
+          [
+            69.664,
+            69.6639,
+            69.6622,
+            69.6642,
+            69.674,
+            69.6716,
+            69.6776,
+            69.6724
+          ]
+        ]
+      },
+      "matched_ranks": [
+        {
+          "batch": 8192,
+          "correctness_passed": true,
+          "device": 0,
+          "free_bytes_after": 3272474624,
+          "model_count": 2,
+          "numeric_error": 0,
+          "parents": 1048576,
+          "readout_oracle_max_key_error": 1,
+          "score_input": "full_frontier_file",
+          "seconds": [
+            65.08240625,
+            65.2460625,
+            65.2862421875,
+            65.286328125,
+            65.28154296875,
+            65.2719453125,
+            65.2725234375
+          ],
+          "torch_allocated_peak_bytes": 4850205696,
+          "torch_reserved_peak_bytes": 9063890944
+        },
+        {
+          "batch": 8192,
+          "correctness_passed": true,
+          "device": 1,
+          "free_bytes_after": 3272409088,
+          "model_count": 2,
+          "numeric_error": 0,
+          "parents": 1048576,
+          "readout_oracle_max_key_error": 1,
+          "score_input": "full_frontier_file",
+          "seconds": [
+            64.85971875,
+            64.95948046875,
+            65.05069140625,
+            65.04390625,
+            65.03537109375,
+            65.0311953125,
+            65.0310234375
+          ],
+          "torch_allocated_peak_bytes": 4850205696,
+          "torch_reserved_peak_bytes": 9063890944
+        },
+        {
+          "batch": 8192,
+          "correctness_passed": true,
+          "device": 2,
+          "free_bytes_after": 3272409088,
+          "model_count": 2,
+          "numeric_error": 0,
+          "parents": 1048576,
+          "readout_oracle_max_key_error": 1,
+          "score_input": "full_frontier_file",
+          "seconds": [
+            65.60825,
+            66.0838046875,
+            66.5809609375,
+            66.51096875,
+            65.950703125,
+            65.80384375,
+            65.8122421875
+          ],
+          "torch_allocated_peak_bytes": 4850205696,
+          "torch_reserved_peak_bytes": 9063890944
+        },
+        {
+          "batch": 8192,
+          "correctness_passed": true,
+          "device": 3,
+          "free_bytes_after": 3272474624,
+          "model_count": 2,
+          "numeric_error": 0,
+          "parents": 1048576,
+          "readout_oracle_max_key_error": 1,
+          "score_input": "full_frontier_file",
+          "seconds": [
+            65.6547421875,
+            67.11090625,
+            66.68771875,
+            66.349375,
+            65.8535625,
+            65.9746640625,
+            66.4689375
+          ],
+          "torch_allocated_peak_bytes": 4850205696,
+          "torch_reserved_peak_bytes": 9063890944
+        },
+        {
+          "batch": 8192,
+          "correctness_passed": true,
+          "device": 4,
+          "free_bytes_after": 3272540160,
+          "model_count": 2,
+          "numeric_error": 0,
+          "parents": 1048576,
+          "readout_oracle_max_key_error": 1,
+          "score_input": "full_frontier_file",
+          "seconds": [
+            66.6073203125,
+            67.17746875,
+            67.179,
+            67.1835234375,
+            67.176984375,
+            67.1801953125,
+            67.17878125
+          ],
+          "torch_allocated_peak_bytes": 4850205696,
+          "torch_reserved_peak_bytes": 9063890944
+        },
+        {
+          "batch": 8192,
+          "correctness_passed": true,
+          "device": 5,
+          "free_bytes_after": 3272474624,
+          "model_count": 2,
+          "numeric_error": 0,
+          "parents": 1048576,
+          "readout_oracle_max_key_error": 1,
+          "score_input": "full_frontier_file",
+          "seconds": [
+            66.0161796875,
+            67.078796875,
+            67.0803828125,
+            66.6819140625,
+            66.533125,
+            66.517984375,
+            66.5164765625
+          ],
+          "torch_allocated_peak_bytes": 4850205696,
+          "torch_reserved_peak_bytes": 9063890944
+        },
+        {
+          "batch": 8192,
+          "correctness_passed": true,
+          "device": 6,
+          "free_bytes_after": 3272409088,
+          "model_count": 2,
+          "numeric_error": 0,
+          "parents": 1048576,
+          "readout_oracle_max_key_error": 1,
+          "score_input": "full_frontier_file",
+          "seconds": [
+            65.710515625,
+            65.9085390625,
+            66.3685390625,
+            66.3571796875,
+            65.92390625,
+            65.8299375,
+            65.8295546875
+          ],
+          "torch_allocated_peak_bytes": 4850205696,
+          "torch_reserved_peak_bytes": 9063890944
+        },
+        {
+          "batch": 8192,
+          "correctness_passed": true,
+          "device": 7,
+          "free_bytes_after": 3272409088,
+          "model_count": 2,
+          "numeric_error": 0,
+          "parents": 1048576,
+          "readout_oracle_max_key_error": 1,
+          "score_input": "full_frontier_file",
+          "seconds": [
+            65.6448125,
+            65.955953125,
+            66.5241875,
+            66.534328125,
+            66.1125859375,
+            65.87915625,
+            65.8787421875
+          ],
+          "torch_allocated_peak_bytes": 4850205696,
+          "torch_reserved_peak_bytes": 9063890944
+        }
+      ],
+      "native_plans": [
+        {
+          "BEAM_WIDTH_ALIGNMENT": 16384,
+          "B_MICRO": 8192,
+          "GLOBAL_BEAM_WIDTH_EFFECTIVE": 8388608,
+          "LOCAL_RANK": 0,
+          "RING_COUNT": 3,
+          "SHARD_CAPACITY_CANDIDATES": 917504,
+          "SHARD_COUNT": 2,
+          "STREAM3_RING_SLOTS": 1,
+          "STREAM4_ACTIVE_SORT_SLOTS": 2,
+          "STREAM4_BATCH_ALIGNMENT": 1024,
+          "STREAM4_BATCH_CANDIDATES": 524288,
+          "WORLD_SIZE": 8,
+          "estimated_required_device_bytes": 2211582960,
+          "frontier_state_capacity": 1048576,
+          "gpu_budget_bytes": 2265776128
+        },
+        {
+          "BEAM_WIDTH_ALIGNMENT": 16384,
+          "B_MICRO": 8192,
+          "GLOBAL_BEAM_WIDTH_EFFECTIVE": 8388608,
+          "LOCAL_RANK": 1,
+          "RING_COUNT": 3,
+          "SHARD_CAPACITY_CANDIDATES": 917504,
+          "SHARD_COUNT": 2,
+          "STREAM3_RING_SLOTS": 1,
+          "STREAM4_ACTIVE_SORT_SLOTS": 2,
+          "STREAM4_BATCH_ALIGNMENT": 1024,
+          "STREAM4_BATCH_CANDIDATES": 524288,
+          "WORLD_SIZE": 8,
+          "estimated_required_device_bytes": 2211582960,
+          "frontier_state_capacity": 1048576,
+          "gpu_budget_bytes": 2265776128
+        },
+        {
+          "BEAM_WIDTH_ALIGNMENT": 16384,
+          "B_MICRO": 8192,
+          "GLOBAL_BEAM_WIDTH_EFFECTIVE": 8388608,
+          "LOCAL_RANK": 2,
+          "RING_COUNT": 3,
+          "SHARD_CAPACITY_CANDIDATES": 917504,
+          "SHARD_COUNT": 2,
+          "STREAM3_RING_SLOTS": 1,
+          "STREAM4_ACTIVE_SORT_SLOTS": 2,
+          "STREAM4_BATCH_ALIGNMENT": 1024,
+          "STREAM4_BATCH_CANDIDATES": 524288,
+          "WORLD_SIZE": 8,
+          "estimated_required_device_bytes": 2211582960,
+          "frontier_state_capacity": 1048576,
+          "gpu_budget_bytes": 2265776128
+        },
+        {
+          "BEAM_WIDTH_ALIGNMENT": 16384,
+          "B_MICRO": 8192,
+          "GLOBAL_BEAM_WIDTH_EFFECTIVE": 8388608,
+          "LOCAL_RANK": 3,
+          "RING_COUNT": 3,
+          "SHARD_CAPACITY_CANDIDATES": 917504,
+          "SHARD_COUNT": 2,
+          "STREAM3_RING_SLOTS": 1,
+          "STREAM4_ACTIVE_SORT_SLOTS": 2,
+          "STREAM4_BATCH_ALIGNMENT": 1024,
+          "STREAM4_BATCH_CANDIDATES": 524288,
+          "WORLD_SIZE": 8,
+          "estimated_required_device_bytes": 2211582960,
+          "frontier_state_capacity": 1048576,
+          "gpu_budget_bytes": 2265776128
+        },
+        {
+          "BEAM_WIDTH_ALIGNMENT": 16384,
+          "B_MICRO": 8192,
+          "GLOBAL_BEAM_WIDTH_EFFECTIVE": 8388608,
+          "LOCAL_RANK": 4,
+          "RING_COUNT": 3,
+          "SHARD_CAPACITY_CANDIDATES": 917504,
+          "SHARD_COUNT": 2,
+          "STREAM3_RING_SLOTS": 1,
+          "STREAM4_ACTIVE_SORT_SLOTS": 2,
+          "STREAM4_BATCH_ALIGNMENT": 1024,
+          "STREAM4_BATCH_CANDIDATES": 524288,
+          "WORLD_SIZE": 8,
+          "estimated_required_device_bytes": 2211582960,
+          "frontier_state_capacity": 1048576,
+          "gpu_budget_bytes": 2265776128
+        },
+        {
+          "BEAM_WIDTH_ALIGNMENT": 16384,
+          "B_MICRO": 8192,
+          "GLOBAL_BEAM_WIDTH_EFFECTIVE": 8388608,
+          "LOCAL_RANK": 5,
+          "RING_COUNT": 3,
+          "SHARD_CAPACITY_CANDIDATES": 917504,
+          "SHARD_COUNT": 2,
+          "STREAM3_RING_SLOTS": 1,
+          "STREAM4_ACTIVE_SORT_SLOTS": 2,
+          "STREAM4_BATCH_ALIGNMENT": 1024,
+          "STREAM4_BATCH_CANDIDATES": 524288,
+          "WORLD_SIZE": 8,
+          "estimated_required_device_bytes": 2211582960,
+          "frontier_state_capacity": 1048576,
+          "gpu_budget_bytes": 2265776128
+        },
+        {
+          "BEAM_WIDTH_ALIGNMENT": 16384,
+          "B_MICRO": 8192,
+          "GLOBAL_BEAM_WIDTH_EFFECTIVE": 8388608,
+          "LOCAL_RANK": 6,
+          "RING_COUNT": 3,
+          "SHARD_CAPACITY_CANDIDATES": 917504,
+          "SHARD_COUNT": 2,
+          "STREAM3_RING_SLOTS": 1,
+          "STREAM4_ACTIVE_SORT_SLOTS": 2,
+          "STREAM4_BATCH_ALIGNMENT": 1024,
+          "STREAM4_BATCH_CANDIDATES": 524288,
+          "WORLD_SIZE": 8,
+          "estimated_required_device_bytes": 2211582960,
+          "frontier_state_capacity": 1048576,
+          "gpu_budget_bytes": 2265776128
+        },
+        {
+          "BEAM_WIDTH_ALIGNMENT": 16384,
+          "B_MICRO": 8192,
+          "GLOBAL_BEAM_WIDTH_EFFECTIVE": 8388608,
+          "LOCAL_RANK": 7,
+          "RING_COUNT": 3,
+          "SHARD_CAPACITY_CANDIDATES": 917504,
+          "SHARD_COUNT": 2,
+          "STREAM3_RING_SLOTS": 1,
+          "STREAM4_ACTIVE_SORT_SLOTS": 2,
+          "STREAM4_BATCH_ALIGNMENT": 1024,
+          "STREAM4_BATCH_CANDIDATES": 524288,
+          "WORLD_SIZE": 8,
+          "estimated_required_device_bytes": 2211582960,
+          "frontier_state_capacity": 1048576,
+          "gpu_budget_bytes": 2265776128
+        }
+      ],
+      "selected_environment": {
+        "BEAM_B_MICRO": "8192",
+        "BEAM_SHARD_COUNT": "2",
+        "BEAM_STREAM3_RING_SLOTS": "1",
+        "BEAM_STREAM4_ACTIVE_SORT_SLOTS": "2",
+        "BEAM_STREAM4_BATCH_CANDIDATES": "524288",
+        "BEAM_ENSEMBLE_INFERENCE_MICRO": "8192",
+        "BEAM_ENSEMBLE_RESERVE_BYTES": "9483321344"
+      },
+      "inference_admission": {
+        "unconstrained_batch": 8192,
+        "unconstrained_estimate": {
+          "profile": "8192",
+          "median": 0.00000780884362757206,
+          "low": 0.000007766562514007091,
+          "high": 0.000007821000181138516,
+          "relative_mad": 0.001556767448067784,
+          "repeats": 7
+        },
+        "attempts": [
+          {
+            "parent_batch": 8192,
+            "reserve_bytes": 9483321344,
+            "estimate": {
+              "profile": "8192",
+              "median": 0.00000780884362757206,
+              "low": 0.000007766562514007091,
+              "high": 0.000007821000181138516,
+              "relative_mad": 0.001556767448067784,
+              "repeats": 7
+            },
+            "admitted": true
+          }
+        ]
+      },
+      "wall_seconds": 1074.5479311220115,
+      "scope": "native internal Cube444 families and real public component tuner; public CubeTransformer adapter not tested",
+      "exact_count_gate": "PASS all8 ranks all6 complete depths"
+    }
+  ]
+}

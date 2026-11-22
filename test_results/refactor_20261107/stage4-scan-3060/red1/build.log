@@ -1,0 +1,8 @@
+[1/2] Building CUDA object CMakeFiles/stream4_scan_cuda_tests.dir/tests/stream4_scan_cuda_tests.cu.o
+FAILED: [code=1] CMakeFiles/stream4_scan_cuda_tests.dir/tests/stream4_scan_cuda_tests.cu.o 
+/usr/local/cuda/bin/nvcc -forward-unknown-to-host-compiler   -DONNX_NAMESPACE=onnx_c2 -gencode arch=compute_86,code=sm_86 -Xcudafe --diag_suppress=cc_clobber_ignored,--diag_suppress=field_without_dll_interface,--diag_suppress=base_class_has_different_dll_interface,--diag_suppress=dll_interface_conflict_none_assumed,--diag_suppress=dll_interface_conflict_dllexport_assumed,--diag_suppress=bad_friend_decl --expt-relaxed-constexpr --expt-extended-lambda -O3 -DNDEBUG -std=c++17 "--generate-code=arch=compute_86,code=[compute_86,sm_86]" -Xcompiler=-fPIE -MD -MT CMakeFiles/stream4_scan_cuda_tests.dir/tests/stream4_scan_cuda_tests.cu.o -MF CMakeFiles/stream4_scan_cuda_tests.dir/tests/stream4_scan_cuda_tests.cu.o.d -x cu -c /workspace/beam-native-source/tests/stream4_scan_cuda_tests.cu -o CMakeFiles/stream4_scan_cuda_tests.dir/tests/stream4_scan_cuda_tests.cu.o
+/workspace/beam-native-source/tests/stream4_scan_cuda_tests.cu:1:10: fatal error: ../cuda/stream4_scan.cuh: No such file or directory
+    1 | #include "../cuda/stream4_scan.cuh"
+      |          ^~~~~~~~~~~~~~~~~~~~~~~~~~
+compilation terminated.
+ninja: build stopped: subcommand failed.

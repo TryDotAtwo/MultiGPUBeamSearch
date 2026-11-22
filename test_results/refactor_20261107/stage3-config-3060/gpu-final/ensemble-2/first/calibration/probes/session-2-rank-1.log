@@ -1,0 +1,2 @@
+{"capacity":32,"device":1,"ready":true}
+{"batch":16,"correctness_passed":true,"device":1,"free_bytes_after":12286033920,"model_count":2,"numeric_error":0,"parents":2048,"readout_oracle_max_key_error":0,"score_input":"graph_states","seconds":[0.11988886260986328,0.11979366302490234,0.11954889678955079,0.11942694091796875,0.11947315216064452,0.12132454681396485,0.11968204498291016],"torch_allocated_peak_bytes":46699008,"torch_reserved_peak_bytes":52428800}

@@ -1,0 +1,169 @@
+{
+  "pairs": [
+    {
+      "control_peak_bytes": [
+        689045504,
+        686948352
+      ],
+      "candidate_peak_bytes": [
+        680656896,
+        678559744
+      ],
+      "control_baseline_bytes": [
+        397475840,
+        395378688
+      ],
+      "candidate_baseline_bytes": [
+        397475840,
+        395378688
+      ],
+      "control_net_peak_bytes": [
+        291569664,
+        291569664
+      ],
+      "candidate_net_peak_bytes": [
+        283181056,
+        283181056
+      ],
+      "saved_net_bytes": [
+        8388608,
+        8388608
+      ],
+      "speedup_percent": 3.602859732151842
+    },
+    {
+      "control_peak_bytes": [
+        689045504,
+        686948352
+      ],
+      "candidate_peak_bytes": [
+        680656896,
+        678559744
+      ],
+      "control_baseline_bytes": [
+        397475840,
+        395378688
+      ],
+      "candidate_baseline_bytes": [
+        397475840,
+        395378688
+      ],
+      "control_net_peak_bytes": [
+        291569664,
+        291569664
+      ],
+      "candidate_net_peak_bytes": [
+        283181056,
+        283181056
+      ],
+      "saved_net_bytes": [
+        8388608,
+        8388608
+      ],
+      "speedup_percent": 2.2373713549512786
+    },
+    {
+      "control_peak_bytes": [
+        689045504,
+        686948352
+      ],
+      "candidate_peak_bytes": [
+        680656896,
+        678559744
+      ],
+      "control_baseline_bytes": [
+        397475840,
+        395378688
+      ],
+      "candidate_baseline_bytes": [
+        397475840,
+        395378688
+      ],
+      "control_net_peak_bytes": [
+        291569664,
+        291569664
+      ],
+      "candidate_net_peak_bytes": [
+        283181056,
+        283181056
+      ],
+      "saved_net_bytes": [
+        8388608,
+        8388608
+      ],
+      "speedup_percent": 5.2266000926131095
+    },
+    {
+      "control_peak_bytes": [
+        689045504,
+        686948352
+      ],
+      "candidate_peak_bytes": [
+        680656896,
+        678559744
+      ],
+      "control_baseline_bytes": [
+        397475840,
+        395378688
+      ],
+      "candidate_baseline_bytes": [
+        397475840,
+        395378688
+      ],
+      "control_net_peak_bytes": [
+        291569664,
+        291569664
+      ],
+      "candidate_net_peak_bytes": [
+        283181056,
+        283181056
+      ],
+      "saved_net_bytes": [
+        8388608,
+        8388608
+      ],
+      "speedup_percent": -2.7020755072737046
+    },
+    {
+      "control_peak_bytes": [
+        689045504,
+        686948352
+      ],
+      "candidate_peak_bytes": [
+        680656896,
+        678559744
+      ],
+      "control_baseline_bytes": [
+        397475840,
+        395378688
+      ],
+      "candidate_baseline_bytes": [
+        397475840,
+        395378688
+      ],
+      "control_net_peak_bytes": [
+        291569664,
+        291569664
+      ],
+      "candidate_net_peak_bytes": [
+        283181056,
+        283181056
+      ],
+      "saved_net_bytes": [
+        8388608,
+        8388608
+      ],
+      "speedup_percent": -1.74001198999858
+    }
+  ],
+  "median_saved_net_bytes_by_gpu": [
+    8388608,
+    8388608
+  ],
+  "median_speedup_percent": 2.2373713549512786,
+  "source_sha256": {
+    "native_index_memory_pair_gpu.py": "d18e30b18bdaa4529169d013c50f2a8b62e1d6517dc77d3bcb25488d2c95b375",
+    "native_radix128_pair_gpu.py": "6612c30cc695c9837aaaeb35ff3341ebc1050ba24727912d53af4edbe48f69e4"
+  },
+  "scope": "paired sampled whole-device peak above idle baseline; 25 ms sampling can miss peaks"
+}

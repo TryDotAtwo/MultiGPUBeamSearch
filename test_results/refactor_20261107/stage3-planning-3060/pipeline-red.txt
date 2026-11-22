@@ -1,0 +1,9 @@
+   Compiling beam-runtime v0.1.0 (/workspace/beam-work/rust/beam-runtime)
+error[E0432]: unresolved import `beam_runtime::pipeline`
+ --> rust/beam-runtime/tests/pipeline.rs:1:19
+  |
+1 | use beam_runtime::pipeline::{parse_depths,parse_plan};
+  |                   ^^^^^^^^ could not find `pipeline` in `beam_runtime`
+
+For more information about this error, try `rustc --explain E0432`.
+error: could not compile `beam-runtime` (test "pipeline") due to 1 previous error

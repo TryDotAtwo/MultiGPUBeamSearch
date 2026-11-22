@@ -1,0 +1,4 @@
+========= COMPUTE-SANITIZER
+score_histograms stream3_stream4_cpu_oracle_and_graph=PASS
+========= LEAK SUMMARY: 0 bytes leaked in 0 allocations
+========= ERROR SUMMARY: 0 errors

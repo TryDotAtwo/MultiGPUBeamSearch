@@ -1,0 +1,161 @@
+{
+  "scope": "five alternating pairs; full six-depth public calls with two resident groups on the same GPUs",
+  "width": 4096,
+  "max_steps": 6,
+  "num_gpus": 2,
+  "model": "synthetic Hamming FP16",
+  "median_wall_seconds": {
+    "python": 2.235717619987554,
+    "rust": 2.210313760995632
+  },
+  "gpu_memory_mib_with_both_sessions": [
+    "599, 12288",
+    "599, 12288"
+  ],
+  "rows": [
+    {
+      "engine": "python",
+      "phase": "cold",
+      "pair": null,
+      "wall_seconds": 5.243044009999721,
+      "worker_seconds": 1.1955338419938926,
+      "run_dir": "/workspace/beam-results/public-rust/gpu-cutlass/cache/runs/b6a87d0b8a2849898cf6ddeeab87422d",
+      "pids": [
+        12822,
+        12823
+      ]
+    },
+    {
+      "engine": "rust",
+      "phase": "cold",
+      "pair": null,
+      "wall_seconds": 6.948156942002242,
+      "worker_seconds": 1.080191491,
+      "run_dir": "/workspace/beam-results/public-rust/gpu-cutlass/cache/runs/a917377b723a445c86a7669d7afe60c4",
+      "pids": [
+        12865,
+        12866
+      ]
+    },
+    {
+      "engine": "python",
+      "phase": "repeated",
+      "pair": 0,
+      "wall_seconds": 2.235717619987554,
+      "worker_seconds": 0.26378251500136685,
+      "run_dir": "/workspace/beam-results/public-rust/gpu-cutlass/cache/runs/cafdc4c12f8c4d0f9ef3827602816c54",
+      "pids": [
+        12822,
+        12823
+      ]
+    },
+    {
+      "engine": "rust",
+      "phase": "repeated",
+      "pair": 0,
+      "wall_seconds": 2.243667467002524,
+      "worker_seconds": 0.243801341,
+      "run_dir": "/workspace/beam-results/public-rust/gpu-cutlass/cache/runs/22a3e999bafe441b99b95e5db44e5a52",
+      "pids": [
+        12865,
+        12866
+      ]
+    },
+    {
+      "engine": "rust",
+      "phase": "repeated",
+      "pair": 1,
+      "wall_seconds": 2.1978034710045904,
+      "worker_seconds": 0.233117938,
+      "run_dir": "/workspace/beam-results/public-rust/gpu-cutlass/cache/runs/e664990d4b46423eaf0b146b9377bf47",
+      "pids": [
+        12865,
+        12866
+      ]
+    },
+    {
+      "engine": "python",
+      "phase": "repeated",
+      "pair": 1,
+      "wall_seconds": 2.239133322989801,
+      "worker_seconds": 0.26417121599661186,
+      "run_dir": "/workspace/beam-results/public-rust/gpu-cutlass/cache/runs/6e7fd168b5ec4cf8ac3a3f6550e75170",
+      "pids": [
+        12822,
+        12823
+      ]
+    },
+    {
+      "engine": "python",
+      "phase": "repeated",
+      "pair": 2,
+      "wall_seconds": 2.2248231539997505,
+      "worker_seconds": 0.24347251700237393,
+      "run_dir": "/workspace/beam-results/public-rust/gpu-cutlass/cache/runs/5d3541c85ebe43939cf08793ad40f2ae",
+      "pids": [
+        12822,
+        12823
+      ]
+    },
+    {
+      "engine": "rust",
+      "phase": "repeated",
+      "pair": 2,
+      "wall_seconds": 2.2144450880005024,
+      "worker_seconds": 0.23328958,
+      "run_dir": "/workspace/beam-results/public-rust/gpu-cutlass/cache/runs/a671dd7ec88a492fbebdd3224bf4a610",
+      "pids": [
+        12865,
+        12866
+      ]
+    },
+    {
+      "engine": "rust",
+      "phase": "repeated",
+      "pair": 3,
+      "wall_seconds": 2.186562953997054,
+      "worker_seconds": 0.232906428,
+      "run_dir": "/workspace/beam-results/public-rust/gpu-cutlass/cache/runs/60a01d3ba63c48bdb2a22d7b0705355c",
+      "pids": [
+        12865,
+        12866
+      ]
+    },
+    {
+      "engine": "python",
+      "phase": "repeated",
+      "pair": 3,
+      "wall_seconds": 2.2394874159945175,
+      "worker_seconds": 0.2633580109977629,
+      "run_dir": "/workspace/beam-results/public-rust/gpu-cutlass/cache/runs/998282c292f54b80bc3398d46896c53a",
+      "pids": [
+        12822,
+        12823
+      ]
+    },
+    {
+      "engine": "python",
+      "phase": "repeated",
+      "pair": 4,
+      "wall_seconds": 2.2262609399913345,
+      "worker_seconds": 0.24340803000086453,
+      "run_dir": "/workspace/beam-results/public-rust/gpu-cutlass/cache/runs/120ef6aeca2347cfa0f7a5c662dbe561",
+      "pids": [
+        12822,
+        12823
+      ]
+    },
+    {
+      "engine": "rust",
+      "phase": "repeated",
+      "pair": 4,
+      "wall_seconds": 2.210313760995632,
+      "worker_seconds": 0.233297175,
+      "run_dir": "/workspace/beam-results/public-rust/gpu-cutlass/cache/runs/37aead27c49544dab53a1c8e0ae09112",
+      "pids": [
+        12865,
+        12866
+      ]
+    }
+  ]
+}

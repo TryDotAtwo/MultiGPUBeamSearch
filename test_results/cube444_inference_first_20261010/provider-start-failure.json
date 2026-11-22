@@ -1,0 +1,8 @@
+{
+  "instance": 55160534,
+  "label": "cube444-inference-first-2x3060-20261010",
+  "status": "PROVIDER_START_FAILURE",
+  "error": "OCI/CDI unresolvable GPU device; confirmed twice before any remote login or GPU execution",
+  "gpu_results_exist": false,
+  "source": "0f57aff8dea3220135cf77c9cd7594b1f9581c9a"
+}

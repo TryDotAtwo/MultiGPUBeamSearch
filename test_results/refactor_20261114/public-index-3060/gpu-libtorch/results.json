@@ -1,0 +1,814 @@
+{
+  "backend": "libtorch",
+  "experimental_parallel_nccl_identity": true,
+  "experimental_index_sort": true,
+  "scope": "public bounded deterministic session correctness; no performance claim",
+  "records": [
+    {
+      "world": 1,
+      "engine": "python",
+      "case": "first",
+      "path": [
+        0,
+        1,
+        2
+      ],
+      "width": 64,
+      "experimental_index_sort": true,
+      "build_key": "4f8be782cbbd63f1cc53cf6e5817bcdccc161dd1b728c4a1b0fe4a306fe38b94",
+      "persistent": {
+        "reused": false,
+        "worker_pids": [
+          6154
+        ],
+        "request_count": 1
+      },
+      "run_dir": "/workspace/beam-results/public-index-20261114/cache-libtorch/runs/be2f8ff97c484b35a1acab59133b2b43",
+      "solutions": [
+        [
+          0,
+          1,
+          2
+        ]
+      ]
+    },
+    {
+      "world": 1,
+      "engine": "python",
+      "case": "repeat",
+      "path": [
+        0,
+        3,
+        1,
+        2
+      ],
+      "width": 64,
+      "experimental_index_sort": true,
+      "build_key": "4f8be782cbbd63f1cc53cf6e5817bcdccc161dd1b728c4a1b0fe4a306fe38b94",
+      "persistent": {
+        "reused": true,
+        "worker_pids": [
+          6154
+        ],
+        "request_count": 2
+      },
+      "run_dir": "/workspace/beam-results/public-index-20261114/cache-libtorch/runs/cee931470f5145a89609e88260eb8c22",
+      "solutions": [
+        [
+          0,
+          3,
+          1,
+          2
+        ]
+      ]
+    },
+    {
+      "world": 1,
+      "engine": "python",
+      "case": "unsolved",
+      "path": null,
+      "width": 64,
+      "experimental_index_sort": true,
+      "build_key": "4f8be782cbbd63f1cc53cf6e5817bcdccc161dd1b728c4a1b0fe4a306fe38b94",
+      "persistent": {
+        "reused": true,
+        "worker_pids": [
+          6154
+        ],
+        "request_count": 3
+      },
+      "run_dir": "/workspace/beam-results/public-index-20261114/cache-libtorch/runs/dec2dbfd0865445c880c803141030231",
+      "solutions": []
+    },
+    {
+      "world": 1,
+      "engine": "python",
+      "case": "model-change",
+      "path": [
+        0,
+        1,
+        2
+      ],
+      "width": 64,
+      "experimental_index_sort": true,
+      "build_key": "4f8be782cbbd63f1cc53cf6e5817bcdccc161dd1b728c4a1b0fe4a306fe38b94",
+      "persistent": {
+        "reused": false,
+        "worker_pids": [
+          6195
+        ],
+        "request_count": 1
+      },
+      "run_dir": "/workspace/beam-results/public-index-20261114/cache-libtorch/runs/55bc57be8e8b4fcda4657221bf8cd856",
+      "solutions": [
+        [
+          0,
+          1,
+          2
+        ]
+      ]
+    },
+    {
+      "world": 1,
+      "engine": "python",
+      "case": "index-change",
+      "path": [
+        0,
+        1,
+        2
+      ],
+      "width": 64,
+      "experimental_index_sort": false,
+      "build_key": "17b2ff9a647cab723521e61d681b9e3b7db6f49a845fc400798cf5acf3782acd",
+      "persistent": {
+        "reused": false,
+        "worker_pids": [
+          6892
+        ],
+        "request_count": 1
+      },
+      "run_dir": "/workspace/beam-results/public-index-20261114/cache-libtorch/runs/8f08e8b251ae46c788afc5b8a38960fa",
+      "solutions": [
+        [
+          0,
+          1,
+          2
+        ]
+      ]
+    },
+    {
+      "world": 1,
+      "engine": "python",
+      "case": "beam-change",
+      "path": [
+        0,
+        1,
+        2
+      ],
+      "width": 65,
+      "experimental_index_sort": true,
+      "build_key": "4f8be782cbbd63f1cc53cf6e5817bcdccc161dd1b728c4a1b0fe4a306fe38b94",
+      "persistent": {
+        "reused": false,
+        "worker_pids": [
+          6912
+        ],
+        "request_count": 1
+      },
+      "run_dir": "/workspace/beam-results/public-index-20261114/cache-libtorch/runs/55f1a5d59a824cc9bcd2b828f00e6a02",
+      "solutions": [
+        [
+          0,
+          1,
+          2
+        ]
+      ]
+    },
+    {
+      "world": 1,
+      "engine": "python",
+      "case": "collect",
+      "path": [
+        0,
+        1,
+        2
+      ],
+      "width": 65,
+      "experimental_index_sort": true,
+      "build_key": "4f8be782cbbd63f1cc53cf6e5817bcdccc161dd1b728c4a1b0fe4a306fe38b94",
+      "persistent": {
+        "reused": false,
+        "worker_pids": [
+          6932
+        ],
+        "request_count": 1
+      },
+      "run_dir": "/workspace/beam-results/public-index-20261114/cache-libtorch/runs/17745c194d1b4ea4a8c33eaaa99ff4be",
+      "solutions": [
+        [
+          0,
+          1,
+          2
+        ],
+        [
+          1,
+          2,
+          0
+        ],
+        [
+          0,
+          2,
+          1
+        ]
+      ]
+    },
+    {
+      "world": 1,
+      "engine": "rust",
+      "case": "first",
+      "path": [
+        0,
+        1,
+        2
+      ],
+      "width": 64,
+      "experimental_index_sort": true,
+      "build_key": "4f8be782cbbd63f1cc53cf6e5817bcdccc161dd1b728c4a1b0fe4a306fe38b94",
+      "persistent": {
+        "reused": false,
+        "worker_pids": [
+          7077
+        ],
+        "request_count": 1
+      },
+      "run_dir": "/workspace/beam-results/public-index-20261114/cache-libtorch/runs/c8e9c2824b5f4e429072e43df1c3273b",
+      "solutions": [
+        [
+          0,
+          1,
+          2
+        ]
+      ]
+    },
+    {
+      "world": 1,
+      "engine": "rust",
+      "case": "repeat",
+      "path": [
+        0,
+        3,
+        1,
+        2
+      ],
+      "width": 64,
+      "experimental_index_sort": true,
+      "build_key": "4f8be782cbbd63f1cc53cf6e5817bcdccc161dd1b728c4a1b0fe4a306fe38b94",
+      "persistent": {
+        "reused": true,
+        "worker_pids": [
+          7077
+        ],
+        "request_count": 2
+      },
+      "run_dir": "/workspace/beam-results/public-index-20261114/cache-libtorch/runs/0f17d7acd2cb400d98b5f5495298b00e",
+      "solutions": [
+        [
+          0,
+          3,
+          1,
+          2
+        ]
+      ]
+    },
+    {
+      "world": 1,
+      "engine": "rust",
+      "case": "unsolved",
+      "path": null,
+      "width": 64,
+      "experimental_index_sort": true,
+      "build_key": "4f8be782cbbd63f1cc53cf6e5817bcdccc161dd1b728c4a1b0fe4a306fe38b94",
+      "persistent": {
+        "reused": true,
+        "worker_pids": [
+          7077
+        ],
+        "request_count": 3
+      },
+      "run_dir": "/workspace/beam-results/public-index-20261114/cache-libtorch/runs/b809866929154100a2eae4fc1f602416",
+      "solutions": []
+    },
+    {
+      "world": 1,
+      "engine": "rust",
+      "case": "model-change",
+      "path": [
+        0,
+        1,
+        2
+      ],
+      "width": 64,
+      "experimental_index_sort": true,
+      "build_key": "4f8be782cbbd63f1cc53cf6e5817bcdccc161dd1b728c4a1b0fe4a306fe38b94",
+      "persistent": {
+        "reused": false,
+        "worker_pids": [
+          7127
+        ],
+        "request_count": 1
+      },
+      "run_dir": "/workspace/beam-results/public-index-20261114/cache-libtorch/runs/81d157c6264249dcbca2a22e553c8c58",
+      "solutions": [
+        [
+          0,
+          1,
+          2
+        ]
+      ]
+    },
+    {
+      "world": 1,
+      "engine": "rust",
+      "case": "index-change",
+      "path": [
+        0,
+        1,
+        2
+      ],
+      "width": 64,
+      "experimental_index_sort": false,
+      "build_key": "17b2ff9a647cab723521e61d681b9e3b7db6f49a845fc400798cf5acf3782acd",
+      "persistent": {
+        "reused": false,
+        "worker_pids": [
+          7276
+        ],
+        "request_count": 1
+      },
+      "run_dir": "/workspace/beam-results/public-index-20261114/cache-libtorch/runs/ca9cb26d47bb4b9e80565537674853a6",
+      "solutions": [
+        [
+          0,
+          1,
+          2
+        ]
+      ]
+    },
+    {
+      "world": 1,
+      "engine": "rust",
+      "case": "beam-change",
+      "path": [
+        0,
+        1,
+        2
+      ],
+      "width": 65,
+      "experimental_index_sort": true,
+      "build_key": "4f8be782cbbd63f1cc53cf6e5817bcdccc161dd1b728c4a1b0fe4a306fe38b94",
+      "persistent": {
+        "reused": false,
+        "worker_pids": [
+          7303
+        ],
+        "request_count": 1
+      },
+      "run_dir": "/workspace/beam-results/public-index-20261114/cache-libtorch/runs/9bf4d8c42c754bac9605e7e56a73ddb9",
+      "solutions": [
+        [
+          0,
+          1,
+          2
+        ]
+      ]
+    },
+    {
+      "world": 1,
+      "engine": "rust",
+      "case": "collect",
+      "path": [
+        0,
+        1,
+        2
+      ],
+      "width": 65,
+      "experimental_index_sort": true,
+      "build_key": "4f8be782cbbd63f1cc53cf6e5817bcdccc161dd1b728c4a1b0fe4a306fe38b94",
+      "persistent": {
+        "reused": false,
+        "worker_pids": [
+          7330
+        ],
+        "request_count": 1
+      },
+      "run_dir": "/workspace/beam-results/public-index-20261114/cache-libtorch/runs/51cdd6a6ced6418fa3f8b188468a00a9",
+      "solutions": [
+        [
+          0,
+          1,
+          2
+        ],
+        [
+          1,
+          2,
+          0
+        ],
+        [
+          0,
+          2,
+          1
+        ]
+      ]
+    },
+    {
+      "world": 2,
+      "engine": "python",
+      "case": "first",
+      "path": [
+        0,
+        1,
+        2
+      ],
+      "width": 64,
+      "experimental_index_sort": true,
+      "build_key": "4f8be782cbbd63f1cc53cf6e5817bcdccc161dd1b728c4a1b0fe4a306fe38b94",
+      "persistent": {
+        "reused": false,
+        "worker_pids": [
+          7348,
+          7349
+        ],
+        "request_count": 1
+      },
+      "run_dir": "/workspace/beam-results/public-index-20261114/cache-libtorch/runs/fe5cb4e84e934fdcb6cc070dee1459a3",
+      "solutions": [
+        [
+          0,
+          1,
+          2
+        ]
+      ]
+    },
+    {
+      "world": 2,
+      "engine": "python",
+      "case": "repeat",
+      "path": [
+        1,
+        0,
+        2,
+        3
+      ],
+      "width": 64,
+      "experimental_index_sort": true,
+      "build_key": "4f8be782cbbd63f1cc53cf6e5817bcdccc161dd1b728c4a1b0fe4a306fe38b94",
+      "persistent": {
+        "reused": true,
+        "worker_pids": [
+          7348,
+          7349
+        ],
+        "request_count": 2
+      },
+      "run_dir": "/workspace/beam-results/public-index-20261114/cache-libtorch/runs/f1c878bd34d54432a7b15f373a557473",
+      "solutions": [
+        [
+          1,
+          0,
+          2,
+          3
+        ]
+      ]
+    },
+    {
+      "world": 2,
+      "engine": "python",
+      "case": "unsolved",
+      "path": null,
+      "width": 64,
+      "experimental_index_sort": true,
+      "build_key": "4f8be782cbbd63f1cc53cf6e5817bcdccc161dd1b728c4a1b0fe4a306fe38b94",
+      "persistent": {
+        "reused": true,
+        "worker_pids": [
+          7348,
+          7349
+        ],
+        "request_count": 3
+      },
+      "run_dir": "/workspace/beam-results/public-index-20261114/cache-libtorch/runs/6b154c3d908c4a71b77c3e4aca4316fa",
+      "solutions": []
+    },
+    {
+      "world": 2,
+      "engine": "python",
+      "case": "model-change",
+      "path": [
+        0,
+        1,
+        2
+      ],
+      "width": 64,
+      "experimental_index_sort": true,
+      "build_key": "4f8be782cbbd63f1cc53cf6e5817bcdccc161dd1b728c4a1b0fe4a306fe38b94",
+      "persistent": {
+        "reused": false,
+        "worker_pids": [
+          7419,
+          7420
+        ],
+        "request_count": 1
+      },
+      "run_dir": "/workspace/beam-results/public-index-20261114/cache-libtorch/runs/76116214f9454a6595fb304eeae1eb48",
+      "solutions": [
+        [
+          0,
+          1,
+          2
+        ]
+      ]
+    },
+    {
+      "world": 2,
+      "engine": "python",
+      "case": "index-change",
+      "path": [
+        0,
+        1,
+        2
+      ],
+      "width": 64,
+      "experimental_index_sort": false,
+      "build_key": "17b2ff9a647cab723521e61d681b9e3b7db6f49a845fc400798cf5acf3782acd",
+      "persistent": {
+        "reused": false,
+        "worker_pids": [
+          7462,
+          7463
+        ],
+        "request_count": 1
+      },
+      "run_dir": "/workspace/beam-results/public-index-20261114/cache-libtorch/runs/f1c7bfa1e3634ee1bedd0bb253a18aff",
+      "solutions": [
+        [
+          0,
+          1,
+          2
+        ]
+      ]
+    },
+    {
+      "world": 2,
+      "engine": "python",
+      "case": "beam-change",
+      "path": [
+        0,
+        1,
+        2
+      ],
+      "width": 65,
+      "experimental_index_sort": true,
+      "build_key": "4f8be782cbbd63f1cc53cf6e5817bcdccc161dd1b728c4a1b0fe4a306fe38b94",
+      "persistent": {
+        "reused": false,
+        "worker_pids": [
+          7505,
+          7506
+        ],
+        "request_count": 1
+      },
+      "run_dir": "/workspace/beam-results/public-index-20261114/cache-libtorch/runs/dd7bed3325a748a985eaeecfadc1920a",
+      "solutions": [
+        [
+          0,
+          1,
+          2
+        ]
+      ]
+    },
+    {
+      "world": 2,
+      "engine": "python",
+      "case": "collect",
+      "path": [
+        0,
+        1,
+        2
+      ],
+      "width": 65,
+      "experimental_index_sort": true,
+      "build_key": "4f8be782cbbd63f1cc53cf6e5817bcdccc161dd1b728c4a1b0fe4a306fe38b94",
+      "persistent": {
+        "reused": false,
+        "worker_pids": [
+          7548,
+          7549
+        ],
+        "request_count": 1
+      },
+      "run_dir": "/workspace/beam-results/public-index-20261114/cache-libtorch/runs/e1fb738dd8da460fa6aa21958dc664f2",
+      "solutions": [
+        [
+          0,
+          1,
+          2
+        ],
+        [
+          1,
+          2,
+          0
+        ],
+        [
+          0,
+          2,
+          1
+        ]
+      ]
+    },
+    {
+      "world": 2,
+      "engine": "rust",
+      "case": "first",
+      "path": [
+        0,
+        1,
+        2
+      ],
+      "width": 64,
+      "experimental_index_sort": true,
+      "build_key": "4f8be782cbbd63f1cc53cf6e5817bcdccc161dd1b728c4a1b0fe4a306fe38b94",
+      "persistent": {
+        "reused": false,
+        "worker_pids": [
+          7595,
+          7596
+        ],
+        "request_count": 1
+      },
+      "run_dir": "/workspace/beam-results/public-index-20261114/cache-libtorch/runs/b81c1a7c65db4e7081c9146ceb6ca23e",
+      "solutions": [
+        [
+          0,
+          1,
+          2
+        ]
+      ]
+    },
+    {
+      "world": 2,
+      "engine": "rust",
+      "case": "repeat",
+      "path": [
+        1,
+        0,
+        2,
+        3
+      ],
+      "width": 64,
+      "experimental_index_sort": true,
+      "build_key": "4f8be782cbbd63f1cc53cf6e5817bcdccc161dd1b728c4a1b0fe4a306fe38b94",
+      "persistent": {
+        "reused": true,
+        "worker_pids": [
+          7595,
+          7596
+        ],
+        "request_count": 2
+      },
+      "run_dir": "/workspace/beam-results/public-index-20261114/cache-libtorch/runs/ea8d2a6287264385ab6649a254864f76",
+      "solutions": [
+        [
+          1,
+          0,
+          2,
+          3
+        ]
+      ]
+    },
+    {
+      "world": 2,
+      "engine": "rust",
+      "case": "unsolved",
+      "path": null,
+      "width": 64,
+      "experimental_index_sort": true,
+      "build_key": "4f8be782cbbd63f1cc53cf6e5817bcdccc161dd1b728c4a1b0fe4a306fe38b94",
+      "persistent": {
+        "reused": true,
+        "worker_pids": [
+          7595,
+          7596
+        ],
+        "request_count": 3
+      },
+      "run_dir": "/workspace/beam-results/public-index-20261114/cache-libtorch/runs/762b7c178a1941679854cf85259afbd2",
+      "solutions": []
+    },
+    {
+      "world": 2,
+      "engine": "rust",
+      "case": "model-change",
+      "path": [
+        0,
+        1,
+        2
+      ],
+      "width": 64,
+      "experimental_index_sort": true,
+      "build_key": "4f8be782cbbd63f1cc53cf6e5817bcdccc161dd1b728c4a1b0fe4a306fe38b94",
+      "persistent": {
+        "reused": false,
+        "worker_pids": [
+          7676,
+          7677
+        ],
+        "request_count": 1
+      },
+      "run_dir": "/workspace/beam-results/public-index-20261114/cache-libtorch/runs/66be8ad755754d35985104f4b61beed6",
+      "solutions": [
+        [
+          0,
+          1,
+          2
+        ]
+      ]
+    },
+    {
+      "world": 2,
+      "engine": "rust",
+      "case": "index-change",
+      "path": [
+        0,
+        1,
+        2
+      ],
+      "width": 64,
+      "experimental_index_sort": false,
+      "build_key": "17b2ff9a647cab723521e61d681b9e3b7db6f49a845fc400798cf5acf3782acd",
+      "persistent": {
+        "reused": false,
+        "worker_pids": [
+          7727,
+          7728
+        ],
+        "request_count": 1
+      },
+      "run_dir": "/workspace/beam-results/public-index-20261114/cache-libtorch/runs/cf47f15c5bcd4f54802e32e30447c2e8",
+      "solutions": [
+        [
+          0,
+          1,
+          2
+        ]
+      ]
+    },
+    {
+      "world": 2,
+      "engine": "rust",
+      "case": "beam-change",
+      "path": [
+        0,
+        1,
+        2
+      ],
+      "width": 65,
+      "experimental_index_sort": true,
+      "build_key": "4f8be782cbbd63f1cc53cf6e5817bcdccc161dd1b728c4a1b0fe4a306fe38b94",
+      "persistent": {
+        "reused": false,
+        "worker_pids": [
+          7778,
+          7779
+        ],
+        "request_count": 1
+      },
+      "run_dir": "/workspace/beam-results/public-index-20261114/cache-libtorch/runs/323514ba913744a390bc08d9c2a8723e",
+      "solutions": [
+        [
+          0,
+          1,
+          2
+        ]
+      ]
+    },
+    {
+      "world": 2,
+      "engine": "rust",
+      "case": "collect",
+      "path": [
+        0,
+        1,
+        2
+      ],
+      "width": 65,
+      "experimental_index_sort": true,
+      "build_key": "4f8be782cbbd63f1cc53cf6e5817bcdccc161dd1b728c4a1b0fe4a306fe38b94",
+      "persistent": {
+        "reused": false,
+        "worker_pids": [
+          7829,
+          7830
+        ],
+        "request_count": 1
+      },
+      "run_dir": "/workspace/beam-results/public-index-20261114/cache-libtorch/runs/7af16df2cb554500b26a53f858bab7ff",
+      "solutions": [
+        [
+          0,
+          1,
+          2
+        ],
+        [
+          1,
+          2,
+          0
+        ],
+        [
+          0,
+          2,
+          1
+        ]
+      ]
+    }
+  ]
+}

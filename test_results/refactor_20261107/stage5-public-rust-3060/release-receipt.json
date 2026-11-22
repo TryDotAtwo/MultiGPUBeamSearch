@@ -1,0 +1,16 @@
+{
+  "instance": 59637230,
+  "label": "codex-beam-public-rust-3060-20261108",
+  "before": {
+    "id": 59637230,
+    "label": "codex-beam-public-rust-3060-20261108",
+    "actual_status": "running",
+    "dph_total": 0.13422222222222221,
+    "duration": 4016.162853240967,
+    "start_date": 1794094868.8354466
+  },
+  "destroy_returncode": 0,
+  "provider_absence_verified": true,
+  "archive_sha256": "9db81b13f09ac174a9c4d557030f1391110b2a6487c9d8d8d4eaf751d606cd6e",
+  "unix_time": 1794098889.9538305
+}

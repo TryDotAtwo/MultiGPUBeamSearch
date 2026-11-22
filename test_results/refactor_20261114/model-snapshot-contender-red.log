@@ -1,0 +1,69 @@
+F.                                                                       [100%]
+================================== FAILURES ===================================
+__________ test_pending_contender_does_not_interrupt_running_launch ___________
+
+tmp_path = WindowsPath('D:/100XH100/.local/cache/session-snapshot/pytest-contender-red-20261114/test_pending_contender_does_no0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x00000227CB3D8890>
+
+    def test_pending_contender_does_not_interrupt_running_launch(tmp_path, monkeypatch):
+        import threading
+        from types import SimpleNamespace
+        from multigpubeamsearch import models
+        from multigpubeamsearch.options import NativeOptions, NativeOutcome
+    
+        monkeypatch.setattr(models, 'verify_prepared_model', lambda *args: None)
+        session = NativeSession()
+        started, contender_has_lock, launch_done, release_contender, release_run = [threading.Event() for _ in range(5)]
+        errors = []
+        class PausedLock:
+            def __init__(self):self.inner = threading.Lock()
+            def acquire(self, blocking):
+                result = self.inner.acquire(blocking=blocking)
+                if result and threading.current_thread().name == 'contender':
+                    contender_has_lock.set()
+                    assert release_contender.wait(timeout=10)
+                return result
+            def release(self):self.inner.release()
+            def locked(self):return self.inner.locked()
+        session._operation_lock = PausedLock()
+        monkeypatch.setattr(session, '_launch', lambda *args, **kwargs: .01)
+        def execute(*args, **kwargs):
+            started.set()
+            assert contender_has_lock.wait(timeout=10)
+            session.launch(['runner'], contract=None, run_dir=tmp_path, env={}, world=1, timeout=1)
+            launch_done.set()
+            assert release_run.wait(timeout=10)
+            return NativeOutcome(None, .01, 1, tmp_path,
+                                 {'requested_beam_width': 1, 'profile': {}, 'terminal_records': 1})
+        def work():
+            try:
+                session.run(execute, SimpleNamespace(graph_hash='graph'),
+                            SimpleNamespace(artifact_hash='model', backend='mlp'),
+                            NativeOptions(), 1, 1, tmp_path, (0,))
+            except BaseException as error:errors.append(error)
+        def contend():
+            try:
+                with session.search_scope():pass
+            except RuntimeError as error:errors.append(error)
+        worker = threading.Thread(target=work)
+        contender = threading.Thread(target=contend, name='contender')
+        worker.start()
+        try:
+            assert started.wait(timeout=10)
+            contender.start()
+>           assert launch_done.wait(timeout=5)
+E           assert False
+E            +  where False = wait(timeout=5)
+E            +    where wait = <threading.Event at 0x227cb3d8290: unset>.wait
+
+integrations\cayleypy_native\tests\test_persistent_search.py:317: AssertionError
+============================== warnings summary ===============================
+tests/test_persistent_search.py::test_pending_contender_does_not_interrupt_running_launch
+tests/test_persistent_search.py::test_pending_contender_does_not_interrupt_running_launch
+  C:\Users\���� ������\AppData\Local\Programs\Python\Python311\Lib\site-packages\asttokens\util.py:202: DeprecationWarning: importing 'Const' from 'astroid' is deprecated and will be removed in v5, import it from 'astroid.nodes' instead
+    from astroid import Const
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+FAILED integrations\cayleypy_native\tests\test_persistent_search.py::test_pending_contender_does_not_interrupt_running_launch
+1 failed, 1 passed, 2 warnings in 13.73s

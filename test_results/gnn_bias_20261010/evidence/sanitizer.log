@@ -1,0 +1,8 @@
+========= COMPUTE-SANITIZER
+/venv/main/lib/python3.12/site-packages/torch/profiler/profiler.py:224: UserWarning: Warning: Profiler clears events at the end of each cycle.Only events from the current cycle will be reported.To keep events across cycles, set acc_events=True.
+  _warn_once(
+WARNING:2026-10-10 12:18:35 1320:1320 init.cpp:116] function cbapi->getCuptiStatus() failed with error CUPTI_ERROR_MULTIPLE_SUBSCRIBERS_NOT_SUPPORTED (39)
+WARNING:2026-10-10 12:18:35 1320:1320 init.cpp:117] CUPTI initialization failed - CUDA profiler activities will be missing
+INFO:2026-10-10 12:18:35 1320:1320 init.cpp:119] If you see CUPTI_ERROR_INSUFFICIENT_PRIVILEGES, refer to https://developer.nvidia.com/nvidia-development-tools-solutions-err-nvgpuctrperm-cupti
+candidate 28 projection cases PASS
+========= ERROR SUMMARY: 0 errors

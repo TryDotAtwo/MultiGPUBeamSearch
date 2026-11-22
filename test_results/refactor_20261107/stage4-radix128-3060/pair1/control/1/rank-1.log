@@ -1,0 +1,4 @@
+native_host_memory_available_bytes=84129878016 native_host_memory_history_budget=0 native_host_memory_headroom=4294967296
+communicator_rank=1 world_size=2 node_local_rank=1 local_world_size=2 cuda_ordinal=1
+GLOBAL_BEAM_WIDTH_EFFECTIVE=4096
+benchmark_plan_only=1 admitted_global_beam=4096

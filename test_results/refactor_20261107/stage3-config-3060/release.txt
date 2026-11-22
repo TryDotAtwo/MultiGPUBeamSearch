@@ -1,0 +1,14 @@
+   Compiling version_check v0.9.5
+   Compiling typenum v1.20.1
+   Compiling cpufeatures v0.2.17
+   Compiling beam-core v0.1.0 (/workspace/beam-work/rust/beam-core)
+   Compiling generic-array v0.14.7
+   Compiling beam-native-sys v0.1.0 (/workspace/beam-work/rust/beam-native-sys)
+   Compiling block-buffer v0.10.4
+   Compiling crypto-common v0.1.7
+   Compiling digest v0.10.7
+   Compiling sha2 v0.10.9
+   Compiling beam-runtime v0.1.0 (/workspace/beam-work/rust/beam-runtime)
+   Compiling beam-python v0.1.0 (/workspace/beam-work/rust/beam-python)
+   Compiling beam-cli v0.1.0 (/workspace/beam-work/rust/beam-cli)
+    Finished `release` profile [optimized] target(s) in 10.74s

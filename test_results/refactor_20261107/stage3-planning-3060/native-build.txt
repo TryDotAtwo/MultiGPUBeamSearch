@@ -1,0 +1,76 @@
+[0/1] Re-running CMake...
+-- Beam state logical bytes: 96
+-- Beam state physical bytes: 112
+-- Beam state alignment: 16
+-- Beam move count: 24
+-- PyTorch: CUDA detected: 12.8
+-- PyTorch: CUDA nvcc is: /usr/local/cuda/bin/nvcc
+-- PyTorch: CUDA toolkit directory: /usr/local/cuda
+-- PyTorch: Header version is: 12.8
+CMake Warning at /opt/conda/lib/python3.11/site-packages/torch/share/cmake/Caffe2/public/cuda.cmake:140 (message):
+  Failed to compute shorthash for libnvrtc.so
+Call Stack (most recent call first):
+  /opt/conda/lib/python3.11/site-packages/torch/share/cmake/Caffe2/Caffe2Config.cmake:86 (include)
+  /opt/conda/lib/python3.11/site-packages/torch/share/cmake/Torch/TorchConfig.cmake:68 (find_package)
+  CMakeLists.txt:31 (find_package)
+
+
+-- USE_CUDNN is set to 0. Compiling without cuDNN support
+-- USE_CUSPARSELT is set to 0. Compiling without cuSPARSELt support
+-- USE_CUDSS is set to 0. Compiling without cuDSS support
+-- USE_CUFILE is set to 0. Compiling without cuFile support
+-- Autodetected CUDA architecture(s):  8.6 8.6
+CMake Warning at /opt/conda/lib/python3.11/site-packages/torch/share/cmake/Caffe2/public/cuda.cmake:323 (message):
+  pytorch is not compatible with `CMAKE_CUDA_ARCHITECTURES` and will ignore
+  its value.  Please configure `TORCH_CUDA_ARCH_LIST` instead.
+Call Stack (most recent call first):
+  /opt/conda/lib/python3.11/site-packages/torch/share/cmake/Caffe2/Caffe2Config.cmake:86 (include)
+  /opt/conda/lib/python3.11/site-packages/torch/share/cmake/Torch/TorchConfig.cmake:68 (find_package)
+  CMakeLists.txt:31 (find_package)
+
+
+-- Added CUDA NVCC flags for: -gencode;arch=compute_86,code=sm_86
+CMake Warning at /opt/conda/lib/python3.11/site-packages/torch/share/cmake/Torch/TorchConfig.cmake:22 (message):
+  static library kineto_LIBRARY-NOTFOUND not found.
+Call Stack (most recent call first):
+  /opt/conda/lib/python3.11/site-packages/torch/share/cmake/Torch/TorchConfig.cmake:125 (append_torchlib_if_found)
+  CMakeLists.txt:31 (find_package)
+
+
+-- Configuring done (2.2s)
+-- Generating done (0.1s)
+-- Build files have been written to: /workspace/build-work
+[1/35] Building CUDA object CMakeFiles/final_union_dispatcher_cuda_tests.dir/tests/final_union_dispatcher_cuda_tests.cu.o
+[2/35] Building CUDA object CMakeFiles/beam_cuda.dir/cuda/dispatcher.cu.o
+[3/35] Linking CXX static library libbeam_cuda.a
+[4/35] Linking CXX executable stream1_cuda_tests
+[5/35] Linking CXX executable stream2_cuda_tests
+[6/35] Linking CXX executable stream1_transformer_hopper_gemm_cuda_tests
+[7/35] Linking CXX executable stream1_transformer_final_cls_cuda_tests
+[8/35] Linking CXX executable stream1_transformer_cuda_tests
+[9/35] Linking CXX executable stream3_cuda_tests
+[10/35] Linking CXX executable stream1_transformer_dual_ln_cuda_tests
+[11/35] Linking CXX executable stream4_cuda_tests
+[12/35] Linking CXX executable stream4_logical_union_cuda_tests
+[13/35] Linking CXX executable union_memory_cuda_tests
+[14/35] Linking CXX executable runtime_arithmetic_tests
+[15/35] Linking CXX executable stream5_cuda_tests
+[16/35] Linking CXX executable final_cuda_tests
+[17/35] Linking CXX executable threshold_cuda_tests
+[18/35] Linking CXX executable stream4_bounded_graph_cuda_tests
+[19/35] Linking CXX executable final_union_dispatcher_cuda_tests
+[20/35] Linking CXX executable final_snapshot_validation_cuda_tests
+[21/35] Linking CXX executable threshold_union_cuda_tests
+[22/35] Linking CXX executable stream1_nonfinite_score_cuda_tests
+[23/35] Linking CXX executable stitched_cuda_tests
+[24/35] Linking CXX executable static_memory_cuda_tests
+[25/35] Linking CXX executable dispatcher_cuda_tests
+[26/35] Linking CXX executable production_runner
+[27/35] Linking CXX executable stream_benchmark
+[28/35] Linking CXX shared library libbeam_native.so
+[29/35] Linking CXX executable stream_pipeline_benchmark
+[30/35] Linking CXX executable stream1_ensemble_benchmark
+[31/35] Linking CXX shared library libbeam_native_libtorch.so
+[32/35] Linking CXX executable production_runner_libtorch_stream1
+[33/35] Linking CXX executable stream1_native_mlp_benchmark
+[34/35] Linking CXX executable stream1_libtorch_mlp_benchmark

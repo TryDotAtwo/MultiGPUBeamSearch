@@ -1,0 +1,174 @@
+FsFFF                                                                    [100%]
+================================== FAILURES ===================================
+_____________ test_thread_start_failure_uses_verified_serial_path _____________
+
+tmp_path = WindowsPath('D:/100XH100/.local/tmp/nccl-review-red/test_thread_start_failure_uses0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x0000020ECD152290>
+
+    def test_thread_start_failure_uses_verified_serial_path(tmp_path, monkeypatch):
+        from multigpubeamsearch import nccl_digest
+    
+        library = tmp_path / "libnccl.so.2"
+        library.write_bytes(b"abcdefghijklmnopq")
+        cache = nccl_digest.ChunkDigestCache(chunk_bytes=4, workers=2)
+        cache.sha256(library)
+    
+        def no_threads(*args, **kwargs):
+            raise RuntimeError("can't start new thread")
+    
+        monkeypatch.setattr(nccl_digest, "ThreadPoolExecutor", no_threads)
+>       assert cache.sha256(library) == hashlib.sha256(library.read_bytes()).hexdigest()
+               ^^^^^^^^^^^^^^^^^^^^^
+
+integrations\cayleypy_native\tests\test_nccl_chunk_digest.py:120: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+integrations\cayleypy_native\multigpubeamsearch\nccl_digest.py:83: in sha256
+    with ThreadPoolExecutor(max_workers=partitions) as executor:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+args = (), kwargs = {'max_workers': 2}
+
+    def no_threads(*args, **kwargs):
+>       raise RuntimeError("can't start new thread")
+E       RuntimeError: can't start new thread
+
+integrations\cayleypy_native\tests\test_nccl_chunk_digest.py:117: RuntimeError
+___ test_dispatch_rejects_invalid_session_before_digest_preparation[closed] ___
+
+tmp_path = WindowsPath('D:/100XH100/.local/tmp/nccl-review-red/test_dispatch_rejects_invalid_0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x0000020ECD1E7450>
+invalid = 'closed'
+
+    @pytest.mark.parametrize("invalid", ["closed", "other_process"])
+    def test_dispatch_rejects_invalid_session_before_digest_preparation(tmp_path, monkeypatch, invalid):
+        from multigpubeamsearch import NativeSession
+    
+        fake_native(monkeypatch, tmp_path)
+        monkeypatch.setattr(dispatch, "prepare_runtime", lambda *args, **kwargs: pytest.fail("must reject before preparation"))
+        session = NativeSession(experimental_parallel_nccl_identity=True)
+        with session.activate():
+            owner = session._owner_pid
+            if invalid == "closed":
+                session.close()
+            else:
+                session._owner_pid = -1
+            try:
+                with pytest.raises(RuntimeError, match="closed|process"):
+>                   dispatch.beam_search(graph(), backend="native", native_options=NativeOptions(cache_dir=tmp_path),
+                                         start_state=[1, 0, 2, 3, 4], max_steps=4)
+
+integrations\cayleypy_native\tests\test_dispatch.py:184: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+integrations\cayleypy_native\multigpubeamsearch\dispatch.py:279: in beam_search
+    return _search(original, graph, kwargs, options, backend)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+integrations\cayleypy_native\multigpubeamsearch\dispatch.py:220: in _search
+    runtime = prepare_runtime(contract, model, options, run_dir, devices, **runtime_kwargs)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+args = (GraphContract(state_len=5, num_classes=5, generators=((1, 2, 3, 4, 0), (4, 0, 1, 2, 3), (1, 0, 2, 3, 4)), generator_n...('D:/100XH100/.local/tmp/nccl-review-red/test_dispatch_rejects_invalid_0/runs/344ed874caf54b96b8b2e4e9b1b651ef'), (0,))
+kwargs = {'nccl_digest_cache': <multigpubeamsearch.nccl_digest.ChunkDigestCache object at 0x0000020ECD182350>, 'touch_bfs_radius': 0}
+
+>   monkeypatch.setattr(dispatch, "prepare_runtime", lambda *args, **kwargs: pytest.fail("must reject before preparation"))
+                                                                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   Failed: must reject before preparation
+
+integrations\cayleypy_native\tests\test_dispatch.py:174: Failed
+_ test_dispatch_rejects_invalid_session_before_digest_preparation[other_process] _
+
+tmp_path = WindowsPath('D:/100XH100/.local/tmp/nccl-review-red/test_dispatch_rejects_invalid_1')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x0000020ECD2C78D0>
+invalid = 'other_process'
+
+    @pytest.mark.parametrize("invalid", ["closed", "other_process"])
+    def test_dispatch_rejects_invalid_session_before_digest_preparation(tmp_path, monkeypatch, invalid):
+        from multigpubeamsearch import NativeSession
+    
+        fake_native(monkeypatch, tmp_path)
+        monkeypatch.setattr(dispatch, "prepare_runtime", lambda *args, **kwargs: pytest.fail("must reject before preparation"))
+        session = NativeSession(experimental_parallel_nccl_identity=True)
+        with session.activate():
+            owner = session._owner_pid
+            if invalid == "closed":
+                session.close()
+            else:
+                session._owner_pid = -1
+            try:
+                with pytest.raises(RuntimeError, match="closed|process"):
+>                   dispatch.beam_search(graph(), backend="native", native_options=NativeOptions(cache_dir=tmp_path),
+                                         start_state=[1, 0, 2, 3, 4], max_steps=4)
+
+integrations\cayleypy_native\tests\test_dispatch.py:184: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+integrations\cayleypy_native\multigpubeamsearch\dispatch.py:279: in beam_search
+    return _search(original, graph, kwargs, options, backend)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+integrations\cayleypy_native\multigpubeamsearch\dispatch.py:220: in _search
+    runtime = prepare_runtime(contract, model, options, run_dir, devices, **runtime_kwargs)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+args = (GraphContract(state_len=5, num_classes=5, generators=((1, 2, 3, 4, 0), (4, 0, 1, 2, 3), (1, 0, 2, 3, 4)), generator_n...('D:/100XH100/.local/tmp/nccl-review-red/test_dispatch_rejects_invalid_1/runs/fa9c140db09e459b9d906e880f9b9a44'), (0,))
+kwargs = {'nccl_digest_cache': <multigpubeamsearch.nccl_digest.ChunkDigestCache object at 0x0000020ECD2C5450>, 'touch_bfs_radius': 0}
+
+>   monkeypatch.setattr(dispatch, "prepare_runtime", lambda *args, **kwargs: pytest.fail("must reject before preparation"))
+                                                                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   Failed: must reject before preparation
+
+integrations\cayleypy_native\tests\test_dispatch.py:174: Failed
+_________ test_session_cannot_close_while_nccl_preparation_is_active __________
+
+tmp_path = WindowsPath('D:/100XH100/.local/tmp/nccl-review-red/test_session_cannot_close_whil0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x0000020ECD020B10>
+
+    def test_session_cannot_close_while_nccl_preparation_is_active(tmp_path, monkeypatch):
+        from multigpubeamsearch import NativeSession
+    
+        fake_native(monkeypatch, tmp_path)
+        with NativeSession(experimental_parallel_nccl_identity=True) as session:
+            def prepare(*args, **kwargs):
+                with pytest.raises(RuntimeError, match="during a search"):
+                    session.close()
+                return SimpleNamespace(build_metadata={})
+    
+            monkeypatch.setattr(dispatch, "prepare_runtime", prepare)
+>           dispatch.beam_search(graph(), backend="native", native_options=NativeOptions(cache_dir=tmp_path),
+                                 start_state=[1, 0, 2, 3, 4], max_steps=4)
+
+integrations\cayleypy_native\tests\test_dispatch.py:202: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+integrations\cayleypy_native\multigpubeamsearch\dispatch.py:279: in beam_search
+    return _search(original, graph, kwargs, options, backend)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+integrations\cayleypy_native\multigpubeamsearch\dispatch.py:220: in _search
+    runtime = prepare_runtime(contract, model, options, run_dir, devices, **runtime_kwargs)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+args = (GraphContract(state_len=5, num_classes=5, generators=((1, 2, 3, 4, 0), (4, 0, 1, 2, 3), (1, 0, 2, 3, 4)), generator_n...('D:/100XH100/.local/tmp/nccl-review-red/test_session_cannot_close_whil0/runs/56f31a9a1ad244328939fe39faf42a9b'), (0,))
+kwargs = {'nccl_digest_cache': <multigpubeamsearch.nccl_digest.ChunkDigestCache object at 0x0000020ECD021D90>, 'touch_bfs_radius': 0}
+
+    def prepare(*args, **kwargs):
+>       with pytest.raises(RuntimeError, match="during a search"):
+E       Failed: DID NOT RAISE <class 'RuntimeError'>
+
+integrations\cayleypy_native\tests\test_dispatch.py:197: Failed
+============================== warnings summary ===============================
+C:\Users\���� ������\AppData\Local\Programs\Python\Python311\Lib\site-packages\asttokens\util.py:202
+C:\Users\���� ������\AppData\Local\Programs\Python\Python311\Lib\site-packages\asttokens\util.py:202
+  C:\Users\���� ������\AppData\Local\Programs\Python\Python311\Lib\site-packages\asttokens\util.py:202: DeprecationWarning: importing 'Const' from 'astroid' is deprecated and will be removed in v5, import it from 'astroid.nodes' instead
+    from astroid import Const
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+FAILED integrations\cayleypy_native\tests\test_nccl_chunk_digest.py::test_thread_start_failure_uses_verified_serial_path
+FAILED integrations\cayleypy_native\tests\test_dispatch.py::test_dispatch_rejects_invalid_session_before_digest_preparation[closed]
+FAILED integrations\cayleypy_native\tests\test_dispatch.py::test_dispatch_rejects_invalid_session_before_digest_preparation[other_process]
+FAILED integrations\cayleypy_native\tests\test_dispatch.py::test_session_cannot_close_while_nccl_preparation_is_active
+4 failed, 1 skipped, 53 deselected, 2 warnings in 8.71s
+Exception ignored in: <function Console.__del__ at 0x0000020EF96534C0>
+Traceback (most recent call last):
+  File "C:\Users\���� ������\AppData\Local\Programs\Python\Python311\Lib\site-packages\pyreadline3\console\console.py", line 255, in __del__
+OSError: [WinError -1073741816] Windows Error 0xc0000008

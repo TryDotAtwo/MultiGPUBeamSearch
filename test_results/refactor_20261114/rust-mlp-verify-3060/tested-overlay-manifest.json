@@ -1,0 +1,54 @@
+{
+  "base_commit": "df696b736099330a83e5c2802a7e9bb959cdf3ff",
+  "base_sha256": "c1a634885738b09fe6a9e98e366ef0640dfb07dbb832d458d4e63675abce0d6e",
+  "baseline_files": 493,
+  "cutlass_sha256": "458b5d80f344652d61fe011b557968cd58e9583a96f0ab0823ecc4dc9dc0f0c6",
+  "files": {
+    "integrations/cayleypy_native/multigpubeamsearch/model_snapshot.py": {
+      "normalized_lf_sha256": "3d989c981150c1ca066de277f48b45e03cd2e15bf4478095763206cc332d52e5",
+      "sha256": "3d989c981150c1ca066de277f48b45e03cd2e15bf4478095763206cc332d52e5"
+    },
+    "integrations/cayleypy_native/multigpubeamsearch/models.py": {
+      "normalized_lf_sha256": "c9691e4ed16ff1c3fbe7ff58fcfd95af40e751086db7370367479d1b8d3d1ce7",
+      "sha256": "c6d5b2c1a0453d50d550c0ffebd6e592e611611bbcddb9b7112316376f32aaac"
+    },
+    "integrations/cayleypy_native/multigpubeamsearch/persistent.py": {
+      "normalized_lf_sha256": "0a76674d7c6dcbb48116d8d1c031b60135c3f27ba2c60ebbda042907ef33d11b",
+      "sha256": "0a76674d7c6dcbb48116d8d1c031b60135c3f27ba2c60ebbda042907ef33d11b"
+    },
+    "integrations/cayleypy_native/tests/test_persistent_search.py": {
+      "normalized_lf_sha256": "b4ba176f4be707aa7410ac13978ffe92392b2156c17b1fc934c44b9546909611",
+      "sha256": "2ba0b92c69df081495a1b0ad7eba0c2074a96f18ba2ab3be67588dfe7947b948"
+    },
+    "integrations/cayleypy_native/tests/test_rust_model_snapshot.py": {
+      "normalized_lf_sha256": "0ef9bde751895782e14c152757da1fea7e59cdea64ea7c0b89346840d169b118",
+      "sha256": "0ef9bde751895782e14c152757da1fea7e59cdea64ea7c0b89346840d169b118"
+    },
+    "integrations/cayleypy_native/tests/test_session_model_snapshot.py": {
+      "normalized_lf_sha256": "de57855e5791f2d78b59340d22936dd6007acc2165c46b207fb8f90e78f93aaf",
+      "sha256": "de57855e5791f2d78b59340d22936dd6007acc2165c46b207fb8f90e78f93aaf"
+    },
+    "rust/beam-python/src/mlp_snapshot.rs": {
+      "normalized_lf_sha256": "f4cef88f532c651565d1804bd66f28277e13b60a50c548329194bfc173723d78",
+      "sha256": "f4cef88f532c651565d1804bd66f28277e13b60a50c548329194bfc173723d78"
+    },
+    "rust/beam-python/tests/mlp_snapshot.py": {
+      "normalized_lf_sha256": "2a55db28730b34824e503d36d76037f74b1a4fa47e1f53e9c7fe1f663436a37f",
+      "sha256": "2a55db28730b34824e503d36d76037f74b1a4fa47e1f53e9c7fe1f663436a37f"
+    },
+    "rust/beam-runtime/src/mlp_snapshot.rs": {
+      "normalized_lf_sha256": "50f2d5ec06d852861cf1f7a7d196998beaff4f08b669fbe1c0b0e3cd9d5ede9b",
+      "sha256": "50f2d5ec06d852861cf1f7a7d196998beaff4f08b669fbe1c0b0e3cd9d5ede9b"
+    },
+    "rust/beam-runtime/tests/mlp_snapshot.rs": {
+      "normalized_lf_sha256": "cabd707e7c3dd42850db401a4463cb41a3f072519c3e2f883ab1b864f0dddc63",
+      "sha256": "cabd707e7c3dd42850db401a4463cb41a3f072519c3e2f883ab1b864f0dddc63"
+    },
+    "tests/public_mlp_launch_verify_gpu.py": {
+      "normalized_lf_sha256": "32d5629262636805c08ee9429e4b4f7defcb62cecec730935e8232bc45c10feb",
+      "sha256": "32d5629262636805c08ee9429e4b4f7defcb62cecec730935e8232bc45c10feb"
+    }
+  },
+  "overlay_manifest_sha256": "dccee2e4ab22970394bceb178c32e4644666e62e8902ea01f5fc174c46f52209",
+  "overlay_sha256": "37b573f1c8973193b6c33863d14ff6c5f58604acfdd180c15afb003ad13f08de"
+}

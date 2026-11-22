@@ -1,0 +1,9 @@
+{
+  "rust_cpu_passed": 55,
+  "python_passed": 528,
+  "python_skipped": 9,
+  "scope": "control, exact workload, cache and cleanup; no trained-model quality or production performance promotion",
+  "component_fixture_flush": 131072,
+  "logical_width": 4096,
+  "native_baseline_small_profile_overflow": "baseline-overflow/receipt.json"
+}

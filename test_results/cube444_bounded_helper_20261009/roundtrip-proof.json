@@ -1,0 +1,8 @@
+{
+  "status": "PASS",
+  "artifact_commit": "00a9f82dd95c6aaf8ebcb1ffea66fe3537fb66a0",
+  "archive_sha256": "635ffed25aca4fc01045b81652e39ca350d19200d9b8edc4e1f752e9730d5435",
+  "helper_sha256": "fc15f6736456c8a3b01776d43eacdedf7f2c91c77fffb720e0535064dcffd53f",
+  "bytes": 432715,
+  "parts": 6
+}

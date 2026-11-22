@@ -1,0 +1,23 @@
+native_host_memory_available_bytes=83681546240 native_host_memory_history_budget=0 native_host_memory_headroom=4294967296
+communicator_rank=0 world_size=2 node_local_rank=0 local_world_size=2 cuda_ordinal=0
+GLOBAL_BEAM_WIDTH_EFFECTIVE=4096
+stream1_mode=model
+stream1_executor=native_cuda_graph
+runtime_ring_count=3
+runtime_ring_slot_count=2
+runtime_ring_slot_physical_jobs=6
+runtime_ring_graph_execs_per_lane_requested=
+runtime_ring_graph_debug_sync=
+stream1_backend=mlp
+runtime_ring_slot_graph_windowed=0
+runtime_ring_slot_graph_window_rings=3
+runtime_ring_slot_graph_window_jobs=6
+runtime_ring_slot_graph_physical_jobs=6
+calibration_depth=0 rank=0 parents=2048 depth_sec=0.0206158 search_depth=4 next_frontier_size=2048
+calibration_depth=1 rank=0 parents=2048 depth_sec=0.0203469 search_depth=5 next_frontier_size=2048
+calibration_depth=2 rank=0 parents=2048 depth_sec=0.0203332 search_depth=6 next_frontier_size=2048
+calibration_depth=3 rank=0 parents=2048 depth_sec=0.0198904 search_depth=7 next_frontier_size=2048
+calibration_depth=4 rank=0 parents=2048 depth_sec=0.0196689 search_depth=8 next_frontier_size=2048
+calibration_depth=5 rank=0 parents=2048 depth_sec=0.0193 search_depth=9 next_frontier_size=2048
+calibration_saturated_steps=6
+puzzle_solved=0 puzzle_id=0 seconds=0.335683 solution_length=-1 solution=

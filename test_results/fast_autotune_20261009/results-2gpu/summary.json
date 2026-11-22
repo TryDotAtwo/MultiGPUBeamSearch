@@ -1,0 +1,5397 @@
+[
+  {
+    "file": "verified-small-65536.json",
+    "beam": 65536,
+    "path_replay": true,
+    "inference": {
+      "signature": {
+        "schema": 5,
+        "search_policy": "coarse-local-v1",
+        "graph": "e05fbac16dfae541895b81c0c0063ad07a1067ccf326649c455541dda88e1359",
+        "models": "eb62916af2116fc2aef735a634f4c6f4d8af5fd434297d528085429a3a23693b",
+        "runner": "611ccc84844dde1b0d110bf2015420d1b230340013c2aee6346fecc81dbe1cef",
+        "probe": "c3b182baed6a03cc481f8122e1d161d5536daeaef652fc150c00ff5deb164def",
+        "gpu_properties": [
+          "_CudaDeviceProperties(name='NVIDIA GeForce RTX 3060', major=8, minor=6, total_memory=11907MB, multi_processor_count=28, uuid=2f8eeec4-28fb-0399-d6f1-e91e7f4bc8ef, pci_bus_id=3, pci_device_id=0, pci_domain_id=0, L2_cache_size=2MB)",
+          "_CudaDeviceProperties(name='NVIDIA GeForce RTX 3060', major=8, minor=6, total_memory=11909MB, multi_processor_count=28, uuid=9c6b7f55-0eb8-f370-e9b4-e9e950e0c90e, pci_bus_id=131, pci_device_id=0, pci_domain_id=0, L2_cache_size=2MB)"
+        ],
+        "device_indices": [
+          0,
+          1
+        ],
+        "world_size": 2,
+        "torch": "2.11.0+cu128",
+        "cuda": "12.8",
+        "topology_sha256": "53ffa83b847acfd328d58eba58f12315317feb3159b732c1a72cdbc6711e08df",
+        "hardware_sha256": "8d303daba766293c9289c8a6457c95f7e30d0c18e91ea9d338bbaff994fcfca0",
+        "gpu_uuids": [
+          "2f8eeec4-28fb-0399-d6f1-e91e7f4bc8ef",
+          "9c6b7f55-0eb8-f370-e9b4-e9e950e0c90e"
+        ],
+        "host": {
+          "machine": "x86_64",
+          "processor": "x86_64"
+        },
+        "requested_beam_width": 65536,
+        "precision": "fp16/fp32",
+        "max_batch": 2048
+      },
+      "phase": "inference_verified",
+      "parent_batch": 2048,
+      "reserve_bytes": 562036736,
+      "estimate": {
+        "profile": "2048",
+        "median": 1.797500008251518e-7,
+        "low": 1.7662500613369047e-7,
+        "high": 1.8274999456480146e-7,
+        "relative_mad": 0.016689812105023887,
+        "repeats": 7
+      },
+      "records": [
+        {
+          "batch": 256,
+          "correctness_passed": true,
+          "device": 0,
+          "free_bytes_after": 12175802368,
+          "model_count": 3,
+          "numeric_error": 0,
+          "parents": 8192,
+          "readout_oracle_max_key_error": 0,
+          "score_input": "graph_states",
+          "seconds": [
+            0.02328780746459961,
+            0.025044992446899415,
+            0.02327347183227539,
+            0.02305638313293457,
+            0.022971328735351564,
+            0.023017471313476562,
+            0.022790143966674805
+          ],
+          "torch_reserved_peak_bytes": 25165824
+        },
+        {
+          "batch": 256,
+          "correctness_passed": true,
+          "device": 1,
+          "free_bytes_after": 12311199744,
+          "model_count": 3,
+          "numeric_error": 0,
+          "parents": 8192,
+          "readout_oracle_max_key_error": 0,
+          "score_input": "graph_states",
+          "seconds": [
+            0.022389759063720704,
+            0.02201190376281738,
+            0.022218591690063478,
+            0.022297599792480468,
+            0.02208563232421875,
+            0.02206812858581543,
+            0.022005760192871093
+          ],
+          "torch_reserved_peak_bytes": 25165824
+        },
+        {
+          "batch": 128,
+          "correctness_passed": true,
+          "device": 0,
+          "free_bytes_after": 12175802368,
+          "model_count": 3,
+          "numeric_error": 0,
+          "parents": 8192,
+          "readout_oracle_max_key_error": 0,
+          "score_input": "graph_states",
+          "seconds": [
+            0.04686131286621094,
+            0.04650700759887695,
+            0.0463267822265625,
+            0.04597452926635742,
+            0.046018558502197264,
+            0.04589875030517578,
+            0.04599811172485352
+          ],
+          "torch_reserved_peak_bytes": 25165824
+        },
+        {
+          "batch": 128,
+          "correctness_passed": true,
+          "device": 1,
+          "free_bytes_after": 12311199744,
+          "model_count": 3,
+          "numeric_error": 0,
+          "parents": 8192,
+          "readout_oracle_max_key_error": 0,
+          "score_input": "graph_states",
+          "seconds": [
+            0.04528742218017578,
+            0.04454707336425781,
+            0.04446495819091797,
+            0.04424806213378906,
+            0.04434636688232422,
+            0.04413030242919922,
+            0.04455955123901367
+          ],
+          "torch_reserved_peak_bytes": 25165824
+        },
+        {
+          "batch": 1024,
+          "correctness_passed": true,
+          "device": 0,
+          "free_bytes_after": 12175802368,
+          "model_count": 3,
+          "numeric_error": 0,
+          "parents": 8192,
+          "readout_oracle_max_key_error": 0,
+          "score_input": "graph_states",
+          "seconds": [
+            0.005850111961364746,
+            0.0057118721008300784,
+            0.005814271926879883,
+            0.005658624172210694,
+            0.005856256008148194,
+            0.005699584007263184,
+            0.005850111961364746
+          ],
+          "torch_reserved_peak_bytes": 25165824
+        },
+        {
+          "batch": 1024,
+          "correctness_passed": true,
+          "device": 1,
+          "free_bytes_after": 12311199744,
+          "model_count": 3,
+          "numeric_error": 0,
+          "parents": 8192,
+          "readout_oracle_max_key_error": 0,
+          "score_input": "graph_states",
+          "seconds": [
+            0.005602560043334961,
+            0.00538108777999878,
+            0.005637119770050049,
+            0.005370880126953125,
+            0.005516287803649903,
+            0.005518335819244385,
+            0.0055214080810546875
+          ],
+          "torch_reserved_peak_bytes": 25165824
+        },
+        {
+          "batch": 32,
+          "correctness_passed": true,
+          "device": 0,
+          "free_bytes_after": 12175802368,
+          "model_count": 3,
+          "numeric_error": 0,
+          "parents": 8192,
+          "readout_oracle_max_key_error": 0,
+          "score_input": "graph_states",
+          "seconds": [
+            0.209328125,
+            0.20958003234863282,
+            0.21033164978027344,
+            0.20996505737304688,
+            0.2094620819091797,
+            0.20973379516601562,
+            0.2129633331298828
+          ],
+          "torch_reserved_peak_bytes": 25165824
+        },
+        {
+          "batch": 32,
+          "correctness_passed": true,
+          "device": 1,
+          "free_bytes_after": 12311199744,
+          "model_count": 3,
+          "numeric_error": 0,
+          "parents": 8192,
+          "readout_oracle_max_key_error": 0,
+          "score_input": "graph_states",
+          "seconds": [
+            0.19687103271484374,
+            0.19636428833007813,
+            0.1976944580078125,
+            0.1959832000732422,
+            0.19657728576660155,
+            0.19683616638183593,
+            0.2003056640625
+          ],
+          "torch_reserved_peak_bytes": 25165824
+        },
+        {
+          "batch": 512,
+          "correctness_passed": true,
+          "device": 0,
+          "free_bytes_after": 12175802368,
+          "model_count": 3,
+          "numeric_error": 0,
+          "parents": 8192,
+          "readout_oracle_max_key_error": 0,
+          "score_input": "graph_states",
+          "seconds": [
+            0.011975680351257324,
+            0.013626367568969726,
+            0.011706368446350097,
+            0.011764736175537109,
+            0.01174732780456543,
+            0.011600799560546875,
+            0.011592703819274902
+          ],
+          "torch_reserved_peak_bytes": 25165824
+        },
+        {
+          "batch": 512,
+          "correctness_passed": true,
+          "device": 1,
+          "free_bytes_after": 12311199744,
+          "model_count": 3,
+          "numeric_error": 0,
+          "parents": 8192,
+          "readout_oracle_max_key_error": 0,
+          "score_input": "graph_states",
+          "seconds": [
+            0.011521920204162598,
+            0.01115135955810547,
+            0.011156479835510253,
+            0.011214847564697266,
+            0.011157504081726074,
+            0.011312128067016602,
+            0.011080703735351562
+          ],
+          "torch_reserved_peak_bytes": 25165824
+        },
+        {
+          "batch": 64,
+          "correctness_passed": true,
+          "device": 0,
+          "free_bytes_after": 12175802368,
+          "model_count": 3,
+          "numeric_error": 0,
+          "parents": 8192,
+          "readout_oracle_max_key_error": 0,
+          "score_input": "graph_states",
+          "seconds": [
+            0.09273958587646484,
+            0.09165824127197265,
+            0.09148518371582032,
+            0.09125888061523438,
+            0.09108480072021484,
+            0.09117183685302735,
+            0.09117696380615234
+          ],
+          "torch_reserved_peak_bytes": 25165824
+        },
+        {
+          "batch": 64,
+          "correctness_passed": true,
+          "device": 1,
+          "free_bytes_after": 12311199744,
+          "model_count": 3,
+          "numeric_error": 0,
+          "parents": 8192,
+          "readout_oracle_max_key_error": 0,
+          "score_input": "graph_states",
+          "seconds": [
+            0.09133567810058593,
+            0.08833638763427734,
+            0.08824626922607422,
+            0.08830038452148438,
+            0.0877096939086914,
+            0.08787452697753906,
+            0.08820941162109375
+          ],
+          "torch_reserved_peak_bytes": 25165824
+        },
+        {
+          "batch": 2048,
+          "correctness_passed": true,
+          "device": 0,
+          "free_bytes_after": 12175802368,
+          "model_count": 3,
+          "numeric_error": 0,
+          "parents": 8192,
+          "readout_oracle_max_key_error": 0,
+          "score_input": "graph_states",
+          "seconds": [
+            0.0030289919376373293,
+            0.002994175910949707,
+            0.002945024013519287,
+            0.0028938241004943847,
+            0.0029716479778289797,
+            0.002892735958099365,
+            0.00291430401802063
+          ],
+          "torch_reserved_peak_bytes": 25165824
+        },
+        {
+          "batch": 2048,
+          "correctness_passed": true,
+          "device": 1,
+          "free_bytes_after": 12311199744,
+          "model_count": 3,
+          "numeric_error": 0,
+          "parents": 8192,
+          "readout_oracle_max_key_error": 0,
+          "score_input": "graph_states",
+          "seconds": [
+            0.002933759927749634,
+            0.0028569600582122805,
+            0.0028651518821716307,
+            0.002799616098403931,
+            0.002831360101699829,
+            0.002831360101699829,
+            0.0027832000255584716
+          ],
+          "torch_reserved_peak_bytes": 25165824
+        },
+        {
+          "batch": 1792,
+          "correctness_passed": true,
+          "device": 0,
+          "free_bytes_after": 12175802368,
+          "model_count": 3,
+          "numeric_error": 0,
+          "parents": 8192,
+          "readout_oracle_max_key_error": 0,
+          "score_input": "graph_states",
+          "seconds": [
+            0.003768320083618164,
+            0.0038297600746154785,
+            0.003668992042541504,
+            0.0036669440269470215,
+            0.0035932159423828127,
+            0.003643392086029053,
+            0.0036247680187225344
+          ],
+          "torch_reserved_peak_bytes": 25165824
+        },
+        {
+          "batch": 1792,
+          "correctness_passed": true,
+          "device": 1,
+          "free_bytes_after": 12311199744,
+          "model_count": 3,
+          "numeric_error": 0,
+          "parents": 8192,
+          "readout_oracle_max_key_error": 0,
+          "score_input": "graph_states",
+          "seconds": [
+            0.0036505279541015627,
+            0.0036671040058135988,
+            0.0034600958824157714,
+            0.003506175994873047,
+            0.0035919361114501954,
+            0.003457024097442627,
+            0.003440799951553345
+          ],
+          "torch_reserved_peak_bytes": 25165824
+        },
+        {
+          "batch": 1280,
+          "correctness_passed": true,
+          "device": 0,
+          "free_bytes_after": 12175802368,
+          "model_count": 3,
+          "numeric_error": 0,
+          "parents": 8192,
+          "readout_oracle_max_key_error": 0,
+          "score_input": "graph_states",
+          "seconds": [
+            0.005212128162384033,
+            0.005313471794128418,
+            0.00520908784866333,
+            0.0049827837944030765,
+            0.005074944019317627,
+            0.005127168178558349,
+            0.005026656150817871
+          ],
+          "torch_reserved_peak_bytes": 25165824
+        },
+        {
+          "batch": 1280,
+          "correctness_passed": true,
+          "device": 1,
+          "free_bytes_after": 12311199744,
+          "model_count": 3,
+          "numeric_error": 0,
+          "parents": 8192,
+          "readout_oracle_max_key_error": 0,
+          "score_input": "graph_states",
+          "seconds": [
+            0.0051140799522399905,
+            0.005090079784393311,
+            0.005134496212005615,
+            0.004863999843597412,
+            0.004951039791107178,
+            0.004968448162078858,
+            0.004907008171081543
+          ],
+          "torch_reserved_peak_bytes": 25165824
+        },
+        {
+          "batch": 1536,
+          "correctness_passed": true,
+          "device": 0,
+          "free_bytes_after": 12175802368,
+          "model_count": 3,
+          "numeric_error": 0,
+          "parents": 8192,
+          "readout_oracle_max_key_error": 0,
+          "score_input": "graph_states",
+          "seconds": [
+            0.004574207782745361,
+            0.0045015039443969725,
+            0.0045946879386901856,
+            0.004443136215209961,
+            0.004431871891021728,
+            0.004520959854125976,
+            0.004435967922210693
+          ],
+          "torch_reserved_peak_bytes": 25165824
+        },
+        {
+          "batch": 1536,
+          "correctness_passed": true,
+          "device": 1,
+          "free_bytes_after": 12311199744,
+          "model_count": 3,
+          "numeric_error": 0,
+          "parents": 8192,
+          "readout_oracle_max_key_error": 0,
+          "score_input": "graph_states",
+          "seconds": [
+            0.004462592124938965,
+            0.004411392211914063,
+            0.004423679828643799,
+            0.004382912158966064,
+            0.00435814380645752,
+            0.004387839794158936,
+            0.004346879959106445
+          ],
+          "torch_reserved_peak_bytes": 25165824
+        }
+      ],
+      "rejected": {},
+      "stat_rejected": {},
+      "gpu_telemetry": {
+        "32": {
+          "samples": [
+            [
+              {
+                "index": 0,
+                "uuid": "GPU-2f8eeec4-28fb-0399-d6f1-e91e7f4bc8ef",
+                "temperature": 39,
+                "throttled": false
+              },
+              {
+                "index": 1,
+                "uuid": "GPU-9c6b7f55-0eb8-f370-e9b4-e9e950e0c90e",
+                "temperature": 40,
+                "throttled": false
+              }
+            ],
+            [
+              {
+                "index": 0,
+                "uuid": "GPU-2f8eeec4-28fb-0399-d6f1-e91e7f4bc8ef",
+                "temperature": 39,
+                "throttled": false
+              },
+              {
+                "index": 1,
+                "uuid": "GPU-9c6b7f55-0eb8-f370-e9b4-e9e950e0c90e",
+                "temperature": 40,
+                "throttled": false
+              }
+            ]
+          ],
+          "errors": [],
+          "interval_seconds": 5,
+          "throttled": false,
+          "scope": "sampled visible GPUs; transient events may be missed"
+        },
+        "64": {
+          "samples": [
+            [
+              {
+                "index": 0,
+                "uuid": "GPU-2f8eeec4-28fb-0399-d6f1-e91e7f4bc8ef",
+                "temperature": 39,
+                "throttled": false
+              },
+              {
+                "index": 1,
+                "uuid": "GPU-9c6b7f55-0eb8-f370-e9b4-e9e950e0c90e",
+                "temperature": 40,
+                "throttled": false
+              }
+            ],
+            [
+              {
+                "index": 0,
+                "uuid": "GPU-2f8eeec4-28fb-0399-d6f1-e91e7f4bc8ef",
+                "temperature": 39,
+                "throttled": false
+              },
+              {
+                "index": 1,
+                "uuid": "GPU-9c6b7f55-0eb8-f370-e9b4-e9e950e0c90e",
+                "temperature": 40,
+                "throttled": false
+              }
+            ]
+          ],
+          "errors": [],
+          "interval_seconds": 5,
+          "throttled": false,
+          "scope": "sampled visible GPUs; transient events may be missed"
+        },
+        "128": {
+          "samples": [
+            [
+              {
+                "index": 0,
+                "uuid": "GPU-2f8eeec4-28fb-0399-d6f1-e91e7f4bc8ef",
+                "temperature": 38,
+                "throttled": false
+              },
+              {
+                "index": 1,
+                "uuid": "GPU-9c6b7f55-0eb8-f370-e9b4-e9e950e0c90e",
+                "temperature": 40,
+                "throttled": false
+              }
+            ],
+            [
+              {
+                "index": 0,
+                "uuid": "GPU-2f8eeec4-28fb-0399-d6f1-e91e7f4bc8ef",
+                "temperature": 38,
+                "throttled": false
+              },
+              {
+                "index": 1,
+                "uuid": "GPU-9c6b7f55-0eb8-f370-e9b4-e9e950e0c90e",
+                "temperature": 40,
+                "throttled": false
+              }
+            ]
+          ],
+          "errors": [],
+          "interval_seconds": 5,
+          "throttled": false,
+          "scope": "sampled visible GPUs; transient events may be missed"
+        },
+        "256": {
+          "samples": [
+            [
+              {
+                "index": 0,
+                "uuid": "GPU-2f8eeec4-28fb-0399-d6f1-e91e7f4bc8ef",
+                "temperature": 38,
+                "throttled": false
+              },
+              {
+                "index": 1,
+                "uuid": "GPU-9c6b7f55-0eb8-f370-e9b4-e9e950e0c90e",
+                "temperature": 39,
+                "throttled": false
+              }
+            ],
+            [
+              {
+                "index": 0,
+                "uuid": "GPU-2f8eeec4-28fb-0399-d6f1-e91e7f4bc8ef",
+                "temperature": 38,
+                "throttled": false
+              },
+              {
+                "index": 1,
+                "uuid": "GPU-9c6b7f55-0eb8-f370-e9b4-e9e950e0c90e",
+                "temperature": 40,
+                "throttled": false
+              }
+            ]
+          ],
+          "errors": [],
+          "interval_seconds": 5,
+          "throttled": false,
+          "scope": "sampled visible GPUs; transient events may be missed"
+        },
+        "512": {
+          "samples": [
+            [
+              {
+                "index": 0,
+                "uuid": "GPU-2f8eeec4-28fb-0399-d6f1-e91e7f4bc8ef",
+                "temperature": 39,
+                "throttled": false
+              },
+              {
+                "index": 1,
+                "uuid": "GPU-9c6b7f55-0eb8-f370-e9b4-e9e950e0c90e",
+                "temperature": 40,
+                "throttled": false
+              }
+            ],
+            [
+              {
+                "index": 0,
+                "uuid": "GPU-2f8eeec4-28fb-0399-d6f1-e91e7f4bc8ef",
+                "temperature": 39,
+                "throttled": false
+              },
+              {
+                "index": 1,
+                "uuid": "GPU-9c6b7f55-0eb8-f370-e9b4-e9e950e0c90e",
+                "temperature": 40,
+                "throttled": false
+              }
+            ]
+          ],
+          "errors": [],
+          "interval_seconds": 5,
+          "throttled": false,
+          "scope": "sampled visible GPUs; transient events may be missed"
+        },
+        "1024": {
+          "samples": [
+            [
+              {
+                "index": 0,
+                "uuid": "GPU-2f8eeec4-28fb-0399-d6f1-e91e7f4bc8ef",
+                "temperature": 38,
+                "throttled": false
+              },
+              {
+                "index": 1,
+                "uuid": "GPU-9c6b7f55-0eb8-f370-e9b4-e9e950e0c90e",
+                "temperature": 40,
+                "throttled": false
+              }
+            ],
+            [
+              {
+                "index": 0,
+                "uuid": "GPU-2f8eeec4-28fb-0399-d6f1-e91e7f4bc8ef",
+                "temperature": 39,
+                "throttled": false
+              },
+              {
+                "index": 1,
+                "uuid": "GPU-9c6b7f55-0eb8-f370-e9b4-e9e950e0c90e",
+                "temperature": 40,
+                "throttled": false
+              }
+            ]
+          ],
+          "errors": [],
+          "interval_seconds": 5,
+          "throttled": false,
+          "scope": "sampled visible GPUs; transient events may be missed"
+        },
+        "1280": {
+          "samples": [
+            [
+              {
+                "index": 0,
+                "uuid": "GPU-2f8eeec4-28fb-0399-d6f1-e91e7f4bc8ef",
+                "temperature": 39,
+                "throttled": false
+              },
+              {
+                "index": 1,
+                "uuid": "GPU-9c6b7f55-0eb8-f370-e9b4-e9e950e0c90e",
+                "temperature": 40,
+                "throttled": false
+              }
+            ],
+            [
+              {
+                "index": 0,
+                "uuid": "GPU-2f8eeec4-28fb-0399-d6f1-e91e7f4bc8ef",
+                "temperature": 39,
+                "throttled": false
+              },
+              {
+                "index": 1,
+                "uuid": "GPU-9c6b7f55-0eb8-f370-e9b4-e9e950e0c90e",
+                "temperature": 40,
+                "throttled": false
+              }
+            ]
+          ],
+          "errors": [],
+          "interval_seconds": 5,
+          "throttled": false,
+          "scope": "sampled visible GPUs; transient events may be missed"
+        },
+        "1536": {
+          "samples": [
+            [
+              {
+                "index": 0,
+                "uuid": "GPU-2f8eeec4-28fb-0399-d6f1-e91e7f4bc8ef",
+                "temperature": 39,
+                "throttled": false
+              },
+              {
+                "index": 1,
+                "uuid": "GPU-9c6b7f55-0eb8-f370-e9b4-e9e950e0c90e",
+                "temperature": 40,
+                "throttled": false
+              }
+            ],
+            [
+              {
+                "index": 0,
+                "uuid": "GPU-2f8eeec4-28fb-0399-d6f1-e91e7f4bc8ef",
+                "temperature": 39,
+                "throttled": false
+              },
+              {
+                "index": 1,
+                "uuid": "GPU-9c6b7f55-0eb8-f370-e9b4-e9e950e0c90e",
+                "temperature": 40,
+                "throttled": false
+              }
+            ]
+          ],
+          "errors": [],
+          "interval_seconds": 5,
+          "throttled": false,
+          "scope": "sampled visible GPUs; transient events may be missed"
+        },
+        "1792": {
+          "samples": [
+            [
+              {
+                "index": 0,
+                "uuid": "GPU-2f8eeec4-28fb-0399-d6f1-e91e7f4bc8ef",
+                "temperature": 39,
+                "throttled": false
+              },
+              {
+                "index": 1,
+                "uuid": "GPU-9c6b7f55-0eb8-f370-e9b4-e9e950e0c90e",
+                "temperature": 40,
+                "throttled": false
+              }
+            ],
+            [
+              {
+                "index": 0,
+                "uuid": "GPU-2f8eeec4-28fb-0399-d6f1-e91e7f4bc8ef",
+                "temperature": 39,
+                "throttled": false
+              },
+              {
+                "index": 1,
+                "uuid": "GPU-9c6b7f55-0eb8-f370-e9b4-e9e950e0c90e",
+                "temperature": 40,
+                "throttled": false
+              }
+            ]
+          ],
+          "errors": [],
+          "interval_seconds": 5,
+          "throttled": false,
+          "scope": "sampled visible GPUs; transient events may be missed"
+        },
+        "2048": {
+          "samples": [
+            [
+              {
+                "index": 0,
+                "uuid": "GPU-2f8eeec4-28fb-0399-d6f1-e91e7f4bc8ef",
+                "temperature": 39,
+                "throttled": false
+              },
+              {
+                "index": 1,
+                "uuid": "GPU-9c6b7f55-0eb8-f370-e9b4-e9e950e0c90e",
+                "temperature": 40,
+                "throttled": false
+              }
+            ],
+            [
+              {
+                "index": 0,
+                "uuid": "GPU-2f8eeec4-28fb-0399-d6f1-e91e7f4bc8ef",
+                "temperature": 39,
+                "throttled": false
+              },
+              {
+                "index": 1,
+                "uuid": "GPU-9c6b7f55-0eb8-f370-e9b4-e9e950e0c90e",
+                "temperature": 40,
+                "throttled": false
+              }
+            ]
+          ],
+          "errors": [],
+          "interval_seconds": 5,
+          "throttled": false,
+          "scope": "sampled visible GPUs; transient events may be missed"
+        }
+      },
+      "coarse_candidates": [
+        256,
+        128,
+        1024,
+        32,
+        512,
+        64,
+        2048
+      ],
+      "refinement_candidates": [
+        1792,
+        1280,
+        1536
+      ],
+      "calibration_wall_seconds": 5.982987241819501,
+      "probe_process_starts": 2,
+      "probe_protocol": "json-session-v1",
+      "pipeline_verified": false,
+      "cache_hit": true,
+      "measured_candidates": [
+        32,
+        64,
+        128,
+        256,
+        512,
+        1024,
+        1280,
+        1536,
+        1792,
+        2048
+      ]
+    },
+    "pipeline": {
+      "phase": "pipeline_measured",
+      "environment": {
+        "BEAM_B_MICRO": "2048",
+        "BEAM_ENSEMBLE_INFERENCE_MICRO": "2048",
+        "BEAM_SHARD_COUNT": "4",
+        "BEAM_STREAM3_RING_SLOTS": "8",
+        "BEAM_STREAM4_ACTIVE_SORT_SLOTS": "4",
+        "BEAM_STREAM4_BATCH_CANDIDATES": "16384"
+      },
+      "requested_beam_effective": 65536,
+      "workload_parents": 65536,
+      "measurement_scope": "full_requested_frontier",
+      "pipeline_verified": true,
+      "cache_hit": false,
+      "tested": [
+        {
+          "name": "baseline",
+          "environment": {
+            "BEAM_B_MICRO": "2048",
+            "BEAM_ENSEMBLE_INFERENCE_MICRO": "2048",
+            "BEAM_SHARD_COUNT": "4",
+            "BEAM_STREAM3_RING_SLOTS": "8",
+            "BEAM_STREAM4_ACTIVE_SORT_SLOTS": "4",
+            "BEAM_STREAM4_BATCH_CANDIDATES": "16384"
+          },
+          "plans": [
+            {
+              "BEAM_WIDTH_ALIGNMENT": 8192,
+              "B_MICRO": 2048,
+              "GLOBAL_BEAM_WIDTH_EFFECTIVE": 65536,
+              "LOCAL_RANK": 0,
+              "RING_COUNT": 2,
+              "SHARD_CAPACITY_CANDIDATES": 106496,
+              "SHARD_COUNT": 4,
+              "STREAM3_RING_SLOTS": 8,
+              "STREAM4_ACTIVE_SORT_SLOTS": 4,
+              "STREAM4_BATCH_ALIGNMENT": 1024,
+              "STREAM4_BATCH_CANDIDATES": 16384,
+              "WORLD_SIZE": 2,
+              "estimated_required_device_bytes": 151661318,
+              "frontier_state_capacity": 32768,
+              "gpu_budget_bytes": 10785390592
+            },
+            {
+              "BEAM_WIDTH_ALIGNMENT": 8192,
+              "B_MICRO": 2048,
+              "GLOBAL_BEAM_WIDTH_EFFECTIVE": 65536,
+              "LOCAL_RANK": 1,
+              "RING_COUNT": 2,
+              "SHARD_CAPACITY_CANDIDATES": 106496,
+              "SHARD_COUNT": 4,
+              "STREAM3_RING_SLOTS": 8,
+              "STREAM4_ACTIVE_SORT_SLOTS": 4,
+              "STREAM4_BATCH_ALIGNMENT": 1024,
+              "STREAM4_BATCH_CANDIDATES": 16384,
+              "WORLD_SIZE": 2,
+              "estimated_required_device_bytes": 151661318,
+              "frontier_state_capacity": 32768,
+              "gpu_budget_bytes": 10920787968
+            }
+          ],
+          "rank_measurements": [
+            {
+              "component_calibration": true,
+              "correctness_passed": true,
+              "full_step_verified": false,
+              "outer_candidates": 49152,
+              "rank": 0,
+              "scope": "synthetic_unique_metadata_at_exact_admitted_capacities",
+              "shard_capacity": 106496,
+              "sort_jobs_concurrent": 4,
+              "stream3_seconds": [
+                0.0002099200040102005,
+                0.0002109439969062805,
+                0.0002088959962129593,
+                0.0002109439969062805,
+                0.00020883199572563173
+              ],
+              "stream4_group_seconds": [
+                0.0034703359603881836,
+                0.0035543038845062256,
+                0.003386431932449341,
+                0.003361792087554932,
+                0.0034856960773468016
+              ],
+              "transport": [
+                {
+                  "items": 24576,
+                  "seconds": [
+                    0.00012697599828243256,
+                    0.0001443839967250824,
+                    0.00013823999464511873,
+                    0.0001361919939517975,
+                    0.00013414399325847626
+                  ]
+                },
+                {
+                  "items": 49152,
+                  "seconds": [
+                    0.0002467840015888214,
+                    0.00024371199309825898,
+                    0.00024985599517822265,
+                    0.00025097599625587463,
+                    0.00024268800020217895
+                  ]
+                }
+              ],
+              "union_seconds": [
+                0.0022568960189819336,
+                0.002274303913116455,
+                0.0022762238979339602,
+                0.0022650558948516847,
+                0.0022773759365081786
+              ]
+            },
+            {
+              "component_calibration": true,
+              "correctness_passed": true,
+              "full_step_verified": false,
+              "outer_candidates": 49152,
+              "rank": 1,
+              "scope": "synthetic_unique_metadata_at_exact_admitted_capacities",
+              "shard_capacity": 106496,
+              "sort_jobs_concurrent": 4,
+              "stream3_seconds": [
+                0.00020787200331687927,
+                0.00020668800175189972,
+                0.00020502400398254394,
+                0.00020684799551963807,
+                0.00020684799551963807
+              ],
+              "stream4_group_seconds": [
+                0.0034314239025115966,
+                0.0033894400596618654,
+                0.00345088005065918,
+                0.003461184024810791,
+                0.003451904058456421
+              ],
+              "transport": [
+                {
+                  "items": 24576,
+                  "seconds": [
+                    0.00013312000036239626,
+                    0.00013823999464511873,
+                    0.00013823999464511873,
+                    0.00013600000739097596,
+                    0.00014131200313568116
+                  ]
+                },
+                {
+                  "items": 49152,
+                  "seconds": [
+                    0.0002465600073337555,
+                    0.00024780799448490145,
+                    0.0002508800029754639,
+                    0.0002488320022821426,
+                    0.00024371199309825898
+                  ]
+                }
+              ],
+              "union_seconds": [
+                0.0022824959754943848,
+                0.002275327920913696,
+                0.002269279956817627,
+                0.0022732799053192137,
+                0.002281599998474121
+              ]
+            }
+          ],
+          "estimate": {
+            "service_envelope_seconds": 0.020881407737731932,
+            "inference_seconds": 0.011780096054077148,
+            "stream3_seconds": 0.000419840008020401,
+            "stream4_seconds": 0.006940671920776367,
+            "transport_seconds": 0.0004956159889698029,
+            "union_seconds": 0.009101311683654785,
+            "scope": "isolated exact-capacity service envelope; not full-step timing"
+          }
+        },
+        {
+          "name": "service-batch",
+          "environment": {
+            "BEAM_B_MICRO": "2048",
+            "BEAM_ENSEMBLE_INFERENCE_MICRO": "2048",
+            "BEAM_SHARD_COUNT": "4",
+            "BEAM_STREAM3_RING_SLOTS": "8",
+            "BEAM_STREAM4_ACTIVE_SORT_SLOTS": "4",
+            "BEAM_STREAM4_BATCH_CANDIDATES": "6144"
+          },
+          "plans": [
+            {
+              "BEAM_WIDTH_ALIGNMENT": 8192,
+              "B_MICRO": 2048,
+              "GLOBAL_BEAM_WIDTH_EFFECTIVE": 65536,
+              "LOCAL_RANK": 0,
+              "RING_COUNT": 2,
+              "SHARD_CAPACITY_CANDIDATES": 106496,
+              "SHARD_COUNT": 4,
+              "STREAM3_RING_SLOTS": 8,
+              "STREAM4_ACTIVE_SORT_SLOTS": 4,
+              "STREAM4_BATCH_ALIGNMENT": 1024,
+              "STREAM4_BATCH_CANDIDATES": 6144,
+              "WORLD_SIZE": 2,
+              "estimated_required_device_bytes": 151661318,
+              "frontier_state_capacity": 32768,
+              "gpu_budget_bytes": 10785390592
+            },
+            {
+              "BEAM_WIDTH_ALIGNMENT": 8192,
+              "B_MICRO": 2048,
+              "GLOBAL_BEAM_WIDTH_EFFECTIVE": 65536,
+              "LOCAL_RANK": 1,
+              "RING_COUNT": 2,
+              "SHARD_CAPACITY_CANDIDATES": 106496,
+              "SHARD_COUNT": 4,
+              "STREAM3_RING_SLOTS": 8,
+              "STREAM4_ACTIVE_SORT_SLOTS": 4,
+              "STREAM4_BATCH_ALIGNMENT": 1024,
+              "STREAM4_BATCH_CANDIDATES": 6144,
+              "WORLD_SIZE": 2,
+              "estimated_required_device_bytes": 151661318,
+              "frontier_state_capacity": 32768,
+              "gpu_budget_bytes": 10920787968
+            }
+          ],
+          "rank_measurements": [
+            {
+              "component_calibration": true,
+              "correctness_passed": true,
+              "full_step_verified": false,
+              "outer_candidates": 49152,
+              "rank": 0,
+              "scope": "synthetic_unique_metadata_at_exact_admitted_capacities",
+              "shard_capacity": 106496,
+              "sort_jobs_concurrent": 4,
+              "stream3_seconds": [
+                0.0002109439969062805,
+                0.00020684799551963807,
+                0.00020787200331687927,
+                0.00020787200331687927,
+                0.00020787200331687927
+              ],
+              "stream4_group_seconds": [
+                0.0035296640396118165,
+                0.003343296051025391,
+                0.003471359968185425,
+                0.003547136068344116,
+                0.0034160640239715577
+              ],
+              "transport": [
+                {
+                  "items": 24576,
+                  "seconds": [
+                    0.0001372160017490387,
+                    0.00013107199966907502,
+                    0.00013926400244235993,
+                    0.0001372160017490387,
+                    0.00013823999464511873
+                  ]
+                },
+                {
+                  "items": 49152,
+                  "seconds": [
+                    0.0002488320022821426,
+                    0.00024371199309825898,
+                    0.00024268800020217895,
+                    0.0002457599937915802,
+                    0.00024780799448490145
+                  ]
+                }
+              ],
+              "union_seconds": [
+                0.002272255897521973,
+                0.00227839994430542,
+                0.0022732799053192137,
+                0.002284543991088867,
+                0.0022804479598999023
+              ]
+            },
+            {
+              "component_calibration": true,
+              "correctness_passed": true,
+              "full_step_verified": false,
+              "outer_candidates": 49152,
+              "rank": 1,
+              "scope": "synthetic_unique_metadata_at_exact_admitted_capacities",
+              "shard_capacity": 106496,
+              "sort_jobs_concurrent": 4,
+              "stream3_seconds": [
+                0.0002088959962129593,
+                0.00020867200195789337,
+                0.0002088959962129593,
+                0.00020684799551963807,
+                0.00020787200331687927
+              ],
+              "stream4_group_seconds": [
+                0.003422399997711182,
+                0.0035174400806427,
+                0.0035092480182647707,
+                0.0033075199127197267,
+                0.0034007039070129397
+              ],
+              "transport": [
+                {
+                  "items": 24576,
+                  "seconds": [
+                    0.0001372160017490387,
+                    0.0001360960006713867,
+                    0.00013942399621009826,
+                    0.00013414399325847626,
+                    0.00014211200177669526
+                  ]
+                },
+                {
+                  "items": 49152,
+                  "seconds": [
+                    0.00023955200612545014,
+                    0.0002385919988155365,
+                    0.0002447360008955002,
+                    0.0002488320022821426,
+                    0.00023756800591945648
+                  ]
+                }
+              ],
+              "union_seconds": [
+                0.0022773759365081786,
+                0.0022763519287109374,
+                0.0022751679420471194,
+                0.002275327920913696,
+                0.002267136096954346
+              ]
+            }
+          ],
+          "estimate": {
+            "service_envelope_seconds": 0.02299903964996338,
+            "inference_seconds": 0.011780096054077148,
+            "stream3_seconds": 0.00041734400391578674,
+            "stream4_seconds": 0.0138854398727417,
+            "transport_seconds": 0.0004915199875831604,
+            "union_seconds": 0.00911359977722168,
+            "scope": "isolated exact-capacity service envelope; not full-step timing"
+          }
+        },
+        {
+          "name": "shards-2",
+          "environment": {
+            "BEAM_B_MICRO": "2048",
+            "BEAM_ENSEMBLE_INFERENCE_MICRO": "2048",
+            "BEAM_SHARD_COUNT": "2",
+            "BEAM_STREAM3_RING_SLOTS": "2",
+            "BEAM_STREAM4_ACTIVE_SORT_SLOTS": "4",
+            "BEAM_STREAM4_BATCH_CANDIDATES": "6144"
+          },
+          "plans": [
+            {
+              "BEAM_WIDTH_ALIGNMENT": 4096,
+              "B_MICRO": 2048,
+              "GLOBAL_BEAM_WIDTH_EFFECTIVE": 65536,
+              "LOCAL_RANK": 0,
+              "RING_COUNT": 3,
+              "SHARD_CAPACITY_CANDIDATES": 40960,
+              "SHARD_COUNT": 2,
+              "STREAM3_RING_SLOTS": 2,
+              "STREAM4_ACTIVE_SORT_SLOTS": 4,
+              "STREAM4_BATCH_ALIGNMENT": 1024,
+              "STREAM4_BATCH_CANDIDATES": 6144,
+              "WORLD_SIZE": 2,
+              "estimated_required_device_bytes": 59032070,
+              "frontier_state_capacity": 32768,
+              "gpu_budget_bytes": 10785390592
+            },
+            {
+              "BEAM_WIDTH_ALIGNMENT": 4096,
+              "B_MICRO": 2048,
+              "GLOBAL_BEAM_WIDTH_EFFECTIVE": 65536,
+              "LOCAL_RANK": 1,
+              "RING_COUNT": 3,
+              "SHARD_CAPACITY_CANDIDATES": 40960,
+              "SHARD_COUNT": 2,
+              "STREAM3_RING_SLOTS": 2,
+              "STREAM4_ACTIVE_SORT_SLOTS": 4,
+              "STREAM4_BATCH_ALIGNMENT": 1024,
+              "STREAM4_BATCH_CANDIDATES": 6144,
+              "WORLD_SIZE": 2,
+              "estimated_required_device_bytes": 59032070,
+              "frontier_state_capacity": 32768,
+              "gpu_budget_bytes": 10920787968
+            }
+          ],
+          "rank_measurements": [
+            {
+              "component_calibration": true,
+              "correctness_passed": true,
+              "full_step_verified": false,
+              "outer_candidates": 12288,
+              "rank": 0,
+              "scope": "synthetic_unique_metadata_at_exact_admitted_capacities",
+              "shard_capacity": 40960,
+              "sort_jobs_concurrent": 4,
+              "stream3_seconds": [
+                0.00012697599828243256,
+                0.00012595200538635255,
+                0.00012595200538635255,
+                0.00012595200538635255,
+                0.00012713600695133209
+              ],
+              "stream4_group_seconds": [
+                0.0015341119766235352,
+                0.0015247360467910767,
+                0.001525760054588318,
+                0.0015544320344924928,
+                0.001567744016647339
+              ],
+              "transport": [
+                {
+                  "items": 6144,
+                  "seconds": [
+                    0.00006758400052785873,
+                    0.00005119999870657921,
+                    0.000057344000786542894,
+                    0.00005119999870657921,
+                    0.00005632000043988228
+                  ]
+                },
+                {
+                  "items": 12288,
+                  "seconds": [
+                    0.00008188799768686294,
+                    0.000081727996468544,
+                    0.0000798719972372055,
+                    0.00008294399827718735,
+                    0.0000798719972372055
+                  ]
+                }
+              ],
+              "union_seconds": [
+                0.0010465279817581177,
+                0.0010485759973526002,
+                0.0010414079427719116,
+                0.0010475200414657593,
+                0.0010485759973526002
+              ]
+            },
+            {
+              "component_calibration": true,
+              "correctness_passed": true,
+              "full_step_verified": false,
+              "outer_candidates": 12288,
+              "rank": 1,
+              "scope": "synthetic_unique_metadata_at_exact_admitted_capacities",
+              "shard_capacity": 40960,
+              "sort_jobs_concurrent": 4,
+              "stream3_seconds": [
+                0.00012697599828243256,
+                0.00012595200538635255,
+                0.00012492799758911133,
+                0.00012492799758911133,
+                0.0001361919939517975
+              ],
+              "stream4_group_seconds": [
+                0.0014724160432815553,
+                0.0014899200201034545,
+                0.001435647964477539,
+                0.0014971200227737427,
+                0.001486847996711731
+              ],
+              "transport": [
+                {
+                  "items": 6144,
+                  "seconds": [
+                    0.00006143999844789505,
+                    0.00006348799914121628,
+                    0.00004812800139188767,
+                    0.00006358399987220764,
+                    0.00004604800045490265
+                  ]
+                },
+                {
+                  "items": 12288,
+                  "seconds": [
+                    0.00008396799862384797,
+                    0.00008595199882984162,
+                    0.00007577600330114365,
+                    0.00008819200098514557,
+                    0.00007878399640321732
+                  ]
+                }
+              ],
+              "union_seconds": [
+                0.0010414079427719116,
+                0.001043455958366394,
+                0.001043455958366394,
+                0.0010444799661636353,
+                0.0010455039739608765
+              ]
+            }
+          ],
+          "estimate": {
+            "service_envelope_seconds": 0.013875136137008666,
+            "inference_seconds": 0.011780096054077148,
+            "stream3_seconds": 0.0010076160430908204,
+            "stream4_seconds": 0.006136447906494141,
+            "transport_seconds": 0.0006717439889907837,
+            "union_seconds": 0.0020950400829315187,
+            "scope": "isolated exact-capacity service envelope; not full-step timing"
+          }
+        },
+        {
+          "name": "outer-double",
+          "environment": {
+            "BEAM_B_MICRO": "4096",
+            "BEAM_ENSEMBLE_INFERENCE_MICRO": "2048",
+            "BEAM_SHARD_COUNT": "4",
+            "BEAM_STREAM3_RING_SLOTS": "2",
+            "BEAM_STREAM4_ACTIVE_SORT_SLOTS": "4",
+            "BEAM_STREAM4_BATCH_CANDIDATES": "6144"
+          },
+          "plans": [
+            {
+              "BEAM_WIDTH_ALIGNMENT": 8192,
+              "B_MICRO": 4096,
+              "GLOBAL_BEAM_WIDTH_EFFECTIVE": 65536,
+              "LOCAL_RANK": 0,
+              "RING_COUNT": 1,
+              "SHARD_CAPACITY_CANDIDATES": 57344,
+              "SHARD_COUNT": 4,
+              "STREAM3_RING_SLOTS": 2,
+              "STREAM4_ACTIVE_SORT_SLOTS": 4,
+              "STREAM4_BATCH_ALIGNMENT": 1024,
+              "STREAM4_BATCH_CANDIDATES": 6144,
+              "WORLD_SIZE": 2,
+              "estimated_required_device_bytes": 91110150,
+              "frontier_state_capacity": 32768,
+              "gpu_budget_bytes": 10785390592
+            },
+            {
+              "BEAM_WIDTH_ALIGNMENT": 8192,
+              "B_MICRO": 4096,
+              "GLOBAL_BEAM_WIDTH_EFFECTIVE": 65536,
+              "LOCAL_RANK": 1,
+              "RING_COUNT": 1,
+              "SHARD_CAPACITY_CANDIDATES": 57344,
+              "SHARD_COUNT": 4,
+              "STREAM3_RING_SLOTS": 2,
+              "STREAM4_ACTIVE_SORT_SLOTS": 4,
+              "STREAM4_BATCH_ALIGNMENT": 1024,
+              "STREAM4_BATCH_CANDIDATES": 6144,
+              "WORLD_SIZE": 2,
+              "estimated_required_device_bytes": 91110150,
+              "frontier_state_capacity": 32768,
+              "gpu_budget_bytes": 10920787968
+            }
+          ],
+          "rank_measurements": [
+            {
+              "component_calibration": true,
+              "correctness_passed": true,
+              "full_step_verified": false,
+              "outer_candidates": 24576,
+              "rank": 0,
+              "scope": "synthetic_unique_metadata_at_exact_admitted_capacities",
+              "shard_capacity": 57344,
+              "sort_jobs_concurrent": 4,
+              "stream3_seconds": [
+                0.0001504960060119629,
+                0.00014847999811172486,
+                0.00014847999811172486,
+                0.0001650560051202774,
+                0.00014847999811172486
+              ],
+              "stream4_group_seconds": [
+                0.0019394559860229494,
+                0.001947648048400879,
+                0.0019967999458312988,
+                0.0019365119934082033,
+                0.0019333120584487916
+              ],
+              "transport": [
+                {
+                  "items": 12288,
+                  "seconds": [
+                    0.00008179199695587158,
+                    0.0000870399996638298,
+                    0.00008191999793052673,
+                    0.00008089599758386612,
+                    0.0000798719972372055
+                  ]
+                },
+                {
+                  "items": 24576,
+                  "seconds": [
+                    0.00014214399456977843,
+                    0.00013926400244235993,
+                    0.0001361919939517975,
+                    0.00014131200313568116,
+                    0.00013414399325847626
+                  ]
+                }
+              ],
+              "union_seconds": [
+                0.001324031949043274,
+                0.001321984052658081,
+                0.0013199360370635986,
+                0.0013240000009536743,
+                0.001324031949043274
+              ]
+            },
+            {
+              "component_calibration": true,
+              "correctness_passed": true,
+              "full_step_verified": false,
+              "outer_candidates": 24576,
+              "rank": 1,
+              "scope": "synthetic_unique_metadata_at_exact_admitted_capacities",
+              "shard_capacity": 57344,
+              "sort_jobs_concurrent": 4,
+              "stream3_seconds": [
+                0.00014745600521564483,
+                0.00014745600521564483,
+                0.00014643199741840363,
+                0.00014847999811172486,
+                0.0001505279988050461
+              ],
+              "stream4_group_seconds": [
+                0.0018995200395584106,
+                0.0018728959560394287,
+                0.001883136034011841,
+                0.0019158079624176025,
+                0.001908735990524292
+              ],
+              "transport": [
+                {
+                  "items": 12288,
+                  "seconds": [
+                    0.00008502399921417237,
+                    0.00008089599758386612,
+                    0.0000870399996638298,
+                    0.00007782399654388428,
+                    0.00008396799862384797
+                  ]
+                },
+                {
+                  "items": 24576,
+                  "seconds": [
+                    0.00013926400244235993,
+                    0.00013926400244235993,
+                    0.0001443839967250824,
+                    0.0001372160017490387,
+                    0.00013516800105571746
+                  ]
+                }
+              ],
+              "union_seconds": [
+                0.001324031949043274,
+                0.0013199360370635986,
+                0.0013199360370635986,
+                0.0013211519718170166,
+                0.001321984052658081
+              ]
+            }
+          ],
+          "estimate": {
+            "service_envelope_seconds": 0.017076096057891843,
+            "inference_seconds": 0.011780096054077148,
+            "stream3_seconds": 0.0005939199924468994,
+            "stream4_seconds": 0.007757823944091797,
+            "transport_seconds": 0.0005570560097694397,
+            "union_seconds": 0.005296000003814697,
+            "scope": "isolated exact-capacity service envelope; not full-step timing"
+          }
+        },
+        {
+          "name": "sort-lanes-2",
+          "environment": {
+            "BEAM_B_MICRO": "2048",
+            "BEAM_ENSEMBLE_INFERENCE_MICRO": "2048",
+            "BEAM_SHARD_COUNT": "4",
+            "BEAM_STREAM3_RING_SLOTS": "2",
+            "BEAM_STREAM4_ACTIVE_SORT_SLOTS": "2",
+            "BEAM_STREAM4_BATCH_CANDIDATES": "6144"
+          },
+          "plans": [
+            {
+              "BEAM_WIDTH_ALIGNMENT": 8192,
+              "B_MICRO": 2048,
+              "GLOBAL_BEAM_WIDTH_EFFECTIVE": 65536,
+              "LOCAL_RANK": 0,
+              "RING_COUNT": 2,
+              "SHARD_CAPACITY_CANDIDATES": 32768,
+              "SHARD_COUNT": 4,
+              "STREAM3_RING_SLOTS": 2,
+              "STREAM4_ACTIVE_SORT_SLOTS": 2,
+              "STREAM4_BATCH_ALIGNMENT": 1024,
+              "STREAM4_BATCH_CANDIDATES": 6144,
+              "WORLD_SIZE": 2,
+              "estimated_required_device_bytes": 54864390,
+              "frontier_state_capacity": 32768,
+              "gpu_budget_bytes": 10785390592
+            },
+            {
+              "BEAM_WIDTH_ALIGNMENT": 8192,
+              "B_MICRO": 2048,
+              "GLOBAL_BEAM_WIDTH_EFFECTIVE": 65536,
+              "LOCAL_RANK": 1,
+              "RING_COUNT": 2,
+              "SHARD_CAPACITY_CANDIDATES": 32768,
+              "SHARD_COUNT": 4,
+              "STREAM3_RING_SLOTS": 2,
+              "STREAM4_ACTIVE_SORT_SLOTS": 2,
+              "STREAM4_BATCH_ALIGNMENT": 1024,
+              "STREAM4_BATCH_CANDIDATES": 6144,
+              "WORLD_SIZE": 2,
+              "estimated_required_device_bytes": 54864390,
+              "frontier_state_capacity": 32768,
+              "gpu_budget_bytes": 10920787968
+            }
+          ],
+          "rank_measurements": [
+            {
+              "component_calibration": true,
+              "correctness_passed": true,
+              "full_step_verified": false,
+              "outer_candidates": 12288,
+              "rank": 0,
+              "scope": "synthetic_unique_metadata_at_exact_admitted_capacities",
+              "shard_capacity": 32768,
+              "sort_jobs_concurrent": 2,
+              "stream3_seconds": [
+                0.00012800000607967376,
+                0.00012585599720478058,
+                0.00012697599828243256,
+                0.00012595200538635255,
+                0.00012694400548934935
+              ],
+              "stream4_group_seconds": [
+                0.0008089600205421448,
+                0.0008058879971504212,
+                0.0008272960186004639,
+                0.0007854080200195313,
+                0.0007802879810333252
+              ],
+              "transport": [
+                {
+                  "items": 6144,
+                  "seconds": [
+                    0.00005427199974656105,
+                    0.00005615999922156334,
+                    0.000053247999399900436,
+                    0.00005529600009322167,
+                    0.00005119999870657921
+                  ]
+                },
+                {
+                  "items": 12288,
+                  "seconds": [
+                    0.00008089599758386612,
+                    0.0000798719972372055,
+                    0.00007968000322580338,
+                    0.00008191999793052673,
+                    0.00008396799862384797
+                  ]
+                }
+              ],
+              "union_seconds": [
+                0.0008744959831237793,
+                0.0008735359907150269,
+                0.0008755199909210205,
+                0.0008715519905090332,
+                0.0008734719753265381
+              ]
+            },
+            {
+              "component_calibration": true,
+              "correctness_passed": true,
+              "full_step_verified": false,
+              "outer_candidates": 12288,
+              "rank": 1,
+              "scope": "synthetic_unique_metadata_at_exact_admitted_capacities",
+              "shard_capacity": 32768,
+              "sort_jobs_concurrent": 2,
+              "stream3_seconds": [
+                0.00012483199685811997,
+                0.00012486399710178375,
+                0.00012387199699878692,
+                0.000125791996717453,
+                0.00012390399724245072
+              ],
+              "stream4_group_seconds": [
+                0.0007865920066833496,
+                0.0007903680205345154,
+                0.0007986879944801331,
+                0.0007976959943771363,
+                0.0007958400249481201
+              ],
+              "transport": [
+                {
+                  "items": 6144,
+                  "seconds": [
+                    0.00006057599931955338,
+                    0.00005119999870657921,
+                    0.0000645119994878769,
+                    0.000046080000698566435,
+                    0.00006553599983453751
+                  ]
+                },
+                {
+                  "items": 12288,
+                  "seconds": [
+                    0.00009011200070381165,
+                    0.0000777600035071373,
+                    0.00008089599758386612,
+                    0.00008089599758386612,
+                    0.00008396799862384797
+                  ]
+                }
+              ],
+              "union_seconds": [
+                0.0008796160221099853,
+                0.0008756800293922424,
+                0.0008796160221099853,
+                0.0008908799886703492,
+                0.0008806399703025818
+              ]
+            }
+          ],
+          "estimate": {
+            "service_envelope_seconds": 0.01529856014251709,
+            "inference_seconds": 0.011780096054077148,
+            "stream3_seconds": 0.0010155520439147948,
+            "stream4_seconds": 0.0064471039772033695,
+            "transport_seconds": 0.0006471679806709289,
+            "union_seconds": 0.0035184640884399414,
+            "scope": "isolated exact-capacity service envelope; not full-step timing"
+          }
+        }
+      ],
+      "selection": "baseline-full-verified",
+      "estimate": {
+        "profile": "baseline",
+        "median": 4.7045745849609373e-7,
+        "low": 4.6901397705078123e-7,
+        "high": 4.87689208984375e-7,
+        "relative_mad": 0.0030682507403046923,
+        "repeats": 5
+      },
+      "selection_rejections": {},
+      "search_policy": "baseline plus at most four exact-capacity candidates; frozen inference microbatch",
+      "requested_beam_width": 65536,
+      "full_comparison_rejections": {
+        "selected": "no statistically separated material gain"
+      },
+      "fixture": {
+        "schema": 2,
+        "graph_hash": "e05fbac16dfae541895b81c0c0063ad07a1067ccf326649c455541dda88e1359",
+        "global_parents": 65536,
+        "unique_states": 65536,
+        "state_len": 13,
+        "storage_len": 32,
+        "files": [
+          {
+            "rank": 0,
+            "parents": 32768,
+            "path": "/workspace/fast-results/cache/runs/37254d4d9d854d388cecd081199af677/pipeline-calibration/frontiers/frontier-rank-0.bin",
+            "sha256": "3b35fae1cb0364e041ac6a59d30077ef67e39eaf0fb258c4c868d756cafb3d9b",
+            "bytes": 1048576
+          },
+          {
+            "rank": 1,
+            "parents": 32768,
+            "path": "/workspace/fast-results/cache/runs/37254d4d9d854d388cecd081199af677/pipeline-calibration/frontiers/frontier-rank-1.bin",
+            "sha256": "b395b07dfca0654702d6d14f293f517e3671cc9b3c525455a57d32196ff36ff7",
+            "bytes": 1048576
+          }
+        ],
+        "excluded_center_and_predecessors": true,
+        "generator": "distinct factorial permutation ranks",
+        "rank_stride": 65537,
+        "rank_offset": 2075673600,
+        "reachability_certificate": {
+          "proof": "connected transposition conjugates generate S_n",
+          "cycle": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            0
+          ],
+          "transposition": [
+            1,
+            0,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12
+          ],
+          "edges": [
+            [
+              0,
+              1
+            ],
+            [
+              1,
+              2
+            ],
+            [
+              2,
+              3
+            ],
+            [
+              3,
+              4
+            ],
+            [
+              4,
+              5
+            ],
+            [
+              5,
+              6
+            ],
+            [
+              6,
+              7
+            ],
+            [
+              7,
+              8
+            ],
+            [
+              8,
+              9
+            ],
+            [
+              9,
+              10
+            ],
+            [
+              10,
+              11
+            ],
+            [
+              11,
+              12
+            ],
+            [
+              12,
+              0
+            ]
+          ]
+        }
+      },
+      "measurements": [
+        {
+          "profile": "baseline",
+          "parents": 65536,
+          "seconds_by_rank": [
+            0.0317588,
+            0.0319612
+          ],
+          "correctness_passed": true,
+          "memory_admitted": true,
+          "throttled": false
+        },
+        {
+          "profile": "baseline",
+          "parents": 65536,
+          "seconds_by_rank": [
+            0.0310668,
+            0.0312612
+          ],
+          "correctness_passed": true,
+          "memory_admitted": true,
+          "throttled": false
+        },
+        {
+          "profile": "baseline",
+          "parents": 65536,
+          "seconds_by_rank": [
+            0.0305278,
+            0.0307373
+          ],
+          "correctness_passed": true,
+          "memory_admitted": true,
+          "throttled": false
+        },
+        {
+          "profile": "baseline",
+          "parents": 65536,
+          "seconds_by_rank": [
+            0.0306434,
+            0.0308316
+          ],
+          "correctness_passed": true,
+          "memory_admitted": true,
+          "throttled": false
+        },
+        {
+          "profile": "baseline",
+          "parents": 65536,
+          "seconds_by_rank": [
+            0.0306338,
+            0.0308319
+          ],
+          "correctness_passed": true,
+          "memory_admitted": true,
+          "throttled": false
+        }
+      ],
+      "full_comparison_measurements": [
+        {
+          "profile": "baseline",
+          "parents": 65536,
+          "seconds_by_rank": [
+            0.0317588,
+            0.0319612
+          ],
+          "correctness_passed": true,
+          "memory_admitted": true,
+          "throttled": false
+        },
+        {
+          "profile": "baseline",
+          "parents": 65536,
+          "seconds_by_rank": [
+            0.0310668,
+            0.0312612
+          ],
+          "correctness_passed": true,
+          "memory_admitted": true,
+          "throttled": false
+        },
+        {
+          "profile": "baseline",
+          "parents": 65536,
+          "seconds_by_rank": [
+            0.0305278,
+            0.0307373
+          ],
+          "correctness_passed": true,
+          "memory_admitted": true,
+          "throttled": false
+        },
+        {
+          "profile": "baseline",
+          "parents": 65536,
+          "seconds_by_rank": [
+            0.0306434,
+            0.0308316
+          ],
+          "correctness_passed": true,
+          "memory_admitted": true,
+          "throttled": false
+        },
+        {
+          "profile": "baseline",
+          "parents": 65536,
+          "seconds_by_rank": [
+            0.0306338,
+            0.0308319
+          ],
+          "correctness_passed": true,
+          "memory_admitted": true,
+          "throttled": false
+        },
+        {
+          "profile": "selected",
+          "parents": 65536,
+          "seconds_by_rank": [
+            0.0954916,
+            0.095666
+          ],
+          "correctness_passed": true,
+          "memory_admitted": true,
+          "throttled": false
+        },
+        {
+          "profile": "selected",
+          "parents": 65536,
+          "seconds_by_rank": [
+            0.0954901,
+            0.0956939
+          ],
+          "correctness_passed": true,
+          "memory_admitted": true,
+          "throttled": false
+        },
+        {
+          "profile": "selected",
+          "parents": 65536,
+          "seconds_by_rank": [
+            0.0956921,
+            0.0958837
+          ],
+          "correctness_passed": true,
+          "memory_admitted": true,
+          "throttled": false
+        },
+        {
+          "profile": "selected",
+          "parents": 65536,
+          "seconds_by_rank": [
+            0.095633,
+            0.0958231
+          ],
+          "correctness_passed": true,
+          "memory_admitted": true,
+          "throttled": false
+        },
+        {
+          "profile": "selected",
+          "parents": 65536,
+          "seconds_by_rank": [
+            0.095761,
+            0.0959498
+          ],
+          "correctness_passed": true,
+          "memory_admitted": true,
+          "throttled": false
+        }
+      ],
+      "matched_stream1": {
+        "parents": 65536,
+        "world_size": 2,
+        "measurement_scope": "matched_full_frontier",
+        "stream1_seconds": 0.011350015640258788,
+        "full_step_seconds": 0.0308319,
+        "stream1_parents_per_second": 5774088.959625939,
+        "full_step_parents_per_second": 2125590.703135389,
+        "throughput_loss_fraction": 0.6318742717685648,
+        "relative_time_overhead": 1.7164632170759733
+      }
+    },
+    "capacity": null
+  },
+  {
+    "file": "verified-small-1048576.json",
+    "beam": 1048576,
+    "path_replay": true,
+    "inference": {
+      "signature": {
+        "schema": 5,
+        "search_policy": "coarse-local-v1",
+        "graph": "e05fbac16dfae541895b81c0c0063ad07a1067ccf326649c455541dda88e1359",
+        "models": "eb62916af2116fc2aef735a634f4c6f4d8af5fd434297d528085429a3a23693b",
+        "runner": "611ccc84844dde1b0d110bf2015420d1b230340013c2aee6346fecc81dbe1cef",
+        "probe": "c3b182baed6a03cc481f8122e1d161d5536daeaef652fc150c00ff5deb164def",
+        "gpu_properties": [
+          "_CudaDeviceProperties(name='NVIDIA GeForce RTX 3060', major=8, minor=6, total_memory=11907MB, multi_processor_count=28, uuid=2f8eeec4-28fb-0399-d6f1-e91e7f4bc8ef, pci_bus_id=3, pci_device_id=0, pci_domain_id=0, L2_cache_size=2MB)",
+          "_CudaDeviceProperties(name='NVIDIA GeForce RTX 3060', major=8, minor=6, total_memory=11909MB, multi_processor_count=28, uuid=9c6b7f55-0eb8-f370-e9b4-e9e950e0c90e, pci_bus_id=131, pci_device_id=0, pci_domain_id=0, L2_cache_size=2MB)"
+        ],
+        "device_indices": [
+          0,
+          1
+        ],
+        "world_size": 2,
+        "torch": "2.11.0+cu128",
+        "cuda": "12.8",
+        "topology_sha256": "53ffa83b847acfd328d58eba58f12315317feb3159b732c1a72cdbc6711e08df",
+        "hardware_sha256": "8d303daba766293c9289c8a6457c95f7e30d0c18e91ea9d338bbaff994fcfca0",
+        "gpu_uuids": [
+          "2f8eeec4-28fb-0399-d6f1-e91e7f4bc8ef",
+          "9c6b7f55-0eb8-f370-e9b4-e9e950e0c90e"
+        ],
+        "host": {
+          "machine": "x86_64",
+          "processor": "x86_64"
+        },
+        "requested_beam_width": 1048576,
+        "precision": "fp16/fp32",
+        "max_batch": 2048
+      },
+      "phase": "inference_verified",
+      "parent_batch": 2048,
+      "reserve_bytes": 562036736,
+      "estimate": {
+        "profile": "2048",
+        "median": 1.7600000137463213e-7,
+        "low": 1.731249940348789e-7,
+        "high": 1.7844921967480332e-7,
+        "relative_mad": 0.013916012960464703,
+        "repeats": 7
+      },
+      "records": [
+        {
+          "batch": 256,
+          "correctness_passed": true,
+          "device": 0,
+          "free_bytes_after": 12175802368,
+          "model_count": 3,
+          "numeric_error": 0,
+          "parents": 8192,
+          "readout_oracle_max_key_error": 0,
+          "score_input": "graph_states",
+          "seconds": [
+            0.02549849510192871,
+            0.02368716812133789,
+            0.022849536895751952,
+            0.023400447845458985,
+            0.02288332748413086,
+            0.022806528091430665,
+            0.023165952682495116
+          ],
+          "torch_reserved_peak_bytes": 25165824
+        },
+        {
+          "batch": 256,
+          "correctness_passed": true,
+          "device": 1,
+          "free_bytes_after": 12311199744,
+          "model_count": 3,
+          "numeric_error": 0,
+          "parents": 8192,
+          "readout_oracle_max_key_error": 0,
+          "score_input": "graph_states",
+          "seconds": [
+            0.023757823944091795,
+            0.023723007202148438,
+            0.02353455924987793,
+            0.02327552032470703,
+            0.023416927337646484,
+            0.02275225639343262,
+            0.02290460777282715
+          ],
+          "torch_reserved_peak_bytes": 25165824
+        },
+        {
+          "batch": 128,
+          "correctness_passed": true,
+          "device": 0,
+          "free_bytes_after": 12175802368,
+          "model_count": 3,
+          "numeric_error": 0,
+          "parents": 8192,
+          "readout_oracle_max_key_error": 0,
+          "score_input": "graph_states",
+          "seconds": [
+            0.046739456176757815,
+            0.04653347015380859,
+            0.048075775146484374,
+            0.04647116851806641,
+            0.04622438430786133,
+            0.04549324798583984,
+            0.045664161682128904
+          ],
+          "torch_reserved_peak_bytes": 25165824
+        },
+        {
+          "batch": 128,
+          "correctness_passed": true,
+          "device": 1,
+          "free_bytes_after": 12311199744,
+          "model_count": 3,
+          "numeric_error": 0,
+          "parents": 8192,
+          "readout_oracle_max_key_error": 0,
+          "score_input": "graph_states",
+          "seconds": [
+            0.046707710266113284,
+            0.04677017593383789,
+            0.04809830474853516,
+            0.046560161590576174,
+            0.04632163238525391,
+            0.045661216735839845,
+            0.04585472106933594
+          ],
+          "torch_reserved_peak_bytes": 25165824
+        },
+        {
+          "batch": 1024,
+          "correctness_passed": true,
+          "device": 0,
+          "free_bytes_after": 12175802368,
+          "model_count": 3,
+          "numeric_error": 0,
+          "parents": 8192,
+          "readout_oracle_max_key_error": 0,
+          "score_input": "graph_states",
+          "seconds": [
+            0.005807104110717773,
+            0.005804031848907471,
+            0.005694464206695556,
+            0.005702655792236328,
+            0.005602303981781006,
+            0.005767168045043946,
+            0.005638016223907471
+          ],
+          "torch_reserved_peak_bytes": 25165824
+        },
+        {
+          "batch": 1024,
+          "correctness_passed": true,
+          "device": 1,
+          "free_bytes_after": 12311199744,
+          "model_count": 3,
+          "numeric_error": 0,
+          "parents": 8192,
+          "readout_oracle_max_key_error": 0,
+          "score_input": "graph_states",
+          "seconds": [
+            0.005781504154205322,
+            0.005775360107421875,
+            0.005667840003967285,
+            0.005687295913696289,
+            0.005570528030395508,
+            0.005738495826721191,
+            0.005601280212402344
+          ],
+          "torch_reserved_peak_bytes": 25165824
+        },
+        {
+          "batch": 32,
+          "correctness_passed": true,
+          "device": 0,
+          "free_bytes_after": 12175802368,
+          "model_count": 3,
+          "numeric_error": 0,
+          "parents": 8192,
+          "readout_oracle_max_key_error": 0,
+          "score_input": "graph_states",
+          "seconds": [
+            0.2043443145751953,
+            0.2040678405761719,
+            0.2079866943359375,
+            0.20343807983398438,
+            0.20241696166992187,
+            0.21731837463378906,
+            0.201459716796875
+          ],
+          "torch_reserved_peak_bytes": 25165824
+        },
+        {
+          "batch": 32,
+          "correctness_passed": true,
+          "device": 1,
+          "free_bytes_after": 12311199744,
+          "model_count": 3,
+          "numeric_error": 0,
+          "parents": 8192,
+          "readout_oracle_max_key_error": 0,
+          "score_input": "graph_states",
+          "seconds": [
+            0.2061854705810547,
+            0.20604631042480467,
+            0.211451904296875,
+            0.20477548217773436,
+            0.20421836853027345,
+            0.21395762634277343,
+            0.202514404296875
+          ],
+          "torch_reserved_peak_bytes": 25165824
+        },
+        {
+          "batch": 512,
+          "correctness_passed": true,
+          "device": 0,
+          "free_bytes_after": 12175802368,
+          "model_count": 3,
+          "numeric_error": 0,
+          "parents": 8192,
+          "readout_oracle_max_key_error": 0,
+          "score_input": "graph_states",
+          "seconds": [
+            0.011973631858825684,
+            0.011743231773376465,
+            0.013399104118347167,
+            0.011865056037902832,
+            0.011789312362670898,
+            0.01174835205078125,
+            0.01183743953704834
+          ],
+          "torch_reserved_peak_bytes": 25165824
+        },
+        {
+          "batch": 512,
+          "correctness_passed": true,
+          "device": 1,
+          "free_bytes_after": 12311199744,
+          "model_count": 3,
+          "numeric_error": 0,
+          "parents": 8192,
+          "readout_oracle_max_key_error": 0,
+          "score_input": "graph_states",
+          "seconds": [
+            0.011991040229797363,
+            0.011794431686401367,
+            0.011878399848937989,
+            0.011800576210021972,
+            0.011817983627319336,
+            0.011823103904724122,
+            0.011873087882995605
+          ],
+          "torch_reserved_peak_bytes": 25165824
+        },
+        {
+          "batch": 64,
+          "correctness_passed": true,
+          "device": 0,
+          "free_bytes_after": 12175802368,
+          "model_count": 3,
+          "numeric_error": 0,
+          "parents": 8192,
+          "readout_oracle_max_key_error": 0,
+          "score_input": "graph_states",
+          "seconds": [
+            0.0929986572265625,
+            0.0913776626586914,
+            0.0895578842163086,
+            0.08982527923583984,
+            0.08852070617675781,
+            0.08846937561035156,
+            0.08862924957275391
+          ],
+          "torch_reserved_peak_bytes": 25165824
+        },
+        {
+          "batch": 64,
+          "correctness_passed": true,
+          "device": 1,
+          "free_bytes_after": 12311199744,
+          "model_count": 3,
+          "numeric_error": 0,
+          "parents": 8192,
+          "readout_oracle_max_key_error": 0,
+          "score_input": "graph_states",
+          "seconds": [
+            0.0940769271850586,
+            0.0923842544555664,
+            0.09004338836669921,
+            0.09008332824707031,
+            0.08902963256835937,
+            0.08918418884277343,
+            0.0890541763305664
+          ],
+          "torch_reserved_peak_bytes": 25165824
+        },
+        {
+          "batch": 2048,
+          "correctness_passed": true,
+          "device": 0,
+          "free_bytes_after": 12175802368,
+          "model_count": 3,
+          "numeric_error": 0,
+          "parents": 8192,
+          "readout_oracle_max_key_error": 0,
+          "score_input": "graph_states",
+          "seconds": [
+            0.002950144052505493,
+            0.002844480037689209,
+            0.0028938241004943847,
+            0.002836479902267456,
+            0.0029237120151519775,
+            0.0027944960594177247,
+            0.002883584022521973
+          ],
+          "torch_reserved_peak_bytes": 25165824
+        },
+        {
+          "batch": 2048,
+          "correctness_passed": true,
+          "device": 1,
+          "free_bytes_after": 12311199744,
+          "model_count": 3,
+          "numeric_error": 0,
+          "parents": 8192,
+          "readout_oracle_max_key_error": 0,
+          "score_input": "graph_states",
+          "seconds": [
+            0.0029235200881958007,
+            0.0028282880783081056,
+            0.002871295928955078,
+            0.0028180480003356934,
+            0.0029030399322509766,
+            0.002776063919067383,
+            0.0028505918979644775
+          ],
+          "torch_reserved_peak_bytes": 25165824
+        },
+        {
+          "batch": 1792,
+          "correctness_passed": true,
+          "device": 0,
+          "free_bytes_after": 12175802368,
+          "model_count": 3,
+          "numeric_error": 0,
+          "parents": 8192,
+          "readout_oracle_max_key_error": 0,
+          "score_input": "graph_states",
+          "seconds": [
+            0.003516416072845459,
+            0.003564543962478638,
+            0.003514240026473999,
+            0.003526655912399292,
+            0.0035153920650482177,
+            0.0036290559768676757,
+            0.0036116480827331544
+          ],
+          "torch_reserved_peak_bytes": 25165824
+        },
+        {
+          "batch": 1792,
+          "correctness_passed": true,
+          "device": 1,
+          "free_bytes_after": 12311199744,
+          "model_count": 3,
+          "numeric_error": 0,
+          "parents": 8192,
+          "readout_oracle_max_key_error": 0,
+          "score_input": "graph_states",
+          "seconds": [
+            0.003511264085769653,
+            0.003571487903594971,
+            0.0035000319480895997,
+            0.0035031039714813234,
+            0.0034949119091033935,
+            0.0036239359378814695,
+            0.00360863995552063
+          ],
+          "torch_reserved_peak_bytes": 25165824
+        },
+        {
+          "batch": 1280,
+          "correctness_passed": true,
+          "device": 0,
+          "free_bytes_after": 12175802368,
+          "model_count": 3,
+          "numeric_error": 0,
+          "parents": 8192,
+          "readout_oracle_max_key_error": 0,
+          "score_input": "graph_states",
+          "seconds": [
+            0.005109824180603027,
+            0.005161983966827393,
+            0.005085184097290039,
+            0.0050564160346984865,
+            0.0050432000160217285,
+            0.004957344055175781,
+            0.005074944019317627
+          ],
+          "torch_reserved_peak_bytes": 25165824
+        },
+        {
+          "batch": 1280,
+          "correctness_passed": true,
+          "device": 1,
+          "free_bytes_after": 12311199744,
+          "model_count": 3,
+          "numeric_error": 0,
+          "parents": 8192,
+          "readout_oracle_max_key_error": 0,
+          "score_input": "graph_states",
+          "seconds": [
+            0.005095295906066895,
+            0.00518943977355957,
+            0.004941728115081787,
+            0.0049797120094299315,
+            0.0049500160217285155,
+            0.004997119903564453,
+            0.005045248031616211
+          ],
+          "torch_reserved_peak_bytes": 25165824
+        },
+        {
+          "batch": 1536,
+          "correctness_passed": true,
+          "device": 0,
+          "free_bytes_after": 12175802368,
+          "model_count": 3,
+          "numeric_error": 0,
+          "parents": 8192,
+          "readout_oracle_max_key_error": 0,
+          "score_input": "graph_states",
+          "seconds": [
+            0.004513792037963867,
+            0.004470784187316895,
+            0.004465663909912109,
+            0.004432896137237549,
+            0.004429823875427246,
+            0.004412288188934326,
+            0.004440063953399658
+          ],
+          "torch_reserved_peak_bytes": 25165824
+        },
+        {
+          "batch": 1536,
+          "correctness_passed": true,
+          "device": 1,
+          "free_bytes_after": 12311199744,
+          "model_count": 3,
+          "numeric_error": 0,
+          "parents": 8192,
+          "readout_oracle_max_key_error": 0,
+          "score_input": "graph_states",
+          "seconds": [
+            0.004484096050262451,
+            0.004446208000183105,
+            0.004440991878509521,
+            0.004427775859832763,
+            0.004393983840942383,
+            0.004394879817962646,
+            0.004400928020477295
+          ],
+          "torch_reserved_peak_bytes": 25165824
+        }
+      ],
+      "rejected": {},
+      "stat_rejected": {},
+      "gpu_telemetry": {
+        "32": {
+          "samples": [
+            [
+              {
+                "index": 0,
+                "uuid": "GPU-2f8eeec4-28fb-0399-d6f1-e91e7f4bc8ef",
+                "temperature": 39,
+                "throttled": false
+              },
+              {
+                "index": 1,
+                "uuid": "GPU-9c6b7f55-0eb8-f370-e9b4-e9e950e0c90e",
+                "temperature": 40,
+                "throttled": false
+              }
+            ],
+            [
+              {
+                "index": 0,
+                "uuid": "GPU-2f8eeec4-28fb-0399-d6f1-e91e7f4bc8ef",
+                "temperature": 39,
+                "throttled": false
+              },
+              {
+                "index": 1,
+                "uuid": "GPU-9c6b7f55-0eb8-f370-e9b4-e9e950e0c90e",
+                "temperature": 40,
+                "throttled": false
+              }
+            ]
+          ],
+          "errors": [],
+          "interval_seconds": 5,
+          "throttled": false,
+          "scope": "sampled visible GPUs; transient events may be missed"
+        },
+        "64": {
+          "samples": [
+            [
+              {
+                "index": 0,
+                "uuid": "GPU-2f8eeec4-28fb-0399-d6f1-e91e7f4bc8ef",
+                "temperature": 39,
+                "throttled": false
+              },
+              {
+                "index": 1,
+                "uuid": "GPU-9c6b7f55-0eb8-f370-e9b4-e9e950e0c90e",
+                "temperature": 40,
+                "throttled": false
+              }
+            ],
+            [
+              {
+                "index": 0,
+                "uuid": "GPU-2f8eeec4-28fb-0399-d6f1-e91e7f4bc8ef",
+                "temperature": 39,
+                "throttled": false
+              },
+              {
+                "index": 1,
+                "uuid": "GPU-9c6b7f55-0eb8-f370-e9b4-e9e950e0c90e",
+                "temperature": 40,
+                "throttled": false
+              }
+            ]
+          ],
+          "errors": [],
+          "interval_seconds": 5,
+          "throttled": false,
+          "scope": "sampled visible GPUs; transient events may be missed"
+        },
+        "128": {
+          "samples": [
+            [
+              {
+                "index": 0,
+                "uuid": "GPU-2f8eeec4-28fb-0399-d6f1-e91e7f4bc8ef",
+                "temperature": 39,
+                "throttled": false
+              },
+              {
+                "index": 1,
+                "uuid": "GPU-9c6b7f55-0eb8-f370-e9b4-e9e950e0c90e",
+                "temperature": 40,
+                "throttled": false
+              }
+            ],
+            [
+              {
+                "index": 0,
+                "uuid": "GPU-2f8eeec4-28fb-0399-d6f1-e91e7f4bc8ef",
+                "temperature": 39,
+                "throttled": false
+              },
+              {
+                "index": 1,
+                "uuid": "GPU-9c6b7f55-0eb8-f370-e9b4-e9e950e0c90e",
+                "temperature": 40,
+                "throttled": false
+              }
+            ]
+          ],
+          "errors": [],
+          "interval_seconds": 5,
+          "throttled": false,
+          "scope": "sampled visible GPUs; transient events may be missed"
+        },
+        "256": {
+          "samples": [
+            [
+              {
+                "index": 0,
+                "uuid": "GPU-2f8eeec4-28fb-0399-d6f1-e91e7f4bc8ef",
+                "temperature": 39,
+                "throttled": false
+              },
+              {
+                "index": 1,
+                "uuid": "GPU-9c6b7f55-0eb8-f370-e9b4-e9e950e0c90e",
+                "temperature": 40,
+                "throttled": false
+              }
+            ],
+            [
+              {
+                "index": 0,
+                "uuid": "GPU-2f8eeec4-28fb-0399-d6f1-e91e7f4bc8ef",
+                "temperature": 39,
+                "throttled": false
+              },
+              {
+                "index": 1,
+                "uuid": "GPU-9c6b7f55-0eb8-f370-e9b4-e9e950e0c90e",
+                "temperature": 40,
+                "throttled": false
+              }
+            ]
+          ],
+          "errors": [],
+          "interval_seconds": 5,
+          "throttled": false,
+          "scope": "sampled visible GPUs; transient events may be missed"
+        },
+        "512": {
+          "samples": [
+            [
+              {
+                "index": 0,
+                "uuid": "GPU-2f8eeec4-28fb-0399-d6f1-e91e7f4bc8ef",
+                "temperature": 39,
+                "throttled": false
+              },
+              {
+                "index": 1,
+                "uuid": "GPU-9c6b7f55-0eb8-f370-e9b4-e9e950e0c90e",
+                "temperature": 40,
+                "throttled": false
+              }
+            ],
+            [
+              {
+                "index": 0,
+                "uuid": "GPU-2f8eeec4-28fb-0399-d6f1-e91e7f4bc8ef",
+                "temperature": 39,
+                "throttled": false
+              },
+              {
+                "index": 1,
+                "uuid": "GPU-9c6b7f55-0eb8-f370-e9b4-e9e950e0c90e",
+                "temperature": 40,
+                "throttled": false
+              }
+            ]
+          ],
+          "errors": [],
+          "interval_seconds": 5,
+          "throttled": false,
+          "scope": "sampled visible GPUs; transient events may be missed"
+        },
+        "1024": {
+          "samples": [
+            [
+              {
+                "index": 0,
+                "uuid": "GPU-2f8eeec4-28fb-0399-d6f1-e91e7f4bc8ef",
+                "temperature": 39,
+                "throttled": false
+              },
+              {
+                "index": 1,
+                "uuid": "GPU-9c6b7f55-0eb8-f370-e9b4-e9e950e0c90e",
+                "temperature": 40,
+                "throttled": false
+              }
+            ],
+            [
+              {
+                "index": 0,
+                "uuid": "GPU-2f8eeec4-28fb-0399-d6f1-e91e7f4bc8ef",
+                "temperature": 39,
+                "throttled": false
+              },
+              {
+                "index": 1,
+                "uuid": "GPU-9c6b7f55-0eb8-f370-e9b4-e9e950e0c90e",
+                "temperature": 40,
+                "throttled": false
+              }
+            ]
+          ],
+          "errors": [],
+          "interval_seconds": 5,
+          "throttled": false,
+          "scope": "sampled visible GPUs; transient events may be missed"
+        },
+        "1280": {
+          "samples": [
+            [
+              {
+                "index": 0,
+                "uuid": "GPU-2f8eeec4-28fb-0399-d6f1-e91e7f4bc8ef",
+                "temperature": 39,
+                "throttled": false
+              },
+              {
+                "index": 1,
+                "uuid": "GPU-9c6b7f55-0eb8-f370-e9b4-e9e950e0c90e",
+                "temperature": 40,
+                "throttled": false
+              }
+            ],
+            [
+              {
+                "index": 0,
+                "uuid": "GPU-2f8eeec4-28fb-0399-d6f1-e91e7f4bc8ef",
+                "temperature": 39,
+                "throttled": false
+              },
+              {
+                "index": 1,
+                "uuid": "GPU-9c6b7f55-0eb8-f370-e9b4-e9e950e0c90e",
+                "temperature": 40,
+                "throttled": false
+              }
+            ]
+          ],
+          "errors": [],
+          "interval_seconds": 5,
+          "throttled": false,
+          "scope": "sampled visible GPUs; transient events may be missed"
+        },
+        "1536": {
+          "samples": [
+            [
+              {
+                "index": 0,
+                "uuid": "GPU-2f8eeec4-28fb-0399-d6f1-e91e7f4bc8ef",
+                "temperature": 39,
+                "throttled": false
+              },
+              {
+                "index": 1,
+                "uuid": "GPU-9c6b7f55-0eb8-f370-e9b4-e9e950e0c90e",
+                "temperature": 40,
+                "throttled": false
+              }
+            ],
+            [
+              {
+                "index": 0,
+                "uuid": "GPU-2f8eeec4-28fb-0399-d6f1-e91e7f4bc8ef",
+                "temperature": 39,
+                "throttled": false
+              },
+              {
+                "index": 1,
+                "uuid": "GPU-9c6b7f55-0eb8-f370-e9b4-e9e950e0c90e",
+                "temperature": 40,
+                "throttled": false
+              }
+            ]
+          ],
+          "errors": [],
+          "interval_seconds": 5,
+          "throttled": false,
+          "scope": "sampled visible GPUs; transient events may be missed"
+        },
+        "1792": {
+          "samples": [
+            [
+              {
+                "index": 0,
+                "uuid": "GPU-2f8eeec4-28fb-0399-d6f1-e91e7f4bc8ef",
+                "temperature": 39,
+                "throttled": false
+              },
+              {
+                "index": 1,
+                "uuid": "GPU-9c6b7f55-0eb8-f370-e9b4-e9e950e0c90e",
+                "temperature": 40,
+                "throttled": false
+              }
+            ],
+            [
+              {
+                "index": 0,
+                "uuid": "GPU-2f8eeec4-28fb-0399-d6f1-e91e7f4bc8ef",
+                "temperature": 39,
+                "throttled": false
+              },
+              {
+                "index": 1,
+                "uuid": "GPU-9c6b7f55-0eb8-f370-e9b4-e9e950e0c90e",
+                "temperature": 40,
+                "throttled": false
+              }
+            ]
+          ],
+          "errors": [],
+          "interval_seconds": 5,
+          "throttled": false,
+          "scope": "sampled visible GPUs; transient events may be missed"
+        },
+        "2048": {
+          "samples": [
+            [
+              {
+                "index": 0,
+                "uuid": "GPU-2f8eeec4-28fb-0399-d6f1-e91e7f4bc8ef",
+                "temperature": 39,
+                "throttled": false
+              },
+              {
+                "index": 1,
+                "uuid": "GPU-9c6b7f55-0eb8-f370-e9b4-e9e950e0c90e",
+                "temperature": 40,
+                "throttled": false
+              }
+            ],
+            [
+              {
+                "index": 0,
+                "uuid": "GPU-2f8eeec4-28fb-0399-d6f1-e91e7f4bc8ef",
+                "temperature": 39,
+                "throttled": false
+              },
+              {
+                "index": 1,
+                "uuid": "GPU-9c6b7f55-0eb8-f370-e9b4-e9e950e0c90e",
+                "temperature": 40,
+                "throttled": false
+              }
+            ]
+          ],
+          "errors": [],
+          "interval_seconds": 5,
+          "throttled": false,
+          "scope": "sampled visible GPUs; transient events may be missed"
+        }
+      },
+      "coarse_candidates": [
+        256,
+        128,
+        1024,
+        32,
+        512,
+        64,
+        2048
+      ],
+      "refinement_candidates": [
+        1792,
+        1280,
+        1536
+      ],
+      "calibration_wall_seconds": 6.115924810990691,
+      "probe_process_starts": 2,
+      "probe_protocol": "json-session-v1",
+      "pipeline_verified": false,
+      "cache_hit": true,
+      "measured_candidates": [
+        32,
+        64,
+        128,
+        256,
+        512,
+        1024,
+        1280,
+        1536,
+        1792,
+        2048
+      ]
+    },
+    "pipeline": {
+      "phase": "pipeline_measured",
+      "environment": {
+        "BEAM_B_MICRO": "2048",
+        "BEAM_ENSEMBLE_INFERENCE_MICRO": "2048",
+        "BEAM_SHARD_COUNT": "4",
+        "BEAM_STREAM3_RING_SLOTS": "8",
+        "BEAM_STREAM4_ACTIVE_SORT_SLOTS": "4",
+        "BEAM_STREAM4_BATCH_CANDIDATES": "131072"
+      },
+      "requested_beam_effective": 1048576,
+      "workload_parents": 1048576,
+      "measurement_scope": "full_requested_frontier",
+      "pipeline_verified": true,
+      "cache_hit": false,
+      "tested": [
+        {
+          "name": "baseline",
+          "environment": {
+            "BEAM_B_MICRO": "2048",
+            "BEAM_ENSEMBLE_INFERENCE_MICRO": "2048",
+            "BEAM_SHARD_COUNT": "4",
+            "BEAM_STREAM3_RING_SLOTS": "8",
+            "BEAM_STREAM4_ACTIVE_SORT_SLOTS": "4",
+            "BEAM_STREAM4_BATCH_CANDIDATES": "131072"
+          },
+          "plans": [
+            {
+              "BEAM_WIDTH_ALIGNMENT": 8192,
+              "B_MICRO": 2048,
+              "GLOBAL_BEAM_WIDTH_EFFECTIVE": 1048576,
+              "LOCAL_RANK": 0,
+              "RING_COUNT": 22,
+              "SHARD_CAPACITY_CANDIDATES": 229376,
+              "SHARD_COUNT": 4,
+              "STREAM3_RING_SLOTS": 8,
+              "STREAM4_ACTIVE_SORT_SLOTS": 4,
+              "STREAM4_BATCH_ALIGNMENT": 1024,
+              "STREAM4_BATCH_CANDIDATES": 131072,
+              "WORLD_SIZE": 2,
+              "estimated_required_device_bytes": 397440774,
+              "frontier_state_capacity": 524288,
+              "gpu_budget_bytes": 10785390592
+            },
+            {
+              "BEAM_WIDTH_ALIGNMENT": 8192,
+              "B_MICRO": 2048,
+              "GLOBAL_BEAM_WIDTH_EFFECTIVE": 1048576,
+              "LOCAL_RANK": 1,
+              "RING_COUNT": 22,
+              "SHARD_CAPACITY_CANDIDATES": 229376,
+              "SHARD_COUNT": 4,
+              "STREAM3_RING_SLOTS": 8,
+              "STREAM4_ACTIVE_SORT_SLOTS": 4,
+              "STREAM4_BATCH_ALIGNMENT": 1024,
+              "STREAM4_BATCH_CANDIDATES": 131072,
+              "WORLD_SIZE": 2,
+              "estimated_required_device_bytes": 397440774,
+              "frontier_state_capacity": 524288,
+              "gpu_budget_bytes": 10920787968
+            }
+          ],
+          "rank_measurements": [
+            {
+              "component_calibration": true,
+              "correctness_passed": true,
+              "full_step_verified": false,
+              "outer_candidates": 49152,
+              "rank": 0,
+              "scope": "synthetic_unique_metadata_at_exact_admitted_capacities",
+              "shard_capacity": 229376,
+              "sort_jobs_concurrent": 4,
+              "stream3_seconds": [
+                0.00021196800470352174,
+                0.0002109439969062805,
+                0.0002109439969062805,
+                0.0002099200040102005,
+                0.00021091200411319733
+              ],
+              "stream4_group_seconds": [
+                0.007378943920135498,
+                0.007393280029296875,
+                0.007349247932434082,
+                0.007374847888946533,
+                0.007457791805267334
+              ],
+              "transport": [
+                {
+                  "items": 24576,
+                  "seconds": [
+                    0.00012800000607967376,
+                    0.00014233599603176116,
+                    0.00013711999356746674,
+                    0.00014950400590896606,
+                    0.00013104000687599182
+                  ]
+                },
+                {
+                  "items": 49152,
+                  "seconds": [
+                    0.0002396160066127777,
+                    0.0002396160066127777,
+                    0.000241567999124527,
+                    0.00024249599874019625,
+                    0.0002447360008955002
+                  ]
+                }
+              ],
+              "union_seconds": [
+                0.004561920166015625,
+                0.00456496000289917,
+                0.0045578241348266605,
+                0.004568096160888672,
+                0.004576064109802246
+              ]
+            },
+            {
+              "component_calibration": true,
+              "correctness_passed": true,
+              "full_step_verified": false,
+              "outer_candidates": 49152,
+              "rank": 1,
+              "scope": "synthetic_unique_metadata_at_exact_admitted_capacities",
+              "shard_capacity": 229376,
+              "sort_jobs_concurrent": 4,
+              "stream3_seconds": [
+                0.00021296000480651857,
+                0.0002109439969062805,
+                0.00021196800470352174,
+                0.0002131199985742569,
+                0.00021081599593162536
+              ],
+              "stream4_group_seconds": [
+                0.0074002881050109865,
+                0.007374847888946533,
+                0.007326720237731934,
+                0.007312384128570557,
+                0.007451648235321045
+              ],
+              "transport": [
+                {
+                  "items": 24576,
+                  "seconds": [
+                    0.00013414399325847626,
+                    0.00014233599603176116,
+                    0.00014028799533843993,
+                    0.00014643199741840363,
+                    0.00013926400244235993
+                  ]
+                },
+                {
+                  "items": 49152,
+                  "seconds": [
+                    0.0002488320022821426,
+                    0.00023449599742889405,
+                    0.0002335679978132248,
+                    0.00024873599410057067,
+                    0.00024985599517822265
+                  ]
+                }
+              ],
+              "union_seconds": [
+                0.004561920166015625,
+                0.004555776119232178,
+                0.004563968181610108,
+                0.004580351829528808,
+                0.0045504322052001955
+              ]
+            }
+          ],
+          "estimate": {
+            "service_envelope_seconds": 0.20280921745300295,
+            "inference_seconds": 0.18454937744140626,
+            "stream3_seconds": 0.006782976150512696,
+            "stream4_seconds": 0.022136831760406494,
+            "transport_seconds": 0.007959551811218261,
+            "union_seconds": 0.01825984001159668,
+            "scope": "isolated exact-capacity service envelope; not full-step timing"
+          }
+        },
+        {
+          "name": "service-batch",
+          "environment": {
+            "BEAM_B_MICRO": "2048",
+            "BEAM_ENSEMBLE_INFERENCE_MICRO": "2048",
+            "BEAM_SHARD_COUNT": "4",
+            "BEAM_STREAM3_RING_SLOTS": "8",
+            "BEAM_STREAM4_ACTIVE_SORT_SLOTS": "4",
+            "BEAM_STREAM4_BATCH_CANDIDATES": "20480"
+          },
+          "plans": [
+            {
+              "BEAM_WIDTH_ALIGNMENT": 8192,
+              "B_MICRO": 2048,
+              "GLOBAL_BEAM_WIDTH_EFFECTIVE": 1048576,
+              "LOCAL_RANK": 0,
+              "RING_COUNT": 22,
+              "SHARD_CAPACITY_CANDIDATES": 229376,
+              "SHARD_COUNT": 4,
+              "STREAM3_RING_SLOTS": 8,
+              "STREAM4_ACTIVE_SORT_SLOTS": 4,
+              "STREAM4_BATCH_ALIGNMENT": 1024,
+              "STREAM4_BATCH_CANDIDATES": 20480,
+              "WORLD_SIZE": 2,
+              "estimated_required_device_bytes": 397440774,
+              "frontier_state_capacity": 524288,
+              "gpu_budget_bytes": 10785390592
+            },
+            {
+              "BEAM_WIDTH_ALIGNMENT": 8192,
+              "B_MICRO": 2048,
+              "GLOBAL_BEAM_WIDTH_EFFECTIVE": 1048576,
+              "LOCAL_RANK": 1,
+              "RING_COUNT": 22,
+              "SHARD_CAPACITY_CANDIDATES": 229376,
+              "SHARD_COUNT": 4,
+              "STREAM3_RING_SLOTS": 8,
+              "STREAM4_ACTIVE_SORT_SLOTS": 4,
+              "STREAM4_BATCH_ALIGNMENT": 1024,
+              "STREAM4_BATCH_CANDIDATES": 20480,
+              "WORLD_SIZE": 2,
+              "estimated_required_device_bytes": 397440774,
+              "frontier_state_capacity": 524288,
+              "gpu_budget_bytes": 10920787968
+            }
+          ],
+          "rank_measurements": [
+            {
+              "component_calibration": true,
+              "correctness_passed": true,
+              "full_step_verified": false,
+              "outer_candidates": 49152,
+              "rank": 0,
+              "scope": "synthetic_unique_metadata_at_exact_admitted_capacities",
+              "shard_capacity": 229376,
+              "sort_jobs_concurrent": 4,
+              "stream3_seconds": [
+                0.0002099200040102005,
+                0.00020684799551963807,
+                0.00020684799551963807,
+                0.00020787200331687927,
+                0.0002088959962129593
+              ],
+              "stream4_group_seconds": [
+                0.0072325119972229,
+                0.007341887950897217,
+                0.007484416007995606,
+                0.007233503818511963,
+                0.007300096035003662
+              ],
+              "transport": [
+                {
+                  "items": 24576,
+                  "seconds": [
+                    0.0001415040045976639,
+                    0.00013414399325847626,
+                    0.00013094399869441987,
+                    0.00013312000036239626,
+                    0.00014838400483131408
+                  ]
+                },
+                {
+                  "items": 49152,
+                  "seconds": [
+                    0.00024371199309825898,
+                    0.00024166400730609895,
+                    0.00024063999950885774,
+                    0.0002457599937915802,
+                    0.0002488320022821426
+                  ]
+                }
+              ],
+              "union_seconds": [
+                0.004547584056854248,
+                0.004543488025665283,
+                0.004549632072448731,
+                0.004549632072448731,
+                0.0045578241348266605
+              ]
+            },
+            {
+              "component_calibration": true,
+              "correctness_passed": true,
+              "full_step_verified": false,
+              "outer_candidates": 49152,
+              "rank": 1,
+              "scope": "synthetic_unique_metadata_at_exact_admitted_capacities",
+              "shard_capacity": 229376,
+              "sort_jobs_concurrent": 4,
+              "stream3_seconds": [
+                0.00021401600539684297,
+                0.0002099200040102005,
+                0.0002099200040102005,
+                0.00021081599593162536,
+                0.0002109439969062805
+              ],
+              "stream4_group_seconds": [
+                0.007205887794494629,
+                0.007548927783966064,
+                0.007342080116271973,
+                0.007204927921295166,
+                0.007300096035003662
+              ],
+              "transport": [
+                {
+                  "items": 24576,
+                  "seconds": [
+                    0.00013516800105571746,
+                    0.0001372160017490387,
+                    0.00013414399325847626,
+                    0.0001433600038290024,
+                    0.00011468800157308579
+                  ]
+                },
+                {
+                  "items": 49152,
+                  "seconds": [
+                    0.00022937600314617158,
+                    0.0002467840015888214,
+                    0.0002508800029754639,
+                    0.0002314240038394928,
+                    0.0002539519965648651
+                  ]
+                }
+              ],
+              "union_seconds": [
+                0.004550655841827392,
+                0.004583424091339112,
+                0.004563968181610108,
+                0.004573184013366699,
+                0.00456601619720459
+              ]
+            }
+          ],
+          "estimate": {
+            "service_envelope_seconds": 0.20281344223022463,
+            "inference_seconds": 0.18454937744140626,
+            "stream3_seconds": 0.006746111869812011,
+            "stream4_seconds": 0.14600192070007323,
+            "transport_seconds": 0.007897088050842285,
+            "union_seconds": 0.01826406478881836,
+            "scope": "isolated exact-capacity service envelope; not full-step timing"
+          }
+        },
+        {
+          "name": "shards-8",
+          "environment": {
+            "BEAM_B_MICRO": "2048",
+            "BEAM_ENSEMBLE_INFERENCE_MICRO": "2048",
+            "BEAM_SHARD_COUNT": "8",
+            "BEAM_STREAM3_RING_SLOTS": "2",
+            "BEAM_STREAM4_ACTIVE_SORT_SLOTS": "4",
+            "BEAM_STREAM4_BATCH_CANDIDATES": "20480"
+          },
+          "plans": [
+            {
+              "BEAM_WIDTH_ALIGNMENT": 16384,
+              "B_MICRO": 2048,
+              "GLOBAL_BEAM_WIDTH_EFFECTIVE": 1048576,
+              "LOCAL_RANK": 0,
+              "RING_COUNT": 11,
+              "SHARD_CAPACITY_CANDIDATES": 90112,
+              "SHARD_COUNT": 8,
+              "STREAM3_RING_SLOTS": 2,
+              "STREAM4_ACTIVE_SORT_SLOTS": 4,
+              "STREAM4_BATCH_ALIGNMENT": 1024,
+              "STREAM4_BATCH_CANDIDATES": 20480,
+              "WORLD_SIZE": 2,
+              "estimated_required_device_bytes": 190917382,
+              "frontier_state_capacity": 524288,
+              "gpu_budget_bytes": 10785390592
+            },
+            {
+              "BEAM_WIDTH_ALIGNMENT": 16384,
+              "B_MICRO": 2048,
+              "GLOBAL_BEAM_WIDTH_EFFECTIVE": 1048576,
+              "LOCAL_RANK": 1,
+              "RING_COUNT": 11,
+              "SHARD_CAPACITY_CANDIDATES": 90112,
+              "SHARD_COUNT": 8,
+              "STREAM3_RING_SLOTS": 2,
+              "STREAM4_ACTIVE_SORT_SLOTS": 4,
+              "STREAM4_BATCH_ALIGNMENT": 1024,
+              "STREAM4_BATCH_CANDIDATES": 20480,
+              "WORLD_SIZE": 2,
+              "estimated_required_device_bytes": 190917382,
+              "frontier_state_capacity": 524288,
+              "gpu_budget_bytes": 10920787968
+            }
+          ],
+          "rank_measurements": [
+            {
+              "component_calibration": true,
+              "correctness_passed": true,
+              "full_step_verified": false,
+              "outer_candidates": 12288,
+              "rank": 0,
+              "scope": "synthetic_unique_metadata_at_exact_admitted_capacities",
+              "shard_capacity": 90112,
+              "sort_jobs_concurrent": 4,
+              "stream3_seconds": [
+                0.0001268479973077774,
+                0.00012595200538635255,
+                0.00012492799758911133,
+                0.00012492799758911133,
+                0.00012492799758911133
+              ],
+              "stream4_group_seconds": [
+                0.0029276158809661865,
+                0.0029521920680999755,
+                0.003144704103469849,
+                0.0029173760414123538,
+                0.0028989439010620116
+              ],
+              "transport": [
+                {
+                  "items": 6144,
+                  "seconds": [
+                    0.00005836800113320351,
+                    0.000052223999053239826,
+                    0.00005427199974656105,
+                    0.00005407999828457832,
+                    0.00005510399863123894
+                  ]
+                },
+                {
+                  "items": 12288,
+                  "seconds": [
+                    0.00008294399827718735,
+                    0.00008275199681520462,
+                    0.00008294399827718735,
+                    0.0000809599980711937,
+                    0.00008191999793052673
+                  ]
+                }
+              ],
+              "union_seconds": [
+                0.002017280101776123,
+                0.002017215967178345,
+                0.0020131840705871584,
+                0.002012160062789917,
+                0.0020111041069030763
+              ]
+            },
+            {
+              "component_calibration": true,
+              "correctness_passed": true,
+              "full_step_verified": false,
+              "outer_candidates": 12288,
+              "rank": 1,
+              "scope": "synthetic_unique_metadata_at_exact_admitted_capacities",
+              "shard_capacity": 90112,
+              "sort_jobs_concurrent": 4,
+              "stream3_seconds": [
+                0.00012511999905109406,
+                0.00012572799623012542,
+                0.00012390399724245072,
+                0.00012492799758911133,
+                0.00012492799758911133
+              ],
+              "stream4_group_seconds": [
+                0.0028928000926971434,
+                0.0029419519901275636,
+                0.003009536027908325,
+                0.0030127038955688476,
+                0.0029921278953552247
+              ],
+              "transport": [
+                {
+                  "items": 6144,
+                  "seconds": [
+                    0.00004419200122356415,
+                    0.00006348799914121628,
+                    0.000052223999053239826,
+                    0.000053279999643564224,
+                    0.00005721599981188774
+                  ]
+                },
+                {
+                  "items": 12288,
+                  "seconds": [
+                    0.00008089599758386612,
+                    0.00008191999793052673,
+                    0.00008396799862384797,
+                    0.0000870399996638298,
+                    0.00007577600330114365
+                  ]
+                }
+              ],
+              "union_seconds": [
+                0.0020244479179382323,
+                0.002020479917526245,
+                0.0020193281173706053,
+                0.0020254719257354736,
+                0.0020305919647216797
+              ]
+            }
+          ],
+          "estimate": {
+            "service_envelope_seconds": 0.2007449607849121,
+            "inference_seconds": 0.18454937744140626,
+            "stream3_seconds": 0.01599078369140625,
+            "stream4_seconds": 0.05984255790710449,
+            "transport_seconds": 0.010592255592346191,
+            "union_seconds": 0.01619558334350586,
+            "scope": "isolated exact-capacity service envelope; not full-step timing"
+          }
+        },
+        {
+          "name": "outer-double",
+          "environment": {
+            "BEAM_B_MICRO": "4096",
+            "BEAM_ENSEMBLE_INFERENCE_MICRO": "2048",
+            "BEAM_SHARD_COUNT": "4",
+            "BEAM_STREAM3_RING_SLOTS": "2",
+            "BEAM_STREAM4_ACTIVE_SORT_SLOTS": "4",
+            "BEAM_STREAM4_BATCH_CANDIDATES": "20480"
+          },
+          "plans": [
+            {
+              "BEAM_WIDTH_ALIGNMENT": 8192,
+              "B_MICRO": 4096,
+              "GLOBAL_BEAM_WIDTH_EFFECTIVE": 1048576,
+              "LOCAL_RANK": 0,
+              "RING_COUNT": 11,
+              "SHARD_CAPACITY_CANDIDATES": 180224,
+              "SHARD_COUNT": 4,
+              "STREAM3_RING_SLOTS": 2,
+              "STREAM4_ACTIVE_SORT_SLOTS": 4,
+              "STREAM4_BATCH_ALIGNMENT": 1024,
+              "STREAM4_BATCH_CANDIDATES": 20480,
+              "WORLD_SIZE": 2,
+              "estimated_required_device_bytes": 251363334,
+              "frontier_state_capacity": 524288,
+              "gpu_budget_bytes": 10785390592
+            },
+            {
+              "BEAM_WIDTH_ALIGNMENT": 8192,
+              "B_MICRO": 4096,
+              "GLOBAL_BEAM_WIDTH_EFFECTIVE": 1048576,
+              "LOCAL_RANK": 1,
+              "RING_COUNT": 11,
+              "SHARD_CAPACITY_CANDIDATES": 180224,
+              "SHARD_COUNT": 4,
+              "STREAM3_RING_SLOTS": 2,
+              "STREAM4_ACTIVE_SORT_SLOTS": 4,
+              "STREAM4_BATCH_ALIGNMENT": 1024,
+              "STREAM4_BATCH_CANDIDATES": 20480,
+              "WORLD_SIZE": 2,
+              "estimated_required_device_bytes": 251363334,
+              "frontier_state_capacity": 524288,
+              "gpu_budget_bytes": 10920787968
+            }
+          ],
+          "rank_measurements": [
+            {
+              "component_calibration": true,
+              "correctness_passed": true,
+              "full_step_verified": false,
+              "outer_candidates": 24576,
+              "rank": 0,
+              "scope": "synthetic_unique_metadata_at_exact_admitted_capacities",
+              "shard_capacity": 180224,
+              "sort_jobs_concurrent": 4,
+              "stream3_seconds": [
+                0.0001515520066022873,
+                0.00014847999811172486,
+                0.00014745600521564483,
+                0.00014847999811172486,
+                0.0001505279988050461
+              ],
+              "stream4_group_seconds": [
+                0.005826560020446778,
+                0.005715968132019043,
+                0.005868544101715088,
+                0.00602623987197876,
+                0.005750783920288086
+              ],
+              "transport": [
+                {
+                  "items": 12288,
+                  "seconds": [
+                    0.00008191999793052673,
+                    0.00008294399827718735,
+                    0.0000798719972372055,
+                    0.0000798719972372055,
+                    0.00008294399827718735
+                  ]
+                },
+                {
+                  "items": 24576,
+                  "seconds": [
+                    0.00014028799533843993,
+                    0.00013107199966907502,
+                    0.00014127999544143676,
+                    0.00012697599828243256,
+                    0.00014435200393199922
+                  ]
+                }
+              ],
+              "union_seconds": [
+                0.003714047908782959,
+                0.003707904100418091,
+                0.003709952116012573,
+                0.0037130239009857176,
+                0.0037160959243774413
+              ]
+            },
+            {
+              "component_calibration": true,
+              "correctness_passed": true,
+              "full_step_verified": false,
+              "outer_candidates": 24576,
+              "rank": 1,
+              "scope": "synthetic_unique_metadata_at_exact_admitted_capacities",
+              "shard_capacity": 180224,
+              "sort_jobs_concurrent": 4,
+              "stream3_seconds": [
+                0.0001515520066022873,
+                0.0001504960060119629,
+                0.00014847999811172486,
+                0.00014944000542163849,
+                0.00014934399724006654
+              ],
+              "stream4_group_seconds": [
+                0.005780479907989502,
+                0.005942272186279297,
+                0.005855231761932373,
+                0.0057199039459228515,
+                0.005856256008148194
+              ],
+              "transport": [
+                {
+                  "items": 12288,
+                  "seconds": [
+                    0.00008601599931716918,
+                    0.0000830719992518425,
+                    0.0000798719972372055,
+                    0.00008294399827718735,
+                    0.0000798719972372055
+                  ]
+                },
+                {
+                  "items": 24576,
+                  "seconds": [
+                    0.00011878400295972824,
+                    0.00015241600573062897,
+                    0.00013209599256515503,
+                    0.00013516800105571746,
+                    0.000130048006772995
+                  ]
+                }
+              ],
+              "union_seconds": [
+                0.0037262399196624756,
+                0.003707904100418091,
+                0.0037048320770263674,
+                0.0037201919555664062,
+                0.0037201919555664062
+              ]
+            }
+          ],
+          "estimate": {
+            "service_envelope_seconds": 0.1994301452636719,
+            "inference_seconds": 0.18454937744140626,
+            "stream3_seconds": 0.009564160346984863,
+            "stream4_seconds": 0.11710463523864746,
+            "transport_seconds": 0.008978431701660156,
+            "union_seconds": 0.014880767822265625,
+            "scope": "isolated exact-capacity service envelope; not full-step timing"
+          }
+        },
+        {
+          "name": "sort-lanes-2",
+          "environment": {
+            "BEAM_B_MICRO": "2048",
+            "BEAM_ENSEMBLE_INFERENCE_MICRO": "2048",
+            "BEAM_SHARD_COUNT": "4",
+            "BEAM_STREAM3_RING_SLOTS": "2",
+            "BEAM_STREAM4_ACTIVE_SORT_SLOTS": "2",
+            "BEAM_STREAM4_BATCH_CANDIDATES": "20480"
+          },
+          "plans": [
+            {
+              "BEAM_WIDTH_ALIGNMENT": 8192,
+              "B_MICRO": 2048,
+              "GLOBAL_BEAM_WIDTH_EFFECTIVE": 1048576,
+              "LOCAL_RANK": 0,
+              "RING_COUNT": 22,
+              "SHARD_CAPACITY_CANDIDATES": 163840,
+              "SHARD_COUNT": 4,
+              "STREAM3_RING_SLOTS": 2,
+              "STREAM4_ACTIVE_SORT_SLOTS": 2,
+              "STREAM4_BATCH_ALIGNMENT": 1024,
+              "STREAM4_BATCH_CANDIDATES": 20480,
+              "WORLD_SIZE": 2,
+              "estimated_required_device_bytes": 176560134,
+              "frontier_state_capacity": 524288,
+              "gpu_budget_bytes": 10785390592
+            },
+            {
+              "BEAM_WIDTH_ALIGNMENT": 8192,
+              "B_MICRO": 2048,
+              "GLOBAL_BEAM_WIDTH_EFFECTIVE": 1048576,
+              "LOCAL_RANK": 1,
+              "RING_COUNT": 22,
+              "SHARD_CAPACITY_CANDIDATES": 163840,
+              "SHARD_COUNT": 4,
+              "STREAM3_RING_SLOTS": 2,
+              "STREAM4_ACTIVE_SORT_SLOTS": 2,
+              "STREAM4_BATCH_ALIGNMENT": 1024,
+              "STREAM4_BATCH_CANDIDATES": 20480,
+              "WORLD_SIZE": 2,
+              "estimated_required_device_bytes": 176560134,
+              "frontier_state_capacity": 524288,
+              "gpu_budget_bytes": 10920787968
+            }
+          ],
+          "rank_measurements": [
+            {
+              "component_calibration": true,
+              "correctness_passed": true,
+              "full_step_verified": false,
+              "outer_candidates": 12288,
+              "rank": 0,
+              "scope": "synthetic_unique_metadata_at_exact_admitted_capacities",
+              "shard_capacity": 163840,
+              "sort_jobs_concurrent": 2,
+              "stream3_seconds": [
+                0.00012800000607967376,
+                0.00012697599828243256,
+                0.00012697599828243256,
+                0.00012713600695133209,
+                0.00012697599828243256
+              ],
+              "stream4_group_seconds": [
+                0.003086335897445679,
+                0.003092479944229126,
+                0.003105792045593262,
+                0.0030626559257507326,
+                0.003117055892944336
+              ],
+              "transport": [
+                {
+                  "items": 6144,
+                  "seconds": [
+                    0.00005728000029921532,
+                    0.000052223999053239826,
+                    0.000057344000786542894,
+                    0.000053247999399900436,
+                    0.000057151999324560164
+                  ]
+                },
+                {
+                  "items": 12288,
+                  "seconds": [
+                    0.00008396799862384797,
+                    0.00008275199681520462,
+                    0.00008275199681520462,
+                    0.00008275199681520462,
+                    0.00008191999793052673
+                  ]
+                }
+              ],
+              "union_seconds": [
+                0.0034232320785522463,
+                0.003422208070755005,
+                0.003437567949295044,
+                0.0034191360473632814,
+                0.00341811203956604
+              ]
+            },
+            {
+              "component_calibration": true,
+              "correctness_passed": true,
+              "full_step_verified": false,
+              "outer_candidates": 12288,
+              "rank": 1,
+              "scope": "synthetic_unique_metadata_at_exact_admitted_capacities",
+              "shard_capacity": 163840,
+              "sort_jobs_concurrent": 2,
+              "stream3_seconds": [
+                0.00012492799758911133,
+                0.00012479999661445617,
+                0.00012390399724245072,
+                0.00012390399724245072,
+                0.00012390399724245072
+              ],
+              "stream4_group_seconds": [
+                0.0030605759620666506,
+                0.003104896068572998,
+                0.0030998079776763917,
+                0.0030945279598236083,
+                0.0030769920349121094
+              ],
+              "transport": [
+                {
+                  "items": 6144,
+                  "seconds": [
+                    0.00004710400104522705,
+                    0.00006348799914121628,
+                    0.000046080000698566435,
+                    0.00006553599983453751,
+                    0.000045056000351905825
+                  ]
+                },
+                {
+                  "items": 12288,
+                  "seconds": [
+                    0.00008102399855852127,
+                    0.00008499199897050858,
+                    0.00008271999657154083,
+                    0.00008396799862384797,
+                    0.00008284799754619598
+                  ]
+                }
+              ],
+              "union_seconds": [
+                0.0034365439414978027,
+                0.003429343938827515,
+                0.0034346880912780762,
+                0.00342630410194397,
+                0.0034201600551605226
+              ]
+            }
+          ],
+          "estimate": {
+            "service_envelope_seconds": 0.19826675319671633,
+            "inference_seconds": 0.18454937744140626,
+            "stream3_seconds": 0.016252927780151367,
+            "stream4_seconds": 0.12378111839294434,
+            "transport_seconds": 0.010604543685913086,
+            "union_seconds": 0.01371737575531006,
+            "scope": "isolated exact-capacity service envelope; not full-step timing"
+          }
+        }
+      ],
+      "selection": "baseline",
+      "estimate": {
+        "profile": "selected",
+        "median": 4.7414493560791014e-7,
+        "low": 4.173870086669922e-7,
+        "high": 4.78663444519043e-7,
+        "relative_mad": 0.006599259418677812,
+        "repeats": 5
+      },
+      "selection_rejections": {
+        "sort-lanes-2": "no statistically separated material gain",
+        "outer-double": "no statistically separated material gain",
+        "shards-8": "no statistically separated material gain",
+        "service-batch": "no statistically separated material gain"
+      },
+      "search_policy": "baseline plus at most four exact-capacity candidates; frozen inference microbatch",
+      "requested_beam_width": 1048576,
+      "fixture": {
+        "schema": 2,
+        "graph_hash": "e05fbac16dfae541895b81c0c0063ad07a1067ccf326649c455541dda88e1359",
+        "global_parents": 1048576,
+        "unique_states": 1048576,
+        "state_len": 13,
+        "storage_len": 32,
+        "files": [
+          {
+            "rank": 0,
+            "parents": 524288,
+            "path": "/workspace/fast-results/cache/runs/90ad505d29c14c6197ba4dc4f46ed5e0/pipeline-calibration/frontiers/frontier-rank-0.bin",
+            "sha256": "728d12d4e04159cd3efdbd2bf264e36f8a44fb1438781ebc5e5b0bf63e507f36",
+            "bytes": 16777216
+          },
+          {
+            "rank": 1,
+            "parents": 524288,
+            "path": "/workspace/fast-results/cache/runs/90ad505d29c14c6197ba4dc4f46ed5e0/pipeline-calibration/frontiers/frontier-rank-1.bin",
+            "sha256": "51cf8f4de1bcd398d8241ed6218171291dd524c07206339b9b9375daf4d72d20",
+            "bytes": 16777216
+          }
+        ],
+        "excluded_center_and_predecessors": true,
+        "generator": "distinct factorial permutation ranks",
+        "rank_stride": 65537,
+        "rank_offset": 2075673600,
+        "reachability_certificate": {
+          "proof": "connected transposition conjugates generate S_n",
+          "cycle": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            0
+          ],
+          "transposition": [
+            1,
+            0,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12
+          ],
+          "edges": [
+            [
+              0,
+              1
+            ],
+            [
+              1,
+              2
+            ],
+            [
+              2,
+              3
+            ],
+            [
+              3,
+              4
+            ],
+            [
+              4,
+              5
+            ],
+            [
+              5,
+              6
+            ],
+            [
+              6,
+              7
+            ],
+            [
+              7,
+              8
+            ],
+            [
+              8,
+              9
+            ],
+            [
+              9,
+              10
+            ],
+            [
+              10,
+              11
+            ],
+            [
+              11,
+              12
+            ],
+            [
+              12,
+              0
+            ]
+          ]
+        }
+      },
+      "measurements": [
+        {
+          "profile": "selected",
+          "parents": 1048576,
+          "seconds_by_rank": [
+            0.437412,
+            0.437662
+          ],
+          "correctness_passed": true,
+          "memory_admitted": true,
+          "throttled": false
+        },
+        {
+          "profile": "selected",
+          "parents": 1048576,
+          "seconds_by_rank": [
+            0.496951,
+            0.497177
+          ],
+          "correctness_passed": true,
+          "memory_admitted": true,
+          "throttled": false
+        },
+        {
+          "profile": "selected",
+          "parents": 1048576,
+          "seconds_by_rank": [
+            0.50166,
+            0.501915
+          ],
+          "correctness_passed": true,
+          "memory_admitted": true,
+          "throttled": false
+        },
+        {
+          "profile": "selected",
+          "parents": 1048576,
+          "seconds_by_rank": [
+            0.495639,
+            0.495865
+          ],
+          "correctness_passed": true,
+          "memory_admitted": true,
+          "throttled": false
+        },
+        {
+          "profile": "selected",
+          "parents": 1048576,
+          "seconds_by_rank": [
+            0.500207,
+            0.500458
+          ],
+          "correctness_passed": true,
+          "memory_admitted": true,
+          "throttled": false
+        }
+      ],
+      "matched_stream1": {
+        "parents": 1048576,
+        "world_size": 2,
+        "measurement_scope": "matched_full_frontier",
+        "stream1_seconds": 0.18390631103515626,
+        "full_step_seconds": 0.497177,
+        "stream1_parents_per_second": 5701685.788257425,
+        "full_step_parents_per_second": 2109059.751356157,
+        "throughput_loss_fraction": 0.6300989164117482,
+        "relative_time_overhead": 1.7034254409298528
+      }
+    },
+    "capacity": null
+  },
+  {
+    "file": "final-public-max.json",
+    "beam": "max",
+    "path_replay": true,
+    "inference": {
+      "signature": {
+        "schema": 5,
+        "search_policy": "coarse-local-v1",
+        "graph": "e05fbac16dfae541895b81c0c0063ad07a1067ccf326649c455541dda88e1359",
+        "models": "eb62916af2116fc2aef735a634f4c6f4d8af5fd434297d528085429a3a23693b",
+        "runner": "611ccc84844dde1b0d110bf2015420d1b230340013c2aee6346fecc81dbe1cef",
+        "probe": "c3b182baed6a03cc481f8122e1d161d5536daeaef652fc150c00ff5deb164def",
+        "gpu_properties": [
+          "_CudaDeviceProperties(name='NVIDIA GeForce RTX 3060', major=8, minor=6, total_memory=11907MB, multi_processor_count=28, uuid=2f8eeec4-28fb-0399-d6f1-e91e7f4bc8ef, pci_bus_id=3, pci_device_id=0, pci_domain_id=0, L2_cache_size=2MB)",
+          "_CudaDeviceProperties(name='NVIDIA GeForce RTX 3060', major=8, minor=6, total_memory=11909MB, multi_processor_count=28, uuid=9c6b7f55-0eb8-f370-e9b4-e9e950e0c90e, pci_bus_id=131, pci_device_id=0, pci_domain_id=0, L2_cache_size=2MB)"
+        ],
+        "device_indices": [
+          0,
+          1
+        ],
+        "world_size": 2,
+        "torch": "2.11.0+cu128",
+        "cuda": "12.8",
+        "topology_sha256": "53ffa83b847acfd328d58eba58f12315317feb3159b732c1a72cdbc6711e08df",
+        "hardware_sha256": "8d303daba766293c9289c8a6457c95f7e30d0c18e91ea9d338bbaff994fcfca0",
+        "gpu_uuids": [
+          "2f8eeec4-28fb-0399-d6f1-e91e7f4bc8ef",
+          "9c6b7f55-0eb8-f370-e9b4-e9e950e0c90e"
+        ],
+        "host": {
+          "machine": "x86_64",
+          "processor": "x86_64"
+        },
+        "requested_beam_width": 1048576,
+        "precision": "fp16/fp32",
+        "max_batch": 2048
+      },
+      "phase": "inference_verified",
+      "parent_batch": 2048,
+      "reserve_bytes": 562036736,
+      "estimate": {
+        "profile": "2048",
+        "median": 1.7600000137463213e-7,
+        "low": 1.731249940348789e-7,
+        "high": 1.7844921967480332e-7,
+        "relative_mad": 0.013916012960464703,
+        "repeats": 7
+      },
+      "records": [
+        {
+          "batch": 256,
+          "correctness_passed": true,
+          "device": 0,
+          "free_bytes_after": 12175802368,
+          "model_count": 3,
+          "numeric_error": 0,
+          "parents": 8192,
+          "readout_oracle_max_key_error": 0,
+          "score_input": "graph_states",
+          "seconds": [
+            0.02549849510192871,
+            0.02368716812133789,
+            0.022849536895751952,
+            0.023400447845458985,
+            0.02288332748413086,
+            0.022806528091430665,
+            0.023165952682495116
+          ],
+          "torch_reserved_peak_bytes": 25165824
+        },
+        {
+          "batch": 256,
+          "correctness_passed": true,
+          "device": 1,
+          "free_bytes_after": 12311199744,
+          "model_count": 3,
+          "numeric_error": 0,
+          "parents": 8192,
+          "readout_oracle_max_key_error": 0,
+          "score_input": "graph_states",
+          "seconds": [
+            0.023757823944091795,
+            0.023723007202148438,
+            0.02353455924987793,
+            0.02327552032470703,
+            0.023416927337646484,
+            0.02275225639343262,
+            0.02290460777282715
+          ],
+          "torch_reserved_peak_bytes": 25165824
+        },
+        {
+          "batch": 128,
+          "correctness_passed": true,
+          "device": 0,
+          "free_bytes_after": 12175802368,
+          "model_count": 3,
+          "numeric_error": 0,
+          "parents": 8192,
+          "readout_oracle_max_key_error": 0,
+          "score_input": "graph_states",
+          "seconds": [
+            0.046739456176757815,
+            0.04653347015380859,
+            0.048075775146484374,
+            0.04647116851806641,
+            0.04622438430786133,
+            0.04549324798583984,
+            0.045664161682128904
+          ],
+          "torch_reserved_peak_bytes": 25165824
+        },
+        {
+          "batch": 128,
+          "correctness_passed": true,
+          "device": 1,
+          "free_bytes_after": 12311199744,
+          "model_count": 3,
+          "numeric_error": 0,
+          "parents": 8192,
+          "readout_oracle_max_key_error": 0,
+          "score_input": "graph_states",
+          "seconds": [
+            0.046707710266113284,
+            0.04677017593383789,
+            0.04809830474853516,
+            0.046560161590576174,
+            0.04632163238525391,
+            0.045661216735839845,
+            0.04585472106933594
+          ],
+          "torch_reserved_peak_bytes": 25165824
+        },
+        {
+          "batch": 1024,
+          "correctness_passed": true,
+          "device": 0,
+          "free_bytes_after": 12175802368,
+          "model_count": 3,
+          "numeric_error": 0,
+          "parents": 8192,
+          "readout_oracle_max_key_error": 0,
+          "score_input": "graph_states",
+          "seconds": [
+            0.005807104110717773,
+            0.005804031848907471,
+            0.005694464206695556,
+            0.005702655792236328,
+            0.005602303981781006,
+            0.005767168045043946,
+            0.005638016223907471
+          ],
+          "torch_reserved_peak_bytes": 25165824
+        },
+        {
+          "batch": 1024,
+          "correctness_passed": true,
+          "device": 1,
+          "free_bytes_after": 12311199744,
+          "model_count": 3,
+          "numeric_error": 0,
+          "parents": 8192,
+          "readout_oracle_max_key_error": 0,
+          "score_input": "graph_states",
+          "seconds": [
+            0.005781504154205322,
+            0.005775360107421875,
+            0.005667840003967285,
+            0.005687295913696289,
+            0.005570528030395508,
+            0.005738495826721191,
+            0.005601280212402344
+          ],
+          "torch_reserved_peak_bytes": 25165824
+        },
+        {
+          "batch": 32,
+          "correctness_passed": true,
+          "device": 0,
+          "free_bytes_after": 12175802368,
+          "model_count": 3,
+          "numeric_error": 0,
+          "parents": 8192,
+          "readout_oracle_max_key_error": 0,
+          "score_input": "graph_states",
+          "seconds": [
+            0.2043443145751953,
+            0.2040678405761719,
+            0.2079866943359375,
+            0.20343807983398438,
+            0.20241696166992187,
+            0.21731837463378906,
+            0.201459716796875
+          ],
+          "torch_reserved_peak_bytes": 25165824
+        },
+        {
+          "batch": 32,
+          "correctness_passed": true,
+          "device": 1,
+          "free_bytes_after": 12311199744,
+          "model_count": 3,
+          "numeric_error": 0,
+          "parents": 8192,
+          "readout_oracle_max_key_error": 0,
+          "score_input": "graph_states",
+          "seconds": [
+            0.2061854705810547,
+            0.20604631042480467,
+            0.211451904296875,
+            0.20477548217773436,
+            0.20421836853027345,
+            0.21395762634277343,
+            0.202514404296875
+          ],
+          "torch_reserved_peak_bytes": 25165824
+        },
+        {
+          "batch": 512,
+          "correctness_passed": true,
+          "device": 0,
+          "free_bytes_after": 12175802368,
+          "model_count": 3,
+          "numeric_error": 0,
+          "parents": 8192,
+          "readout_oracle_max_key_error": 0,
+          "score_input": "graph_states",
+          "seconds": [
+            0.011973631858825684,
+            0.011743231773376465,
+            0.013399104118347167,
+            0.011865056037902832,
+            0.011789312362670898,
+            0.01174835205078125,
+            0.01183743953704834
+          ],
+          "torch_reserved_peak_bytes": 25165824
+        },
+        {
+          "batch": 512,
+          "correctness_passed": true,
+          "device": 1,
+          "free_bytes_after": 12311199744,
+          "model_count": 3,
+          "numeric_error": 0,
+          "parents": 8192,
+          "readout_oracle_max_key_error": 0,
+          "score_input": "graph_states",
+          "seconds": [
+            0.011991040229797363,
+            0.011794431686401367,
+            0.011878399848937989,
+            0.011800576210021972,
+            0.011817983627319336,
+            0.011823103904724122,
+            0.011873087882995605
+          ],
+          "torch_reserved_peak_bytes": 25165824
+        },
+        {
+          "batch": 64,
+          "correctness_passed": true,
+          "device": 0,
+          "free_bytes_after": 12175802368,
+          "model_count": 3,
+          "numeric_error": 0,
+          "parents": 8192,
+          "readout_oracle_max_key_error": 0,
+          "score_input": "graph_states",
+          "seconds": [
+            0.0929986572265625,
+            0.0913776626586914,
+            0.0895578842163086,
+            0.08982527923583984,
+            0.08852070617675781,
+            0.08846937561035156,
+            0.08862924957275391
+          ],
+          "torch_reserved_peak_bytes": 25165824
+        },
+        {
+          "batch": 64,
+          "correctness_passed": true,
+          "device": 1,
+          "free_bytes_after": 12311199744,
+          "model_count": 3,
+          "numeric_error": 0,
+          "parents": 8192,
+          "readout_oracle_max_key_error": 0,
+          "score_input": "graph_states",
+          "seconds": [
+            0.0940769271850586,
+            0.0923842544555664,
+            0.09004338836669921,
+            0.09008332824707031,
+            0.08902963256835937,
+            0.08918418884277343,
+            0.0890541763305664
+          ],
+          "torch_reserved_peak_bytes": 25165824
+        },
+        {
+          "batch": 2048,
+          "correctness_passed": true,
+          "device": 0,
+          "free_bytes_after": 12175802368,
+          "model_count": 3,
+          "numeric_error": 0,
+          "parents": 8192,
+          "readout_oracle_max_key_error": 0,
+          "score_input": "graph_states",
+          "seconds": [
+            0.002950144052505493,
+            0.002844480037689209,
+            0.0028938241004943847,
+            0.002836479902267456,
+            0.0029237120151519775,
+            0.0027944960594177247,
+            0.002883584022521973
+          ],
+          "torch_reserved_peak_bytes": 25165824
+        },
+        {
+          "batch": 2048,
+          "correctness_passed": true,
+          "device": 1,
+          "free_bytes_after": 12311199744,
+          "model_count": 3,
+          "numeric_error": 0,
+          "parents": 8192,
+          "readout_oracle_max_key_error": 0,
+          "score_input": "graph_states",
+          "seconds": [
+            0.0029235200881958007,
+            0.0028282880783081056,
+            0.002871295928955078,
+            0.0028180480003356934,
+            0.0029030399322509766,
+            0.002776063919067383,
+            0.0028505918979644775
+          ],
+          "torch_reserved_peak_bytes": 25165824
+        },
+        {
+          "batch": 1792,
+          "correctness_passed": true,
+          "device": 0,
+          "free_bytes_after": 12175802368,
+          "model_count": 3,
+          "numeric_error": 0,
+          "parents": 8192,
+          "readout_oracle_max_key_error": 0,
+          "score_input": "graph_states",
+          "seconds": [
+            0.003516416072845459,
+            0.003564543962478638,
+            0.003514240026473999,
+            0.003526655912399292,
+            0.0035153920650482177,
+            0.0036290559768676757,
+            0.0036116480827331544
+          ],
+          "torch_reserved_peak_bytes": 25165824
+        },
+        {
+          "batch": 1792,
+          "correctness_passed": true,
+          "device": 1,
+          "free_bytes_after": 12311199744,
+          "model_count": 3,
+          "numeric_error": 0,
+          "parents": 8192,
+          "readout_oracle_max_key_error": 0,
+          "score_input": "graph_states",
+          "seconds": [
+            0.003511264085769653,
+            0.003571487903594971,
+            0.0035000319480895997,
+            0.0035031039714813234,
+            0.0034949119091033935,
+            0.0036239359378814695,
+            0.00360863995552063
+          ],
+          "torch_reserved_peak_bytes": 25165824
+        },
+        {
+          "batch": 1280,
+          "correctness_passed": true,
+          "device": 0,
+          "free_bytes_after": 12175802368,
+          "model_count": 3,
+          "numeric_error": 0,
+          "parents": 8192,
+          "readout_oracle_max_key_error": 0,
+          "score_input": "graph_states",
+          "seconds": [
+            0.005109824180603027,
+            0.005161983966827393,
+            0.005085184097290039,
+            0.0050564160346984865,
+            0.0050432000160217285,
+            0.004957344055175781,
+            0.005074944019317627
+          ],
+          "torch_reserved_peak_bytes": 25165824
+        },
+        {
+          "batch": 1280,
+          "correctness_passed": true,
+          "device": 1,
+          "free_bytes_after": 12311199744,
+          "model_count": 3,
+          "numeric_error": 0,
+          "parents": 8192,
+          "readout_oracle_max_key_error": 0,
+          "score_input": "graph_states",
+          "seconds": [
+            0.005095295906066895,
+            0.00518943977355957,
+            0.004941728115081787,
+            0.0049797120094299315,
+            0.0049500160217285155,
+            0.004997119903564453,
+            0.005045248031616211
+          ],
+          "torch_reserved_peak_bytes": 25165824
+        },
+        {
+          "batch": 1536,
+          "correctness_passed": true,
+          "device": 0,
+          "free_bytes_after": 12175802368,
+          "model_count": 3,
+          "numeric_error": 0,
+          "parents": 8192,
+          "readout_oracle_max_key_error": 0,
+          "score_input": "graph_states",
+          "seconds": [
+            0.004513792037963867,
+            0.004470784187316895,
+            0.004465663909912109,
+            0.004432896137237549,
+            0.004429823875427246,
+            0.004412288188934326,
+            0.004440063953399658
+          ],
+          "torch_reserved_peak_bytes": 25165824
+        },
+        {
+          "batch": 1536,
+          "correctness_passed": true,
+          "device": 1,
+          "free_bytes_after": 12311199744,
+          "model_count": 3,
+          "numeric_error": 0,
+          "parents": 8192,
+          "readout_oracle_max_key_error": 0,
+          "score_input": "graph_states",
+          "seconds": [
+            0.004484096050262451,
+            0.004446208000183105,
+            0.004440991878509521,
+            0.004427775859832763,
+            0.004393983840942383,
+            0.004394879817962646,
+            0.004400928020477295
+          ],
+          "torch_reserved_peak_bytes": 25165824
+        }
+      ],
+      "rejected": {},
+      "stat_rejected": {},
+      "gpu_telemetry": {
+        "32": {
+          "samples": [
+            [
+              {
+                "index": 0,
+                "uuid": "GPU-2f8eeec4-28fb-0399-d6f1-e91e7f4bc8ef",
+                "temperature": 39,
+                "throttled": false
+              },
+              {
+                "index": 1,
+                "uuid": "GPU-9c6b7f55-0eb8-f370-e9b4-e9e950e0c90e",
+                "temperature": 40,
+                "throttled": false
+              }
+            ],
+            [
+              {
+                "index": 0,
+                "uuid": "GPU-2f8eeec4-28fb-0399-d6f1-e91e7f4bc8ef",
+                "temperature": 39,
+                "throttled": false
+              },
+              {
+                "index": 1,
+                "uuid": "GPU-9c6b7f55-0eb8-f370-e9b4-e9e950e0c90e",
+                "temperature": 40,
+                "throttled": false
+              }
+            ]
+          ],
+          "errors": [],
+          "interval_seconds": 5,
+          "throttled": false,
+          "scope": "sampled visible GPUs; transient events may be missed"
+        },
+        "64": {
+          "samples": [
+            [
+              {
+                "index": 0,
+                "uuid": "GPU-2f8eeec4-28fb-0399-d6f1-e91e7f4bc8ef",
+                "temperature": 39,
+                "throttled": false
+              },
+              {
+                "index": 1,
+                "uuid": "GPU-9c6b7f55-0eb8-f370-e9b4-e9e950e0c90e",
+                "temperature": 40,
+                "throttled": false
+              }
+            ],
+            [
+              {
+                "index": 0,
+                "uuid": "GPU-2f8eeec4-28fb-0399-d6f1-e91e7f4bc8ef",
+                "temperature": 39,
+                "throttled": false
+              },
+              {
+                "index": 1,
+                "uuid": "GPU-9c6b7f55-0eb8-f370-e9b4-e9e950e0c90e",
+                "temperature": 40,
+                "throttled": false
+              }
+            ]
+          ],
+          "errors": [],
+          "interval_seconds": 5,
+          "throttled": false,
+          "scope": "sampled visible GPUs; transient events may be missed"
+        },
+        "128": {
+          "samples": [
+            [
+              {
+                "index": 0,
+                "uuid": "GPU-2f8eeec4-28fb-0399-d6f1-e91e7f4bc8ef",
+                "temperature": 39,
+                "throttled": false
+              },
+              {
+                "index": 1,
+                "uuid": "GPU-9c6b7f55-0eb8-f370-e9b4-e9e950e0c90e",
+                "temperature": 40,
+                "throttled": false
+              }
+            ],
+            [
+              {
+                "index": 0,
+                "uuid": "GPU-2f8eeec4-28fb-0399-d6f1-e91e7f4bc8ef",
+                "temperature": 39,
+                "throttled": false
+              },
+              {
+                "index": 1,
+                "uuid": "GPU-9c6b7f55-0eb8-f370-e9b4-e9e950e0c90e",
+                "temperature": 40,
+                "throttled": false
+              }
+            ]
+          ],
+          "errors": [],
+          "interval_seconds": 5,
+          "throttled": false,
+          "scope": "sampled visible GPUs; transient events may be missed"
+        },
+        "256": {
+          "samples": [
+            [
+              {
+                "index": 0,
+                "uuid": "GPU-2f8eeec4-28fb-0399-d6f1-e91e7f4bc8ef",
+                "temperature": 39,
+                "throttled": false
+              },
+              {
+                "index": 1,
+                "uuid": "GPU-9c6b7f55-0eb8-f370-e9b4-e9e950e0c90e",
+                "temperature": 40,
+                "throttled": false
+              }
+            ],
+            [
+              {
+                "index": 0,
+                "uuid": "GPU-2f8eeec4-28fb-0399-d6f1-e91e7f4bc8ef",
+                "temperature": 39,
+                "throttled": false
+              },
+              {
+                "index": 1,
+                "uuid": "GPU-9c6b7f55-0eb8-f370-e9b4-e9e950e0c90e",
+                "temperature": 40,
+                "throttled": false
+              }
+            ]
+          ],
+          "errors": [],
+          "interval_seconds": 5,
+          "throttled": false,
+          "scope": "sampled visible GPUs; transient events may be missed"
+        },
+        "512": {
+          "samples": [
+            [
+              {
+                "index": 0,
+                "uuid": "GPU-2f8eeec4-28fb-0399-d6f1-e91e7f4bc8ef",
+                "temperature": 39,
+                "throttled": false
+              },
+              {
+                "index": 1,
+                "uuid": "GPU-9c6b7f55-0eb8-f370-e9b4-e9e950e0c90e",
+                "temperature": 40,
+                "throttled": false
+              }
+            ],
+            [
+              {
+                "index": 0,
+                "uuid": "GPU-2f8eeec4-28fb-0399-d6f1-e91e7f4bc8ef",
+                "temperature": 39,
+                "throttled": false
+              },
+              {
+                "index": 1,
+                "uuid": "GPU-9c6b7f55-0eb8-f370-e9b4-e9e950e0c90e",
+                "temperature": 40,
+                "throttled": false
+              }
+            ]
+          ],
+          "errors": [],
+          "interval_seconds": 5,
+          "throttled": false,
+          "scope": "sampled visible GPUs; transient events may be missed"
+        },
+        "1024": {
+          "samples": [
+            [
+              {
+                "index": 0,
+                "uuid": "GPU-2f8eeec4-28fb-0399-d6f1-e91e7f4bc8ef",
+                "temperature": 39,
+                "throttled": false
+              },
+              {
+                "index": 1,
+                "uuid": "GPU-9c6b7f55-0eb8-f370-e9b4-e9e950e0c90e",
+                "temperature": 40,
+                "throttled": false
+              }
+            ],
+            [
+              {
+                "index": 0,
+                "uuid": "GPU-2f8eeec4-28fb-0399-d6f1-e91e7f4bc8ef",
+                "temperature": 39,
+                "throttled": false
+              },
+              {
+                "index": 1,
+                "uuid": "GPU-9c6b7f55-0eb8-f370-e9b4-e9e950e0c90e",
+                "temperature": 40,
+                "throttled": false
+              }
+            ]
+          ],
+          "errors": [],
+          "interval_seconds": 5,
+          "throttled": false,
+          "scope": "sampled visible GPUs; transient events may be missed"
+        },
+        "1280": {
+          "samples": [
+            [
+              {
+                "index": 0,
+                "uuid": "GPU-2f8eeec4-28fb-0399-d6f1-e91e7f4bc8ef",
+                "temperature": 39,
+                "throttled": false
+              },
+              {
+                "index": 1,
+                "uuid": "GPU-9c6b7f55-0eb8-f370-e9b4-e9e950e0c90e",
+                "temperature": 40,
+                "throttled": false
+              }
+            ],
+            [
+              {
+                "index": 0,
+                "uuid": "GPU-2f8eeec4-28fb-0399-d6f1-e91e7f4bc8ef",
+                "temperature": 39,
+                "throttled": false
+              },
+              {
+                "index": 1,
+                "uuid": "GPU-9c6b7f55-0eb8-f370-e9b4-e9e950e0c90e",
+                "temperature": 40,
+                "throttled": false
+              }
+            ]
+          ],
+          "errors": [],
+          "interval_seconds": 5,
+          "throttled": false,
+          "scope": "sampled visible GPUs; transient events may be missed"
+        },
+        "1536": {
+          "samples": [
+            [
+              {
+                "index": 0,
+                "uuid": "GPU-2f8eeec4-28fb-0399-d6f1-e91e7f4bc8ef",
+                "temperature": 39,
+                "throttled": false
+              },
+              {
+                "index": 1,
+                "uuid": "GPU-9c6b7f55-0eb8-f370-e9b4-e9e950e0c90e",
+                "temperature": 40,
+                "throttled": false
+              }
+            ],
+            [
+              {
+                "index": 0,
+                "uuid": "GPU-2f8eeec4-28fb-0399-d6f1-e91e7f4bc8ef",
+                "temperature": 39,
+                "throttled": false
+              },
+              {
+                "index": 1,
+                "uuid": "GPU-9c6b7f55-0eb8-f370-e9b4-e9e950e0c90e",
+                "temperature": 40,
+                "throttled": false
+              }
+            ]
+          ],
+          "errors": [],
+          "interval_seconds": 5,
+          "throttled": false,
+          "scope": "sampled visible GPUs; transient events may be missed"
+        },
+        "1792": {
+          "samples": [
+            [
+              {
+                "index": 0,
+                "uuid": "GPU-2f8eeec4-28fb-0399-d6f1-e91e7f4bc8ef",
+                "temperature": 39,
+                "throttled": false
+              },
+              {
+                "index": 1,
+                "uuid": "GPU-9c6b7f55-0eb8-f370-e9b4-e9e950e0c90e",
+                "temperature": 40,
+                "throttled": false
+              }
+            ],
+            [
+              {
+                "index": 0,
+                "uuid": "GPU-2f8eeec4-28fb-0399-d6f1-e91e7f4bc8ef",
+                "temperature": 39,
+                "throttled": false
+              },
+              {
+                "index": 1,
+                "uuid": "GPU-9c6b7f55-0eb8-f370-e9b4-e9e950e0c90e",
+                "temperature": 40,
+                "throttled": false
+              }
+            ]
+          ],
+          "errors": [],
+          "interval_seconds": 5,
+          "throttled": false,
+          "scope": "sampled visible GPUs; transient events may be missed"
+        },
+        "2048": {
+          "samples": [
+            [
+              {
+                "index": 0,
+                "uuid": "GPU-2f8eeec4-28fb-0399-d6f1-e91e7f4bc8ef",
+                "temperature": 39,
+                "throttled": false
+              },
+              {
+                "index": 1,
+                "uuid": "GPU-9c6b7f55-0eb8-f370-e9b4-e9e950e0c90e",
+                "temperature": 40,
+                "throttled": false
+              }
+            ],
+            [
+              {
+                "index": 0,
+                "uuid": "GPU-2f8eeec4-28fb-0399-d6f1-e91e7f4bc8ef",
+                "temperature": 39,
+                "throttled": false
+              },
+              {
+                "index": 1,
+                "uuid": "GPU-9c6b7f55-0eb8-f370-e9b4-e9e950e0c90e",
+                "temperature": 40,
+                "throttled": false
+              }
+            ]
+          ],
+          "errors": [],
+          "interval_seconds": 5,
+          "throttled": false,
+          "scope": "sampled visible GPUs; transient events may be missed"
+        }
+      },
+      "coarse_candidates": [
+        256,
+        128,
+        1024,
+        32,
+        512,
+        64,
+        2048
+      ],
+      "refinement_candidates": [
+        1792,
+        1280,
+        1536
+      ],
+      "calibration_wall_seconds": 6.115924810990691,
+      "probe_process_starts": 2,
+      "probe_protocol": "json-session-v1",
+      "pipeline_verified": false,
+      "cache_hit": true,
+      "measured_candidates": [
+        32,
+        64,
+        128,
+        256,
+        512,
+        1024,
+        1280,
+        1536,
+        1792,
+        2048
+      ]
+    },
+    "pipeline": {
+      "phase": "pipeline_measured",
+      "environment": {
+        "BEAM_B_MICRO": "2048",
+        "BEAM_ENSEMBLE_INFERENCE_MICRO": "2048",
+        "BEAM_SHARD_COUNT": "4",
+        "BEAM_STREAM3_RING_SLOTS": "2",
+        "BEAM_STREAM4_ACTIVE_SORT_SLOTS": "1",
+        "BEAM_STREAM4_BATCH_CANDIDATES": "1604608"
+      },
+      "requested_beam_effective": 89530368,
+      "workload_parents": 89530368,
+      "measurement_scope": "full_requested_frontier",
+      "pipeline_verified": true,
+      "cache_hit": false,
+      "tested": [
+        {
+          "name": "baseline",
+          "environment": {
+            "BEAM_B_MICRO": "2048",
+            "BEAM_ENSEMBLE_INFERENCE_MICRO": "2048",
+            "BEAM_SHARD_COUNT": "4",
+            "BEAM_STREAM3_RING_SLOTS": "2",
+            "BEAM_STREAM4_ACTIVE_SORT_SLOTS": "1",
+            "BEAM_STREAM4_BATCH_CANDIDATES": "8192"
+          },
+          "plans": [
+            {
+              "BEAM_WIDTH_ALIGNMENT": 8192,
+              "B_MICRO": 2048,
+              "GLOBAL_BEAM_WIDTH_EFFECTIVE": 89530368,
+              "LOCAL_RANK": 0,
+              "RING_COUNT": 1822,
+              "SHARD_CAPACITY_CANDIDATES": 13989888,
+              "SHARD_COUNT": 4,
+              "STREAM3_RING_SLOTS": 2,
+              "STREAM4_ACTIVE_SORT_SLOTS": 1,
+              "STREAM4_BATCH_ALIGNMENT": 1024,
+              "STREAM4_BATCH_CANDIDATES": 8192,
+              "WORLD_SIZE": 2,
+              "estimated_required_device_bytes": 10785073670,
+              "frontier_state_capacity": 44765184,
+              "gpu_budget_bytes": 10785390592
+            },
+            {
+              "BEAM_WIDTH_ALIGNMENT": 8192,
+              "B_MICRO": 2048,
+              "GLOBAL_BEAM_WIDTH_EFFECTIVE": 89530368,
+              "LOCAL_RANK": 1,
+              "RING_COUNT": 1822,
+              "SHARD_CAPACITY_CANDIDATES": 13989888,
+              "SHARD_COUNT": 4,
+              "STREAM3_RING_SLOTS": 2,
+              "STREAM4_ACTIVE_SORT_SLOTS": 1,
+              "STREAM4_BATCH_ALIGNMENT": 1024,
+              "STREAM4_BATCH_CANDIDATES": 8192,
+              "WORLD_SIZE": 2,
+              "estimated_required_device_bytes": 10785073670,
+              "frontier_state_capacity": 44765184,
+              "gpu_budget_bytes": 10920787968
+            }
+          ],
+          "rank_measurements": [
+            {
+              "component_calibration": true,
+              "correctness_passed": true,
+              "full_step_verified": false,
+              "outer_candidates": 12288,
+              "rank": 0,
+              "scope": "synthetic_unique_metadata_at_exact_admitted_capacities",
+              "shard_capacity": 13989888,
+              "sort_jobs_concurrent": 1,
+              "stream3_seconds": [
+                0.0001290239989757538,
+                0.00012697599828243256,
+                0.00012697599828243256,
+                0.00012697599828243256,
+                0.00012595200538635255
+              ],
+              "stream4_group_seconds": [
+                0.1505587158203125,
+                0.15051683044433595,
+                0.1504890899658203,
+                0.15053619384765626,
+                0.15060684204101563
+              ],
+              "transport": [
+                {
+                  "items": 6144,
+                  "seconds": [
+                    0.00006143999844789505,
+                    0.00005836800113320351,
+                    0.00006246399879455566,
+                    0.00005619199946522713,
+                    0.000053247999399900436
+                  ]
+                },
+                {
+                  "items": 12288,
+                  "seconds": [
+                    0.00007782399654388428,
+                    0.00010649599879980087,
+                    0.0000798719972372055,
+                    0.00008908800035715103,
+                    0.00007782399654388428
+                  ]
+                }
+              ],
+              "union_seconds": [
+                0.3129077758789063,
+                0.31284130859375003,
+                0.312909912109375,
+                0.31294668579101564,
+                0.3128186950683594
+              ]
+            },
+            {
+              "component_calibration": true,
+              "correctness_passed": true,
+              "full_step_verified": false,
+              "outer_candidates": 12288,
+              "rank": 1,
+              "scope": "synthetic_unique_metadata_at_exact_admitted_capacities",
+              "shard_capacity": 13989888,
+              "sort_jobs_concurrent": 1,
+              "stream3_seconds": [
+                0.00012483199685811997,
+                0.00012390399724245072,
+                0.00012390399724245072,
+                0.00012390399724245072,
+                0.0001250240057706833
+              ],
+              "stream4_group_seconds": [
+                0.1505494079589844,
+                0.1504542694091797,
+                0.15050137329101562,
+                0.1505392608642578,
+                0.15045222473144532
+              ],
+              "transport": [
+                {
+                  "items": 6144,
+                  "seconds": [
+                    0.000044128000736236574,
+                    0.00007782399654388428,
+                    0.00004825599864125252,
+                    0.000057312000542879106,
+                    0.00006143999844789505
+                  ]
+                },
+                {
+                  "items": 12288,
+                  "seconds": [
+                    0.00009932799637317657,
+                    0.00007270400226116181,
+                    0.00009728000313043595,
+                    0.00007680000364780426,
+                    0.00009196799993515015
+                  ]
+                }
+              ],
+              "union_seconds": [
+                0.31289138793945315,
+                0.31269866943359376,
+                0.3127388305664063,
+                0.3127091064453125,
+                0.31281561279296877
+              ]
+            }
+          ],
+          "estimate": {
+            "service_envelope_seconds": 2469.4430654296875,
+            "inference_seconds": 15.75734489107132,
+            "stream3_seconds": 1.3877206852287054,
+            "stream4_seconds": 2468.191434326172,
+            "transport_seconds": 1.005118271291256,
+            "union_seconds": 1.2516311035156251,
+            "scope": "isolated exact-capacity service envelope; not full-step timing"
+          }
+        },
+        {
+          "name": "service-batch",
+          "environment": {
+            "BEAM_B_MICRO": "2048",
+            "BEAM_ENSEMBLE_INFERENCE_MICRO": "2048",
+            "BEAM_SHARD_COUNT": "4",
+            "BEAM_STREAM3_RING_SLOTS": "2",
+            "BEAM_STREAM4_ACTIVE_SORT_SLOTS": "1",
+            "BEAM_STREAM4_BATCH_CANDIDATES": "1604608"
+          },
+          "plans": [
+            {
+              "BEAM_WIDTH_ALIGNMENT": 8192,
+              "B_MICRO": 2048,
+              "GLOBAL_BEAM_WIDTH_EFFECTIVE": 89530368,
+              "LOCAL_RANK": 0,
+              "RING_COUNT": 1822,
+              "SHARD_CAPACITY_CANDIDATES": 13989888,
+              "SHARD_COUNT": 4,
+              "STREAM3_RING_SLOTS": 2,
+              "STREAM4_ACTIVE_SORT_SLOTS": 1,
+              "STREAM4_BATCH_ALIGNMENT": 1024,
+              "STREAM4_BATCH_CANDIDATES": 1604608,
+              "WORLD_SIZE": 2,
+              "estimated_required_device_bytes": 10785073670,
+              "frontier_state_capacity": 44765184,
+              "gpu_budget_bytes": 10785390592
+            },
+            {
+              "BEAM_WIDTH_ALIGNMENT": 8192,
+              "B_MICRO": 2048,
+              "GLOBAL_BEAM_WIDTH_EFFECTIVE": 89530368,
+              "LOCAL_RANK": 1,
+              "RING_COUNT": 1822,
+              "SHARD_CAPACITY_CANDIDATES": 13989888,
+              "SHARD_COUNT": 4,
+              "STREAM3_RING_SLOTS": 2,
+              "STREAM4_ACTIVE_SORT_SLOTS": 1,
+              "STREAM4_BATCH_ALIGNMENT": 1024,
+              "STREAM4_BATCH_CANDIDATES": 1604608,
+              "WORLD_SIZE": 2,
+              "estimated_required_device_bytes": 10785073670,
+              "frontier_state_capacity": 44765184,
+              "gpu_budget_bytes": 10920787968
+            }
+          ],
+          "rank_measurements": [
+            {
+              "component_calibration": true,
+              "correctness_passed": true,
+              "full_step_verified": false,
+              "outer_candidates": 12288,
+              "rank": 0,
+              "scope": "synthetic_unique_metadata_at_exact_admitted_capacities",
+              "shard_capacity": 13989888,
+              "sort_jobs_concurrent": 1,
+              "stream3_seconds": [
+                0.0001290239989757538,
+                0.00012800000607967376,
+                0.00012800000607967376,
+                0.00012800000607967376,
+                0.00013199999928474427
+              ],
+              "stream4_group_seconds": [
+                0.15054336547851563,
+                0.15058944702148438,
+                0.15046759033203125,
+                0.15047254943847657,
+                0.15046861267089845
+              ],
+              "transport": [
+                {
+                  "items": 6144,
+                  "seconds": [
+                    0.00005836800113320351,
+                    0.000054207999259233475,
+                    0.00006457599997520447,
+                    0.000053247999399900436,
+                    0.00005632000043988228
+                  ]
+                },
+                {
+                  "items": 12288,
+                  "seconds": [
+                    0.00008899199962615967,
+                    0.00008175999671220779,
+                    0.00008601599931716918,
+                    0.00008191999793052673,
+                    0.00008294399827718735
+                  ]
+                }
+              ],
+              "union_seconds": [
+                0.3133726806640625,
+                0.31346279907226565,
+                0.31337457275390623,
+                0.31341567993164066,
+                0.3135487976074219
+              ]
+            },
+            {
+              "component_calibration": true,
+              "correctness_passed": true,
+              "full_step_verified": false,
+              "outer_candidates": 12288,
+              "rank": 1,
+              "scope": "synthetic_unique_metadata_at_exact_admitted_capacities",
+              "shard_capacity": 13989888,
+              "sort_jobs_concurrent": 1,
+              "stream3_seconds": [
+                0.0001268479973077774,
+                0.00012588800489902498,
+                0.000125791996717453,
+                0.00012572799623012542,
+                0.00012492799758911133
+              ],
+              "stream4_group_seconds": [
+                0.15051161193847656,
+                0.15047680664062502,
+                0.15048294067382814,
+                0.15043276977539063,
+                0.15043072509765626
+              ],
+              "transport": [
+                {
+                  "items": 6144,
+                  "seconds": [
+                    0.00004915200173854828,
+                    0.00006143999844789505,
+                    0.000060416001826524736,
+                    0.00004915200173854828,
+                    0.00005939200147986412
+                  ]
+                },
+                {
+                  "items": 12288,
+                  "seconds": [
+                    0.00007782399654388428,
+                    0.00008607999980449676,
+                    0.00009625600278377533,
+                    0.00007360000163316727,
+                    0.00008499199897050858
+                  ]
+                }
+              ],
+              "union_seconds": [
+                0.3126578369140625,
+                0.31278057861328123,
+                0.3128227844238281,
+                0.3127214050292969,
+                0.3127562255859375
+              ]
+            }
+          ],
+          "estimate": {
+            "service_envelope_seconds": 17.011007610797883,
+            "inference_seconds": 15.75734489107132,
+            "stream3_seconds": 1.3989120664447545,
+            "stream4_seconds": 12.6400517578125,
+            "transport_seconds": 0.9288775567486883,
+            "union_seconds": 1.2536627197265626,
+            "scope": "isolated exact-capacity service envelope; not full-step timing"
+          }
+        }
+      ],
+      "selection": "service-batch",
+      "estimate": {
+        "profile": "selected",
+        "median": 5.220586159100786e-7,
+        "low": 5.049772608998994e-7,
+        "high": 5.264705267379221e-7,
+        "relative_mad": 0.004041497557771463,
+        "repeats": 5
+      },
+      "selection_rejections": {},
+      "search_policy": "baseline plus at most four exact-capacity candidates; frozen inference microbatch",
+      "requested_beam_width": 89530368,
+      "fixture": {
+        "schema": 2,
+        "graph_hash": "e05fbac16dfae541895b81c0c0063ad07a1067ccf326649c455541dda88e1359",
+        "global_parents": 89530368,
+        "unique_states": 89530368,
+        "state_len": 13,
+        "storage_len": 32,
+        "files": [
+          {
+            "rank": 0,
+            "parents": 44765184,
+            "path": "/workspace/fast-results/cache/runs/a23185939a8640e29b6ce83406d9b636/pipeline-calibration/frontiers/frontier-rank-0.bin",
+            "sha256": "a26ed85c33d96a7064a7f6fbe2ff5884f5e365f05d9518a1ff0b786c427dafff",
+            "bytes": 1432485888
+          },
+          {
+            "rank": 1,
+            "parents": 44765184,
+            "path": "/workspace/fast-results/cache/runs/a23185939a8640e29b6ce83406d9b636/pipeline-calibration/frontiers/frontier-rank-1.bin",
+            "sha256": "524d166666dae6a48f5e653f45d73fa766f6c051e154954bde8ec7f9e80b03cd",
+            "bytes": 1432485888
+          }
+        ],
+        "excluded_center_and_predecessors": true,
+        "generator": "distinct factorial permutation ranks",
+        "rank_stride": 65537,
+        "rank_offset": 2075673600,
+        "reachability_certificate": {
+          "proof": "connected transposition conjugates generate S_n",
+          "cycle": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            0
+          ],
+          "transposition": [
+            1,
+            0,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12
+          ],
+          "edges": [
+            [
+              0,
+              1
+            ],
+            [
+              1,
+              2
+            ],
+            [
+              2,
+              3
+            ],
+            [
+              3,
+              4
+            ],
+            [
+              4,
+              5
+            ],
+            [
+              5,
+              6
+            ],
+            [
+              6,
+              7
+            ],
+            [
+              7,
+              8
+            ],
+            [
+              8,
+              9
+            ],
+            [
+              9,
+              10
+            ],
+            [
+              10,
+              11
+            ],
+            [
+              11,
+              12
+            ],
+            [
+              12,
+              0
+            ]
+          ]
+        },
+        "fixture_reused_verified": true
+      },
+      "measurements": [
+        {
+          "profile": "selected",
+          "parents": 89530368,
+          "seconds_by_rank": [
+            46.5512,
+            46.5512
+          ],
+          "correctness_passed": true,
+          "memory_admitted": true,
+          "throttled": false
+        },
+        {
+          "profile": "selected",
+          "parents": 89530368,
+          "seconds_by_rank": [
+            47.135,
+            47.1351
+          ],
+          "correctness_passed": true,
+          "memory_admitted": true,
+          "throttled": false
+        },
+        {
+          "profile": "selected",
+          "parents": 89530368,
+          "seconds_by_rank": [
+            46.897,
+            46.8971
+          ],
+          "correctness_passed": true,
+          "memory_admitted": true,
+          "throttled": false
+        },
+        {
+          "profile": "selected",
+          "parents": 89530368,
+          "seconds_by_rank": [
+            46.7401,
+            46.7401
+          ],
+          "correctness_passed": true,
+          "memory_admitted": true,
+          "throttled": false
+        },
+        {
+          "profile": "selected",
+          "parents": 89530368,
+          "seconds_by_rank": [
+            45.2108,
+            45.2108
+          ],
+          "correctness_passed": true,
+          "memory_admitted": true,
+          "throttled": false
+        }
+      ],
+      "matched_stream1": {
+        "parents": 89530368,
+        "world_size": 2,
+        "measurement_scope": "matched_full_frontier",
+        "stream1_seconds": 15.645306640625,
+        "full_step_seconds": 46.7401,
+        "stream1_parents_per_second": 5722506.439568476,
+        "full_step_parents_per_second": 1915493.7195256322,
+        "throughput_loss_fraction": 0.6652701504569951,
+        "relative_time_overhead": 1.9874837913776306
+      }
+    },
+    "capacity": {
+      "requested_beam": 89530368,
+      "effective_beam": 89530368,
+      "profile": {
+        "BEAM_B_MICRO": "2048",
+        "BEAM_SHARD_COUNT": "4",
+        "BEAM_STREAM3_RING_SLOTS": "2",
+        "BEAM_STREAM4_ACTIVE_SORT_SLOTS": "1",
+        "BEAM_STREAM4_BATCH_CANDIDATES": "8192"
+      },
+      "plans": [
+        {
+          "BEAM_WIDTH_ALIGNMENT": 8192,
+          "B_MICRO": 2048,
+          "GLOBAL_BEAM_WIDTH_EFFECTIVE": 89530368,
+          "LOCAL_RANK": 0,
+          "RING_COUNT": 1822,
+          "SHARD_CAPACITY_CANDIDATES": 13989888,
+          "SHARD_COUNT": 4,
+          "STREAM3_RING_SLOTS": 2,
+          "STREAM4_ACTIVE_SORT_SLOTS": 1,
+          "STREAM4_BATCH_ALIGNMENT": 1024,
+          "STREAM4_BATCH_CANDIDATES": 8192,
+          "WORLD_SIZE": 2,
+          "estimated_required_device_bytes": 10785073670,
+          "frontier_state_capacity": 44765184,
+          "gpu_budget_bytes": 10785390592
+        },
+        {
+          "BEAM_WIDTH_ALIGNMENT": 8192,
+          "B_MICRO": 2048,
+          "GLOBAL_BEAM_WIDTH_EFFECTIVE": 89530368,
+          "LOCAL_RANK": 1,
+          "RING_COUNT": 1822,
+          "SHARD_CAPACITY_CANDIDATES": 13989888,
+          "SHARD_COUNT": 4,
+          "STREAM3_RING_SLOTS": 2,
+          "STREAM4_ACTIVE_SORT_SLOTS": 1,
+          "STREAM4_BATCH_ALIGNMENT": 1024,
+          "STREAM4_BATCH_CANDIDATES": 8192,
+          "WORLD_SIZE": 2,
+          "estimated_required_device_bytes": 10785073670,
+          "frontier_state_capacity": 44765184,
+          "gpu_budget_bytes": 10920787968
+        }
+      ],
+      "probes": 1650,
+      "upper_rejected_beam": 89538560,
+      "search_complete": true,
+      "full_step_verified": true,
+      "wall_seconds": 1.9452775847166777,
+      "profiles": "shards 1..128, two staging slots, one active sort slot",
+      "upper_bound_source": "minimum of smallest GPU VRAM / state storage and multiset permutation bound",
+      "capacity_scope": "full-step verified",
+      "rejected": [],
+      "execution_profile": {
+        "BEAM_B_MICRO": "2048",
+        "BEAM_ENSEMBLE_INFERENCE_MICRO": "2048",
+        "BEAM_SHARD_COUNT": "4",
+        "BEAM_STREAM3_RING_SLOTS": "2",
+        "BEAM_STREAM4_ACTIVE_SORT_SLOTS": "1",
+        "BEAM_STREAM4_BATCH_CANDIDATES": "1604608"
+      }
+    }
+  }
+]

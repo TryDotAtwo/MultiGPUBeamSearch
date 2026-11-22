@@ -1,0 +1,17 @@
+[1/16] Building CUDA object CMakeFiles/stream4_scan_cuda_tests.dir/tests/stream4_scan_cuda_tests.cu.o
+[2/16] Building CUDA object CMakeFiles/stream4_scan_large_union_cuda_tests.dir/tests/stream4_scan_large_union_cuda_tests.cu.o
+FAILED: [code=2] CMakeFiles/stream4_scan_large_union_cuda_tests.dir/tests/stream4_scan_large_union_cuda_tests.cu.o 
+/usr/local/cuda/bin/nvcc -forward-unknown-to-host-compiler -DBEAM_DEBUG_DEPTH_FLOW_TRACE=0 -DBEAM_DEBUG_FINAL_EXCHANGE_TRACE=0 -DBEAM_DEBUG_FINAL_HISTOGRAM_TRACE=0 -DBEAM_DEBUG_FINAL_VALIDATE=0 -DBEAM_DEBUG_INFERENCE_TRACE=0 -DBEAM_DEBUG_PATH_TRACE=0 -DBEAM_DEBUG_STREAM4_HISTOGRAM_TRACE=0 -DBEAM_DEBUG_STREAM_TIMING=0 -DBEAM_ENABLE_DEBUG=0 -DBEAM_HAS_CUTLASS=1 -DBEAM_HAS_CUTLASS_FMHA=1 -DBEAM_MOVE_COUNT=24 -DBEAM_STATE_ALIGNMENT=16 -DBEAM_STATE_LOGICAL_BYTES=96 -DBEAM_STATE_PHYSICAL_BYTES=112 -I/workspace/beam-native-source/src -I/workspace/beam-native-source/cuda -I/usr/local/cuda/targets/x86_64-linux/include -I/workspace/cutlass/include -I/workspace/cutlass/tools/util/include -I/workspace/cutlass/examples/41_fused_multi_head_attention -I/opt/conda/lib/python3.11/site-packages/nvidia/nccl/include -DONNX_NAMESPACE=onnx_c2 -gencode arch=compute_86,code=sm_86 -Xcudafe --diag_suppress=cc_clobber_ignored,--diag_suppress=field_without_dll_interface,--diag_suppress=base_class_has_different_dll_interface,--diag_suppress=dll_interface_conflict_none_assumed,--diag_suppress=dll_interface_conflict_dllexport_assumed,--diag_suppress=bad_friend_decl --expt-relaxed-constexpr --expt-extended-lambda -O3 -DNDEBUG -std=c++17 "--generate-code=arch=compute_86,code=[compute_86,sm_86]" -Xcompiler=-fPIE -MD -MT CMakeFiles/stream4_scan_large_union_cuda_tests.dir/tests/stream4_scan_large_union_cuda_tests.cu.o -MF CMakeFiles/stream4_scan_large_union_cuda_tests.dir/tests/stream4_scan_large_union_cuda_tests.cu.o.d -x cu -c /workspace/beam-native-source/tests/stream4_scan_large_union_cuda_tests.cu -o CMakeFiles/stream4_scan_large_union_cuda_tests.dir/tests/stream4_scan_large_union_cuda_tests.cu.o
+/workspace/beam-native-source/tests/stream4_scan_large_union_cuda_tests.cu(15): error: cannot deduce type of range in range-based "for" loop
+              for (const auto sizes : {std::pair<unsigned, unsigned>{0, 0}, {1, 1},
+                                      ^
+
+1 error detected in the compilation of "/workspace/beam-native-source/tests/stream4_scan_large_union_cuda_tests.cu".
+[3/16] Building CUDA object CMakeFiles/beam_cuda.dir/cuda/stream4.cu.o
+/workspace/beam-native-source/cuda/stream4.cu(212): warning #177-D: function "beam::<unnamed>::stream4_scan_block_counts_kernel" was declared but never referenced
+  __attribute__((global)) void stream4_scan_block_counts_kernel(
+                               ^
+
+Remark: The warnings can be suppressed with "-diag-suppress <warning-number>"
+
+ninja: build stopped: subcommand failed.

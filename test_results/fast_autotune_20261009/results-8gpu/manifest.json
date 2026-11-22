@@ -1,0 +1,11 @@
+{
+  "instance": 55039547,
+  "archive": "/workspace/results-8gpu.tar.gz",
+  "bytes": 5183235,
+  "sha256": "ee41b3622c7eaaee40b0febbee8bc538958600de2d726d8b7a876a9116edaf14",
+  "manifest_sha256": "1447c7bc39534c15eb67935a066dad1187bb5a998bfdb9d01e5a445b51a92ad0",
+  "files": 1938,
+  "part_bytes": 300000,
+  "parts": 18,
+  "excluded_bytes": 116052948437
+}

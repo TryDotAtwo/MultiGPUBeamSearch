@@ -1,0 +1,247 @@
+[1/151] Building CXX object CMakeFiles/beam_core.dir/src/history.cpp.o
+[2/151] Building CXX object CMakeFiles/beam_core.dir/src/hash.cpp.o
+[3/151] Building CXX object CMakeFiles/beam_core.dir/src/state.cpp.o
+[4/151] Building CXX object CMakeFiles/beam_core.dir/src/config.cpp.o
+[5/151] Building CXX object CMakeFiles/beam_core.dir/src/history_budget.cpp.o
+[6/151] Building CXX object CMakeFiles/beam_core.dir/src/stream4.cpp.o
+In file included from /usr/include/c++/11/bits/stl_algo.h:61,
+                 from /usr/include/c++/11/vector:62,
+                 from /workspace/beam-baseline/src/stream4.hpp:5,
+                 from /workspace/beam-baseline/src/stream4.cpp:1:
+/usr/include/c++/11/bits/stl_heap.h: In function ‘constexpr void std::__adjust_heap(_RandomAccessIterator, _Distance, _Distance, _Tp, _Compare) [with _RandomAccessIterator = __gnu_cxx::__normal_iterator<beam::CandidateMeta*, std::vector<beam::CandidateMeta> >; _Distance = long int; _Tp = beam::CandidateMeta; _Compare = __gnu_cxx::__ops::_Iter_comp_iter<beam::stream4_threshold_sort_dedup(const std::vector<beam::CandidateMeta>&, uint32_t)::<lambda(const beam::CandidateMeta&, const beam::CandidateMeta&)> >]’:
+/usr/include/c++/11/bits/stl_heap.h:223:5: note: the ABI for passing parameters with 32-byte alignment has changed in GCC 4.6
+  223 |     __adjust_heap(_RandomAccessIterator __first, _Distance __holeIndex,
+      |     ^~~~~~~~~~~~~
+[7/151] Building CXX object CMakeFiles/beam_core.dir/src/stream3.cpp.o
+[8/151] Building CXX object CMakeFiles/beam_core.dir/src/frontier_cpu.cpp.o
+In file included from /usr/include/c++/11/bits/stl_algo.h:61,
+                 from /usr/include/c++/11/vector:62,
+                 from /workspace/beam-baseline/src/state.hpp:5,
+                 from /workspace/beam-baseline/src/frontier_cpu.hpp:4,
+                 from /workspace/beam-baseline/src/frontier_cpu.cpp:1:
+/usr/include/c++/11/bits/stl_heap.h: In function ‘constexpr void std::__adjust_heap(_RandomAccessIterator, _Distance, _Distance, _Tp, _Compare) [with _RandomAccessIterator = __gnu_cxx::__normal_iterator<beam::CandidateMeta*, std::vector<beam::CandidateMeta> >; _Distance = long int; _Tp = beam::CandidateMeta; _Compare = __gnu_cxx::__ops::_Iter_comp_iter<beam::expand_depth_cpu_reference(const std::vector<beam::StatePacked>&, const std::vector<std::array<unsigned char, 112> >&, const State128&, const ZobristTable&, uint32_t, uint64_t)::<lambda(const beam::CandidateMeta&, const beam::CandidateMeta&)> >]’:
+/usr/include/c++/11/bits/stl_heap.h:223:5: note: the ABI for passing parameters with 32-byte alignment has changed in GCC 4.6
+  223 |     __adjust_heap(_RandomAccessIterator __first, _Distance __holeIndex,
+      |     ^~~~~~~~~~~~~
+[9/151] Building CXX object CMakeFiles/beam_core.dir/src/native_input.cpp.o
+[10/151] Linking CXX static library libbeam_core.a
+[11/151] Building CUDA object CMakeFiles/beam_cuda.dir/cuda/stream1.cu.o
+[12/151] Building CUDA object CMakeFiles/beam_cuda.dir/cuda/stream1_blend_readout.cu.o
+[13/151] Building CUDA object CMakeFiles/beam_cuda.dir/cuda/stream1_gnn_projection.cu.o
+[14/151] Building CUDA object CMakeFiles/beam_cuda.dir/cuda/stream1_ensemble_readout.cu.o
+[15/151] Building CUDA object CMakeFiles/beam_cuda.dir/cuda/stream2.cu.o
+[16/151] Building CUDA object CMakeFiles/beam_cuda.dir/cuda/stream4.cu.o
+[17/151] Building CUDA object CMakeFiles/beam_cuda.dir/cuda/stream3.cu.o
+/workspace/beam-baseline/cuda/stream3.cu(129): warning #177-D: function "beam::<unnamed>::stream3_debug_store_count_kernel" was declared but never referenced
+  __attribute__((global)) void stream3_debug_store_count_kernel(
+                               ^
+
+Remark: The warnings can be suppressed with "-diag-suppress <warning-number>"
+
+[18/151] Building CUDA object CMakeFiles/beam_cuda.dir/cuda/stream5.cu.o
+[19/151] Building CUDA object CMakeFiles/beam_cuda.dir/cuda/threshold.cu.o
+[20/151] Building CUDA object CMakeFiles/beam_cuda.dir/cuda/final_materialize.cu.o
+[21/151] Building CUDA object CMakeFiles/beam_cuda.dir/cuda/stream1_transformer_fmha.cu.o
+[22/151] Building CUDA object CMakeFiles/beam_cuda.dir/cuda/dispatcher.cu.o
+[23/151] Building CXX object CMakeFiles/beam_cuda.dir/cuda/runtime_config.cpp.o
+[24/151] Building CXX object CMakeFiles/history_tests.dir/tests/history_tests.cpp.o
+[25/151] Building CXX object CMakeFiles/history_budget_tests.dir/tests/history_budget_tests.cpp.o
+[26/151] Building CXX object CMakeFiles/history_prefault_tests.dir/tests/history_prefault_tests.cpp.o
+[27/151] Building CXX object CMakeFiles/config_limits_tests.dir/tests/config_limits_tests.cpp.o
+[28/151] Building CXX object CMakeFiles/contract_tests.dir/tests/contract_tests.cpp.o
+[29/151] Building CXX object CMakeFiles/cluster_rank_tests.dir/tests/cluster_rank_tests.cpp.o
+[30/151] Building CXX object CMakeFiles/cnot_domain_contract_tests.dir/tests/cnot_domain_contract_tests.cpp.o
+[31/151] Building CXX object CMakeFiles/unique_frontier_tests.dir/tests/unique_frontier_tests.cpp.o
+/workspace/beam-baseline/tests/unique_frontier_tests.cpp: In function ‘int main()’:
+/workspace/beam-baseline/tests/unique_frontier_tests.cpp:29:68: warning: narrowing conversion of ‘(random.std::mersenne_twister_engine<long unsigned int, 32, 624, 397, 31, 2567483615, 11, 4294967295, 7, 2636928640, 15, 4022730752, 18, 1812433253>::operator()() % 8)’ from ‘std::mersenne_twister_engine<long unsigned int, 32, 624, 397, 31, 2567483615, 11, 4294967295, 7, 2636928640, 15, 4022730752, 18, 1812433253>::result_type’ {aka ‘long unsigned int’} to ‘uint32_t’ {aka ‘unsigned int’} [-Wnarrowing]
+   29 |                 CandidateMeta c{{random()%24,random()%4},i,random()%8,random()%16};
+      |                                                            ~~~~~~~~^~
+/workspace/beam-baseline/tests/unique_frontier_tests.cpp:29:79: warning: narrowing conversion of ‘(random.std::mersenne_twister_engine<long unsigned int, 32, 624, 397, 31, 2567483615, 11, 4294967295, 7, 2636928640, 15, 4022730752, 18, 1812433253>::operator()() % 16)’ from ‘std::mersenne_twister_engine<long unsigned int, 32, 624, 397, 31, 2567483615, 11, 4294967295, 7, 2636928640, 15, 4022730752, 18, 1812433253>::result_type’ {aka ‘long unsigned int’} to ‘uint32_t’ {aka ‘unsigned int’} [-Wnarrowing]
+   29 |                 CandidateMeta c{{random()%24,random()%4},i,random()%8,random()%16};
+      |                                                                       ~~~~~~~~^~~
+[32/151] Building CUDA object CMakeFiles/cluster_cuda_device_tests.dir/tests/cluster_cuda_device_tests.cu.o
+[33/151] Building CXX object CMakeFiles/native_input_tests.dir/tests/native_input_tests.cpp.o
+[34/151] Building CXX object CMakeFiles/tensor_binding_tests.dir/tests/tensor_binding_tests.cpp.o
+[35/151] Building CXX object CMakeFiles/native_manifest_tests.dir/tests/native_manifest_tests.cpp.o
+[36/151] Building CUDA object CMakeFiles/stream2_cuda_tests.dir/tests/stream2_cuda_tests.cu.o
+[37/151] Building CUDA object CMakeFiles/stream1_cuda_tests.dir/tests/stream1_cuda_tests.cu.o
+[38/151] Building CUDA object CMakeFiles/device_weight_verification_cuda_tests.dir/tests/device_weight_verification_cuda_tests.cu.o
+[39/151] Building CUDA object CMakeFiles/beam_cuda.dir/cuda/static_memory.cu.o
+[40/151] Building CUDA object CMakeFiles/stream1_transformer_final_cls_cuda_tests.dir/tests/stream1_transformer_final_cls_cuda_tests.cu.o
+[41/151] Building CUDA object CMakeFiles/stream1_transformer_dual_ln_cuda_tests.dir/tests/stream1_transformer_dual_ln_cuda_tests.cu.o
+[42/151] Building CUDA object CMakeFiles/stream1_transformer_cuda_tests.dir/tests/stream1_transformer_cuda_tests.cu.o
+[43/151] Building CXX object CMakeFiles/stream1_transformer_gemm_policy_tests.dir/tests/stream1_transformer_gemm_policy_tests.cpp.o
+[44/151] Building CXX object CMakeFiles/stream1_resolved_gemm_tests.dir/tests/stream1_resolved_gemm_tests.cpp.o
+[45/151] Building CXX object CMakeFiles/stream1_policy_snapshot_tests.dir/tests/stream1_policy_snapshot_tests.cpp.o
+[46/151] Building CXX object CMakeFiles/stream1_transformer_hopper_policy_tests.dir/tests/stream1_transformer_hopper_policy_tests.cpp.o
+[47/151] Building CXX object CMakeFiles/stream1_layout_metadata_tests.dir/tests/stream1_layout_metadata_tests.cpp.o
+[48/151] Building CXX object CMakeFiles/stream1_loaded_execution_admission_tests.dir/tests/stream1_loaded_execution_admission_tests.cpp.o
+[49/151] Building CXX object CMakeFiles/production_score_request_tests.dir/tests/production_score_request_tests.cpp.o
+[50/151] Building CXX object CMakeFiles/stream1_execution_contract_tests.dir/tests/stream1_execution_contract_tests.cpp.o
+[51/151] Building CXX object CMakeFiles/stream1_transformer_attention_policy_tests.dir/tests/stream1_transformer_attention_policy_tests.cpp.o
+[52/151] Building CXX object CMakeFiles/stream1_transformer_layernorm_policy_tests.dir/tests/stream1_transformer_layernorm_policy_tests.cpp.o
+[53/151] Building CXX object CMakeFiles/stream1_transformer_layernorm_split_slots_policy_tests.dir/tests/stream1_transformer_layernorm_policy_tests.cpp.o
+[54/151] Building CXX object CMakeFiles/stream1_transformer_shape_tests.dir/tests/stream1_transformer_shape_tests.cpp.o
+[55/151] Building CXX object CMakeFiles/stream1_transformer_autotune_contract_tests.dir/tests/stream1_transformer_autotune_contract_tests.cpp.o
+[56/151] Building CUDA object CMakeFiles/stream4_cuda_tests.dir/tests/stream4_cuda_tests.cu.o
+[57/151] Building CUDA object CMakeFiles/stream3_cuda_tests.dir/tests/stream3_cuda_tests.cu.o
+[58/151] Building CUDA object CMakeFiles/stream1_transformer_hopper_gemm_cuda_tests.dir/tests/stream1_transformer_hopper_gemm_cuda_tests.cu.o
+[59/151] Building CXX object CMakeFiles/runtime_arithmetic_tests.dir/tests/runtime_arithmetic_tests.cpp.o
+[60/151] Building CUDA object CMakeFiles/union_memory_cuda_tests.dir/tests/union_memory_cuda_tests.cu.o
+[61/151] Building CUDA object CMakeFiles/stream4_logical_union_cuda_tests.dir/tests/stream4_logical_union_cuda_tests.cu.o
+[62/151] Building CUDA object CMakeFiles/stream5_cuda_tests.dir/tests/stream5_cuda_tests.cu.o
+[63/151] Building CUDA object CMakeFiles/final_cuda_tests.dir/tests/final_cuda_tests.cu.o
+[64/151] Building CUDA object CMakeFiles/threshold_cuda_tests.dir/tests/threshold_cuda_tests.cu.o
+[65/151] Building CXX object CMakeFiles/stream1_execution_shape_tests.dir/tests/stream1_execution_shape_tests.cpp.o
+[66/151] Building CXX object CMakeFiles/stream1_executor_contract_tests.dir/tests/stream1_executor_contract_tests.cpp.o
+[67/151] Building CUDA object CMakeFiles/stream4_bounded_graph_cuda_tests.dir/tests/stream4_bounded_graph_cuda_tests.cu.o
+/workspace/beam-baseline/tests/stream4_logical_union_cuda_tests.cu(62): warning #177-D: variable "sort_bound" was declared but never referenced
+          unsigned sort_bound = 0;
+                   ^
+
+Remark: The warnings can be suppressed with "-diag-suppress <warning-number>"
+
+[68/151] Building CUDA object CMakeFiles/final_snapshot_validation_cuda_tests.dir/tests/final_snapshot_validation_cuda_tests.cu.o
+[69/151] Building CXX object CMakeFiles/stream1_chunk_plan_tests.dir/tests/stream1_chunk_plan_tests.cpp.o
+[70/151] Building CXX object CMakeFiles/stream1_kernel_description_tests.dir/tests/stream1_kernel_description_tests.cpp.o
+[71/151] Building CUDA object CMakeFiles/stream1_nonfinite_score_cuda_tests.dir/tests/stream1_nonfinite_score_cuda_tests.cu.o
+[72/151] Building CUDA object CMakeFiles/threshold_union_cuda_tests.dir/tests/threshold_union_cuda_tests.cu.o
+[73/151] Building CUDA object CMakeFiles/stitched_cuda_tests.dir/tests/stitched_cuda_tests.cu.o
+[74/151] Building CUDA object CMakeFiles/static_memory_cuda_tests.dir/tests/static_memory_cuda_tests.cu.o
+[75/151] Building CUDA object CMakeFiles/dispatcher_cuda_tests.dir/tests/dispatcher_cuda_tests.cu.o
+[76/151] Building CUDA object CMakeFiles/beam_cuda.dir/cuda/stream1_transformer.cu.o
+[77/151] Linking CXX static library libbeam_cuda.a
+[78/151] Building CUDA object CMakeFiles/stream_benchmark.dir/tools/stream_benchmark_mlp.cu.o
+[79/151] Building CUDA object CMakeFiles/stream_benchmark.dir/tools/stream_benchmark.cu.o
+[80/151] Building CUDA object CMakeFiles/stream_benchmark.dir/tools/stream_benchmark_transformer.cu.o
+[81/151] Building CUDA object CMakeFiles/stream_pipeline_benchmark.dir/tools/stream_pipeline_benchmark.cu.o
+[82/151] Building CXX object CMakeFiles/stream1_transformer_libtorch_benchmark.dir/tools/stream1_transformer_libtorch_backend.cpp.o
+[83/151] Building CXX object CMakeFiles/stream1_transformer_libtorch_benchmark.dir/tools/stream1_transformer_libtorch_benchmark.cpp.o
+[84/151] Building CXX object CMakeFiles/production_runner_libtorch_stream1.dir/tools/stream1_transformer_libtorch_backend.cpp.o
+[85/151] Building CXX object CMakeFiles/production_runner_libtorch_stream1.dir/tools/stream1_libtorch_ring_slot_launcher.cpp.o
+[86/151] Building CXX object CMakeFiles/production_runner_libtorch_stream1.dir/tools/stream1_gnn_projection_libtorch.cpp.o
+[87/151] Building CUDA object CMakeFiles/production_runner.dir/tools/production_runner.cu.o
+/workspace/beam-baseline/tools/production_runner.cu(4810): warning #177-D: variable "tracked_solution" was declared but never referenced
+      TrackedSolutionPrefix tracked_solution;
+                            ^
+
+Remark: The warnings can be suppressed with "-diag-suppress <warning-number>"
+
+/workspace/beam-baseline/tools/production_runner.cu(514): warning #177-D: function "<unnamed>::parse_next_u32" was declared but never referenced
+  std::uint32_t parse_next_u32(const std::string& text, std::size_t& pos, const char* context) {
+                ^
+
+/workspace/beam-baseline/tools/production_runner.cu(1284): warning #177-D: function "<unnamed>::build_solved_neighborhood_runtime" was declared but never referenced
+  SolvedNeighborhoodRuntime build_solved_neighborhood_runtime(
+                            ^
+
+/workspace/beam-baseline/tools/production_runner.cu(1327): warning #177-D: function "<unnamed>::RepairSolvedNeighborhoodPrefetch::enabled" was declared but never referenced
+      bool enabled() const {
+           ^
+
+/workspace/beam-baseline/tools/production_runner.cu(1583): warning #177-D: function "<unnamed>::track_location_name" was declared but never referenced
+  const char* track_location_name(std::uint32_t location) {
+              ^
+
+/workspace/beam-baseline/tools/production_runner.cu(1600): warning #177-D: function "<unnamed>::track_stream4_phase_name" was declared but never referenced
+  const char* track_stream4_phase_name(std::uint32_t phase) {
+              ^
+
+/workspace/beam-baseline/tools/production_runner.cu(4005): warning #177-D: function "<unnamed>::NcclRuntime::operator=(<unnamed>::NcclRuntime &&) noexcept" was declared but never referenced
+      NcclRuntime& operator=(NcclRuntime&& other) noexcept {
+                   ^
+
+[88/151] Building CXX object CMakeFiles/stream1_ensemble_benchmark.dir/tools/stream1_ensemble_benchmark.cpp.o
+[89/151] Building CXX object CMakeFiles/stream1_ensemble_benchmark.dir/tools/stream1_gnn_projection_libtorch.cpp.o
+[90/151] Linking CXX executable contract_tests
+[91/151] Linking CXX executable history_tests
+[92/151] Linking CXX executable history_budget_tests
+[93/151] Linking CXX executable history_prefault_tests
+[94/151] Linking CXX executable config_limits_tests
+[95/151] Linking CXX executable cluster_rank_tests
+[96/151] Linking CUDA executable cluster_cuda_device_tests
+[97/151] Linking CXX executable cnot_domain_contract_tests
+[98/151] Linking CXX executable unique_frontier_tests
+[99/151] Linking CXX executable native_input_tests
+[100/151] Linking CXX executable native_manifest_tests
+[101/151] Linking CXX executable tensor_binding_tests
+[102/151] Linking CXX executable stream2_cuda_tests
+[103/151] Linking CXX executable stream1_cuda_tests
+[104/151] Linking CXX executable stream1_transformer_cuda_tests
+[105/151] Linking CUDA executable device_weight_verification_cuda_tests
+[106/151] Linking CXX executable stream1_transformer_final_cls_cuda_tests
+[107/151] Linking CXX executable stream1_transformer_hopper_gemm_cuda_tests
+[108/151] Linking CXX executable stream1_transformer_dual_ln_cuda_tests
+[109/151] Linking CXX executable stream1_transformer_gemm_policy_tests
+[110/151] Linking CXX executable stream1_resolved_gemm_tests
+[111/151] Linking CXX executable production_score_request_tests
+[112/151] Linking CXX executable stream1_policy_snapshot_tests
+[113/151] Linking CXX executable stream1_transformer_hopper_policy_tests
+[114/151] Linking CXX executable stream1_layout_metadata_tests
+[115/151] Linking CXX executable stream1_loaded_execution_admission_tests
+[116/151] Linking CXX executable stream1_execution_contract_tests
+[117/151] Linking CXX executable stream1_transformer_attention_policy_tests
+[118/151] Linking CXX executable stream1_transformer_shape_tests
+[119/151] Linking CXX executable stream1_transformer_layernorm_policy_tests
+[120/151] Linking CXX executable stream1_transformer_layernorm_split_slots_policy_tests
+[121/151] Linking CXX executable stream1_transformer_autotune_contract_tests
+[122/151] Linking CXX executable stream3_cuda_tests
+[123/151] Linking CXX executable stream4_cuda_tests
+[124/151] Linking CXX executable stream4_logical_union_cuda_tests
+[125/151] Linking CXX executable union_memory_cuda_tests
+[126/151] Linking CXX executable runtime_arithmetic_tests
+[127/151] Linking CXX executable stream5_cuda_tests
+[128/151] Linking CXX executable final_cuda_tests
+[129/151] Linking CXX executable threshold_cuda_tests
+[130/151] Linking CXX executable stream4_bounded_graph_cuda_tests
+[131/151] Linking CXX executable final_snapshot_validation_cuda_tests
+[132/151] Linking CXX executable stream1_execution_shape_tests
+[133/151] Linking CXX executable stream1_executor_contract_tests
+[134/151] Linking CXX executable stream1_chunk_plan_tests
+[135/151] Linking CXX executable stream1_kernel_description_tests
+[136/151] Linking CXX executable stream1_nonfinite_score_cuda_tests
+[137/151] Linking CXX executable threshold_union_cuda_tests
+[138/151] Linking CXX executable stitched_cuda_tests
+[139/151] Linking CXX executable dispatcher_cuda_tests
+[140/151] Linking CXX executable static_memory_cuda_tests
+[141/151] Linking CXX executable production_runner
+[142/151] Linking CXX executable stream_benchmark
+[143/151] Linking CXX executable stream_pipeline_benchmark
+[144/151] Linking CXX executable stream1_transformer_libtorch_benchmark
+[145/151] Linking CXX executable stream1_ensemble_benchmark
+[146/151] Building CUDA object CMakeFiles/production_runner_libtorch_stream1.dir/tools/production_runner.cu.o
+/workspace/beam-baseline/tools/production_runner.cu(4810): warning #177-D: variable "tracked_solution" was declared but never referenced
+      TrackedSolutionPrefix tracked_solution;
+                            ^
+
+Remark: The warnings can be suppressed with "-diag-suppress <warning-number>"
+
+/workspace/beam-baseline/tools/production_runner.cu(514): warning #177-D: function "<unnamed>::parse_next_u32" was declared but never referenced
+  std::uint32_t parse_next_u32(const std::string& text, std::size_t& pos, const char* context) {
+                ^
+
+/workspace/beam-baseline/tools/production_runner.cu(1284): warning #177-D: function "<unnamed>::build_solved_neighborhood_runtime" was declared but never referenced
+  SolvedNeighborhoodRuntime build_solved_neighborhood_runtime(
+                            ^
+
+/workspace/beam-baseline/tools/production_runner.cu(1327): warning #177-D: function "<unnamed>::RepairSolvedNeighborhoodPrefetch::enabled" was declared but never referenced
+      bool enabled() const {
+           ^
+
+/workspace/beam-baseline/tools/production_runner.cu(1583): warning #177-D: function "<unnamed>::track_location_name" was declared but never referenced
+  const char* track_location_name(std::uint32_t location) {
+              ^
+
+/workspace/beam-baseline/tools/production_runner.cu(1600): warning #177-D: function "<unnamed>::track_stream4_phase_name" was declared but never referenced
+  const char* track_stream4_phase_name(std::uint32_t phase) {
+              ^
+
+/workspace/beam-baseline/tools/production_runner.cu(4005): warning #177-D: function "<unnamed>::NcclRuntime::operator=(<unnamed>::NcclRuntime &&) noexcept" was declared but never referenced
+      NcclRuntime& operator=(NcclRuntime&& other) noexcept {
+                   ^
+
+[147/151] Linking CXX executable production_runner_libtorch_stream1
+[148/151] Building CXX object CMakeFiles/stream1_native_mlp_benchmark.dir/tools/stream1_native_mlp_benchmark.cpp.o
+[149/151] Linking CXX executable stream1_native_mlp_benchmark
+[150/151] Building CXX object CMakeFiles/stream1_libtorch_mlp_benchmark.dir/tools/stream1_libtorch_mlp_benchmark.cpp.o
+[151/151] Linking CXX executable stream1_libtorch_mlp_benchmark

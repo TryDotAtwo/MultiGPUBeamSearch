@@ -1,0 +1,725 @@
+{
+  "archive_sha256": "e361eac7b0cff172141ed9459ebfed735320bfdc5dcc2efbecdfa2dfda9c47e7",
+  "files": [
+    {
+      "path": "red.log",
+      "bytes": 482,
+      "sha256": "1e3f8b9cccba3a0b9611505fb089e408360d4558600e11a5794de281ed3154b8"
+    },
+    {
+      "path": "pool-first.log",
+      "bytes": 503,
+      "sha256": "c13951606f78120905fe0fb16d0c286003a15b97b6a82354b1cfba62eead5663"
+    },
+    {
+      "path": "deadline-red.log",
+      "bytes": 1048,
+      "sha256": "4698d39d620fb2bf7e840de46327bf303bd6a5883c345a9cecf1f92ef80ca39d"
+    },
+    {
+      "path": "policy-red.log",
+      "bytes": 853,
+      "sha256": "2b1651377badfc47821cbb4544871d37c53fd3764943375098b5d81c7903de08"
+    },
+    {
+      "path": "policy-red-fixed.log",
+      "bytes": 530,
+      "sha256": "a37569ad94d5c91e7c4140e7acc81c22640b4d8b06ae1f4a3b17b34f17fefc83"
+    },
+    {
+      "path": "tuning-red.log",
+      "bytes": 620,
+      "sha256": "a31e5dee30a01514ed57fa8cb323fb9319fb14a41ebf642d2926338063def69a"
+    },
+    {
+      "path": "adapter-red.log",
+      "bytes": 308,
+      "sha256": "e2cc76e3ccdcc9a3db8165228f8df4a847ed3c30ee35534ce854d0e684ace48e"
+    },
+    {
+      "path": "telemetry-red.log",
+      "bytes": 1138,
+      "sha256": "fd01b177bb03d8a6697b62448a3aee283dfa874c303f7f3a0701ad4dbeeee36d"
+    },
+    {
+      "path": "controller-first.log",
+      "bytes": 985,
+      "sha256": "628a17a867c5ff3007d75a008796fcb9f4a41aa610541d7b1147bf993e5dc473"
+    },
+    {
+      "path": "policy-first.log",
+      "bytes": 495,
+      "sha256": "734b992c89a408a5cfbe851ad2553966d10877b4815d9810ca0939df01e354f3"
+    },
+    {
+      "path": "rust.txt",
+      "bytes": 7480,
+      "sha256": "bc7fe2ac8fcb2bac5a11ec15f65eb1c78a6acd8fe06fed9eeb466b8c72e98f48"
+    },
+    {
+      "path": "release.txt",
+      "bytes": 422,
+      "sha256": "b36483bb9f77a44b2d37e18badd1923929ab202c6ed3174ed15c78a3e9b7a2d9"
+    },
+    {
+      "path": "adapter.txt",
+      "bytes": 61,
+      "sha256": "ca38e9ab543335c46f0cf6444db0794a7d9643b9d33f677f44d386af59a72964"
+    },
+    {
+      "path": "adapter-inference.txt",
+      "bytes": 31,
+      "sha256": "dd06db025149c60b8bd2227c0d877a82e6454a73f6922e6aea7b91ed3b3d6e70"
+    },
+    {
+      "path": "gpu.txt",
+      "bytes": 334,
+      "sha256": "cfa592eda48f25fb1dd96fb1b50917c13fa6b55cba58cd9dfc35ece342310438"
+    },
+    {
+      "path": "gpu/inputs/calibration.json",
+      "bytes": 16381,
+      "sha256": "c158024fa32a0dbefc1c18601e35e8abe1d1b7c42427037f4676b242bfd67d4f"
+    },
+    {
+      "path": "gpu/inputs/ensemble.json",
+      "bytes": 16629,
+      "sha256": "b79cf5d912976f2117f4c9eb5ebe9f8639662712943f8f82f753ad1b64c3d6d9"
+    },
+    {
+      "path": "gpu/native_mlp-1/reference/batch-8-rank-0.log",
+      "bytes": 445,
+      "sha256": "246249eb35d4935d96a723c1bfea3ced51ae28981cc9b9eac9ffee723901daa1"
+    },
+    {
+      "path": "gpu/native_mlp-1/reference/batch-32-rank-0.log",
+      "bytes": 448,
+      "sha256": "22382f02b859c2c3ed3e997808b1e60119a417e9a99f9f950e7987801eb53241"
+    },
+    {
+      "path": "gpu/native_mlp-1/reference/batch-16-rank-0.log",
+      "bytes": 450,
+      "sha256": "b6f7fbd8c354d6a8a92e4e3e34d53ef184150bd289dbfba6e738564cbae69661"
+    },
+    {
+      "path": "gpu/native_mlp-1/rust/session-1-rank-0.log",
+      "bytes": 446,
+      "sha256": "cde760a2033f489282d27c82faa005500c868c74f071843901e5ba86beed900e"
+    },
+    {
+      "path": "gpu/native_mlp-1/rust/session-2-rank-0.log",
+      "bytes": 446,
+      "sha256": "99fc46425e2ae6de25e419557a3c724511ae67278f1d58d2080ca9a33e2db2e5"
+    },
+    {
+      "path": "gpu/native_mlp-1/rust/session-3-rank-0.log",
+      "bytes": 452,
+      "sha256": "300b739e86ddd10f38e116ba9a65ea1e820c7fc0a42ad492cc8a4469f34212bc"
+    },
+    {
+      "path": "gpu/libtorch_mlp-1/reference/batch-8-rank-0.log",
+      "bytes": 382,
+      "sha256": "3d6aaaf248631328f4c0a474371e4438b11f2aaa3050350bd1e6d5f82af78009"
+    },
+    {
+      "path": "gpu/libtorch_mlp-1/reference/batch-32-rank-0.log",
+      "bytes": 391,
+      "sha256": "33e183913744b98130ad39265203bceb8696359b856912196dba0140bd24e2d6"
+    },
+    {
+      "path": "gpu/libtorch_mlp-1/reference/batch-16-rank-0.log",
+      "bytes": 386,
+      "sha256": "3bf6154d8ab98a686f322085f6853db8b75a20c13cd97fed666633b3f2b13479"
+    },
+    {
+      "path": "gpu/libtorch_mlp-1/rust/session-1-rank-0.log",
+      "bytes": 382,
+      "sha256": "139547146af3cdbe53de12d3a37d720e7e6b3aa8ec1bc323a3475843d0b6aeb8"
+    },
+    {
+      "path": "gpu/libtorch_mlp-1/rust/session-2-rank-0.log",
+      "bytes": 391,
+      "sha256": "863ab0e827281ed44333b9c440d7c69ada0c3733031e015234ac27ee2645a45f"
+    },
+    {
+      "path": "gpu/libtorch_mlp-1/rust/session-3-rank-0.log",
+      "bytes": 382,
+      "sha256": "9410dd2adc82ce0fff95871a8830585b1d2bab56e7f875647426c0541ad1afbc"
+    },
+    {
+      "path": "gpu/ensemble-1/reference/session-1-rank-0.log",
+      "bytes": 1311,
+      "sha256": "b9b9469b8aa2c7181d8af461914f67d31dead3fa92e1b2f3027599021b363c9e"
+    },
+    {
+      "path": "gpu/ensemble-1/rust/session-1-rank-0.log",
+      "bytes": 1311,
+      "sha256": "71f22a8ec3a41a365b37a14998e4b1a2ebe1af1c392a71fcf3302a89d2d2f19e"
+    },
+    {
+      "path": "gpu/tune-1/session-1-rank-0.log",
+      "bytes": 1715,
+      "sha256": "5b57664785e02e262f0bb46ae9667cf28673be4415660d9c36cea78b407f45f7"
+    },
+    {
+      "path": "gpu/tune-1/batch-32-receipt.json",
+      "bytes": 987,
+      "sha256": "e3866241ea856658221807ef2b419c9fb9fa47d069debd6f4140696b552e0831"
+    },
+    {
+      "path": "gpu/tune-1/batch-24-receipt.json",
+      "bytes": 987,
+      "sha256": "daa4ff9b88a3cadb52b5396e3d8e1bcd6b5a0326284be0ec69f881ac9875e9ff"
+    },
+    {
+      "path": "gpu/tune-1/batch-20-receipt.json",
+      "bytes": 985,
+      "sha256": "de2cddd0ef97fbb0668d5705f9c978405cc9a0cea4bc90f0a999190d92905fd7"
+    },
+    {
+      "path": "gpu/tune-1/batch-28-receipt.json",
+      "bytes": 987,
+      "sha256": "49e79f4b001cfad4b8013bcbfb5a981256c2185301347cca4f2e5dc8b0bfbbfb"
+    },
+    {
+      "path": "gpu/tune-1/inference-selection.json",
+      "bytes": 8450,
+      "sha256": "2ba98ce5e49924d8a8a8d07b29ff43a022f22be9983ac8c8702518dbdc76b4a9"
+    },
+    {
+      "path": "gpu/tune-1.json",
+      "bytes": 13162,
+      "sha256": "1adebbf6f7cfce803ac81f9adbb324c23707d1349b39c29b659121e44ed0a041"
+    },
+    {
+      "path": "gpu/native_mlp-2/reference/batch-8-rank-0.log",
+      "bytes": 446,
+      "sha256": "4e21086904f0d8d233bacea9ffdfa7dd3aaf3c0fe66b6145446a207848b1cc58"
+    },
+    {
+      "path": "gpu/native_mlp-2/reference/batch-8-rank-1.log",
+      "bytes": 446,
+      "sha256": "acac090744b5601899f7f2db49d8218f4bcd2d98d623eb8e878017579abd0bc5"
+    },
+    {
+      "path": "gpu/native_mlp-2/reference/batch-32-rank-0.log",
+      "bytes": 446,
+      "sha256": "f19e8ec56050598adc4a274c9405c3832c761c10a0cf67fe83712ef958527889"
+    },
+    {
+      "path": "gpu/native_mlp-2/reference/batch-32-rank-1.log",
+      "bytes": 450,
+      "sha256": "7c7b4eeb1b944a14a4670d62db584b07cc5a90a88aa2dd3be69873871eae42d4"
+    },
+    {
+      "path": "gpu/native_mlp-2/reference/batch-16-rank-0.log",
+      "bytes": 452,
+      "sha256": "31118dc3dc27b3f2ea066b972178000f283753816c15de2b1a8c7e9a6b7e8a69"
+    },
+    {
+      "path": "gpu/native_mlp-2/reference/batch-16-rank-1.log",
+      "bytes": 449,
+      "sha256": "829f8046bb948be6a6bfcfbb698d5237583da0d8a64cf00359f439957f8b0c89"
+    },
+    {
+      "path": "gpu/native_mlp-2/rust/session-1-rank-0.log",
+      "bytes": 446,
+      "sha256": "f1e9b2e8bbd649ec0007c09b44a0cb9082eb86b2b913494d053ad460f0eb436a"
+    },
+    {
+      "path": "gpu/native_mlp-2/rust/session-2-rank-1.log",
+      "bytes": 443,
+      "sha256": "2de15a6539db2bd64f377ebc6e65727352b152dc83c57f05deae024380a9bdd2"
+    },
+    {
+      "path": "gpu/native_mlp-2/rust/session-3-rank-0.log",
+      "bytes": 446,
+      "sha256": "5da46630ed763d22a2cbd874c3ff546ed2c87e6f1c4feff2a85b51e1fbf59875"
+    },
+    {
+      "path": "gpu/native_mlp-2/rust/session-4-rank-1.log",
+      "bytes": 451,
+      "sha256": "806f1b26a8f034937f23fc526e06b7eaabecc628d5987c96343ed668fe196a1b"
+    },
+    {
+      "path": "gpu/native_mlp-2/rust/session-5-rank-0.log",
+      "bytes": 449,
+      "sha256": "c9dccd768b8d59a2cc0afcc0818292027acb4062dcd17a24585b397e9208f2d9"
+    },
+    {
+      "path": "gpu/native_mlp-2/rust/session-6-rank-1.log",
+      "bytes": 451,
+      "sha256": "b685e66844c4fe2926400f7205c60b469f042ae3a8c27469b6615a38afad21d5"
+    },
+    {
+      "path": "gpu/libtorch_mlp-2/reference/batch-8-rank-0.log",
+      "bytes": 384,
+      "sha256": "0c40bc8b173cf37024bdf8c35d660d07732097dcfcbb8747ee447749f6871729"
+    },
+    {
+      "path": "gpu/libtorch_mlp-2/reference/batch-8-rank-1.log",
+      "bytes": 384,
+      "sha256": "733835c3257b577480255b7793c4125c3e6aa46b825693a0475d4e12a1b4ef02"
+    },
+    {
+      "path": "gpu/libtorch_mlp-2/reference/batch-32-rank-0.log",
+      "bytes": 390,
+      "sha256": "bee9826bd45e54295cc0648f4b52f348490fac9219195fa877d1721c838ef90a"
+    },
+    {
+      "path": "gpu/libtorch_mlp-2/reference/batch-32-rank-1.log",
+      "bytes": 386,
+      "sha256": "066c3a8d266548bd26ff244f44819b13877ac1738c03b795e6337da7d125cbc1"
+    },
+    {
+      "path": "gpu/libtorch_mlp-2/reference/batch-16-rank-0.log",
+      "bytes": 387,
+      "sha256": "336856d10b4703d9b2c1149baed51cb38ffddb60eb647762c1a126b4243e437f"
+    },
+    {
+      "path": "gpu/libtorch_mlp-2/reference/batch-16-rank-1.log",
+      "bytes": 384,
+      "sha256": "4ba243f37ffa85daa5a87d288c4b41dc2f16f8e33abd73576c7ef3a8d3cbb083"
+    },
+    {
+      "path": "gpu/libtorch_mlp-2/rust/session-1-rank-0.log",
+      "bytes": 384,
+      "sha256": "569b7cebe9087f5206f7d3a3c788ead2ffe5486142f01f44ed643be12a7e35c2"
+    },
+    {
+      "path": "gpu/libtorch_mlp-2/rust/session-2-rank-1.log",
+      "bytes": 384,
+      "sha256": "8aeb9d41ee6889547ff426dcd0761ae8d60a2079c768a95e8c21ab3648c63ba2"
+    },
+    {
+      "path": "gpu/libtorch_mlp-2/rust/session-3-rank-0.log",
+      "bytes": 392,
+      "sha256": "ba9e6c1ef82491a61fdc9a023641c4ecde175349fec0aa2906a59a5566bfc11d"
+    },
+    {
+      "path": "gpu/libtorch_mlp-2/rust/session-4-rank-1.log",
+      "bytes": 393,
+      "sha256": "8cbb4c07cf57deaf7fbb503f78b3bb7d8516906baef14112fcc66d9a6cd119c1"
+    },
+    {
+      "path": "gpu/libtorch_mlp-2/rust/session-5-rank-0.log",
+      "bytes": 386,
+      "sha256": "75b482a0a6f6e7413c12ad88604a38cdd56f83b7a97b4a65401c47e8d7bc6fbf"
+    },
+    {
+      "path": "gpu/libtorch_mlp-2/rust/session-6-rank-1.log",
+      "bytes": 385,
+      "sha256": "86f492e691613fc959dd1e90bdec799a0b2a855da158b704d8983d3bf3b23a96"
+    },
+    {
+      "path": "gpu/ensemble-2/reference/session-1-rank-0.log",
+      "bytes": 1314,
+      "sha256": "d41f1c00a3f8405204204aa47f0a92bc4def8890f7805e9547beb371ce94face"
+    },
+    {
+      "path": "gpu/ensemble-2/reference/session-2-rank-1.log",
+      "bytes": 1307,
+      "sha256": "63293e4dc5167da0501939a9a6ea7df99c20fd34168719c692b9a49ab905d92f"
+    },
+    {
+      "path": "gpu/ensemble-2/rust/session-1-rank-0.log",
+      "bytes": 1311,
+      "sha256": "59f6ae0c1b2a033c2ea95c73cf78191b1126af889735510466cd695c16b68780"
+    },
+    {
+      "path": "gpu/ensemble-2/rust/session-2-rank-1.log",
+      "bytes": 1308,
+      "sha256": "ba66019fc6a095c458d2d887f2dca23f3719a097214a59627af61793c16b60f6"
+    },
+    {
+      "path": "gpu/tune-2/session-1-rank-0.log",
+      "bytes": 1710,
+      "sha256": "8fad7daf172bc875b7f6ff29210cbcd2a616a8eae5d5c66336c32a939bf9677d"
+    },
+    {
+      "path": "gpu/tune-2/session-2-rank-1.log",
+      "bytes": 1712,
+      "sha256": "2a2f2c6ec55e215b3b1634330737ba27e2b09725f1c772bf07efdb6f79733a33"
+    },
+    {
+      "path": "gpu/tune-2/batch-32-receipt.json",
+      "bytes": 1405,
+      "sha256": "9b981aef753b6c50eca72244ed43f86611faee9283faa3f3063bdd75464d63cd"
+    },
+    {
+      "path": "gpu/tune-2/batch-24-receipt.json",
+      "bytes": 1403,
+      "sha256": "d733276d08f278135d1b6a937d81353b717681129009e9db8292825e777cb7ca"
+    },
+    {
+      "path": "gpu/tune-2/batch-20-receipt.json",
+      "bytes": 1399,
+      "sha256": "d0e3d0c5ab911052f8606d9da20b5155d1b9d224aa28790cf29c8f1c17b28381"
+    },
+    {
+      "path": "gpu/tune-2/batch-28-receipt.json",
+      "bytes": 1406,
+      "sha256": "0cc26e3db42ef4b7e85972c7c749a1cf2be39a808f4d5e0eb630330ae4781103"
+    },
+    {
+      "path": "gpu/tune-2/inference-selection.json",
+      "bytes": 10668,
+      "sha256": "a073da004169e8b3eb194fe97156293ca40f28a01fa9097eecb76233e1addd51"
+    },
+    {
+      "path": "gpu/tune-2.json",
+      "bytes": 16345,
+      "sha256": "a057f59f68831d546c14cb37cfdf65bfa5d854cfabccab4f1f3be9114c7d4f13"
+    },
+    {
+      "path": "gpu/results.json",
+      "bytes": 41520,
+      "sha256": "6193a986cc42b75c71f7f601529817478a509649f73563db9e662f68a4b9e61f"
+    },
+    {
+      "path": "oom-classification-red.log",
+      "bytes": 1031,
+      "sha256": "caee7dcd893ce3cb1af1fde428c4cefcd03b62f97fd7fc423f36e6cba9566692"
+    },
+    {
+      "path": "rust-final.txt",
+      "bytes": 7425,
+      "sha256": "87939d86d7ff716f5c2f18155c7429c23a4695c9b956dcbd1dcf57df2d8908ca"
+    },
+    {
+      "path": "release-final.txt",
+      "bytes": 274,
+      "sha256": "145f7c41c47253bc187690a83f7f4b86a8a0cef01d6e7457493e3c642812d9fb"
+    },
+    {
+      "path": "adapter-inference-final.txt",
+      "bytes": 31,
+      "sha256": "dd06db025149c60b8bd2227c0d877a82e6454a73f6922e6aea7b91ed3b3d6e70"
+    },
+    {
+      "path": "python.txt",
+      "bytes": 672,
+      "sha256": "7c75814f0f38ad47debf414e9f9a23f9dd123d69caf9d14a99e1fecb3c6c2741"
+    },
+    {
+      "path": "source-manifest.json",
+      "bytes": 174132,
+      "sha256": "ae6b5d870d3e28352d5ccd972dfe81da4337641fc30e855f985dd6421fd363c5"
+    },
+    {
+      "path": "gpu-final.txt",
+      "bytes": 334,
+      "sha256": "cfa592eda48f25fb1dd96fb1b50917c13fa6b55cba58cd9dfc35ece342310438"
+    },
+    {
+      "path": "gpu-final/inputs/calibration.json",
+      "bytes": 16381,
+      "sha256": "c158024fa32a0dbefc1c18601e35e8abe1d1b7c42427037f4676b242bfd67d4f"
+    },
+    {
+      "path": "gpu-final/inputs/ensemble.json",
+      "bytes": 16629,
+      "sha256": "b79cf5d912976f2117f4c9eb5ebe9f8639662712943f8f82f753ad1b64c3d6d9"
+    },
+    {
+      "path": "gpu-final/native_mlp-1/reference/batch-8-rank-0.log",
+      "bytes": 445,
+      "sha256": "a3d0b317b16e3cc79c8d2c7cbb002c99d249ffcb3bd266407f743b18ca34ff38"
+    },
+    {
+      "path": "gpu-final/native_mlp-1/reference/batch-32-rank-0.log",
+      "bytes": 452,
+      "sha256": "4f430f526ec3e29b5b2add512ec9e232962a761328fc8b3fc1e452d920d006de"
+    },
+    {
+      "path": "gpu-final/native_mlp-1/reference/batch-16-rank-0.log",
+      "bytes": 452,
+      "sha256": "4ea214f98a89255684796667e9c5d451440c9eaddc3dd20c874e8d0495f6a500"
+    },
+    {
+      "path": "gpu-final/native_mlp-1/rust/session-1-rank-0.log",
+      "bytes": 446,
+      "sha256": "eff479e701ea260178f634aac2ee32c5471eec9f98f2abc4106d7c1fd0a45136"
+    },
+    {
+      "path": "gpu-final/native_mlp-1/rust/session-2-rank-0.log",
+      "bytes": 446,
+      "sha256": "51e14a7523a176b4aed9de0300f037c2cd47fb4922a589c801d8ce4778f6bb7e"
+    },
+    {
+      "path": "gpu-final/native_mlp-1/rust/session-3-rank-0.log",
+      "bytes": 451,
+      "sha256": "0dab04a74a883618980a0438f305902658cdc3d5b9663df4a55a6f69979b5859"
+    },
+    {
+      "path": "gpu-final/libtorch_mlp-1/reference/batch-8-rank-0.log",
+      "bytes": 383,
+      "sha256": "156627b861a8f3b442dbbc11f324b8bd901963533a19d093064d10e9988ec1f0"
+    },
+    {
+      "path": "gpu-final/libtorch_mlp-1/reference/batch-32-rank-0.log",
+      "bytes": 392,
+      "sha256": "087660956c5f45b2c9c26041adff2686bc72be37abfe699cbb60aaae16ae5af8"
+    },
+    {
+      "path": "gpu-final/libtorch_mlp-1/reference/batch-16-rank-0.log",
+      "bytes": 386,
+      "sha256": "60c30459ed2044d7e04eca17c3e58a59007873f8da6aa7a5df55b07030e2945d"
+    },
+    {
+      "path": "gpu-final/libtorch_mlp-1/rust/session-1-rank-0.log",
+      "bytes": 384,
+      "sha256": "25f2375f23f1845c532de632b516d1f03b6ccdc16a503c83bd2e1ded3488cea4"
+    },
+    {
+      "path": "gpu-final/libtorch_mlp-1/rust/session-2-rank-0.log",
+      "bytes": 390,
+      "sha256": "2d2a59e61765b75783850ef0d43bd813f2a777f70052a0d7625795c8b70798e2"
+    },
+    {
+      "path": "gpu-final/libtorch_mlp-1/rust/session-3-rank-0.log",
+      "bytes": 387,
+      "sha256": "e50aa256b8e1df02b6aa35a06a080430665760f9a2d57ff5fddc73582721f576"
+    },
+    {
+      "path": "gpu-final/ensemble-1/reference/session-1-rank-0.log",
+      "bytes": 1309,
+      "sha256": "5351b8626e10a72decfe541a2778e2c523e246dbee3f4f7fc60a5dd140166184"
+    },
+    {
+      "path": "gpu-final/ensemble-1/rust/session-1-rank-0.log",
+      "bytes": 1314,
+      "sha256": "11cb686727763cdd8960fbd07580398e7bbae0784c76fc35c05ed7600c3c9ff2"
+    },
+    {
+      "path": "gpu-final/tune-1/session-1-rank-0.log",
+      "bytes": 1712,
+      "sha256": "f97f1efe211d9d10cfa97cb7ef7b7c8c1f73bdc54a503cfc6458a55de3fea716"
+    },
+    {
+      "path": "gpu-final/tune-1/batch-32-receipt.json",
+      "bytes": 985,
+      "sha256": "567ca0e338bea151434c46fb021ff6a9a8af55e7d7699333b418216dbaff2561"
+    },
+    {
+      "path": "gpu-final/tune-1/batch-24-receipt.json",
+      "bytes": 985,
+      "sha256": "a4c51e50227bb8efd28f1250a9c0c4e78d78843517963c207210bee26b547e56"
+    },
+    {
+      "path": "gpu-final/tune-1/batch-20-receipt.json",
+      "bytes": 986,
+      "sha256": "02095a40d22737a5c6f39bb36c54d53d620c4dfc005bd8383468dd85d27733ec"
+    },
+    {
+      "path": "gpu-final/tune-1/batch-28-receipt.json",
+      "bytes": 987,
+      "sha256": "463a7de81ee121753556efe3a4f1ef1ca9d3600a1506c2714c399b86227ea3b0"
+    },
+    {
+      "path": "gpu-final/tune-1/inference-selection.json",
+      "bytes": 8444,
+      "sha256": "cf01516c86e70f683ff5a4343ec52e9c3a81133712b9ef0fe85b9cdb48259007"
+    },
+    {
+      "path": "gpu-final/tune-1.json",
+      "bytes": 13156,
+      "sha256": "fe0281aea8c7f7af2ddf31feef28a76b46b7387e341ff46be972451351dd4499"
+    },
+    {
+      "path": "gpu-final/native_mlp-2/reference/batch-8-rank-0.log",
+      "bytes": 446,
+      "sha256": "ab6de1f15abe3bcbd3c7e532dfc50bd11309d7c947f831cc1e86cbf7d7f230e6"
+    },
+    {
+      "path": "gpu-final/native_mlp-2/reference/batch-8-rank-1.log",
+      "bytes": 444,
+      "sha256": "bad37c55e6b35c7f6b84da1346e8f1ee3622dd51bc989c5e9b9535c2eb219481"
+    },
+    {
+      "path": "gpu-final/native_mlp-2/reference/batch-32-rank-0.log",
+      "bytes": 451,
+      "sha256": "24e143e9671b69a3a4ab603eaf0e316c6284ae1516e8aeb3d5c81009db912a14"
+    },
+    {
+      "path": "gpu-final/native_mlp-2/reference/batch-32-rank-1.log",
+      "bytes": 447,
+      "sha256": "aa7f8db664368b249c3fcac99532f21202d1e3e7fdf16427a1875f3f6d95d610"
+    },
+    {
+      "path": "gpu-final/native_mlp-2/reference/batch-16-rank-0.log",
+      "bytes": 449,
+      "sha256": "516f44c817aa2db9051e624b5ce57e40c20feeb2841768eef86d229382faf2df"
+    },
+    {
+      "path": "gpu-final/native_mlp-2/reference/batch-16-rank-1.log",
+      "bytes": 451,
+      "sha256": "3eea8ea9f0acafcfc54ee8a7208d273a1d6c105464accdfde99480341fb21d0e"
+    },
+    {
+      "path": "gpu-final/native_mlp-2/rust/session-1-rank-0.log",
+      "bytes": 446,
+      "sha256": "8d14810ab44596500c739bb4dd397c7f2d78f40b4755f926f1c21821e6ae7485"
+    },
+    {
+      "path": "gpu-final/native_mlp-2/rust/session-2-rank-1.log",
+      "bytes": 443,
+      "sha256": "32b15a6f3e9213842f06d9b6f4437f4a129a7a610cbf5d9b597a7c8ac1b2717c"
+    },
+    {
+      "path": "gpu-final/native_mlp-2/rust/session-3-rank-0.log",
+      "bytes": 446,
+      "sha256": "9e3a3c9cfddd5f028225298fcccd36860d5ae322795a642ff0ba9b21fed503ff"
+    },
+    {
+      "path": "gpu-final/native_mlp-2/rust/session-4-rank-1.log",
+      "bytes": 448,
+      "sha256": "9ebf5265f05030a4f33c99de0bf1f4d1ec828203dc8b4d71fa3d6926791b896d"
+    },
+    {
+      "path": "gpu-final/native_mlp-2/rust/session-5-rank-0.log",
+      "bytes": 451,
+      "sha256": "0d88db427a6dcd9cc5a24f64002529970039cbaab79b5ec4f97688e0234634a1"
+    },
+    {
+      "path": "gpu-final/native_mlp-2/rust/session-6-rank-1.log",
+      "bytes": 451,
+      "sha256": "0e657da02a6effc1465dc623f0c18a53312fe2a4444d2bcc3b1dac7c52987fbc"
+    },
+    {
+      "path": "gpu-final/libtorch_mlp-2/reference/batch-8-rank-0.log",
+      "bytes": 384,
+      "sha256": "c87f29d55d65be03523efe53b776257f60cea81b40189751909d4485ce3a63b6"
+    },
+    {
+      "path": "gpu-final/libtorch_mlp-2/reference/batch-8-rank-1.log",
+      "bytes": 381,
+      "sha256": "ec1777b61fd7754619ce6157fd5696e77f3ca43fc24233f9e8b3ba27cc506735"
+    },
+    {
+      "path": "gpu-final/libtorch_mlp-2/reference/batch-32-rank-0.log",
+      "bytes": 389,
+      "sha256": "23ebe8fb66589e700b457b3148c0293f3952fcef1ba48da9914fcd32afdb3b3a"
+    },
+    {
+      "path": "gpu-final/libtorch_mlp-2/reference/batch-32-rank-1.log",
+      "bytes": 392,
+      "sha256": "f430e8fe05f523809f143d5bb64e52a36edcf0f46ae1dc1e7394b95ca5610782"
+    },
+    {
+      "path": "gpu-final/libtorch_mlp-2/reference/batch-16-rank-0.log",
+      "bytes": 386,
+      "sha256": "ae28473f9f2da25fd7903111cd321ce4c63aedd17074e3147f2e8c032d18e786"
+    },
+    {
+      "path": "gpu-final/libtorch_mlp-2/reference/batch-16-rank-1.log",
+      "bytes": 386,
+      "sha256": "d5014fbf797d744aa09b4bba7fd662ed9b39867e4faf4b4450058c1b3b529a8a"
+    },
+    {
+      "path": "gpu-final/libtorch_mlp-2/rust/session-1-rank-0.log",
+      "bytes": 384,
+      "sha256": "9130f3c2396270a5e1e261603b9c87a5a742f600c2b98d37dc37fb2612ce20ae"
+    },
+    {
+      "path": "gpu-final/libtorch_mlp-2/rust/session-2-rank-1.log",
+      "bytes": 383,
+      "sha256": "9c850eea97d0b0a6ae51654141dcc33fd7d5e4e9d65e39acda5f29db144393a8"
+    },
+    {
+      "path": "gpu-final/libtorch_mlp-2/rust/session-3-rank-0.log",
+      "bytes": 392,
+      "sha256": "f061cb892f5615805e1042e8ebd4ebe41e655c2e32a9e1445bf273ded112b1de"
+    },
+    {
+      "path": "gpu-final/libtorch_mlp-2/rust/session-4-rank-1.log",
+      "bytes": 392,
+      "sha256": "16252b06f1836e6dd38b4d0e97ccb51e5aae5085d176be87fc4a3eaf6e0f5bcb"
+    },
+    {
+      "path": "gpu-final/libtorch_mlp-2/rust/session-5-rank-0.log",
+      "bytes": 388,
+      "sha256": "4016f046781381ad0c6a765886844d5b19270059179381aeb084d4eb01d4eafb"
+    },
+    {
+      "path": "gpu-final/libtorch_mlp-2/rust/session-6-rank-1.log",
+      "bytes": 386,
+      "sha256": "558259d26c1b10abfb728d400c182cceace0a3831306e4a7f9de8c1c4b72f780"
+    },
+    {
+      "path": "gpu-final/ensemble-2/reference/session-1-rank-0.log",
+      "bytes": 1314,
+      "sha256": "6fd96186e4fba83e1de1c765c3b77698554199a194e00df52b217a9462690f39"
+    },
+    {
+      "path": "gpu-final/ensemble-2/reference/session-2-rank-1.log",
+      "bytes": 1312,
+      "sha256": "c1d4ae040891fe39c7fb1abaceaf050d10a7033a62dca8e788088a1c62492c23"
+    },
+    {
+      "path": "gpu-final/ensemble-2/rust/session-1-rank-0.log",
+      "bytes": 1312,
+      "sha256": "fa1d5b8bed582845775116017f6339a531a0ac985e072cf0b7ea9ebeb0c78406"
+    },
+    {
+      "path": "gpu-final/ensemble-2/rust/session-2-rank-1.log",
+      "bytes": 1314,
+      "sha256": "e73882a3f4c6da240a13466f36b58cd4959185a94718383cf06f6d85b5e49149"
+    },
+    {
+      "path": "gpu-final/tune-2/session-1-rank-0.log",
+      "bytes": 1699,
+      "sha256": "0bfc7f59382654fde69616817950bda3268156fd16bf2f702a7825fab7b8f0b3"
+    },
+    {
+      "path": "gpu-final/tune-2/session-2-rank-1.log",
+      "bytes": 1712,
+      "sha256": "d33e481e2a499124c6d246c8af0c0a191797c2fa79768887db1017a63c9b253a"
+    },
+    {
+      "path": "gpu-final/tune-2/batch-32-receipt.json",
+      "bytes": 1392,
+      "sha256": "fe5f4ceee9ba02ee847aababb67eb0f5dd7612484d3238563d3501547c770056"
+    },
+    {
+      "path": "gpu-final/tune-2/batch-24-receipt.json",
+      "bytes": 1403,
+      "sha256": "297042db37b69dd3ef8856ffaee15598aeb7914d5fed71aec12f9cc2bbcc9a04"
+    },
+    {
+      "path": "gpu-final/tune-2/batch-20-receipt.json",
+      "bytes": 1404,
+      "sha256": "042e66d5b7d2883211b5bf61a96eb5bb72b4a358c4e88a6fc667b4ea90aff706"
+    },
+    {
+      "path": "gpu-final/tune-2/batch-28-receipt.json",
+      "bytes": 1404,
+      "sha256": "92f71a2912451ad2250ccaf10251edec54e705148599577948489892b83678d6"
+    },
+    {
+      "path": "gpu-final/tune-2/inference-selection.json",
+      "bytes": 10649,
+      "sha256": "881968e6944b36a97c6b50a248bdb6c097658e15e98215fa411e417cee2528a0"
+    },
+    {
+      "path": "gpu-final/tune-2.json",
+      "bytes": 16326,
+      "sha256": "aa35fff0d5cdbff5d7dac8e8210daafcbc737db34b9cc6e22285b0bea8782a50"
+    },
+    {
+      "path": "gpu-final/results.json",
+      "bytes": 41544,
+      "sha256": "5e1604eeb7fb2cd6ea9b4999abef4078916f78bd27a6eac83c0a3ef526fce11b"
+    },
+    {
+      "path": "gpu-final/source-manifest.json",
+      "bytes": 174132,
+      "sha256": "ae6b5d870d3e28352d5ccd972dfe81da4337641fc30e855f985dd6421fd363c5"
+    },
+    {
+      "path": "executed-binaries.sha256",
+      "bytes": 463,
+      "sha256": "3fd38d4d3c6ad73bde0cf181157467c002c347ea61b438a5aa766a713a30d093"
+    }
+  ]
+}

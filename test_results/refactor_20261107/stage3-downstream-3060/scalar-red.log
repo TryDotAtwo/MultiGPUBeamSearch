@@ -1,0 +1,22 @@
+   Compiling beam-runtime v0.1.0 (/workspace/beam-work/rust/beam-runtime)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.45s
+     Running tests/component_tuning.rs (/workspace/target/debug/deps/component_tuning-b31858116bdc687f)
+
+running 1 test
+test scalar_scorer_keeps_row_batch_distinct_from_parent_batch ... FAILED
+
+failures:
+
+---- scalar_scorer_keeps_row_batch_distinct_from_parent_batch stdout ----
+
+thread 'scalar_scorer_keeps_row_batch_distinct_from_parent_batch' (56966) panicked at rust/beam-runtime/tests/component_tuning.rs:196:6:
+called `Result::unwrap()` on an `Err` value: Contract(Invalid("component admission rank cohort/geometry mismatch"))
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    scalar_scorer_keeps_row_batch_distinct_from_parent_batch
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `-p beam-runtime --test component_tuning`

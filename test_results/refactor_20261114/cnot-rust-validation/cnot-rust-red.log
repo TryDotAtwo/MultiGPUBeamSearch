@@ -1,0 +1,9 @@
+   Compiling beam-core v0.1.0 (D:\100XH100\rust\beam-core)
+error[E0432]: unresolved import `beam_core::cnot`
+ --> rust\beam-core\tests\cnot.rs:1:16
+  |
+1 | use beam_core::cnot::{CnotGate, CnotMatrix};
+  |                ^^^^ could not find `cnot` in `beam_core`
+
+For more information about this error, try `rustc --explain E0432`.
+error: could not compile `beam-core` (test "cnot") due to 1 previous error

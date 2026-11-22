@@ -1,0 +1,17 @@
+PUBLIC_INDEX cold pair=None mode=baseline wall=2.256739
+PUBLIC_INDEX cold pair=None mode=index wall=1.871727
+PUBLIC_INDEX warmup pair=None mode=baseline wall=0.401392
+PUBLIC_INDEX warmup pair=None mode=index wall=0.420260
+PUBLIC_INDEX repeat pair=0 mode=baseline wall=0.418571
+PUBLIC_INDEX repeat pair=0 mode=index wall=0.412805
+PUBLIC_INDEX repeat pair=1 mode=index wall=0.402420
+PUBLIC_INDEX repeat pair=1 mode=baseline wall=0.413773
+PUBLIC_INDEX repeat pair=2 mode=baseline wall=0.407562
+PUBLIC_INDEX repeat pair=2 mode=index wall=0.393924
+PUBLIC_INDEX repeat pair=3 mode=index wall=0.393819
+PUBLIC_INDEX repeat pair=3 mode=baseline wall=0.402477
+PUBLIC_INDEX repeat pair=4 mode=baseline wall=0.414123
+PUBLIC_INDEX repeat pair=4 mode=index wall=0.388013
+PUBLIC_INDEX solved pair=None mode=baseline wall=0.267939
+PUBLIC_INDEX solved pair=None mode=index wall=0.264070
+PUBLIC_INDEX_SORT_PAIR_GPU_OK

@@ -1,0 +1,21 @@
+{
+  "id": 60718487,
+  "label": "beam-stream4-dirty-20261115-01",
+  "provider_inventory_confirmed_absent": true,
+  "absence_confirmed_unix": 1794709385.5767224,
+  "absence_confirmed_utc": "2026-11-15T02:23:05.576722+00:00",
+  "gpu": "RTX 3060",
+  "gpu_count": 2,
+  "start_unix": 1794705693.2660382,
+  "last_recorded_provider_duration_seconds": 3349.5706849098206,
+  "rate_usd_per_hour_gpu_and_disk": 0.1688888888888889,
+  "estimated_gpu_disk_usd_lower": 0.15714035311922617,
+  "estimated_gpu_disk_usd_upper": 0.1732195135799455,
+  "cost_scope": "elapsed GPU/disk estimate; excludes network and final invoice adjustments",
+  "destroy_observation": "Destroy CLI exited zero but returned output that was not valid JSON; the wrapper raised a JSON parse error and did not retain that text. Fresh provider inventories then confirmed the instance absent.",
+  "task_guard_pid": 5868,
+  "task_guard_state": "no process with this PID exists at verification",
+  "evidence_sha256": "e1ce4689c4a2c74d8387d3036532e14c7bc4dda47181833e6bc100016a073d7f",
+  "task_guard_outside_sandbox_check": "PID 5868 absent in a later elevated process inventory",
+  "task_guard_outside_sandbox_check_utc": "2026-11-15T02:38:39.385747+00:00"
+}

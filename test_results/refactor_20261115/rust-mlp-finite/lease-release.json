@@ -1,0 +1,20 @@
+{
+  "id": 60737291,
+  "label": "beam-rust-mlp-finite-20261115-02",
+  "gpu": "RTX 3060",
+  "gpu_count": 2,
+  "start_unix": 1794716211.628681,
+  "last_provider_duration_seconds": 1967.3341937065125,
+  "rate_usd_per_hour_gpu_and_disk": 0.16725925925925927,
+  "destroy_request_unix": 1794718179.103806,
+  "evidence_sha256": "fb2ddaa554fb5cf4fcb52a8362efeff51ba747a852dd0435e3b1de0146cfd764",
+  "destroy_cli_returncode": 0,
+  "destroy_stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "provider_inventory_confirmed_absent": true,
+  "absence_confirmed_unix": 1794718248.7970498,
+  "absence_confirmed_utc": "2026-11-15T04:50:48.797050+00:00",
+  "verification_endpoint": "32.201.207.66",
+  "estimated_gpu_disk_usd_lower": 0.09140412776521203,
+  "estimated_gpu_disk_usd_upper": 0.09464868676517237,
+  "cost_scope": "elapsed GPU/disk estimate; excludes network and final invoice adjustments"
+}

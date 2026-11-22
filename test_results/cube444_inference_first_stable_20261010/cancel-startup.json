@@ -1,0 +1,10 @@
+{
+  "instance": 55162682,
+  "label": "cube444-inference-first-stable-2x3060-20261010",
+  "status": "CANCEL_PENDING_PROVIDER_START",
+  "actual_status": null,
+  "desired_status": "running",
+  "our_jobs_started": false,
+  "our_gpu_results_exist": false,
+  "reason": "Repeated authoritative provider reads lack actual state and all SSH attempts refused; cancel pending owned rental before any replacement"
+}

@@ -1,0 +1,111 @@
+   Compiling pyo3-build-config v0.24.2
+   Compiling beam-runtime v0.1.0 (/workspace/beam-work/rust/beam-runtime)
+   Compiling pyo3-macros-backend v0.24.2
+   Compiling pyo3-ffi v0.24.2
+   Compiling pyo3 v0.24.2
+   Compiling beam-cli v0.1.0 (/workspace/beam-work/rust/beam-cli)
+   Compiling pyo3-macros v0.24.2
+   Compiling beam-python v0.1.0 (/workspace/beam-work/rust/beam-python)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 7.64s
+     Running unittests src/main.rs (/workspace/target/debug/deps/beam_runner-4ff893dd9332a300)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (/workspace/target/debug/deps/beam_core-db5cd96cb8aaa3f9)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/contracts.rs (/workspace/target/debug/deps/contracts-e7d9a091bbbac993)
+
+running 3 tests
+test binary_layout_and_complete_hash_order ... ok
+test domains_do_not_confuse_matrix_words_and_permutation_padding ... ok
+test exact_global_width_and_overflow_diagnostics ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/history.rs (/workspace/target/debug/deps/history-83dfad703be46342)
+
+running 2 tests
+test exact_history_reservations_and_tail_fallback ... ok
+test full_depth_placement_zero_and_arithmetic_limits ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (/workspace/target/debug/deps/beam_native_sys-7fd6c9a5203a67a9)
+
+running 3 tests
+test history::tests::views_empty_alignment_and_panic_boundary ... ok
+test tests::c_layout ... ok
+test tests::absent_library_is_an_error_not_a_cuda_import ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/context.rs (/workspace/target/debug/deps/context-49a14835581394fb)
+
+running 1 test
+test real_ffi_context_reuses_copied_jobs_and_propagates_errors ... ignored, requires BEAM_TEST_LIBRARY built from the CPU ABI fixture
+
+test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (/workspace/target/debug/deps/_beam_runtime-76793de3a3e43a78)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (/workspace/target/debug/deps/beam_runtime-d22299a4a669e9b0)
+
+running 1 test
+test history::tests::disk_error_fallback_cannot_overwrite_future_ram_layer ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/history.rs (/workspace/target/debug/deps/history-afd7dd5211955a64)
+
+running 3 tests
+test ram_pruning_preserves_reconstructed_routes ... ok
+test invalid_parent_and_memory_budget_fail_explicitly ... ok
+test formats_bounds_and_out_of_order_batches ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/probes.rs (/workspace/target/debug/deps/probes-9df0617ad1df1b5d)
+
+running 2 tests
+test retained_probe_ignores_logs_and_reuses_process ... ok
+test deadline_and_one_rank_failure_close_owned_cohort ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.08s
+
+     Running tests/resident.rs (/workspace/target/debug/deps/resident-814528252f1e30ca)
+
+running 3 tests
+test a_failed_rank_closes_the_entire_owned_group ... ok
+test repeated_jobs_keep_rank_pids_and_merge_logs ... ok
+test timeout_and_cancellation_are_terminal ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.16s
+
+   Doc-tests beam_core
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests beam_native_sys
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests beam_runtime
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

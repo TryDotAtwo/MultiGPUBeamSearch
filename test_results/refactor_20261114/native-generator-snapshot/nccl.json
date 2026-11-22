@@ -1,0 +1,1 @@
+{"include_dir": "/opt/conda/lib/python3.11/site-packages/nvidia/nccl/include", "library": "/opt/conda/lib/python3.11/site-packages/nvidia/nccl/lib/libnccl.so.2", "header_sha256": "4b240a1fa79858ca8cdffcf5c2fc40aeaca8b3eaec61728213715f0902aba3a8", "library_sha256": "1d9c10322efacde695cf640db1f29fc1586c929f1087f0e1202d2d5e70fb7168"}

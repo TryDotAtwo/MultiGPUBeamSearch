@@ -1,0 +1,21 @@
+[1/1] Building CUDA object CMakeFiles/stream3_owner_radix_cuda_tests.dir/tests/stream3_owner_scatter_cuda_tests.cu.o
+FAILED: [code=2] CMakeFiles/stream3_owner_radix_cuda_tests.dir/tests/stream3_owner_scatter_cuda_tests.cu.o 
+/usr/local/cuda/bin/nvcc -forward-unknown-to-host-compiler -DBEAM_DEBUG_DEPTH_FLOW_TRACE=0 -DBEAM_DEBUG_FINAL_EXCHANGE_TRACE=0 -DBEAM_DEBUG_FINAL_HISTOGRAM_TRACE=0 -DBEAM_DEBUG_FINAL_VALIDATE=0 -DBEAM_DEBUG_INFERENCE_TRACE=0 -DBEAM_DEBUG_PATH_TRACE=0 -DBEAM_DEBUG_STREAM4_HISTOGRAM_TRACE=0 -DBEAM_DEBUG_STREAM_TIMING=0 -DBEAM_ENABLE_DEBUG=0 -DBEAM_HAS_CUTLASS=1 -DBEAM_HAS_CUTLASS_FMHA=1 -DBEAM_MOVE_COUNT=24 -DBEAM_STATE_ALIGNMENT=16 -DBEAM_STATE_LOGICAL_BYTES=96 -DBEAM_STATE_PHYSICAL_BYTES=112 -DBEAM_TEST_OWNER_RADIX=1 -I/workspace/beam-native-source/src -I/workspace/beam-native-source/cuda -I/usr/local/cuda/targets/x86_64-linux/include -I/workspace/cutlass/include -I/workspace/cutlass/tools/util/include -I/workspace/cutlass/examples/41_fused_multi_head_attention -I/opt/conda/lib/python3.11/site-packages/nvidia/nccl/include -DONNX_NAMESPACE=onnx_c2 -gencode arch=compute_86,code=sm_86 -Xcudafe --diag_suppress=cc_clobber_ignored,--diag_suppress=field_without_dll_interface,--diag_suppress=base_class_has_different_dll_interface,--diag_suppress=dll_interface_conflict_none_assumed,--diag_suppress=dll_interface_conflict_dllexport_assumed,--diag_suppress=bad_friend_decl --expt-relaxed-constexpr --expt-extended-lambda -O3 -DNDEBUG -std=c++17 "--generate-code=arch=compute_86,code=[compute_86,sm_86]" -Xcompiler=-fPIE -MD -MT CMakeFiles/stream3_owner_radix_cuda_tests.dir/tests/stream3_owner_scatter_cuda_tests.cu.o -MF CMakeFiles/stream3_owner_radix_cuda_tests.dir/tests/stream3_owner_scatter_cuda_tests.cu.o.d -x cu -c /workspace/beam-native-source/tests/stream3_owner_scatter_cuda_tests.cu -o CMakeFiles/stream3_owner_radix_cuda_tests.dir/tests/stream3_owner_scatter_cuda_tests.cu.o
+/workspace/beam-native-source/tests/stream3_owner_scatter_cuda_tests.cu(76): error: too many arguments in function call
+                      0, 2, b_micro, capacity, stream, fatal_flag, fatal_trace);
+                                                       ^
+
+/workspace/beam-native-source/tests/stream3_owner_scatter_cuda_tests.cu(107): error: too many arguments in function call
+                              0, world, b_micro, capacity, stream, fatal_flag, fatal_trace);
+                                                                   ^
+
+/workspace/beam-native-source/tests/stream3_owner_scatter_cuda_tests.cu(129): error: identifier "STREAM_FATAL_STREAM3_OWNER_COUNT_OVERFLOW" is undefined
+                      require(flag == STREAM_FATAL_STREAM3_OWNER_COUNT_OVERFLOW, "owner count overflow code mismatch");
+                                      ^
+
+/workspace/beam-native-source/tests/stream3_owner_scatter_cuda_tests.cu(185): error: too many arguments in function call
+                                  capacity, stream, fatal_flag, fatal_trace);
+                                                    ^
+
+4 errors detected in the compilation of "/workspace/beam-native-source/tests/stream3_owner_scatter_cuda_tests.cu".
+ninja: build stopped: subcommand failed.

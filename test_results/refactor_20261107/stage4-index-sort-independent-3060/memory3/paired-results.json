@@ -1,0 +1,247 @@
+{
+  "world": 2,
+  "beam": 4096,
+  "precision": "fp16",
+  "profile": {
+    "BEAM_B_MICRO": "768",
+    "BEAM_ENSEMBLE_INFERENCE_MICRO": "32"
+  },
+  "runners": {
+    "control": {
+      "path": "/workspace/beam-results/radix128/control1/production_runner",
+      "sha256": "7b03e700a3b535bef853db546ba9bed153d53d69c4b7039992457976c54431e5"
+    },
+    "radix": {
+      "path": "/workspace/beam-results/index-sort/green3/production_runner",
+      "sha256": "1e53eaf43e01421f5ed07832882da4b4a96b3b05612d27bbdfcaec171d53b176"
+    }
+  },
+  "input_sha256": "4a84bc138375332f3e4b8a32372b3be797aecdc4f1faf66ed044c79ecf695ccc",
+  "model_files_sha256": {
+    "hidden_bias.fp16": "374708fff7719dd5979ec875d56cd2286f6d3cf7ec317a3b25632aab28ec37bb",
+    "hidden_weight_hxk.fp16": "539c39d3e3846788e45df868bf837a0db2eeeb278e38d44b047cf5775df9c511",
+    "input_bias.fp16": "44532e3c0dccb8197d27cd3a38fc21dbb6177d981f0c625da8bb14146310c4c6",
+    "input_weight_hxk.fp16": "c3725750bf6c8b50147c42fbfaf684063d2de7e56cb5a12bd779b3cdb4877ed8",
+    "manifest.json": "572ffe4d8dd3ac5fa51344cd5eea459fbf3865a6b6acff16ea356872c87a2026",
+    "output_bias.fp16": "96a296d224f285c67bee93c30f8a309157f0daa35dc5b87e410b78630a09cfc7",
+    "output_weight_hxk.fp16": "6e4b8bb217e6d49ce9b76e46098c2d0888ff20b11f8535a27c791bfc9ce938b6",
+    "residual0_fc1_bias.fp16": "374708fff7719dd5979ec875d56cd2286f6d3cf7ec317a3b25632aab28ec37bb",
+    "residual0_fc1_weight_hxk.fp16": "38723a2e5e8a17aa7950dc008209944e898f69a7bd10a23c839d341e935fd5ca",
+    "residual0_fc2_bias.fp16": "374708fff7719dd5979ec875d56cd2286f6d3cf7ec317a3b25632aab28ec37bb",
+    "residual0_fc2_weight_hxk.fp16": "38723a2e5e8a17aa7950dc008209944e898f69a7bd10a23c839d341e935fd5ca"
+  },
+  "plans": {
+    "control": [
+      {
+        "BEAM_WIDTH_ALIGNMENT": 2048,
+        "B_MICRO": 32,
+        "GLOBAL_BEAM_WIDTH_EFFECTIVE": 4096,
+        "LOCAL_RANK": 0,
+        "RING_COUNT": 3,
+        "SHARD_CAPACITY_CANDIDATES": 131072,
+        "SHARD_COUNT": 1,
+        "STREAM3_RING_SLOTS": 2,
+        "STREAM4_ACTIVE_SORT_SLOTS": 1,
+        "STREAM4_BATCH_ALIGNMENT": 1024,
+        "STREAM4_BATCH_CANDIDATES": 131072,
+        "WORLD_SIZE": 2,
+        "estimated_required_device_bytes": 64007106,
+        "frontier_state_capacity": 2048,
+        "gpu_budget_bytes": 11482824704
+      },
+      {
+        "BEAM_WIDTH_ALIGNMENT": 2048,
+        "B_MICRO": 32,
+        "GLOBAL_BEAM_WIDTH_EFFECTIVE": 4096,
+        "LOCAL_RANK": 1,
+        "RING_COUNT": 3,
+        "SHARD_CAPACITY_CANDIDATES": 131072,
+        "SHARD_COUNT": 1,
+        "STREAM3_RING_SLOTS": 2,
+        "STREAM4_ACTIVE_SORT_SLOTS": 1,
+        "STREAM4_BATCH_ALIGNMENT": 1024,
+        "STREAM4_BATCH_CANDIDATES": 131072,
+        "WORLD_SIZE": 2,
+        "estimated_required_device_bytes": 64007106,
+        "frontier_state_capacity": 2048,
+        "gpu_budget_bytes": 11484921856
+      }
+    ],
+    "radix": [
+      {
+        "BEAM_WIDTH_ALIGNMENT": 2048,
+        "B_MICRO": 32,
+        "GLOBAL_BEAM_WIDTH_EFFECTIVE": 4096,
+        "LOCAL_RANK": 0,
+        "RING_COUNT": 3,
+        "SHARD_CAPACITY_CANDIDATES": 131072,
+        "SHARD_COUNT": 1,
+        "STREAM3_RING_SLOTS": 2,
+        "STREAM4_ACTIVE_SORT_SLOTS": 1,
+        "STREAM4_BATCH_ALIGNMENT": 1024,
+        "STREAM4_BATCH_CANDIDATES": 131072,
+        "WORLD_SIZE": 2,
+        "estimated_required_device_bytes": 56822722,
+        "frontier_state_capacity": 2048,
+        "gpu_budget_bytes": 11482824704
+      },
+      {
+        "BEAM_WIDTH_ALIGNMENT": 2048,
+        "B_MICRO": 32,
+        "GLOBAL_BEAM_WIDTH_EFFECTIVE": 4096,
+        "LOCAL_RANK": 1,
+        "RING_COUNT": 3,
+        "SHARD_CAPACITY_CANDIDATES": 131072,
+        "SHARD_COUNT": 1,
+        "STREAM3_RING_SLOTS": 2,
+        "STREAM4_ACTIVE_SORT_SLOTS": 1,
+        "STREAM4_BATCH_ALIGNMENT": 1024,
+        "STREAM4_BATCH_CANDIDATES": 131072,
+        "WORLD_SIZE": 2,
+        "estimated_required_device_bytes": 56822722,
+        "frontier_state_capacity": 2048,
+        "gpu_budget_bytes": 11484921856
+      }
+    ]
+  },
+  "gpu": "NVIDIA GeForce RTX 3060, GPU-a1d72707-5bf6-9fd2-6fa1-d180c01d19fe, 595.91.07, 12288 MiB\nNVIDIA GeForce RTX 3060, GPU-eea9c6a4-fc70-c3d6-598d-9f4dde6f0632, 595.91.07, 12288 MiB\n",
+  "pairs": [
+    {
+      "control": {
+        "seconds": [
+          0.0210766,
+          0.0208946,
+          0.0205776,
+          0.020381,
+          0.0201697
+        ],
+        "median": 0.0205776,
+        "wall_seconds": 1.8469846320076613,
+        "run": "/workspace/beam-results/index-sort/memory3/control/1"
+      },
+      "radix": {
+        "seconds": [
+          0.0202302,
+          0.0199557,
+          0.019862,
+          0.0195309,
+          0.019166
+        ],
+        "median": 0.019862,
+        "wall_seconds": 1.8723682779964292,
+        "run": "/workspace/beam-results/index-sort/memory3/radix/1"
+      },
+      "speedup_percent": 3.602859732151842
+    },
+    {
+      "radix": {
+        "seconds": [
+          0.0200934,
+          0.0198613,
+          0.0197151,
+          0.0195043,
+          0.019134
+        ],
+        "median": 0.0197151,
+        "wall_seconds": 1.8427760689955903,
+        "run": "/workspace/beam-results/index-sort/memory3/radix/2"
+      },
+      "control": {
+        "seconds": [
+          0.0208326,
+          0.020492,
+          0.0201562,
+          0.0199976,
+          0.0196681
+        ],
+        "median": 0.0201562,
+        "wall_seconds": 1.836478270997759,
+        "run": "/workspace/beam-results/index-sort/memory3/control/2"
+      },
+      "speedup_percent": 2.2373713549512786
+    },
+    {
+      "control": {
+        "seconds": [
+          0.021245,
+          0.0210932,
+          0.020906,
+          0.0206359,
+          0.0205935
+        ],
+        "median": 0.020906,
+        "wall_seconds": 1.934970083006192,
+        "run": "/workspace/beam-results/index-sort/memory3/control/3"
+      },
+      "radix": {
+        "seconds": [
+          0.0200169,
+          0.0199081,
+          0.0198676,
+          0.0195342,
+          0.0194002
+        ],
+        "median": 0.0198676,
+        "wall_seconds": 1.844496944002458,
+        "run": "/workspace/beam-results/index-sort/memory3/radix/3"
+      },
+      "speedup_percent": 5.2266000926131095
+    },
+    {
+      "radix": {
+        "seconds": [
+          0.0211836,
+          0.0207564,
+          0.0206841,
+          0.0204666,
+          0.0200286
+        ],
+        "median": 0.0206841,
+        "wall_seconds": 1.9552729590068338,
+        "run": "/workspace/beam-results/index-sort/memory3/radix/4"
+      },
+      "control": {
+        "seconds": [
+          0.0202819,
+          0.0201252,
+          0.0201574,
+          0.0200898,
+          0.0196004
+        ],
+        "median": 0.0201252,
+        "wall_seconds": 1.7453854989871616,
+        "run": "/workspace/beam-results/index-sort/memory3/control/4"
+      },
+      "speedup_percent": -2.7020755072737046
+    },
+    {
+      "control": {
+        "seconds": [
+          0.0206621,
+          0.0204172,
+          0.0201584,
+          0.0201601,
+          0.0197885
+        ],
+        "median": 0.0201601,
+        "wall_seconds": 1.9267306709953118,
+        "run": "/workspace/beam-results/index-sort/memory3/control/5"
+      },
+      "radix": {
+        "seconds": [
+          0.0209645,
+          0.0207466,
+          0.0205171,
+          0.0197727,
+          0.019359
+        ],
+        "median": 0.0205171,
+        "wall_seconds": 1.900710103000165,
+        "run": "/workspace/beam-results/index-sort/memory3/radix/5"
+      },
+      "speedup_percent": -1.74001198999858
+    }
+  ],
+  "median_speedup_percent": 2.2373713549512786,
+  "scope": "five alternating independent process pairs; each uses one warmup and five full steps"
+}

@@ -1,0 +1,25 @@
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\D:\100XH100\.local\cache\rust-mlp-verify-20261114\target\debug\incremental\beam_runtime-3ktr9njgfinsl\s-ho5xixgxsl-0idsb7t-working`
+
+warning: `beam-runtime` (lib) generated 1 warning
+   Compiling beam-runtime v0.1.0 (D:\100XH100\rust\beam-runtime)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.50s
+     Running tests\graph_identity.rs (D:\100XH100\.local\cache\rust-mlp-verify-20261114\target\debug\deps\graph_identity-36bd4831de2bc461.exe)
+
+running 1 test
+test rejects_stale_hash_for_center_or_ordered_generators ... FAILED
+
+failures:
+
+---- rejects_stale_hash_for_center_or_ordered_generators stdout ----
+
+thread 'rejects_stale_hash_for_center_or_ordered_generators' (38908) panicked at rust\beam-runtime\tests\graph_identity.rs:65:28:
+called `Result::unwrap_err()` on an `Ok` value: ()
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    rejects_stale_hash_for_center_or_ordered_generators
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `-p beam-runtime --test graph_identity`

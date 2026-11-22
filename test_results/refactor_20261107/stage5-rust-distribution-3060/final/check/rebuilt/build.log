@@ -1,0 +1,9 @@
+Processing /workspace/beam-results/rust-wheel/final/check/sdist/multigpubeamsearch-0.1.0.dev1.tar.gz
+  Preparing metadata (pyproject.toml): started
+  Preparing metadata (pyproject.toml): finished with status 'done'
+Building wheels for collected packages: multigpubeamsearch
+  Building wheel for multigpubeamsearch (pyproject.toml): started
+  Building wheel for multigpubeamsearch (pyproject.toml): finished with status 'done'
+  Created wheel for multigpubeamsearch: filename=multigpubeamsearch-0.1.0.dev1-cp310-abi3-linux_x86_64.whl size=2453615 sha256=96fe1187b1c200567032b4aede9dcd995356fe685ddc45f8dadbcff6f6e7237a
+  Stored in directory: /root/.cache/pip/wheels/42/e7/63/5357f0c2909201aea2273f5dd2764b7f1537e4eff380e25c6e
+Successfully built multigpubeamsearch

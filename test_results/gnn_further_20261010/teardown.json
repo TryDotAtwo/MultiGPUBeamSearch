@@ -1,0 +1,15 @@
+{
+  "new_contract": 55208650,
+  "label": "gnn-cutlass-further-3060-20261010",
+  "created_at": 1791635065,
+  "destroyed_at": 1791636618,
+  "destroyed": true,
+  "quoted_hourly": 0.08251851851851852,
+  "budget_usd": 10,
+  "archive_commit": "f6a26cc80be1d2030777521560a718fdfacdce40",
+  "verified_files": 94,
+  "stop_success": true,
+  "destroy_success": true,
+  "api_absent": true,
+  "archives_verified": true
+}

@@ -1,0 +1,12 @@
+rank=1
+world_size=2
+solution_found=0
+completed_depths=6
+history_mode=ram
+history_dir=/workspace/beam-results/planning/pipeline-gpu-final/world-2/rust-fixture/1/history/rank-1
+history_depth_count=6
+history_bytes_received=6144
+history_bytes_stored=3072
+history_bytes_stored_ram=3072
+history_bytes_stored_disk=0
+history_bytes_pruned=0

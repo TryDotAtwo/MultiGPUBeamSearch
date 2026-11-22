@@ -1,0 +1,35 @@
+   Compiling beam-runtime v0.1.0 (/workspace/beam-work/rust/beam-runtime)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 4.43s
+     Running tests/component_tuning.rs (/workspace/target/debug/deps/component_tuning-b31858116bdc687f)
+
+running 4 tests
+test scalar_scorer_keeps_row_batch_distinct_from_parent_batch ... ok
+test bounded_component_tuning_keeps_exact_admission_raw_receipts_and_no_full_step_claim ... ok
+test cancellation_or_rank_failure_does_not_become_capacity_and_bad_cohorts_never_select ... ok
+test component_cache_recomputes_evidence_and_readmits_exact_geometry ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+
+     Running tests/downstream_job.rs (/workspace/target/debug/deps/downstream_job-792679b813734583)
+
+running 1 test
+test downstream_identity_binds_quality_graph_geometry_and_semantic_environment ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/pipeline.rs (/workspace/target/debug/deps/pipeline-d7c67769813c9f40)
+
+running 2 tests
+test complete_depth_parser_rejects_missing_reordered_and_changed_workloads ... ok
+test normal_pipeline_cleanup_does_not_cancel_parent_job ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running tests/planning.rs (/workspace/target/debug/deps/planning-f5f1a67b6283b442)
+
+running 2 tests
+test planning_preserves_exact_width_freezes_inference_and_cancels_all_preparations ... ok
+test external_cancellation_reaps_ranks_during_planner_startup ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.21s
+

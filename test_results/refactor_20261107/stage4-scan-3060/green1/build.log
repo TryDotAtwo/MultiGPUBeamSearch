@@ -1,0 +1,21 @@
+[1/15] Building CUDA object CMakeFiles/beam_cuda.dir/cuda/stream4.cu.o
+/workspace/beam-native-source/cuda/stream4.cu(212): warning #177-D: function "beam::<unnamed>::stream4_scan_block_counts_kernel" was declared but never referenced
+  __attribute__((global)) void stream4_scan_block_counts_kernel(
+                               ^
+
+Remark: The warnings can be suppressed with "-diag-suppress <warning-number>"
+
+[2/15] Building CUDA object CMakeFiles/stream4_scan_cuda_tests.dir/tests/stream4_scan_cuda_tests.cu.o
+[3/15] Linking CUDA executable stream4_scan_cuda_tests
+[4/15] Building CUDA object CMakeFiles/beam_cuda.dir/cuda/static_memory.cu.o
+[5/15] Linking CXX static library libbeam_cuda.a
+[6/15] Linking CXX executable stream3_cuda_tests
+[7/15] Linking CXX executable stream4_cuda_tests
+[8/15] Linking CXX executable stream4_logical_union_cuda_tests
+[9/15] Linking CXX executable stream4_logical_union_graph_cuda_tests
+[10/15] Linking CXX executable stream4_logical_union_bounded_graph_cuda_tests
+[11/15] Linking CXX executable stream4_bounded_graph_cuda_tests
+[12/15] Linking CXX executable final_union_dispatcher_cuda_tests
+[13/15] Linking CXX executable stitched_cuda_tests
+[14/15] Linking CXX executable static_memory_cuda_tests
+[15/15] Linking CXX executable production_runner

@@ -1,0 +1,16 @@
+========= COMPUTE-SANITIZER
+========= Program hit cudaErrorInvalidValue (error 1) due to "invalid argument" on CUDA API call to cudaMemsetAsync.
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: cudaError cub::CUB_200700_860_NS::DeviceRadixSort::SortPairs<unsigned int, beam::CandidateMeta, int>(void*, unsigned long&, unsigned int const*, unsigned int*, beam::CandidateMeta const*, beam::CandidateMeta*, int, int, int, CUstream_st*) [0x449e2] in stream3_owner_radix_cuda_tests
+=========         Host Frame: beam::stream3_restore_owner_radix_cuda(beam::Hash128 const*, unsigned long const*, unsigned int const*, unsigned long const*, beam::CandidateMeta*, unsigned int*, beam::CandidateMeta*, unsigned int*, unsigned int*, unsigned int*, unsigned int*, beam::CandidateMeta*, beam::CandidateMeta*, void*, unsigned long, unsigned short, unsigned int, unsigned int, unsigned int, CUstream_st*) [0x34f7a] in stream3_owner_radix_cuda_tests
+=========         Host Frame: main [0x152e6] in stream3_owner_radix_cuda_tests
+========= 
+========= Program hit cudaErrorInvalidValue (error 1) due to "invalid argument" on CUDA API call to cudaGetLastError.
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: cudaError cub::CUB_200700_860_NS::DeviceRadixSort::SortPairs<unsigned int, beam::CandidateMeta, int>(void*, unsigned long&, unsigned int const*, unsigned int*, beam::CandidateMeta const*, beam::CandidateMeta*, int, int, int, CUstream_st*) [0x449ea] in stream3_owner_radix_cuda_tests
+=========         Host Frame: beam::stream3_restore_owner_radix_cuda(beam::Hash128 const*, unsigned long const*, unsigned int const*, unsigned long const*, beam::CandidateMeta*, unsigned int*, beam::CandidateMeta*, unsigned int*, unsigned int*, unsigned int*, unsigned int*, beam::CandidateMeta*, beam::CandidateMeta*, void*, unsigned long, unsigned short, unsigned int, unsigned int, unsigned int, CUstream_st*) [0x34f7a] in stream3_owner_radix_cuda_tests
+=========         Host Frame: main [0x152e6] in stream3_owner_radix_cuda_tests
+========= 
+owner_scatter checks=1848 eager_and_graph=PASS
+========= LEAK SUMMARY: 0 bytes leaked in 0 allocations
+========= ERROR SUMMARY: 2 errors

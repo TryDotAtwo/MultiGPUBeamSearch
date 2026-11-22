@@ -1,0 +1,23 @@
+native_host_memory_available_bytes=84153028608 native_host_memory_history_budget=0 native_host_memory_headroom=3221225472
+communicator_rank=0 world_size=1 node_local_rank=0 local_world_size=1 cuda_ordinal=0
+GLOBAL_BEAM_WIDTH_EFFECTIVE=8192
+stream1_mode=model
+stream1_executor=libtorch_eager
+runtime_ring_count=16
+runtime_ring_slot_count=4
+runtime_ring_slot_physical_jobs=64
+runtime_ring_graph_execs_per_lane_requested=
+runtime_ring_graph_debug_sync=
+stream1_backend=mlp
+runtime_ring_slot_graph_windowed=0
+runtime_ring_slot_graph_window_rings=16
+runtime_ring_slot_graph_window_jobs=64
+runtime_ring_slot_graph_physical_jobs=64
+calibration_depth=0 rank=0 parents=8192 depth_sec=0.419968 search_depth=4 next_frontier_size=8192
+calibration_depth=1 rank=0 parents=8192 depth_sec=0.423637 search_depth=5 next_frontier_size=8192
+calibration_depth=2 rank=0 parents=8192 depth_sec=0.42206 search_depth=6 next_frontier_size=8192
+calibration_depth=3 rank=0 parents=8192 depth_sec=0.420927 search_depth=7 next_frontier_size=8192
+calibration_depth=4 rank=0 parents=8192 depth_sec=0.419776 search_depth=8 next_frontier_size=8192
+calibration_depth=5 rank=0 parents=8192 depth_sec=0.418476 search_depth=9 next_frontier_size=8192
+calibration_saturated_steps=6
+puzzle_solved=0 puzzle_id=0 seconds=3.20049 solution_length=-1 solution=

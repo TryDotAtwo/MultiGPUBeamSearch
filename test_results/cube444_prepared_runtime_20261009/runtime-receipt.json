@@ -1,0 +1,38 @@
+{
+  "sources": {
+    "native": "c1917b6c99c0048bd1f309915f7e3cac677be3dd",
+    "cutlass": "afa1772203677c5118fcd82537a9c8fefbcc7008",
+    "base_image": "ghcr.io/trydotatwo/multigpubeamsearch-h200@sha256:11d1189d9eb160d2260a4e862551eaf45275c6fd4c428ebd574ff52df9f66366"
+  },
+  "shape": {
+    "logical_bytes": 96,
+    "physical_bytes": 112,
+    "alignment": 16,
+    "moves": 24,
+    "sm": 86
+  },
+  "binaries": {
+    "production_runner_libtorch_stream1": {
+      "bytes": 18567136,
+      "sha256": "c10cd09d551e10e1c23b36018194c4028cfe719c36892f0e7568576d1ffb495d"
+    },
+    "stream1_ensemble_benchmark": {
+      "bytes": 1181176,
+      "sha256": "4fb33cc21be9ec5223b3731d6ee2b6f09c912e27070dc75874d3d6dcf4076803"
+    }
+  },
+  "compiled_on": "owned cheap instance55065930 2xRTX3060",
+  "validation_scope": "real FP16 s3 Transformer + mlp_x16 MLP readout gates on both GPUs; six-depth 1M blend acceptance; remaining matched/eight-GPU tests pending",
+  "native_build_on_destination": false,
+  "build_info": {
+    "schema_version": 1,
+    "state_len": 96,
+    "state_storage_len": 112,
+    "move_count": 24,
+    "candidate_meta_bytes": 32,
+    "debug_stream_timing": false,
+    "depth_logs_enabled": true,
+    "debug_enabled": true,
+    "cuda_architectures": "86"
+  }
+}

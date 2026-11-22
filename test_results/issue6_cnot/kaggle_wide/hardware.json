@@ -1,0 +1,33 @@
+{
+  "gpus": [
+    {
+      "index": "0",
+      "uuid": "GPU-0389431d-f7f5-ed91-9137-af5f3e2d477e",
+      "pci": "00000000:00:04.0",
+      "name": "Tesla T4",
+      "memory_mib": "15360",
+      "driver": "580.178.04"
+    },
+    {
+      "index": "1",
+      "uuid": "GPU-9a5d21f6-99a0-4fc5-e4dd-979238a2ff12",
+      "pci": "00000000:00:05.0",
+      "name": "Tesla T4",
+      "memory_mib": "15360",
+      "driver": "580.178.04"
+    }
+  ],
+  "host": "45d84dbb14f7",
+  "platform": "Linux-6.18.55+-x86_64-with-glibc2.39",
+  "python": "3.13.16 (main, Oct  1 2026, 15:40:24) [GCC 13.3.0]",
+  "torch": "2.11.0+cu130",
+  "torch_cuda": "13.0",
+  "nccl": [
+    2,
+    28,
+    9
+  ],
+  "free_temp": 1038200672256,
+  "memory_cgroup": "32212254720",
+  "torch_device_count": 2
+}

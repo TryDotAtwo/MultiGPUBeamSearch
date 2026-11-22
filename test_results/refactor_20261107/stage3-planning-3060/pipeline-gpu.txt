@@ -1,0 +1,19 @@
+Traceback (most recent call last):
+  File "/workspace/beam-work/tests/native_pipeline_gpu.py", line 78, in <module>
+    if __name__=='__main__':main()
+                            ^^^^^^
+  File "/workspace/beam-work/tests/native_pipeline_gpu.py", line 51, in main
+    old=reference.measure(profile,plans)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/beam-work/integrations/cayleypy_native/multigpubeamsearch/pipeline_probe.py", line 200, in measure
+    if self.verify(texts, plans) is not True:
+       ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/beam-work/tests/native_pipeline_gpu.py", line 50, in <lambda>
+    verify=lambda texts,targets: all(len(parse_depths(text,count,6))==6 for text,count in zip(texts,counts)))
+                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/beam-work/tests/native_pipeline_gpu.py", line 50, in <genexpr>
+    verify=lambda texts,targets: all(len(parse_depths(text,count,6))==6 for text,count in zip(texts,counts)))
+                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/beam-work/integrations/cayleypy_native/multigpubeamsearch/pipeline_probe.py", line 46, in parse_depths
+    raise ValueError('native run did not complete all calibration depths')
+ValueError: native run did not complete all calibration depths

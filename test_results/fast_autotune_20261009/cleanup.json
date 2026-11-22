@@ -1,0 +1,26 @@
+{
+  "instances": [
+    {
+      "id": 55029041,
+      "status": "destroyed",
+      "archives_verified": true,
+      "files_verified": 947
+    },
+    {
+      "id": 55053060,
+      "status": "destroyed",
+      "archives_verified": true,
+      "files_verified": 337
+    },
+    {
+      "id": 55039547,
+      "status": "destroyed",
+      "archives_verified": true,
+      "files_verified": 1938
+    }
+  ],
+  "absence_confirmed": true,
+  "checked_at_utc": "2026-10-09 17:40:30",
+  "unrelated_instances_modified": false,
+  "scope": "Only owned exact-id/label leases, archive-verified deletion gate; USD20 combined authorization"
+}

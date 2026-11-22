@@ -1,0 +1,15 @@
+{
+  "instance": 60715196,
+  "label": "beam-cnot-rust-20261115-01",
+  "before": {
+    "id": 60715196,
+    "label": "beam-cnot-rust-20261115-01",
+    "actual_status": "running",
+    "duration": 1232.116460800171,
+    "dph_total": 0.1511111111111111,
+    "start_date": 1794703611.0410757
+  },
+  "destroy_returncode": 0,
+  "provider_absence_verified": true,
+  "unix_time": 1794704867.1369708
+}

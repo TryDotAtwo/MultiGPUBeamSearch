@@ -1,0 +1,67 @@
+{
+  "topology16_gloo": {
+    "status": "pass",
+    "result": {
+      "world": 16,
+      "backend": "gloo",
+      "status": "pass",
+      "report": "topology-world16-gloo.json"
+    },
+    "seconds": 6.134
+  },
+  "pinned_native_prebuild": {
+    "status": "pass",
+    "result": null,
+    "seconds": 22.354
+  },
+  "trained_qhat": {
+    "status": "pass",
+    "result": {
+      "report": "trained-world2-qhat.json",
+      "status": "pass",
+      "mode": "qhat",
+      "gates": [
+        4,
+        1
+      ]
+    },
+    "seconds": 11.078
+  },
+  "trained_proposal": {
+    "status": "pass",
+    "result": {
+      "report": "trained-world2-proposal.json",
+      "status": "pass",
+      "mode": "proposal",
+      "gates": [
+        4,
+        1
+      ]
+    },
+    "seconds": 9.784
+  },
+  "trained_deep_qhat": {
+    "status": "pass",
+    "result": {
+      "report": "trained-deep-world2-qhat.json",
+      "status": "pass",
+      "mode": "qhat",
+      "gates": [
+        5,
+        7,
+        0
+      ]
+    },
+    "seconds": 10.345
+  },
+  "topology2_nccl": {
+    "status": "pass",
+    "result": {
+      "world": 2,
+      "backend": "nccl",
+      "status": "pass",
+      "report": "topology-world2-nccl.json"
+    },
+    "seconds": 6.99
+  }
+}

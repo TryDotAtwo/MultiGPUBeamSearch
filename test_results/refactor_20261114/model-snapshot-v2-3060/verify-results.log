@@ -1,0 +1,18 @@
+{
+  "commit": "46c02ab50284ebe693141af8637066a7f716d054",
+  "path_cases": 20,
+  "pairs": 5,
+  "model_bytes": 18369835,
+  "median_seconds": {
+    "baseline": {
+      "wall_seconds": 0.8187077840557322,
+      "worker_seconds": 0.306277367
+    },
+    "reuse": {
+      "wall_seconds": 0.8244585309876129,
+      "worker_seconds": 0.305963808
+    }
+  },
+  "median_paired_wall_change": 0.005781020240156476,
+  "verification": "PASS"
+}

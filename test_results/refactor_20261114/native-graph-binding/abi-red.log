@@ -1,0 +1,15 @@
+native_abi_tests.cpp
+tests\native_abi_tests.cpp(33): error C2039: "expected_graph_hash": не является членом "beam::native::Control".
+native\engine_control.hpp(20): note:  см. объявление "beam::native::Control"
+tests\native_abi_tests.cpp(76): error C3861: beam_context_set_graph_hash: идентификатор не найден
+tests\native_abi_tests.cpp(76): error C2677: бинарный "==": не найден глобальный оператор, принимающий тип "beam_result" (или приемлемое преобразование отсутствует)
+tests\native_abi_tests.cpp(77): error C3861: beam_context_set_graph_hash: идентификатор не найден
+tests\native_abi_tests.cpp(77): error C2677: бинарный "==": не найден глобальный оператор, принимающий тип "beam_result" (или приемлемое преобразование отсутствует)
+tests\native_abi_tests.cpp(78): error C3861: beam_context_set_graph_hash: идентификатор не найден
+tests\native_abi_tests.cpp(78): error C2677: бинарный "==": не найден глобальный оператор, принимающий тип "beam_result" (или приемлемое преобразование отсутствует)
+tests\native_abi_tests.cpp(80): error C3861: beam_context_set_graph_hash: идентификатор не найден
+tests\native_abi_tests.cpp(80): error C2677: бинарный "==": не найден глобальный оператор, принимающий тип "beam_result" (или приемлемое преобразование отсутствует)
+tests\native_abi_tests.cpp(82): error C3861: beam_context_set_graph_hash: идентификатор не найден
+tests\native_abi_tests.cpp(82): error C2677: бинарный "==": не найден глобальный оператор, принимающий тип "beam_result" (или приемлемое преобразование отсутствует)
+tests\native_abi_tests.cpp(86): error C3861: beam_context_set_graph_hash: идентификатор не найден
+tests\native_abi_tests.cpp(86): error C2677: бинарный "==": не найден глобальный оператор, принимающий тип "beam_result" (или приемлемое преобразование отсутствует)

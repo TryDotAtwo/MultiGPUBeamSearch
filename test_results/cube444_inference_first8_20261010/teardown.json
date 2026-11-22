@@ -1,0 +1,19 @@
+{
+  "instance": 55165801,
+  "label": "cube444-inference-first8-20261010",
+  "status": "destroyed",
+  "provider_stop_success": true,
+  "provider_destroy_success": true,
+  "provider_absent_verified": true,
+  "verified_utc": "2026-10-10 07:59:24 UTC",
+  "archive_commit": "2365de64fad85de38940916fd0f87fe73b337dca",
+  "verification_commit": "6dc8cf4ace9030c4a9b08ba0c2a9e5e1741b3d41",
+  "budget_rebase": {
+    "prior_upper": 19.506527901234566,
+    "early_delete_reduction": 0.2334720987654321,
+    "old_deadline": 1791609300,
+    "verified_absent_epoch": 1791603038,
+    "current_continuous_billing_upper_until_guard_plus60": 19.89740049382716,
+    "traffic_reserve_retained": 0.75
+  }
+}

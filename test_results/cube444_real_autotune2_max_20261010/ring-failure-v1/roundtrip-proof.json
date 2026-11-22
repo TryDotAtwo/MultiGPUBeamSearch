@@ -1,0 +1,10 @@
+{
+  "status": "PASS",
+  "artifact_commit": "7f9b1dd2c6fbac7c2705f76859b6aaa5865a8b98",
+  "prefix": "test_results/cube444_real_autotune2_max_20261010/ring-failure-v1/",
+  "archive_sha256": "f8666754b0e746e80e515a03ceb28a235325d975ca8cb83b144c5ed56b6ff7cd",
+  "parts_verified": 5,
+  "files_verified": 250,
+  "scope": "terminal failure and preparation preservation, no maximum PASS claim",
+  "checked_utc_epoch": 1791591873.9033
+}

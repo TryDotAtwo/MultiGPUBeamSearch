@@ -1,0 +1,24 @@
+[rank 0]
+GLOBAL_BEAM_WIDTH_EFFECTIVE=64
+runtime_depth_start=0 frontier_size=1
+runtime_depth_done=0 depth_sec=0.0286664
+runtime_depth_start=1 frontier_size=12
+runtime_depth_done=1 depth_sec=0.00406269
+runtime_depth_start=2 frontier_size=32
+runtime_depth_done=2 depth_sec=0.00392483
+runtime_depth_start=3 frontier_size=32
+runtime_depth_done=3 depth_sec=0.00366728
+puzzle_solved=0 puzzle_id=0 seconds=0.0409017 solution_length=-1 solution=
+
+[rank 1]
+GLOBAL_BEAM_WIDTH_EFFECTIVE=64
+runtime_depth_start=0 frontier_size=0
+runtime_depth_done=0 depth_sec=0.028916
+runtime_depth_start=1 frontier_size=12
+runtime_depth_done=1 depth_sec=0.00406532
+runtime_depth_start=2 frontier_size=32
+runtime_depth_done=2 depth_sec=0.00393635
+runtime_depth_start=3 frontier_size=32
+runtime_depth_done=3 depth_sec=0.00365914
+puzzle_solved=0 puzzle_id=0 seconds=0.0412022 solution_length=-1 solution=
+

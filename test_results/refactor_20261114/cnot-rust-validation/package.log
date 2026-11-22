@@ -1,0 +1,53 @@
+{
+  "base_commit": "7ae022d9383e31d1ee673f567c39443ad8433b3c",
+  "baseline_count": 502,
+  "overlays": {
+    "integrations/cayleypy_native/multigpubeamsearch/cnot.py": {
+      "sha256": "ccca9823a0348c5e69ec3940838348323e480baea19abc02b4906a9b1c3825c2",
+      "normalized_lf_sha256": "7249426d58423e4c9f0e972d3039bc598abc6521f71258bbbbafd71d0d76c1da"
+    },
+    "integrations/cayleypy_native/multigpubeamsearch/cnot_cli.py": {
+      "sha256": "ea75d5c31f012a57161c5ca18f4605313f56df5fc06fc1b0e927b9ca64d73ce2",
+      "normalized_lf_sha256": "6fee171afa1d9aa2cdd685048e02b6ba8e24a82f71165a6b9e9cecf3753f8e9a"
+    },
+    "integrations/cayleypy_native/tests/test_cnot_search.py": {
+      "sha256": "fee49337905fd8aa3fb8bb7e42127f248a8790f716dfe29d3a956dbca3c7ea32",
+      "normalized_lf_sha256": "6d935e6d49627c3c47aa5d526c3b98c18953e049a568408ecb9f010051f2c46a"
+    },
+    "rust/beam-core/src/lib.rs": {
+      "sha256": "41a86b03b31267aee42640f8af2e8f1a7188164c93aeddd1d15eb1c23da0a69c",
+      "normalized_lf_sha256": "41a86b03b31267aee42640f8af2e8f1a7188164c93aeddd1d15eb1c23da0a69c"
+    },
+    "rust/beam-core/src/cnot.rs": {
+      "sha256": "51fcbf635f76426dc9cf347ea3bddff8efa52d13997f435e4e1e96e05beabfa1",
+      "normalized_lf_sha256": "51fcbf635f76426dc9cf347ea3bddff8efa52d13997f435e4e1e96e05beabfa1"
+    },
+    "rust/beam-core/tests/cnot.rs": {
+      "sha256": "4d559869e0f6f5e1691f9b97977e48d4be4b075d57a06774c366e5f2d34cc458",
+      "normalized_lf_sha256": "4d559869e0f6f5e1691f9b97977e48d4be4b075d57a06774c366e5f2d34cc458"
+    },
+    "rust/beam-python/src/lib.rs": {
+      "sha256": "8a97826d01ba1c47f40e681c96a21d68ec85d6e692637467c484011b4d5fcb2d",
+      "normalized_lf_sha256": "8a97826d01ba1c47f40e681c96a21d68ec85d6e692637467c484011b4d5fcb2d"
+    },
+    "rust/beam-python/src/cnot.rs": {
+      "sha256": "8058657e46061427aa0bb720e4b7b7a5ab1591a91601808f48311b743b4b4dcc",
+      "normalized_lf_sha256": "8058657e46061427aa0bb720e4b7b7a5ab1591a91601808f48311b743b4b4dcc"
+    },
+    "rust/beam-python/tests/cnot.py": {
+      "sha256": "21e4cea192503909afb1ed528fa36fe115d0ba8cb3852b2cac530ad9ff6d1400",
+      "normalized_lf_sha256": "21e4cea192503909afb1ed528fa36fe115d0ba8cb3852b2cac530ad9ff6d1400"
+    },
+    "rust/beam-python/tests/cnot_search.py": {
+      "sha256": "a8569ae7ceeed899fd0757bd1f990a033923ef795b3d496c1b2c3c76ff5c1798",
+      "normalized_lf_sha256": "a8569ae7ceeed899fd0757bd1f990a033923ef795b3d496c1b2c3c76ff5c1798"
+    }
+  },
+  "inputs": {
+    "cnot-base.tar.gz": "3ed3bdd5422abb102f452bda554587d91cd76a63214786e804384c7afbccfe36",
+    "cnot-overlay.tar.gz": "a0800c3bfd45413e8f1a0e34cf93fd672dfcfd265749509fd7c0f841fbea7cef",
+    "cnot-run.sh": "abd5b5f170bc9ac09b679a42fcc2a6d34088edfeedddaab158e84aa40b0c1817"
+  },
+  "bundle_sha256": "b6d975e8879c942e64ede7a3b884685ee2c510f899a6eea74b111bf37064ee58",
+  "bundle_bytes": 1126400
+}

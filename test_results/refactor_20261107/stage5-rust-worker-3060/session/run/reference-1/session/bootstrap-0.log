@@ -1,0 +1,15 @@
+native_host_memory_available_bytes=83177840640 native_host_memory_history_budget=16777216 native_host_memory_headroom=3221225472
+communicator_rank=0 world_size=1 node_local_rank=0 local_world_size=1 cuda_ordinal=0
+GLOBAL_BEAM_WIDTH_EFFECTIVE=64
+stream1_mode=model
+stream1_executor=native_cuda_graph
+runtime_ring_count=2
+runtime_ring_slot_count=8
+runtime_ring_slot_physical_jobs=16
+runtime_ring_graph_execs_per_lane_requested=
+runtime_ring_graph_debug_sync=
+stream1_backend=mlp
+runtime_ring_slot_graph_windowed=0
+runtime_ring_slot_graph_window_rings=2
+runtime_ring_slot_graph_window_jobs=16
+runtime_ring_slot_graph_physical_jobs=16

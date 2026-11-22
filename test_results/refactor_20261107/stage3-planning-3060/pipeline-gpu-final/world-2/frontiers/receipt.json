@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "graph_hash": "4a84bc138375332f3e4b8a32372b3be797aecdc4f1faf66ed044c79ecf695ccc",
+  "global_parents": 64,
+  "unique_states": 64,
+  "seed": 20261009,
+  "walk_length": 64,
+  "walk_length_min": 32,
+  "state_len": 96,
+  "storage_len": 112,
+  "excluded_center_and_predecessors": true,
+  "files": [
+    {
+      "rank": 0,
+      "parents": 32,
+      "path": "/workspace/beam-results/planning/pipeline-gpu-final/world-2/frontiers/frontier-rank-0.bin",
+      "sha256": "bbb38dd73cbd0c59b574e90097c8e16d1c6e3d4cbb252986ebaec6b5e89007db",
+      "bytes": 3584
+    },
+    {
+      "rank": 1,
+      "parents": 32,
+      "path": "/workspace/beam-results/planning/pipeline-gpu-final/world-2/frontiers/frontier-rank-1.bin",
+      "sha256": "0a1a02c732c8bea6ffe5ace9c6df43ce92faf7bf8613d3624a845ef9d14c83cf",
+      "bytes": 3584
+    }
+  ]
+}

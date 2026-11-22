@@ -1,0 +1,60 @@
+{
+  "archive_sha256": "ac06df8466d83d60fbaa7ae5c58eb1cb9ec34d542a6555bd04da93fb77980569",
+  "files": [
+    {
+      "path": "baseline/build.txt",
+      "bytes": 20837,
+      "sha256": "f7ef428a54278605d4919f43d69a2d3a7feddb13dd853b91c8bd122c90eec824"
+    },
+    {
+      "path": "baseline/configure.txt",
+      "bytes": 3076,
+      "sha256": "40f4e1cda4c9a5840eb6a0f6c4740b7bd389e95680d53d0f75534c65d449bad5"
+    },
+    {
+      "path": "baseline/ctest.txt",
+      "bytes": 8706,
+      "sha256": "0ac1082612af5f3d63e2b13d6c569dffa821266baa7a6cb64cd88deadf75e54a"
+    },
+    {
+      "path": "baseline/python-tests.txt",
+      "bytes": 673,
+      "sha256": "de99a390356231a710d9231248c00643f8e0d08166600fb5cf78fa341732af57"
+    },
+    {
+      "path": "baseline/source.txt",
+      "bytes": 82,
+      "sha256": "0895d6859eb470cdd86190a248395e1f3199055b2b03dd60a036e6607204dbe3"
+    },
+    {
+      "path": "baseline-driver.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "bootstrap.log",
+      "bytes": 7527,
+      "sha256": "8dfbfa1bc7684cee4301a4c9937a1e08a2546a973a40105fc670b56abf8a96a5"
+    },
+    {
+      "path": "environment.txt",
+      "bytes": 1351,
+      "sha256": "ef88016285b080347f7d4014f2f56b750634250d703498f281fb9be54f4eeb5e"
+    },
+    {
+      "path": "native-abi/build.txt",
+      "bytes": 574,
+      "sha256": "f82017a8d2e0702e3675ef35709b03fda8b548f7828ec27c9a4153219bb52cf1"
+    },
+    {
+      "path": "native-abi/red.txt",
+      "bytes": 288,
+      "sha256": "9e58b122821c3f704434925791fbeadde4932373694fc58f4af8cf40a685b0b8"
+    },
+    {
+      "path": "native-abi/rust-core-red.txt",
+      "bytes": 1891,
+      "sha256": "e7a5c7c9796d2e753e52bb87b18802c96e8de8f596f5282617963a71cf4ae933"
+    }
+  ]
+}

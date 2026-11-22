@@ -1,0 +1,15 @@
+{
+  "instance": 60967063,
+  "label": "codex-cnot-s5-device2-20261116",
+  "before": {
+    "id": 60967063,
+    "label": "codex-cnot-s5-device2-20261116",
+    "actual_status": "running",
+    "duration": 678.3334743976593,
+    "dph_total": 0.16148148148148148,
+    "start_date": 1794858577.4369507
+  },
+  "destroy_returncode": 0,
+  "provider_absence_verified": true,
+  "unix_time": 1794859322.1263995
+}

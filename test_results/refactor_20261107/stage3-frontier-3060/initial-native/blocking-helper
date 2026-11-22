@@ -1,0 +1,5 @@
+#!/opt/conda/bin/python
+import os,time
+from pathlib import Path
+Path('/workspace/beam-results/frontier/initial-native',"blocked-"+os.environ.get("LOCAL_RANK","0")).write_text(str(os.getpid()))
+time.sleep(30)

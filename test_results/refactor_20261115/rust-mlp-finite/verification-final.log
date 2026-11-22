@@ -1,0 +1,21 @@
+{
+  "status": "verified",
+  "fp16_bf16_patterns": 131072,
+  "snapshot_cases": 20,
+  "independently_replayed_paths": 16,
+  "paired_calls": 10,
+  "median_paired_wall_change": -0.020135864524856162,
+  "median_seconds": {
+    "torch": {
+      "wall_seconds": 0.6010048720054328,
+      "worker_seconds": 0.302906513,
+      "validation_seconds": 0.04152882820926607
+    },
+    "rust": {
+      "wall_seconds": 0.5896356410812587,
+      "worker_seconds": 0.303017056,
+      "validation_seconds": 0.029202476143836975
+    }
+  },
+  "sha256": "fb2ddaa554fb5cf4fcb52a8362efeff51ba747a852dd0435e3b1de0146cfd764"
+}

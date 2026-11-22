@@ -1,0 +1,22 @@
+   Compiling beam-runtime v0.1.0 (/workspace/beam-work/rust/beam-runtime)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.46s
+     Running tests/frontier_policy.rs (/workspace/target/debug/deps/frontier_policy-c2f5c788fa9b36c0)
+
+running 1 test
+test admission_changes_only_measured_batch_never_requested_width ... FAILED
+
+failures:
+
+---- admission_changes_only_measured_batch_never_requested_width stdout ----
+
+thread 'admission_changes_only_measured_batch_never_requested_width' (83339) panicked at rust/beam-runtime/tests/frontier_policy.rs:73:5:
+one valid rank cannot replace the requested two-rank cohort
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    admission_changes_only_measured_batch_never_requested_width
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.02s
+
+error: test failed, to rerun pass `-p beam-runtime --test frontier_policy`

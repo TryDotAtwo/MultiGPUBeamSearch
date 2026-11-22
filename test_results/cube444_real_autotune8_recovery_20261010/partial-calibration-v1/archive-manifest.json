@@ -1,0 +1,23 @@
+{
+  "bytes": 114390,
+  "sha256": "bb76ab8593e6b0b8a650107085bbb245a588e53b23602fd955eb16efa1546cd4",
+  "parts": [
+    {
+      "path": "part-000",
+      "bytes": 75000,
+      "sha256": "f89bbebf6f1a93fdf36fdcd9cf7468661f2b86645b7058a94d990bfab25ec116"
+    },
+    {
+      "path": "part-001",
+      "bytes": 39390,
+      "sha256": "608820decd139922b9e329f8fc65d33c2e7d0dd25f6cbfc1218afe334600d6d4"
+    }
+  ],
+  "files": 113,
+  "completed_cases": [
+    "w2-beam1048576",
+    "w2-beam8388608",
+    "w8-beam1048576",
+    "w8-beam8388608"
+  ]
+}

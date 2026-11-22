@@ -1,0 +1,254 @@
+name: Vast read-only instance and RTX 3060 offer status
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/vast-offer-status.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: vast-offer-status
+  cancel-in-progress: false
+
+jobs:
+  status:
+    name: Read current instance and verified RTX 3060 offers
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Query Vast without changing instance state
+        id: query
+        env:
+          VAST_API_KEY: ${{ secrets.VAST_API_KEY }}
+          VAST_INSTANCE_ID: "61080396"
+        shell: bash
+        run: |
+          set -euo pipefail
+          report="${RUNNER_TEMP}/vast-offers-status.json"
+          python3 - "${VAST_INSTANCE_ID}" "${report}" <<'PY'
+          import datetime
+          import json
+          import os
+          import sys
+          import urllib.error
+          import urllib.parse
+          import urllib.request
+
+          api_key = os.environ.get("VAST_API_KEY", "")
+          if not api_key:
+              raise SystemExit("VAST_API_KEY repository secret is missing")
+
+          base = "https://console.vast.ai/api/v0"
+
+          def api_get(path):
+              request = urllib.request.Request(
+                  base + path,
+                  headers={
+                      "Authorization": "Bearer " + api_key,
+                      "Accept": "application/json",
+                  },
+                  method="GET",
+              )
+              with urllib.request.urlopen(request, timeout=30) as response:
+                  return json.load(response)
+
+          def api_post(path, payload):
+              request = urllib.request.Request(
+                  base + path,
+                  data=json.dumps(payload).encode("utf-8"),
+                  headers={
+                      "Authorization": "Bearer " + api_key,
+                      "Accept": "application/json",
+                      "Content-Type": "application/json",
+                  },
+                  method="POST",
+              )
+              with urllib.request.urlopen(request, timeout=30) as response:
+                  return json.load(response)
+
+          def rows_from(payload, key):
+              if isinstance(payload, dict):
+                  value = payload.get(key, [])
+              else:
+                  value = payload
+              return value if isinstance(value, list) else []
+
+          def clean_state(row, *keys):
+              for key in keys:
+                  value = row.get(key)
+                  if isinstance(value, dict):
+                      value = value.get("state") or value.get("status")
+                  if isinstance(value, str) and value:
+                      return value[:64]
+              return "unknown"
+
+          def number(row, key):
+              value = row.get(key)
+              if isinstance(value, (int, float)) and not isinstance(value, bool):
+                  return value
+              return None
+
+          instance_id = int(sys.argv[1])
+          instance_payload = api_get("/instances/")
+          instances = rows_from(instance_payload, "instances")
+          matches = [
+              row for row in instances
+              if isinstance(row, dict) and str(row.get("id")) == str(instance_id)
+          ]
+          if len(matches) != 1:
+              raise SystemExit("Expected exactly one matching existing instance")
+          row = matches[0]
+          gpu_name = row.get("gpu_name")
+          if not isinstance(gpu_name, str):
+              gpu_name = "unknown"
+          gpu_count = row.get("num_gpus")
+          if not isinstance(gpu_count, int):
+              gpu_count = None
+
+          instance = {
+              "instance_id": instance_id,
+              "actual_status": clean_state(row, "actual_status", "status", "cur_state"),
+              "intended_status": clean_state(row, "intended_status"),
+              "gpu_name": gpu_name[:80],
+              "gpu_count": gpu_count,
+              "dph_total": number(row, "dph_total"),
+              "storage_cost": number(row, "storage_cost"),
+          }
+
+          offer_query = {
+              "gpu_name": {"in": ["RTX_3060", "RTX 3060"]},
+              "num_gpus": {"in": [1, 2]},
+              "verified": {"eq": True},
+              "rentable": {"eq": True},
+              "rented": {"eq": False},
+              "type": "ondemand",
+              "limit": 100,
+          }
+          payload = api_post("/bundles/", offer_query)
+          offers = []
+          seen_ids = set()
+          for offer in rows_from(payload, "offers"):
+              if not isinstance(offer, dict):
+                  continue
+              offer_id = offer.get("id")
+              if offer_id is None or str(offer_id) in seen_ids:
+                  continue
+              name = offer.get("gpu_name")
+              if not isinstance(name, str) or name.replace("_", " ").replace("-", " ").lower() != "rtx 3060":
+                  continue
+              count = offer.get("num_gpus")
+              price = number(offer, "dph_total")
+              if count not in (1, 2) or price is None or price <= 0:
+                  continue
+              if offer.get("rentable") is not True or offer.get("verified") is not True:
+                  continue
+              seen_ids.add(str(offer_id))
+              offers.append({
+                  "offer_id": offer_id,
+                  "gpu_name": name[:80],
+                  "gpu_count": count,
+                  "dph_total": price,
+                  "gpu_ram": number(offer, "gpu_ram"),
+                  "cpu_cores": number(offer, "cpu_cores"),
+                  "cpu_ram": number(offer, "cpu_ram"),
+                  "disk_space": number(offer, "disk_space"),
+                  "cuda_max_good": number(offer, "cuda_max_good"),
+                  "reliability": number(offer, "reliability"),
+                  "verified": True,
+                  "rentable": True,
+              })
+
+          offers.sort(key=lambda item: (item["gpu_count"], item["dph_total"], str(item["offer_id"])))
+          report = {
+              "checked_at_utc": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+              "instance": instance,
+              "verified_rentable_rtx_3060_offers": offers[:40],
+              "state_changed": False,
+          }
+          with open(sys.argv[2], "w", encoding="utf-8") as output:
+              json.dump(report, output, indent=2, sort_keys=True)
+              output.write("\n")
+
+          print("Existing instance status: " + instance["actual_status"])
+          print("Verified rentable RTX 3060 offers: " + str(len(offers)))
+          for count in (1, 2):
+              cheapest = next((item for item in offers if item["gpu_count"] == count), None)
+              if cheapest is None:
+                  print(f"{count} GPU cheapest offer: unavailable")
+              else:
+                  print(
+                      f"{count} GPU cheapest offer: ${cheapest['dph_total']:.6f}/hour "
+                      f"(offer {cheapest['offer_id']})"
+                  )
+          print("No start, stop, rent, or destroy request was made.")
+          PY
+          jq . "${report}" >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload sanitized status
+        uses: actions/upload-artifact@v4
+        with:
+          name: vast-offers-status-${{ github.run_id }}
+          path: ${{ runner.temp }}/vast-offers-status.json
+          if-no-files-found: error
+          retention-days: 7
+      - name: Publish sanitized status to test_results
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - "${RUNNER_TEMP}/vast-offers-status.json" <<'PY'
+          import base64
+          import json
+          import os
+          import sys
+          import urllib.error
+          import urllib.parse
+          import urllib.request
+
+          token = os.environ.get("GH_TOKEN", "")
+          repository = os.environ["GITHUB_REPOSITORY"]
+          if not token:
+              raise SystemExit("GitHub Actions token is missing")
+          path = "test_results/remote-status/vast-offers-latest.json"
+          api = "https://api.github.com/repos/" + repository + "/contents/" + urllib.parse.quote(path, safe="/")
+          headers = {
+              "Authorization": "Bearer " + token,
+              "Accept": "application/vnd.github+json",
+              "X-GitHub-Api-Version": "2022-11-28",
+              "Content-Type": "application/json",
+          }
+          with open(sys.argv[1], "rb") as source:
+              content = base64.b64encode(source.read()).decode("ascii")
+
+          sha = None
+          request = urllib.request.Request(api + "?ref=main", headers=headers, method="GET")
+          try:
+              with urllib.request.urlopen(request, timeout=30) as response:
+                  sha = json.load(response).get("sha")
+          except urllib.error.HTTPError as exc:
+              if exc.code != 404:
+                  raise
+
+          payload = {
+              "message": "ci: publish sanitized Vast offer status",
+              "content": content,
+              "branch": "main",
+          }
+          if sha:
+              payload["sha"] = sha
+          request = urllib.request.Request(
+              api,
+              data=json.dumps(payload).encode("utf-8"),
+              headers=headers,
+              method="PUT",
+          )
+          with urllib.request.urlopen(request, timeout=30):
+              pass
+          print("Published sanitized Vast status to " + path)
+          PY

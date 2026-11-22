@@ -1,0 +1,21 @@
+   Compiling beam-runtime v0.1.0 (/workspace/beam-work/rust/beam-runtime)
+error[E0599]: no associated function or constant named `launch_cancellable` found for struct `PlanningSession` in the current scope
+  --> rust/beam-runtime/tests/planning.rs:22:30
+   |
+22 |     assert!(PlanningSession::launch_cancellable(
+   |                              ^^^^^^^^^^^^^^^^^^ associated function or constant not found in `PlanningSession`
+   |
+note: if you're trying to build a new `PlanningSession`, consider using `PlanningSession::launch` which returns `Result<PlanningSession, beam_runtime::Error>`
+  --> rust/beam-runtime/src/planning.rs:25:5
+   |
+25 | /     pub fn launch(
+26 | |         command: &[String],
+27 | |         environment: &BTreeMap<String, String>,
+28 | |         world: u32,
+...  |
+31 | |         timeout: Duration,
+32 | |     ) -> Result<Self> {
+   | |_____________________^
+
+For more information about this error, try `rustc --explain E0599`.
+error: could not compile `beam-runtime` (test "planning") due to 1 previous error

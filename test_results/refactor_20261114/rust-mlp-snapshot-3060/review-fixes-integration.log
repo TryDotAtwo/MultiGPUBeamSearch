@@ -1,0 +1,16 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.02s
+     Running tests/mlp_snapshot.rs (/workspace/target/debug/build/beam-runtime/f43597c0b532c8fb/out/mlp_snapshot-f43597c0b532c8fb)
+
+running 9 tests
+test rejects_invalid_or_ambiguous_file_names_and_hashes ... ok
+test already_prepared_source_at_target_is_reused_without_a_copy ... ok
+test cache_identity_need_not_exist_when_the_run_directory_is_elsewhere ... ok
+test cancellation_does_not_publish_or_poison_later_attempts ... ok
+test rejects_bad_hash_before_publishing_and_preserves_existing_target ... ok
+test rejects_changed_source_and_retained_snapshot ... ok
+test session_path_defers_retained_validation_until_the_launch_boundary ... ok
+test creates_reuses_and_refreshes_compatible_snapshots ... ok
+test fifo_tensor_cannot_block_snapshot_or_cancellation ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+

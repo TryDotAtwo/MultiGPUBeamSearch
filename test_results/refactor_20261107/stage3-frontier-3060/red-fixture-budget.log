@@ -1,0 +1,24 @@
+   Compiling beam-runtime v0.1.0 (/workspace/beam-work/rust/beam-runtime)
+error[E0599]: no method named `capacity_ceiling` found for struct `beam_runtime::frontier_job::Request` in the current scope
+  --> rust/beam-runtime/tests/frontier_policy.rs:46:21
+   |
+46 |     assert!(request.capacity_ceiling().unwrap().upper_bound>8192);
+   |                     ^^^^^^^^^^^^^^^^ method not found in `beam_runtime::frontier_job::Request`
+
+error[E0609]: no field `frontier_ceiling` on type `Execution`
+  --> rust/beam-runtime/tests/frontier_policy.rs:47:23
+   |
+47 |     request.execution.frontier_ceiling=Some(8192);
+   |                       ^^^^^^^^^^^^^^^^ unknown field
+   |
+   = note: available fields are: `runner`, `row_factor`, `hardware`, `physical_bytes`, `puzzle_id` ... and 4 others
+
+error[E0599]: no method named `capacity_ceiling` found for struct `beam_runtime::frontier_job::Request` in the current scope
+  --> rust/beam-runtime/tests/frontier_policy.rs:48:24
+   |
+48 |     assert_eq!(request.capacity_ceiling().unwrap().upper_bound,8192);
+   |                        ^^^^^^^^^^^^^^^^ method not found in `beam_runtime::frontier_job::Request`
+
+Some errors have detailed explanations: E0599, E0609.
+For more information about an error, try `rustc --explain E0599`.
+error: could not compile `beam-runtime` (test "frontier_policy") due to 3 previous errors

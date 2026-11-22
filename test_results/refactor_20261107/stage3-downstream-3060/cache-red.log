@@ -1,0 +1,11 @@
+   Compiling beam-runtime v0.1.0 (/workspace/beam-work/rust/beam-runtime)
+error[E0432]: unresolved import `beam_runtime::pipeline_cache`
+   --> rust/beam-runtime/tests/component_tuning.rs:206:9
+    |
+206 |     use beam_runtime::pipeline_cache;
+    |         ^^^^^^^^^^^^^^--------------
+    |                       |
+    |                       no `pipeline_cache` in the root
+
+For more information about this error, try `rustc --explain E0432`.
+error: could not compile `beam-runtime` (test "component_tuning") due to 1 previous error

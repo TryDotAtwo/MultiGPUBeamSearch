@@ -1,0 +1,5 @@
+Processing /workspace/wheels/beam_python-0.1.0-cp310-abi3-manylinux_2_34_x86_64.whl
+Installing collected packages: beam-python
+Successfully installed beam-python-0.1.0
+WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager, possibly rendering your system unusable. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv. Use the --root-user-action option if you know what you are doing and want to suppress this warning.
+<class 'builtins.ResidentWorkers'>

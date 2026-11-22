@@ -1,0 +1,9 @@
+Test project /workspace/beam-results/native-generator/cache/builds/316e3b4a2f35d318aebfcf1216b8459fb6ce233c022629e9056f2a17b57c050c
+    Start 12: native_abi_tests
+1/2 Test #12: native_abi_tests .................   Passed    0.03 sec
+    Start 24: native_loaded_graph_hash_tests
+2/2 Test #24: native_loaded_graph_hash_tests ...   Passed    0.00 sec
+
+100% tests passed, 0 tests failed out of 2
+
+Total Test time (real) =   0.04 sec

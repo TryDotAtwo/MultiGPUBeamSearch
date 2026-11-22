@@ -1,0 +1,22 @@
+{
+  "file": "evidence.tar.gz",
+  "bytes": 191732,
+  "sha256": "c802cd8b9db8049a4ed8229d9e2d95a1ade16473a1ab6a9deadd7d81ba9ff763",
+  "parts": [
+    {
+      "path": "evidence.tar.gz.part000",
+      "bytes": 75000,
+      "sha256": "4c607b76cf5366e8dc192a527b415bb0767aba248249aca1b928ba1b9b65cb69"
+    },
+    {
+      "path": "evidence.tar.gz.part001",
+      "bytes": 75000,
+      "sha256": "edd8a55b732d1ce985d9a025f2e303b5c205105446760af546fd2db9fd950c51"
+    },
+    {
+      "path": "evidence.tar.gz.part002",
+      "bytes": 41732,
+      "sha256": "70f7c794ed9464c777e6995ef3e96b1b8251f6c89b917abf52858281afb59101"
+    }
+  ]
+}

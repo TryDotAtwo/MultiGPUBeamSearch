@@ -1,0 +1,15 @@
+{
+  "instance": 60990077,
+  "label": "codex-cnot-native-record-20261117",
+  "before": {
+    "id": 60990077,
+    "label": "codex-cnot-native-record-20261117",
+    "actual_status": "running",
+    "duration": 870.8728144168854,
+    "dph_total": 0.13481481481481483,
+    "start_date": 1794872906.0676038
+  },
+  "destroy_returncode": 0,
+  "provider_absence_verified": true,
+  "unix_time": 1794873793.0142667
+}

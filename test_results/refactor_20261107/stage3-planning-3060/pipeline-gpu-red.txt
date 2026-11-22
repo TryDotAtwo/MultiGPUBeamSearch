@@ -1,0 +1,8 @@
+Traceback (most recent call last):
+  File "/workspace/beam-work/tests/native_pipeline_gpu.py", line 78, in <module>
+    if __name__=='__main__':main()
+                            ^^^^^^
+  File "/workspace/beam-work/tests/native_pipeline_gpu.py", line 24, in main
+    assert hasattr(native,'PipelineProbe'), 'Rust pipeline ownership is not implemented'
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: Rust pipeline ownership is not implemented

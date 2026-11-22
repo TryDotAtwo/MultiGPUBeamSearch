@@ -1,0 +1,3 @@
+$ ['/usr/bin/python3', '-m', 'pytest', '-p', 'no:cacheprovider', '-q', '-rs', '--tb=short', 'integrations/cayleypy_native/tests/test_cnot_search.py::test_two_real_gloo_processes']
+.                                                                        [100%]
+1 passed in 3.95s

@@ -1,0 +1,20 @@
+   Compiling beam-native-sys v0.1.0 (/workspace/beam-work/rust/beam-native-sys)
+   Compiling beam-runtime v0.1.0 (/workspace/beam-work/rust/beam-runtime)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.24s
+     Running tests/history.rs (/workspace/target/debug/deps/history-83dfad703be46342)
+
+running 2 tests
+test exact_history_reservations_and_tail_fallback ... ok
+test full_depth_placement_zero_and_arithmetic_limits ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/history.rs (/workspace/target/debug/deps/history-afd7dd5211955a64)
+
+running 3 tests
+test ram_pruning_preserves_reconstructed_routes ... ok
+test invalid_parent_and_memory_budget_fail_explicitly ... ok
+test formats_bounds_and_out_of_order_batches ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

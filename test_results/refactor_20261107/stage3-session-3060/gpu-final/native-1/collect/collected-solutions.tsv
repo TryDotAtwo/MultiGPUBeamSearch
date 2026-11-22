@@ -1,0 +1,4 @@
+puzzle_id	depth_index	found_depth	total_depth	known_length	delta	owner_rank	solution_path
+0	2	3	3	0	0	0	m0.m1.m2
+0	2	3	3	0	0	0	m1.m2.m0
+0	2	3	3	0	0	0	m0.m2.m1

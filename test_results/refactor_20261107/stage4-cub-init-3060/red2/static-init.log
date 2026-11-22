@@ -1,0 +1,711 @@
+========= COMPUTE-SANITIZER
+========= Host API memory access error at host access to 0x7f6e16271500 of size 9728 bytes
+=========     Uninitialized access at 0x7f6e16271500 on access by cudaMemcpy source
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&)::{lambda(void const*, unsigned long, char const*)#1}::operator()(void const*, unsigned long, char const*) const [0x14a8e] in static_memory_cuda_tests
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&) [0x14bbe] in static_memory_cuda_tests
+=========         Host Frame: main [0x125ce] in static_memory_cuda_tests
+========= 
+========= Host API memory access error at host access to 0x7f6e16271500 of size 9728 bytes
+=========     Uninitialized access at 0x7f6e16271520 on access by cudaMemcpy source
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&)::{lambda(void const*, unsigned long, char const*)#1}::operator()(void const*, unsigned long, char const*) const [0x14a8e] in static_memory_cuda_tests
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&) [0x14bbe] in static_memory_cuda_tests
+=========         Host Frame: main [0x125ce] in static_memory_cuda_tests
+========= 
+========= Host API memory access error at host access to 0x7f6e16271500 of size 9728 bytes
+=========     Uninitialized access at 0x7f6e16271540 on access by cudaMemcpy source
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&)::{lambda(void const*, unsigned long, char const*)#1}::operator()(void const*, unsigned long, char const*) const [0x14a8e] in static_memory_cuda_tests
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&) [0x14bbe] in static_memory_cuda_tests
+=========         Host Frame: main [0x125ce] in static_memory_cuda_tests
+========= 
+========= Host API memory access error at host access to 0x7f6e16271500 of size 9728 bytes
+=========     Uninitialized access at 0x7f6e16271560 on access by cudaMemcpy source
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&)::{lambda(void const*, unsigned long, char const*)#1}::operator()(void const*, unsigned long, char const*) const [0x14a8e] in static_memory_cuda_tests
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&) [0x14bbe] in static_memory_cuda_tests
+=========         Host Frame: main [0x125ce] in static_memory_cuda_tests
+========= 
+========= Host API memory access error at host access to 0x7f6e16271500 of size 9728 bytes
+=========     Uninitialized access at 0x7f6e16271580 on access by cudaMemcpy source
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&)::{lambda(void const*, unsigned long, char const*)#1}::operator()(void const*, unsigned long, char const*) const [0x14a8e] in static_memory_cuda_tests
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&) [0x14bbe] in static_memory_cuda_tests
+=========         Host Frame: main [0x125ce] in static_memory_cuda_tests
+========= 
+========= Host API memory access error at host access to 0x7f6e16271500 of size 9728 bytes
+=========     Uninitialized access at 0x7f6e162715a0 on access by cudaMemcpy source
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&)::{lambda(void const*, unsigned long, char const*)#1}::operator()(void const*, unsigned long, char const*) const [0x14a8e] in static_memory_cuda_tests
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&) [0x14bbe] in static_memory_cuda_tests
+=========         Host Frame: main [0x125ce] in static_memory_cuda_tests
+========= 
+========= Host API memory access error at host access to 0x7f6e16271500 of size 9728 bytes
+=========     Uninitialized access at 0x7f6e162715c0 on access by cudaMemcpy source
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&)::{lambda(void const*, unsigned long, char const*)#1}::operator()(void const*, unsigned long, char const*) const [0x14a8e] in static_memory_cuda_tests
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&) [0x14bbe] in static_memory_cuda_tests
+=========         Host Frame: main [0x125ce] in static_memory_cuda_tests
+========= 
+========= Host API memory access error at host access to 0x7f6e16271500 of size 9728 bytes
+=========     Uninitialized access at 0x7f6e162715e0 on access by cudaMemcpy source
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&)::{lambda(void const*, unsigned long, char const*)#1}::operator()(void const*, unsigned long, char const*) const [0x14a8e] in static_memory_cuda_tests
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&) [0x14bbe] in static_memory_cuda_tests
+=========         Host Frame: main [0x125ce] in static_memory_cuda_tests
+========= 
+========= Host API memory access error at host access to 0x7f6e16271500 of size 9728 bytes
+=========     Uninitialized access at 0x7f6e16271600 on access by cudaMemcpy source
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&)::{lambda(void const*, unsigned long, char const*)#1}::operator()(void const*, unsigned long, char const*) const [0x14a8e] in static_memory_cuda_tests
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&) [0x14bbe] in static_memory_cuda_tests
+=========         Host Frame: main [0x125ce] in static_memory_cuda_tests
+========= 
+========= Host API memory access error at host access to 0x7f6e16271500 of size 9728 bytes
+=========     Uninitialized access at 0x7f6e16271620 on access by cudaMemcpy source
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&)::{lambda(void const*, unsigned long, char const*)#1}::operator()(void const*, unsigned long, char const*) const [0x14a8e] in static_memory_cuda_tests
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&) [0x14bbe] in static_memory_cuda_tests
+=========         Host Frame: main [0x125ce] in static_memory_cuda_tests
+========= 
+========= Host API memory access error at host access to 0x7f6e16271500 of size 9728 bytes
+=========     Uninitialized access at 0x7f6e16271640 on access by cudaMemcpy source
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&)::{lambda(void const*, unsigned long, char const*)#1}::operator()(void const*, unsigned long, char const*) const [0x14a8e] in static_memory_cuda_tests
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&) [0x14bbe] in static_memory_cuda_tests
+=========         Host Frame: main [0x125ce] in static_memory_cuda_tests
+========= 
+========= Host API memory access error at host access to 0x7f6e16271500 of size 9728 bytes
+=========     Uninitialized access at 0x7f6e16271660 on access by cudaMemcpy source
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&)::{lambda(void const*, unsigned long, char const*)#1}::operator()(void const*, unsigned long, char const*) const [0x14a8e] in static_memory_cuda_tests
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&) [0x14bbe] in static_memory_cuda_tests
+=========         Host Frame: main [0x125ce] in static_memory_cuda_tests
+========= 
+========= Host API memory access error at host access to 0x7f6e16271500 of size 9728 bytes
+=========     Uninitialized access at 0x7f6e16271680 on access by cudaMemcpy source
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&)::{lambda(void const*, unsigned long, char const*)#1}::operator()(void const*, unsigned long, char const*) const [0x14a8e] in static_memory_cuda_tests
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&) [0x14bbe] in static_memory_cuda_tests
+=========         Host Frame: main [0x125ce] in static_memory_cuda_tests
+========= 
+========= Host API memory access error at host access to 0x7f6e16271500 of size 9728 bytes
+=========     Uninitialized access at 0x7f6e162716a0 on access by cudaMemcpy source
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&)::{lambda(void const*, unsigned long, char const*)#1}::operator()(void const*, unsigned long, char const*) const [0x14a8e] in static_memory_cuda_tests
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&) [0x14bbe] in static_memory_cuda_tests
+=========         Host Frame: main [0x125ce] in static_memory_cuda_tests
+========= 
+========= Host API memory access error at host access to 0x7f6e16271500 of size 9728 bytes
+=========     Uninitialized access at 0x7f6e162716c0 on access by cudaMemcpy source
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&)::{lambda(void const*, unsigned long, char const*)#1}::operator()(void const*, unsigned long, char const*) const [0x14a8e] in static_memory_cuda_tests
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&) [0x14bbe] in static_memory_cuda_tests
+=========         Host Frame: main [0x125ce] in static_memory_cuda_tests
+========= 
+========= Host API memory access error at host access to 0x7f6e16271500 of size 9728 bytes
+=========     Uninitialized access at 0x7f6e162716e0 on access by cudaMemcpy source
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&)::{lambda(void const*, unsigned long, char const*)#1}::operator()(void const*, unsigned long, char const*) const [0x14a8e] in static_memory_cuda_tests
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&) [0x14bbe] in static_memory_cuda_tests
+=========         Host Frame: main [0x125ce] in static_memory_cuda_tests
+========= 
+========= Host API memory access error at host access to 0x7f6e16271500 of size 9728 bytes
+=========     Uninitialized access at 0x7f6e16271700 on access by cudaMemcpy source
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&)::{lambda(void const*, unsigned long, char const*)#1}::operator()(void const*, unsigned long, char const*) const [0x14a8e] in static_memory_cuda_tests
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&) [0x14bbe] in static_memory_cuda_tests
+=========         Host Frame: main [0x125ce] in static_memory_cuda_tests
+========= 
+========= Host API memory access error at host access to 0x7f6e16271500 of size 9728 bytes
+=========     Uninitialized access at 0x7f6e16271720 on access by cudaMemcpy source
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&)::{lambda(void const*, unsigned long, char const*)#1}::operator()(void const*, unsigned long, char const*) const [0x14a8e] in static_memory_cuda_tests
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&) [0x14bbe] in static_memory_cuda_tests
+=========         Host Frame: main [0x125ce] in static_memory_cuda_tests
+========= 
+========= Host API memory access error at host access to 0x7f6e16271500 of size 9728 bytes
+=========     Uninitialized access at 0x7f6e16271740 on access by cudaMemcpy source
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&)::{lambda(void const*, unsigned long, char const*)#1}::operator()(void const*, unsigned long, char const*) const [0x14a8e] in static_memory_cuda_tests
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&) [0x14bbe] in static_memory_cuda_tests
+=========         Host Frame: main [0x125ce] in static_memory_cuda_tests
+========= 
+========= Host API memory access error at host access to 0x7f6e16271500 of size 9728 bytes
+=========     Uninitialized access at 0x7f6e16271760 on access by cudaMemcpy source
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&)::{lambda(void const*, unsigned long, char const*)#1}::operator()(void const*, unsigned long, char const*) const [0x14a8e] in static_memory_cuda_tests
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&) [0x14bbe] in static_memory_cuda_tests
+=========         Host Frame: main [0x125ce] in static_memory_cuda_tests
+========= 
+========= Host API memory access error at host access to 0x7f6e16271500 of size 9728 bytes
+=========     Uninitialized access at 0x7f6e16271780 on access by cudaMemcpy source
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&)::{lambda(void const*, unsigned long, char const*)#1}::operator()(void const*, unsigned long, char const*) const [0x14a8e] in static_memory_cuda_tests
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&) [0x14bbe] in static_memory_cuda_tests
+=========         Host Frame: main [0x125ce] in static_memory_cuda_tests
+========= 
+========= Host API memory access error at host access to 0x7f6e16271500 of size 9728 bytes
+=========     Uninitialized access at 0x7f6e162717a0 on access by cudaMemcpy source
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&)::{lambda(void const*, unsigned long, char const*)#1}::operator()(void const*, unsigned long, char const*) const [0x14a8e] in static_memory_cuda_tests
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&) [0x14bbe] in static_memory_cuda_tests
+=========         Host Frame: main [0x125ce] in static_memory_cuda_tests
+========= 
+========= Host API memory access error at host access to 0x7f6e16271500 of size 9728 bytes
+=========     Uninitialized access at 0x7f6e162717c0 on access by cudaMemcpy source
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&)::{lambda(void const*, unsigned long, char const*)#1}::operator()(void const*, unsigned long, char const*) const [0x14a8e] in static_memory_cuda_tests
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&) [0x14bbe] in static_memory_cuda_tests
+=========         Host Frame: main [0x125ce] in static_memory_cuda_tests
+========= 
+========= Host API memory access error at host access to 0x7f6e16271500 of size 9728 bytes
+=========     Uninitialized access at 0x7f6e162717e0 on access by cudaMemcpy source
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&)::{lambda(void const*, unsigned long, char const*)#1}::operator()(void const*, unsigned long, char const*) const [0x14a8e] in static_memory_cuda_tests
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&) [0x14bbe] in static_memory_cuda_tests
+=========         Host Frame: main [0x125ce] in static_memory_cuda_tests
+========= 
+========= Host API memory access error at host access to 0x7f6e16271500 of size 9728 bytes
+=========     Uninitialized access at 0x7f6e16271800 on access by cudaMemcpy source
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&)::{lambda(void const*, unsigned long, char const*)#1}::operator()(void const*, unsigned long, char const*) const [0x14a8e] in static_memory_cuda_tests
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&) [0x14bbe] in static_memory_cuda_tests
+=========         Host Frame: main [0x125ce] in static_memory_cuda_tests
+========= 
+========= Host API memory access error at host access to 0x7f6e16271500 of size 9728 bytes
+=========     Uninitialized access at 0x7f6e16271820 on access by cudaMemcpy source
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&)::{lambda(void const*, unsigned long, char const*)#1}::operator()(void const*, unsigned long, char const*) const [0x14a8e] in static_memory_cuda_tests
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&) [0x14bbe] in static_memory_cuda_tests
+=========         Host Frame: main [0x125ce] in static_memory_cuda_tests
+========= 
+========= Host API memory access error at host access to 0x7f6e16271500 of size 9728 bytes
+=========     Uninitialized access at 0x7f6e16271840 on access by cudaMemcpy source
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&)::{lambda(void const*, unsigned long, char const*)#1}::operator()(void const*, unsigned long, char const*) const [0x14a8e] in static_memory_cuda_tests
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&) [0x14bbe] in static_memory_cuda_tests
+=========         Host Frame: main [0x125ce] in static_memory_cuda_tests
+========= 
+========= Host API memory access error at host access to 0x7f6e16271500 of size 9728 bytes
+=========     Uninitialized access at 0x7f6e16271860 on access by cudaMemcpy source
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&)::{lambda(void const*, unsigned long, char const*)#1}::operator()(void const*, unsigned long, char const*) const [0x14a8e] in static_memory_cuda_tests
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&) [0x14bbe] in static_memory_cuda_tests
+=========         Host Frame: main [0x125ce] in static_memory_cuda_tests
+========= 
+========= Host API memory access error at host access to 0x7f6e16271500 of size 9728 bytes
+=========     Uninitialized access at 0x7f6e16271880 on access by cudaMemcpy source
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&)::{lambda(void const*, unsigned long, char const*)#1}::operator()(void const*, unsigned long, char const*) const [0x14a8e] in static_memory_cuda_tests
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&) [0x14bbe] in static_memory_cuda_tests
+=========         Host Frame: main [0x125ce] in static_memory_cuda_tests
+========= 
+========= Host API memory access error at host access to 0x7f6e16271500 of size 9728 bytes
+=========     Uninitialized access at 0x7f6e162718a0 on access by cudaMemcpy source
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&)::{lambda(void const*, unsigned long, char const*)#1}::operator()(void const*, unsigned long, char const*) const [0x14a8e] in static_memory_cuda_tests
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&) [0x14bbe] in static_memory_cuda_tests
+=========         Host Frame: main [0x125ce] in static_memory_cuda_tests
+========= 
+========= Host API memory access error at host access to 0x7f6e16271500 of size 9728 bytes
+=========     Uninitialized access at 0x7f6e162718c0 on access by cudaMemcpy source
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&)::{lambda(void const*, unsigned long, char const*)#1}::operator()(void const*, unsigned long, char const*) const [0x14a8e] in static_memory_cuda_tests
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&) [0x14bbe] in static_memory_cuda_tests
+=========         Host Frame: main [0x125ce] in static_memory_cuda_tests
+========= 
+========= Host API memory access error at host access to 0x7f6e16271500 of size 9728 bytes
+=========     Uninitialized access at 0x7f6e162718e0 on access by cudaMemcpy source
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&)::{lambda(void const*, unsigned long, char const*)#1}::operator()(void const*, unsigned long, char const*) const [0x14a8e] in static_memory_cuda_tests
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&) [0x14bbe] in static_memory_cuda_tests
+=========         Host Frame: main [0x125ce] in static_memory_cuda_tests
+========= 
+========= Host API memory access error at host access to 0x7f6e16271500 of size 9728 bytes
+=========     Uninitialized access at 0x7f6e16271900 on access by cudaMemcpy source
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&)::{lambda(void const*, unsigned long, char const*)#1}::operator()(void const*, unsigned long, char const*) const [0x14a8e] in static_memory_cuda_tests
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&) [0x14bbe] in static_memory_cuda_tests
+=========         Host Frame: main [0x125ce] in static_memory_cuda_tests
+========= 
+========= Host API memory access error at host access to 0x7f6e16271500 of size 9728 bytes
+=========     Uninitialized access at 0x7f6e16271920 on access by cudaMemcpy source
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&)::{lambda(void const*, unsigned long, char const*)#1}::operator()(void const*, unsigned long, char const*) const [0x14a8e] in static_memory_cuda_tests
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&) [0x14bbe] in static_memory_cuda_tests
+=========         Host Frame: main [0x125ce] in static_memory_cuda_tests
+========= 
+========= Host API memory access error at host access to 0x7f6e16271500 of size 9728 bytes
+=========     Uninitialized access at 0x7f6e16271940 on access by cudaMemcpy source
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&)::{lambda(void const*, unsigned long, char const*)#1}::operator()(void const*, unsigned long, char const*) const [0x14a8e] in static_memory_cuda_tests
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&) [0x14bbe] in static_memory_cuda_tests
+=========         Host Frame: main [0x125ce] in static_memory_cuda_tests
+========= 
+========= Host API memory access error at host access to 0x7f6e16271500 of size 9728 bytes
+=========     Uninitialized access at 0x7f6e16271960 on access by cudaMemcpy source
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&)::{lambda(void const*, unsigned long, char const*)#1}::operator()(void const*, unsigned long, char const*) const [0x14a8e] in static_memory_cuda_tests
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&) [0x14bbe] in static_memory_cuda_tests
+=========         Host Frame: main [0x125ce] in static_memory_cuda_tests
+========= 
+========= Host API memory access error at host access to 0x7f6e16271500 of size 9728 bytes
+=========     Uninitialized access at 0x7f6e16271980 on access by cudaMemcpy source
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&)::{lambda(void const*, unsigned long, char const*)#1}::operator()(void const*, unsigned long, char const*) const [0x14a8e] in static_memory_cuda_tests
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&) [0x14bbe] in static_memory_cuda_tests
+=========         Host Frame: main [0x125ce] in static_memory_cuda_tests
+========= 
+========= Host API memory access error at host access to 0x7f6e16271500 of size 9728 bytes
+=========     Uninitialized access at 0x7f6e162719a0 on access by cudaMemcpy source
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&)::{lambda(void const*, unsigned long, char const*)#1}::operator()(void const*, unsigned long, char const*) const [0x14a8e] in static_memory_cuda_tests
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&) [0x14bbe] in static_memory_cuda_tests
+=========         Host Frame: main [0x125ce] in static_memory_cuda_tests
+========= 
+========= Host API memory access error at host access to 0x7f6e16271500 of size 9728 bytes
+=========     Uninitialized access at 0x7f6e162719c0 on access by cudaMemcpy source
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&)::{lambda(void const*, unsigned long, char const*)#1}::operator()(void const*, unsigned long, char const*) const [0x14a8e] in static_memory_cuda_tests
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&) [0x14bbe] in static_memory_cuda_tests
+=========         Host Frame: main [0x125ce] in static_memory_cuda_tests
+========= 
+========= Host API memory access error at host access to 0x7f6e16271500 of size 9728 bytes
+=========     Uninitialized access at 0x7f6e162719e0 on access by cudaMemcpy source
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&)::{lambda(void const*, unsigned long, char const*)#1}::operator()(void const*, unsigned long, char const*) const [0x14a8e] in static_memory_cuda_tests
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&) [0x14bbe] in static_memory_cuda_tests
+=========         Host Frame: main [0x125ce] in static_memory_cuda_tests
+========= 
+========= Host API memory access error at host access to 0x7f6e16271500 of size 9728 bytes
+=========     Uninitialized access at 0x7f6e16271a00 on access by cudaMemcpy source
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&)::{lambda(void const*, unsigned long, char const*)#1}::operator()(void const*, unsigned long, char const*) const [0x14a8e] in static_memory_cuda_tests
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&) [0x14bbe] in static_memory_cuda_tests
+=========         Host Frame: main [0x125ce] in static_memory_cuda_tests
+========= 
+========= Host API memory access error at host access to 0x7f6e16271500 of size 9728 bytes
+=========     Uninitialized access at 0x7f6e16271a20 on access by cudaMemcpy source
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&)::{lambda(void const*, unsigned long, char const*)#1}::operator()(void const*, unsigned long, char const*) const [0x14a8e] in static_memory_cuda_tests
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&) [0x14bbe] in static_memory_cuda_tests
+=========         Host Frame: main [0x125ce] in static_memory_cuda_tests
+========= 
+========= Host API memory access error at host access to 0x7f6e16271500 of size 9728 bytes
+=========     Uninitialized access at 0x7f6e16271a40 on access by cudaMemcpy source
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&)::{lambda(void const*, unsigned long, char const*)#1}::operator()(void const*, unsigned long, char const*) const [0x14a8e] in static_memory_cuda_tests
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&) [0x14bbe] in static_memory_cuda_tests
+=========         Host Frame: main [0x125ce] in static_memory_cuda_tests
+========= 
+========= Host API memory access error at host access to 0x7f6e16271500 of size 9728 bytes
+=========     Uninitialized access at 0x7f6e16271a60 on access by cudaMemcpy source
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&)::{lambda(void const*, unsigned long, char const*)#1}::operator()(void const*, unsigned long, char const*) const [0x14a8e] in static_memory_cuda_tests
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&) [0x14bbe] in static_memory_cuda_tests
+=========         Host Frame: main [0x125ce] in static_memory_cuda_tests
+========= 
+========= Host API memory access error at host access to 0x7f6e16271500 of size 9728 bytes
+=========     Uninitialized access at 0x7f6e16271a80 on access by cudaMemcpy source
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&)::{lambda(void const*, unsigned long, char const*)#1}::operator()(void const*, unsigned long, char const*) const [0x14a8e] in static_memory_cuda_tests
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&) [0x14bbe] in static_memory_cuda_tests
+=========         Host Frame: main [0x125ce] in static_memory_cuda_tests
+========= 
+========= Host API memory access error at host access to 0x7f6e16271500 of size 9728 bytes
+=========     Uninitialized access at 0x7f6e16271aa0 on access by cudaMemcpy source
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&)::{lambda(void const*, unsigned long, char const*)#1}::operator()(void const*, unsigned long, char const*) const [0x14a8e] in static_memory_cuda_tests
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&) [0x14bbe] in static_memory_cuda_tests
+=========         Host Frame: main [0x125ce] in static_memory_cuda_tests
+========= 
+========= Host API memory access error at host access to 0x7f6e16271500 of size 9728 bytes
+=========     Uninitialized access at 0x7f6e16271ac0 on access by cudaMemcpy source
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&)::{lambda(void const*, unsigned long, char const*)#1}::operator()(void const*, unsigned long, char const*) const [0x14a8e] in static_memory_cuda_tests
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&) [0x14bbe] in static_memory_cuda_tests
+=========         Host Frame: main [0x125ce] in static_memory_cuda_tests
+========= 
+========= Host API memory access error at host access to 0x7f6e16271500 of size 9728 bytes
+=========     Uninitialized access at 0x7f6e16271ae0 on access by cudaMemcpy source
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&)::{lambda(void const*, unsigned long, char const*)#1}::operator()(void const*, unsigned long, char const*) const [0x14a8e] in static_memory_cuda_tests
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&) [0x14bbe] in static_memory_cuda_tests
+=========         Host Frame: main [0x125ce] in static_memory_cuda_tests
+========= 
+========= Host API memory access error at host access to 0x7f6e16271500 of size 9728 bytes
+=========     Uninitialized access at 0x7f6e16271b00 on access by cudaMemcpy source
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&)::{lambda(void const*, unsigned long, char const*)#1}::operator()(void const*, unsigned long, char const*) const [0x14a8e] in static_memory_cuda_tests
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&) [0x14bbe] in static_memory_cuda_tests
+=========         Host Frame: main [0x125ce] in static_memory_cuda_tests
+========= 
+========= Host API memory access error at host access to 0x7f6e16271500 of size 9728 bytes
+=========     Uninitialized access at 0x7f6e16271b20 on access by cudaMemcpy source
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&)::{lambda(void const*, unsigned long, char const*)#1}::operator()(void const*, unsigned long, char const*) const [0x14a8e] in static_memory_cuda_tests
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&) [0x14bbe] in static_memory_cuda_tests
+=========         Host Frame: main [0x125ce] in static_memory_cuda_tests
+========= 
+========= Host API memory access error at host access to 0x7f6e16271500 of size 9728 bytes
+=========     Uninitialized access at 0x7f6e16271b40 on access by cudaMemcpy source
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&)::{lambda(void const*, unsigned long, char const*)#1}::operator()(void const*, unsigned long, char const*) const [0x14a8e] in static_memory_cuda_tests
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&) [0x14bbe] in static_memory_cuda_tests
+=========         Host Frame: main [0x125ce] in static_memory_cuda_tests
+========= 
+========= Host API memory access error at host access to 0x7f6e16271500 of size 9728 bytes
+=========     Uninitialized access at 0x7f6e16271b60 on access by cudaMemcpy source
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&)::{lambda(void const*, unsigned long, char const*)#1}::operator()(void const*, unsigned long, char const*) const [0x14a8e] in static_memory_cuda_tests
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&) [0x14bbe] in static_memory_cuda_tests
+=========         Host Frame: main [0x125ce] in static_memory_cuda_tests
+========= 
+========= Host API memory access error at host access to 0x7f6e16271500 of size 9728 bytes
+=========     Uninitialized access at 0x7f6e16271b80 on access by cudaMemcpy source
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&)::{lambda(void const*, unsigned long, char const*)#1}::operator()(void const*, unsigned long, char const*) const [0x14a8e] in static_memory_cuda_tests
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&) [0x14bbe] in static_memory_cuda_tests
+=========         Host Frame: main [0x125ce] in static_memory_cuda_tests
+========= 
+========= Host API memory access error at host access to 0x7f6e16271500 of size 9728 bytes
+=========     Uninitialized access at 0x7f6e16271ba0 on access by cudaMemcpy source
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&)::{lambda(void const*, unsigned long, char const*)#1}::operator()(void const*, unsigned long, char const*) const [0x14a8e] in static_memory_cuda_tests
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&) [0x14bbe] in static_memory_cuda_tests
+=========         Host Frame: main [0x125ce] in static_memory_cuda_tests
+========= 
+========= Host API memory access error at host access to 0x7f6e16271500 of size 9728 bytes
+=========     Uninitialized access at 0x7f6e16271bc0 on access by cudaMemcpy source
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&)::{lambda(void const*, unsigned long, char const*)#1}::operator()(void const*, unsigned long, char const*) const [0x14a8e] in static_memory_cuda_tests
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&) [0x14bbe] in static_memory_cuda_tests
+=========         Host Frame: main [0x125ce] in static_memory_cuda_tests
+========= 
+========= Host API memory access error at host access to 0x7f6e16271500 of size 9728 bytes
+=========     Uninitialized access at 0x7f6e16271be0 on access by cudaMemcpy source
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&)::{lambda(void const*, unsigned long, char const*)#1}::operator()(void const*, unsigned long, char const*) const [0x14a8e] in static_memory_cuda_tests
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&) [0x14bbe] in static_memory_cuda_tests
+=========         Host Frame: main [0x125ce] in static_memory_cuda_tests
+========= 
+========= Host API memory access error at host access to 0x7f6e16271500 of size 9728 bytes
+=========     Uninitialized access at 0x7f6e16271c00 on access by cudaMemcpy source
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&)::{lambda(void const*, unsigned long, char const*)#1}::operator()(void const*, unsigned long, char const*) const [0x14a8e] in static_memory_cuda_tests
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&) [0x14bbe] in static_memory_cuda_tests
+=========         Host Frame: main [0x125ce] in static_memory_cuda_tests
+========= 
+========= Host API memory access error at host access to 0x7f6e16271500 of size 9728 bytes
+=========     Uninitialized access at 0x7f6e16271c20 on access by cudaMemcpy source
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&)::{lambda(void const*, unsigned long, char const*)#1}::operator()(void const*, unsigned long, char const*) const [0x14a8e] in static_memory_cuda_tests
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&) [0x14bbe] in static_memory_cuda_tests
+=========         Host Frame: main [0x125ce] in static_memory_cuda_tests
+========= 
+========= Host API memory access error at host access to 0x7f6e16271500 of size 9728 bytes
+=========     Uninitialized access at 0x7f6e16271c40 on access by cudaMemcpy source
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&)::{lambda(void const*, unsigned long, char const*)#1}::operator()(void const*, unsigned long, char const*) const [0x14a8e] in static_memory_cuda_tests
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&) [0x14bbe] in static_memory_cuda_tests
+=========         Host Frame: main [0x125ce] in static_memory_cuda_tests
+========= 
+========= Host API memory access error at host access to 0x7f6e16271500 of size 9728 bytes
+=========     Uninitialized access at 0x7f6e16271c60 on access by cudaMemcpy source
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&)::{lambda(void const*, unsigned long, char const*)#1}::operator()(void const*, unsigned long, char const*) const [0x14a8e] in static_memory_cuda_tests
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&) [0x14bbe] in static_memory_cuda_tests
+=========         Host Frame: main [0x125ce] in static_memory_cuda_tests
+========= 
+========= Host API memory access error at host access to 0x7f6e16271500 of size 9728 bytes
+=========     Uninitialized access at 0x7f6e16271c80 on access by cudaMemcpy source
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&)::{lambda(void const*, unsigned long, char const*)#1}::operator()(void const*, unsigned long, char const*) const [0x14a8e] in static_memory_cuda_tests
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&) [0x14bbe] in static_memory_cuda_tests
+=========         Host Frame: main [0x125ce] in static_memory_cuda_tests
+========= 
+========= Host API memory access error at host access to 0x7f6e16271500 of size 9728 bytes
+=========     Uninitialized access at 0x7f6e16271ca0 on access by cudaMemcpy source
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&)::{lambda(void const*, unsigned long, char const*)#1}::operator()(void const*, unsigned long, char const*) const [0x14a8e] in static_memory_cuda_tests
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&) [0x14bbe] in static_memory_cuda_tests
+=========         Host Frame: main [0x125ce] in static_memory_cuda_tests
+========= 
+========= Host API memory access error at host access to 0x7f6e16271500 of size 9728 bytes
+=========     Uninitialized access at 0x7f6e16271cc0 on access by cudaMemcpy source
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&)::{lambda(void const*, unsigned long, char const*)#1}::operator()(void const*, unsigned long, char const*) const [0x14a8e] in static_memory_cuda_tests
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&) [0x14bbe] in static_memory_cuda_tests
+=========         Host Frame: main [0x125ce] in static_memory_cuda_tests
+========= 
+========= Host API memory access error at host access to 0x7f6e16271500 of size 9728 bytes
+=========     Uninitialized access at 0x7f6e16271ce0 on access by cudaMemcpy source
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&)::{lambda(void const*, unsigned long, char const*)#1}::operator()(void const*, unsigned long, char const*) const [0x14a8e] in static_memory_cuda_tests
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&) [0x14bbe] in static_memory_cuda_tests
+=========         Host Frame: main [0x125ce] in static_memory_cuda_tests
+========= 
+========= Host API memory access error at host access to 0x7f6e16271500 of size 9728 bytes
+=========     Uninitialized access at 0x7f6e16271d00 on access by cudaMemcpy source
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&)::{lambda(void const*, unsigned long, char const*)#1}::operator()(void const*, unsigned long, char const*) const [0x14a8e] in static_memory_cuda_tests
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&) [0x14bbe] in static_memory_cuda_tests
+=========         Host Frame: main [0x125ce] in static_memory_cuda_tests
+========= 
+========= Host API memory access error at host access to 0x7f6e16271500 of size 9728 bytes
+=========     Uninitialized access at 0x7f6e16271d20 on access by cudaMemcpy source
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&)::{lambda(void const*, unsigned long, char const*)#1}::operator()(void const*, unsigned long, char const*) const [0x14a8e] in static_memory_cuda_tests
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&) [0x14bbe] in static_memory_cuda_tests
+=========         Host Frame: main [0x125ce] in static_memory_cuda_tests
+========= 
+========= Host API memory access error at host access to 0x7f6e16271500 of size 9728 bytes
+=========     Uninitialized access at 0x7f6e16271d40 on access by cudaMemcpy source
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&)::{lambda(void const*, unsigned long, char const*)#1}::operator()(void const*, unsigned long, char const*) const [0x14a8e] in static_memory_cuda_tests
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&) [0x14bbe] in static_memory_cuda_tests
+=========         Host Frame: main [0x125ce] in static_memory_cuda_tests
+========= 
+========= Host API memory access error at host access to 0x7f6e16271500 of size 9728 bytes
+=========     Uninitialized access at 0x7f6e16271d60 on access by cudaMemcpy source
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&)::{lambda(void const*, unsigned long, char const*)#1}::operator()(void const*, unsigned long, char const*) const [0x14a8e] in static_memory_cuda_tests
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&) [0x14bbe] in static_memory_cuda_tests
+=========         Host Frame: main [0x125ce] in static_memory_cuda_tests
+========= 
+========= Host API memory access error at host access to 0x7f6e16271500 of size 9728 bytes
+=========     Uninitialized access at 0x7f6e16271d80 on access by cudaMemcpy source
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&)::{lambda(void const*, unsigned long, char const*)#1}::operator()(void const*, unsigned long, char const*) const [0x14a8e] in static_memory_cuda_tests
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&) [0x14bbe] in static_memory_cuda_tests
+=========         Host Frame: main [0x125ce] in static_memory_cuda_tests
+========= 
+========= Host API memory access error at host access to 0x7f6e16271500 of size 9728 bytes
+=========     Uninitialized access at 0x7f6e16271da0 on access by cudaMemcpy source
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&)::{lambda(void const*, unsigned long, char const*)#1}::operator()(void const*, unsigned long, char const*) const [0x14a8e] in static_memory_cuda_tests
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&) [0x14bbe] in static_memory_cuda_tests
+=========         Host Frame: main [0x125ce] in static_memory_cuda_tests
+========= 
+========= Host API memory access error at host access to 0x7f6e16271500 of size 9728 bytes
+=========     Uninitialized access at 0x7f6e16271dc0 on access by cudaMemcpy source
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&)::{lambda(void const*, unsigned long, char const*)#1}::operator()(void const*, unsigned long, char const*) const [0x14a8e] in static_memory_cuda_tests
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&) [0x14bbe] in static_memory_cuda_tests
+=========         Host Frame: main [0x125ce] in static_memory_cuda_tests
+========= 
+========= Host API memory access error at host access to 0x7f6e16271500 of size 9728 bytes
+=========     Uninitialized access at 0x7f6e16271de0 on access by cudaMemcpy source
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&)::{lambda(void const*, unsigned long, char const*)#1}::operator()(void const*, unsigned long, char const*) const [0x14a8e] in static_memory_cuda_tests
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&) [0x14bbe] in static_memory_cuda_tests
+=========         Host Frame: main [0x125ce] in static_memory_cuda_tests
+========= 
+========= Host API memory access error at host access to 0x7f6e16271500 of size 9728 bytes
+=========     Uninitialized access at 0x7f6e16271e00 on access by cudaMemcpy source
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&)::{lambda(void const*, unsigned long, char const*)#1}::operator()(void const*, unsigned long, char const*) const [0x14a8e] in static_memory_cuda_tests
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&) [0x14bbe] in static_memory_cuda_tests
+=========         Host Frame: main [0x125ce] in static_memory_cuda_tests
+========= 
+========= Host API memory access error at host access to 0x7f6e16271500 of size 9728 bytes
+=========     Uninitialized access at 0x7f6e16271e20 on access by cudaMemcpy source
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&)::{lambda(void const*, unsigned long, char const*)#1}::operator()(void const*, unsigned long, char const*) const [0x14a8e] in static_memory_cuda_tests
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&) [0x14bbe] in static_memory_cuda_tests
+=========         Host Frame: main [0x125ce] in static_memory_cuda_tests
+========= 
+========= Host API memory access error at host access to 0x7f6e16271500 of size 9728 bytes
+=========     Uninitialized access at 0x7f6e16271e40 on access by cudaMemcpy source
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&)::{lambda(void const*, unsigned long, char const*)#1}::operator()(void const*, unsigned long, char const*) const [0x14a8e] in static_memory_cuda_tests
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&) [0x14bbe] in static_memory_cuda_tests
+=========         Host Frame: main [0x125ce] in static_memory_cuda_tests
+========= 
+========= Host API memory access error at host access to 0x7f6e16271500 of size 9728 bytes
+=========     Uninitialized access at 0x7f6e16271e60 on access by cudaMemcpy source
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&)::{lambda(void const*, unsigned long, char const*)#1}::operator()(void const*, unsigned long, char const*) const [0x14a8e] in static_memory_cuda_tests
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&) [0x14bbe] in static_memory_cuda_tests
+=========         Host Frame: main [0x125ce] in static_memory_cuda_tests
+========= 
+========= Host API memory access error at host access to 0x7f6e16271500 of size 9728 bytes
+=========     Uninitialized access at 0x7f6e16271e80 on access by cudaMemcpy source
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&)::{lambda(void const*, unsigned long, char const*)#1}::operator()(void const*, unsigned long, char const*) const [0x14a8e] in static_memory_cuda_tests
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&) [0x14bbe] in static_memory_cuda_tests
+=========         Host Frame: main [0x125ce] in static_memory_cuda_tests
+========= 
+========= Host API memory access error at host access to 0x7f6e16271500 of size 9728 bytes
+=========     Uninitialized access at 0x7f6e16271ea0 on access by cudaMemcpy source
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&)::{lambda(void const*, unsigned long, char const*)#1}::operator()(void const*, unsigned long, char const*) const [0x14a8e] in static_memory_cuda_tests
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&) [0x14bbe] in static_memory_cuda_tests
+=========         Host Frame: main [0x125ce] in static_memory_cuda_tests
+========= 
+========= Host API memory access error at host access to 0x7f6e16271500 of size 9728 bytes
+=========     Uninitialized access at 0x7f6e16271ec0 on access by cudaMemcpy source
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&)::{lambda(void const*, unsigned long, char const*)#1}::operator()(void const*, unsigned long, char const*) const [0x14a8e] in static_memory_cuda_tests
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&) [0x14bbe] in static_memory_cuda_tests
+=========         Host Frame: main [0x125ce] in static_memory_cuda_tests
+========= 
+========= Host API memory access error at host access to 0x7f6e16271500 of size 9728 bytes
+=========     Uninitialized access at 0x7f6e16271ee0 on access by cudaMemcpy source
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&)::{lambda(void const*, unsigned long, char const*)#1}::operator()(void const*, unsigned long, char const*) const [0x14a8e] in static_memory_cuda_tests
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&) [0x14bbe] in static_memory_cuda_tests
+=========         Host Frame: main [0x125ce] in static_memory_cuda_tests
+========= 
+========= Host API memory access error at host access to 0x7f6e16271500 of size 9728 bytes
+=========     Uninitialized access at 0x7f6e16271f00 on access by cudaMemcpy source
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&)::{lambda(void const*, unsigned long, char const*)#1}::operator()(void const*, unsigned long, char const*) const [0x14a8e] in static_memory_cuda_tests
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&) [0x14bbe] in static_memory_cuda_tests
+=========         Host Frame: main [0x125ce] in static_memory_cuda_tests
+========= 
+========= Host API memory access error at host access to 0x7f6e16271500 of size 9728 bytes
+=========     Uninitialized access at 0x7f6e16271f20 on access by cudaMemcpy source
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&)::{lambda(void const*, unsigned long, char const*)#1}::operator()(void const*, unsigned long, char const*) const [0x14a8e] in static_memory_cuda_tests
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&) [0x14bbe] in static_memory_cuda_tests
+=========         Host Frame: main [0x125ce] in static_memory_cuda_tests
+========= 
+========= Host API memory access error at host access to 0x7f6e16271500 of size 9728 bytes
+=========     Uninitialized access at 0x7f6e16271f40 on access by cudaMemcpy source
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&)::{lambda(void const*, unsigned long, char const*)#1}::operator()(void const*, unsigned long, char const*) const [0x14a8e] in static_memory_cuda_tests
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&) [0x14bbe] in static_memory_cuda_tests
+=========         Host Frame: main [0x125ce] in static_memory_cuda_tests
+========= 
+========= Host API memory access error at host access to 0x7f6e16271500 of size 9728 bytes
+=========     Uninitialized access at 0x7f6e16271f60 on access by cudaMemcpy source
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&)::{lambda(void const*, unsigned long, char const*)#1}::operator()(void const*, unsigned long, char const*) const [0x14a8e] in static_memory_cuda_tests
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&) [0x14bbe] in static_memory_cuda_tests
+=========         Host Frame: main [0x125ce] in static_memory_cuda_tests
+========= 
+========= Host API memory access error at host access to 0x7f6e16271500 of size 9728 bytes
+=========     Uninitialized access at 0x7f6e16271f80 on access by cudaMemcpy source
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&)::{lambda(void const*, unsigned long, char const*)#1}::operator()(void const*, unsigned long, char const*) const [0x14a8e] in static_memory_cuda_tests
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&) [0x14bbe] in static_memory_cuda_tests
+=========         Host Frame: main [0x125ce] in static_memory_cuda_tests
+========= 
+========= Host API memory access error at host access to 0x7f6e16271500 of size 9728 bytes
+=========     Uninitialized access at 0x7f6e16271fa0 on access by cudaMemcpy source
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&)::{lambda(void const*, unsigned long, char const*)#1}::operator()(void const*, unsigned long, char const*) const [0x14a8e] in static_memory_cuda_tests
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&) [0x14bbe] in static_memory_cuda_tests
+=========         Host Frame: main [0x125ce] in static_memory_cuda_tests
+========= 
+========= Host API memory access error at host access to 0x7f6e16271500 of size 9728 bytes
+=========     Uninitialized access at 0x7f6e16271fc0 on access by cudaMemcpy source
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&)::{lambda(void const*, unsigned long, char const*)#1}::operator()(void const*, unsigned long, char const*) const [0x14a8e] in static_memory_cuda_tests
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&) [0x14bbe] in static_memory_cuda_tests
+=========         Host Frame: main [0x125ce] in static_memory_cuda_tests
+========= 
+========= Host API memory access error at host access to 0x7f6e16271500 of size 9728 bytes
+=========     Uninitialized access at 0x7f6e16271fe0 on access by cudaMemcpy source
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&)::{lambda(void const*, unsigned long, char const*)#1}::operator()(void const*, unsigned long, char const*) const [0x14a8e] in static_memory_cuda_tests
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&) [0x14bbe] in static_memory_cuda_tests
+=========         Host Frame: main [0x125ce] in static_memory_cuda_tests
+========= 
+========= Host API memory access error at host access to 0x7f6e16271500 of size 9728 bytes
+=========     Uninitialized access at 0x7f6e16272000 on access by cudaMemcpy source
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&)::{lambda(void const*, unsigned long, char const*)#1}::operator()(void const*, unsigned long, char const*) const [0x14a8e] in static_memory_cuda_tests
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&) [0x14bbe] in static_memory_cuda_tests
+=========         Host Frame: main [0x125ce] in static_memory_cuda_tests
+========= 
+========= Host API memory access error at host access to 0x7f6e16271500 of size 9728 bytes
+=========     Uninitialized access at 0x7f6e16272020 on access by cudaMemcpy source
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&)::{lambda(void const*, unsigned long, char const*)#1}::operator()(void const*, unsigned long, char const*) const [0x14a8e] in static_memory_cuda_tests
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&) [0x14bbe] in static_memory_cuda_tests
+=========         Host Frame: main [0x125ce] in static_memory_cuda_tests
+========= 
+========= Host API memory access error at host access to 0x7f6e16271500 of size 9728 bytes
+=========     Uninitialized access at 0x7f6e16272040 on access by cudaMemcpy source
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&)::{lambda(void const*, unsigned long, char const*)#1}::operator()(void const*, unsigned long, char const*) const [0x14a8e] in static_memory_cuda_tests
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&) [0x14bbe] in static_memory_cuda_tests
+=========         Host Frame: main [0x125ce] in static_memory_cuda_tests
+========= 
+========= Host API memory access error at host access to 0x7f6e16271500 of size 9728 bytes
+=========     Uninitialized access at 0x7f6e16272060 on access by cudaMemcpy source
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&)::{lambda(void const*, unsigned long, char const*)#1}::operator()(void const*, unsigned long, char const*) const [0x14a8e] in static_memory_cuda_tests
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&) [0x14bbe] in static_memory_cuda_tests
+=========         Host Frame: main [0x125ce] in static_memory_cuda_tests
+========= 
+========= Host API memory access error at host access to 0x7f6e16271500 of size 9728 bytes
+=========     Uninitialized access at 0x7f6e16272080 on access by cudaMemcpy source
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&)::{lambda(void const*, unsigned long, char const*)#1}::operator()(void const*, unsigned long, char const*) const [0x14a8e] in static_memory_cuda_tests
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&) [0x14bbe] in static_memory_cuda_tests
+=========         Host Frame: main [0x125ce] in static_memory_cuda_tests
+========= 
+========= Host API memory access error at host access to 0x7f6e16271500 of size 9728 bytes
+=========     Uninitialized access at 0x7f6e162720a0 on access by cudaMemcpy source
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&)::{lambda(void const*, unsigned long, char const*)#1}::operator()(void const*, unsigned long, char const*) const [0x14a8e] in static_memory_cuda_tests
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&) [0x14bbe] in static_memory_cuda_tests
+=========         Host Frame: main [0x125ce] in static_memory_cuda_tests
+========= 
+========= Host API memory access error at host access to 0x7f6e16271500 of size 9728 bytes
+=========     Uninitialized access at 0x7f6e162720c0 on access by cudaMemcpy source
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&)::{lambda(void const*, unsigned long, char const*)#1}::operator()(void const*, unsigned long, char const*) const [0x14a8e] in static_memory_cuda_tests
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&) [0x14bbe] in static_memory_cuda_tests
+=========         Host Frame: main [0x125ce] in static_memory_cuda_tests
+========= 
+========= Host API memory access error at host access to 0x7f6e16271500 of size 9728 bytes
+=========     Uninitialized access at 0x7f6e162720e0 on access by cudaMemcpy source
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&)::{lambda(void const*, unsigned long, char const*)#1}::operator()(void const*, unsigned long, char const*) const [0x14a8e] in static_memory_cuda_tests
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&) [0x14bbe] in static_memory_cuda_tests
+=========         Host Frame: main [0x125ce] in static_memory_cuda_tests
+========= 
+========= Host API memory access error at host access to 0x7f6e16271500 of size 9728 bytes
+=========     Uninitialized access at 0x7f6e16272100 on access by cudaMemcpy source
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&)::{lambda(void const*, unsigned long, char const*)#1}::operator()(void const*, unsigned long, char const*) const [0x14a8e] in static_memory_cuda_tests
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&) [0x14bbe] in static_memory_cuda_tests
+=========         Host Frame: main [0x125ce] in static_memory_cuda_tests
+========= 
+========= Host API memory access error at host access to 0x7f6e16271500 of size 9728 bytes
+=========     Uninitialized access at 0x7f6e16272120 on access by cudaMemcpy source
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&)::{lambda(void const*, unsigned long, char const*)#1}::operator()(void const*, unsigned long, char const*) const [0x14a8e] in static_memory_cuda_tests
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&) [0x14bbe] in static_memory_cuda_tests
+=========         Host Frame: main [0x125ce] in static_memory_cuda_tests
+========= 
+========= Host API memory access error at host access to 0x7f6e16271500 of size 9728 bytes
+=========     Uninitialized access at 0x7f6e16272140 on access by cudaMemcpy source
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&)::{lambda(void const*, unsigned long, char const*)#1}::operator()(void const*, unsigned long, char const*) const [0x14a8e] in static_memory_cuda_tests
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&) [0x14bbe] in static_memory_cuda_tests
+=========         Host Frame: main [0x125ce] in static_memory_cuda_tests
+========= 
+========= Host API memory access error at host access to 0x7f6e16271500 of size 9728 bytes
+=========     Uninitialized access at 0x7f6e16272160 on access by cudaMemcpy source
+=========     Saved host backtrace up to driver entry point at error
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&)::{lambda(void const*, unsigned long, char const*)#1}::operator()(void const*, unsigned long, char const*) const [0x14a8e] in static_memory_cuda_tests
+=========         Host Frame: (anonymous namespace)::require_cub_scratch_initialized(beam::StaticMemoryPlan const&, beam::StaticDeviceMemory const&) [0x14bbe] in static_memory_cuda_tests
+=========         Host Frame: main [0x125ce] in static_memory_cuda_tests
+========= 
+initialized_cub_scratch stream3 bytes=9728
+initialized_cub_scratch stream4 bytes=13312
+initialized_cub_scratch final_union bytes=12800
+initialized_cub_scratch stream3 bytes=9728
+initialized_cub_scratch stream4 bytes=13312
+initialized_cub_scratch final_union bytes=12800
+initialized_cub_scratch final_materialize bytes=256
+static_memory_cuda_tests=pass
+========= ERROR SUMMARY: 2248 errors
+========= ERROR SUMMARY: 2148 errors were not printed. Use --print-limit option to adjust the number of printed errors

@@ -1,0 +1,28 @@
+Sat Nov  7 09:24:03 UTC 2026
+name, uuid, memory.total [MiB], driver_version
+NVIDIA GeForce RTX 3090, GPU-d0243f7f-84b0-04b3-f6cc-c5a3c9abdc4b, 24576 MiB, 610.57.04
+NVIDIA GeForce RTX 3090, GPU-5f94c113-fca4-6659-914b-7f461bac2096, 24576 MiB, 610.57.04
+	[4mGPU0	GPU1	CPU Affinity	NUMA Affinity	GPU NUMA ID[0m
+GPU0	 X 	SYS	0-17,36-53	0		N/A
+GPU1	SYS	 X 	18-35,54-71	1		N/A
+
+Legend:
+
+  X    = Self
+  SYS  = Connection traversing PCIe as well as the SMP interconnect between NUMA nodes (e.g., QPI/UPI)
+  NODE = Connection traversing PCIe as well as the interconnect between PCIe Host Bridges within a NUMA node
+  PHB  = Connection traversing PCIe as well as a PCIe Host Bridge (typically the CPU)
+  PXB  = Connection traversing multiple PCIe bridges (without traversing the PCIe Host Bridge)
+  PIX  = Connection traversing at most a single PCIe bridge
+  NV#  = Connection traversing a bonded set of # NVLinks
+nvcc: NVIDIA (R) Cuda compiler driver
+Copyright (c) 2005-2025 NVIDIA Corporation
+Built on Fri_Feb_21_20:23:50_PST_2025
+Cuda compilation tools, release 12.8, V12.8.93
+Build cuda_12.8.r12.8/compiler.35583870_0
+2.9.0+cu128 12.8
+/opt/conda/lib/python3.11/site-packages/torch/share/cmake
+Filesystem      Size  Used Avail Use% Mounted on
+overlay         100G  792K  100G   1% /
+rustc 1.99.1 (58cf8f9c3 2026-10-13)
+cargo 1.99.1 (5f94df478 2026-08-27)

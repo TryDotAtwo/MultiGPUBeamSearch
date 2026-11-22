@@ -1,0 +1,27 @@
+[  6%] Built target beam_native_transport
+[ 40%] Built target beam_core
+[ 40%] Building CUDA object CMakeFiles/beam_cuda.dir/cuda/stream1.cu.o
+[ 46%] Building CUDA object CMakeFiles/beam_cuda.dir/cuda/stream1_transformer.cu.o
+[ 46%] Building CUDA object CMakeFiles/beam_cuda.dir/cuda/stream1_blend_readout.cu.o
+[ 53%] Building CUDA object CMakeFiles/beam_cuda.dir/cuda/stream1_ensemble_readout.cu.o
+[ 53%] Building CUDA object CMakeFiles/beam_cuda.dir/cuda/stream1_gnn_projection.cu.o
+[ 60%] Building CUDA object CMakeFiles/beam_cuda.dir/cuda/stream1_transformer_fmha.cu.o
+[ 60%] Building CUDA object CMakeFiles/beam_cuda.dir/cuda/stream2.cu.o
+[ 66%] Building CUDA object CMakeFiles/beam_cuda.dir/cuda/stream3.cu.o
+/workspace/beam-results/native-library/distribution3/check/checkout/installed/multigpubeamsearch/_native_source/cuda/stream3.cu(132): warning #177-D: function "beam::<unnamed>::stream3_debug_store_count_kernel" was declared but never referenced
+  __attribute__((global)) void stream3_debug_store_count_kernel(
+                               ^
+
+Remark: The warnings can be suppressed with "-diag-suppress <warning-number>"
+
+[ 73%] Building CUDA object CMakeFiles/beam_cuda.dir/cuda/stream4.cu.o
+[ 73%] Building CUDA object CMakeFiles/beam_cuda.dir/cuda/stream5.cu.o
+[ 80%] Building CUDA object CMakeFiles/beam_cuda.dir/cuda/threshold.cu.o
+[ 80%] Building CUDA object CMakeFiles/beam_cuda.dir/cuda/final_materialize.cu.o
+[ 86%] Building CUDA object CMakeFiles/beam_cuda.dir/cuda/dispatcher.cu.o
+[ 86%] Building CUDA object CMakeFiles/beam_cuda.dir/cuda/static_memory.cu.o
+[ 93%] Building CXX object CMakeFiles/beam_cuda.dir/cuda/runtime_config.cpp.o
+[ 93%] Linking CXX static library libbeam_cuda.a
+[ 93%] Built target beam_cuda
+[ 93%] Linking CXX shared library libbeam_native.so
+[100%] Built target beam_native

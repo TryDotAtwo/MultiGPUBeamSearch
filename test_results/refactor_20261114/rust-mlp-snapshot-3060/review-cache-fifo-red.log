@@ -1,0 +1,35 @@
+   Compiling beam-runtime v0.1.0 (/workspace/beam-work/rust/beam-runtime)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.71s
+     Running tests/mlp_snapshot.rs (/workspace/target/debug/build/beam-runtime/9e0bae8e9f249675/out/mlp_snapshot-9e0bae8e9f249675)
+
+running 8 tests
+test rejects_invalid_or_ambiguous_file_names_and_hashes ... ok
+test cache_identity_need_not_exist_when_the_run_directory_is_elsewhere ... FAILED
+test cancellation_does_not_publish_or_poison_later_attempts ... ok
+test rejects_bad_hash_before_publishing_and_preserves_existing_target ... ok
+test rejects_changed_source_and_retained_snapshot ... ok
+test session_path_defers_retained_validation_until_the_launch_boundary ... ok
+test creates_reuses_and_refreshes_compatible_snapshots ... ok
+test fifo_tensor_cannot_block_snapshot_or_cancellation ... FAILED
+
+failures:
+
+---- cache_identity_need_not_exist_when_the_run_directory_is_elsewhere stdout ----
+
+thread 'cache_identity_need_not_exist_when_the_run_directory_is_elsewhere' (2884) panicked at rust/beam-runtime/tests/mlp_snapshot.rs:152:71:
+called `Result::unwrap()` on an `Err` value: Io(Os { code: 2, kind: NotFound, message: "No such file or directory" })
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- fifo_tensor_cannot_block_snapshot_or_cancellation stdout ----
+
+thread 'fifo_tensor_cannot_block_snapshot_or_cancellation' (2887) panicked at rust/beam-runtime/tests/mlp_snapshot.rs:185:10:
+snapshot was blocked opening a FIFO despite cancellation: Timeout
+
+
+failures:
+    cache_identity_need_not_exist_when_the_run_directory_is_elsewhere
+    fifo_tensor_cannot_block_snapshot_or_cancellation
+
+test result: FAILED. 6 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.05s
+
+error: test failed, to rerun pass `-p beam-runtime --test mlp_snapshot`

@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "shape": {
+    "state_len": 96,
+    "storage_len": 112,
+    "move_count": 24,
+    "alignment": 16
+  },
+  "backend": "mlp",
+  "cuda_architectures": [
+    86
+  ],
+  "source_digest": "555a6d3f2bec2b94f948b4a8d28524630edf0e4da7e86d05619747b4acc4300d",
+  "cutlass_digest": "0adcc47dbf4082dc2acbf0bd07545aace5a63dcab8926f919a2e4b236d314e56",
+  "toolchain": {
+    "cmake": "/opt/conda/bin/cmake\ncmake version 4.1.0\n\nCMake suite maintained and supported by Kitware (kitware.com/cmake).\n",
+    "nvcc": "/usr/local/cuda-12.8/bin/nvcc\nnvcc: NVIDIA (R) Cuda compiler driver\nCopyright (c) 2005-2025 NVIDIA Corporation\nBuilt on Fri_Feb_21_20:23:50_PST_2025\nCuda compilation tools, release 12.8, V12.8.93\nBuild cuda_12.8.r12.8/compiler.35583870_0\n",
+    "cxx": "/usr/bin/x86_64-linux-gnu-g++-11\nx86_64-linux-gnu-g++-11 (Ubuntu 11.4.0-1ubuntu1~22.04) 11.4.0\nCopyright (C) 2021 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
+  },
+  "target": "production_runner_libtorch_stream1",
+  "nccl": {
+    "include_dir": "/opt/conda/lib/python3.11/site-packages/nvidia/nccl/include",
+    "library": "/opt/conda/lib/python3.11/site-packages/nvidia/nccl/lib/libnccl.so.2",
+    "header_sha256": "4b240a1fa79858ca8cdffcf5c2fc40aeaca8b3eaec61728213715f0902aba3a8",
+    "library_sha256": "1d9c10322efacde695cf640db1f29fc1586c929f1087f0e1202d2d5e70fb7168"
+  },
+  "build_mode": "release-debug-logs-v1",
+  "inference_backend": "libtorch",
+  "calibration_binary_name": null,
+  "plan_calibration_protocol": "json-session-v1",
+  "frontier_calibration_protocol": "natural-growth-v1",
+  "component_calibration_protocol": "exact-capacity-v1",
+  "torch": {
+    "version": "2.9.0+cu128",
+    "cuda": "12.8",
+    "cxx11_abi": true,
+    "cmake_prefix": "/opt/conda/lib/python3.11/site-packages/torch/share/cmake"
+  },
+  "build_key": "349789a449b8d543e00d858ad27d5d545003e224a3b6995bccd074c8863b56cc",
+  "binary_sha256": "57f47170fce0118fd9307115434ece0d627c2a1b191c9e571b3f56cd6453a57e"
+}

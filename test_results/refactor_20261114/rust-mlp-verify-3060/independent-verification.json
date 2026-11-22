@@ -1,0 +1,34 @@
+{
+  "verification": "PASS",
+  "git_baseline_files": 493,
+  "unchanged_checkout_files": 481,
+  "post_test_docs_excluded": [
+    "ARCHITECTURE_NEED.md",
+    "memory/CHANGELOG.md"
+  ],
+  "sessions": 10,
+  "ranks": 20,
+  "geometry_keys_per_rank": 45,
+  "admission_free_ranges": {
+    "0": [
+      12175802368,
+      12175802368
+    ],
+    "1": [
+      12175802368,
+      12175802368
+    ]
+  },
+  "median_seconds": {
+    "python_verify": 1.4007919300347567,
+    "rust_verify": 1.345925138972234
+  },
+  "paired_changes": [
+    -0.051702661936444794,
+    -0.021291360190094366,
+    -0.07168489606668871,
+    -0.03589735519478987,
+    -0.033558443614304934
+  ],
+  "median_paired_change": -0.03589735519478987
+}

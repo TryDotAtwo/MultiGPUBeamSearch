@@ -1,0 +1,39 @@
+PUBLIC_RUST_CASE cutlass world=1 engine=python first
+PUBLIC_RUST_CASE cutlass world=1 engine=python repeat
+PUBLIC_RUST_CASE cutlass world=1 engine=python unsolved
+PUBLIC_RUST_CASE cutlass world=1 engine=python model-change
+PUBLIC_RUST_CASE cutlass world=1 engine=python beam-change
+PUBLIC_RUST_CASE cutlass world=1 engine=python collect
+Traceback (most recent call last):
+  File "/workspace/beam-work/tests/public_rust_session_gpu.py", line 103, in <module>
+    main()
+  File "/workspace/beam-work/tests/public_rust_session_gpu.py", line 67, in main
+    result = session.beam_search(graph, native_options=selected,
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/beam-work/integrations/cayleypy_native/multigpubeamsearch/persistent.py", line 86, in beam_search
+    return beam_search(graph,**kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/beam-work/integrations/cayleypy_native/multigpubeamsearch/dispatch.py", line 282, in beam_search
+    return _search(original, graph, kwargs, options, backend)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/beam-work/integrations/cayleypy_native/multigpubeamsearch/dispatch.py", line 241, in _search
+    outcome = run_native(contract, model, options, params["beam_width"], params["max_steps"], run_dir, devices,
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/beam-work/integrations/cayleypy_native/multigpubeamsearch/backend.py", line 493, in run_native
+    return session.run(_run_native_once,contract,model,options,beam_width,max_steps,run_dir,devices,runtime=runtime)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/beam-work/integrations/cayleypy_native/multigpubeamsearch/persistent.py", line 160, in run
+    outcome=execute(contract,model,options,beam_width,max_steps,run_dir,devices,runtime=runtime)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/beam-work/integrations/cayleypy_native/multigpubeamsearch/backend.py", line 736, in _run_native_once
+    elapsed=resident_session.launch(args[:4],contract=contract,run_dir=run_dir,env=env,
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/beam-work/integrations/cayleypy_native/multigpubeamsearch/persistent.py", line 126, in launch
+    self._workers = RustResidentWorkers(command, contract=contract, model=model,
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/beam-work/integrations/cayleypy_native/multigpubeamsearch/rust_resident.py", line 21, in __init__
+    library, receipt = ensure_native_library(contract, model, options, runtime.architectures,
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/beam-work/integrations/cayleypy_native/multigpubeamsearch/native_library.py", line 88, in ensure_native_library
+    raise NativeUnavailable('native runner has no managed CMake build directory')
+multigpubeamsearch.errors.NativeUnavailable: native runner has no managed CMake build directory

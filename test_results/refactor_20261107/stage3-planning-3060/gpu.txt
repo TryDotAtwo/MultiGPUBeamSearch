@@ -1,0 +1,17 @@
+Traceback (most recent call last):
+  File "/workspace/beam-work/tests/native_planning_gpu.py", line 84, in <module>
+    main()
+  File "/workspace/beam-work/tests/native_planning_gpu.py", line 50, in main
+    with NativePlanSession(args.runner.resolve(), env, world, root/f'python-{world}', deadline=time.monotonic()+120) as owner:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/beam-work/integrations/cayleypy_native/multigpubeamsearch/plan_session.py", line 21, in __init__
+    self.sessions.append(InferenceSession(
+                         ^^^^^^^^^^^^^^^^^
+  File "/workspace/beam-work/integrations/cayleypy_native/multigpubeamsearch/calibration_session.py", line 24, in __init__
+    self.process = subprocess.Popen(command, env=environment, stdin=subprocess.PIPE,
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/conda/lib/python3.11/subprocess.py", line 1026, in __init__
+    self._execute_child(args, executable, preexec_fn, close_fds,
+  File "/opt/conda/lib/python3.11/subprocess.py", line 1955, in _execute_child
+    raise child_exception_type(errno_num, err_msg, err_filename)
+FileNotFoundError: [Errno 2] No such file or directory: '/workspace/build-work/beam_production_runner'

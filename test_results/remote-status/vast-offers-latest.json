@@ -1,0 +1,14 @@
+{
+  "checked_at_utc": "2026-11-21T07:08:36.012923+00:00",
+  "instance": {
+    "actual_status": "exited",
+    "dph_total": 0.17555555555555558,
+    "gpu_count": 2,
+    "gpu_name": "RTX 3060",
+    "instance_id": 61080396,
+    "intended_status": "stopped",
+    "storage_cost": 1.0
+  },
+  "state_changed": false,
+  "verified_rentable_rtx_3060_offers": []
+}

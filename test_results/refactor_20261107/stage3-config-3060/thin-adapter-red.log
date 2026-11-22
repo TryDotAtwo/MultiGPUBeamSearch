@@ -1,0 +1,15 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+____ test_thin_adapter_passes_validated_model_and_options_to_one_rust_call _____
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7fd611c2af50>
+tmp_path = PosixPath('/tmp/pytest-of-root/pytest-6/test_thin_adapter_passes_valid0')
+
+    def test_thin_adapter_passes_validated_model_and_options_to_one_rust_call(monkeypatch,tmp_path):
+>       from multigpubeamsearch import rust_control
+E       ImportError: cannot import name 'rust_control' from 'multigpubeamsearch' (/workspace/beam-work/integrations/cayleypy_native/multigpubeamsearch/__init__.py)
+
+integrations/cayleypy_native/tests/test_rust_control.py:6: ImportError
+=========================== short test summary info ============================
+FAILED integrations/cayleypy_native/tests/test_rust_control.py::test_thin_adapter_passes_validated_model_and_options_to_one_rust_call
+1 failed in 0.40s

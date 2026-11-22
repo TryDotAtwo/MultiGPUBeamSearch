@@ -1,0 +1,15 @@
+   Compiling beam-runtime v0.1.0 (/workspace/beam-work/rust/beam-runtime)
+error[E0599]: no method named `prepare_for_session_with_cancel` found for struct `MlpSnapshotStore` in the current scope
+   --> rust/beam-runtime/tests/mlp_snapshot.rs:102:26
+    |
+102 |     let deferred = store.prepare_for_session_with_cancel(&input, false, &cancel).unwrap();
+    |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: there is a method `prepare_with_cancel` with a similar name
+    |
+102 -     let deferred = store.prepare_for_session_with_cancel(&input, false, &cancel).unwrap();
+102 +     let deferred = store.prepare_with_cancel(&input, false, &cancel).unwrap();
+    |
+
+For more information about this error, try `rustc --explain E0599`.
+error: could not compile `beam-runtime` (test "mlp_snapshot") due to 1 previous error

@@ -1,0 +1,9 @@
+Processing /workspace/beam-results/native-auto/distribution/check/sdist/multigpubeamsearch-0.1.0.dev1.tar.gz
+  Preparing metadata (pyproject.toml): started
+  Preparing metadata (pyproject.toml): finished with status 'done'
+Building wheels for collected packages: multigpubeamsearch
+  Building wheel for multigpubeamsearch (pyproject.toml): started
+  Building wheel for multigpubeamsearch (pyproject.toml): finished with status 'done'
+  Created wheel for multigpubeamsearch: filename=multigpubeamsearch-0.1.0.dev1-cp310-abi3-linux_x86_64.whl size=2820378 sha256=a084f8240b4640974c56d5b4a47936c7b432264c0bb0cd28ffb1e8342ab75cfb
+  Stored in directory: /root/.cache/pip/wheels/19/83/97/804888d9d4485373df8a5140719a41a2b581408ef58239d925
+Successfully built multigpubeamsearch

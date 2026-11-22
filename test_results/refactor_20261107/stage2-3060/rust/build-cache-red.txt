@@ -1,0 +1,124 @@
+FFFFFF                                                                   [100%]
+=================================== FAILURES ===================================
+___ test_abi_and_rust_changes_invalidate_native_cache[native/beam_native.h] ____
+
+tmp_path = PosixPath('/tmp/pytest-of-root/pytest-0/test_abi_and_rust_changes_inva0')
+relative = 'native/beam_native.h'
+
+    @pytest.mark.parametrize('relative', ['native/beam_native.h', 'native/beam_native.cpp',
+        'rust/beam-runtime/src/lib.rs', 'rust/beam-runtime/Cargo.toml', 'Cargo.toml', 'Cargo.lock'])
+    def test_abi_and_rust_changes_invalidate_native_cache(tmp_path, relative):
+        (tmp_path/'CMakeLists.txt').write_text('project(example)')
+        path=tmp_path/relative
+        path.parent.mkdir(parents=True,exist_ok=True)
+        path.write_text('first source')
+        first=source_digest(tmp_path)
+        path.write_text('changed source')
+>       assert source_digest(tmp_path)!=first
+E       AssertionError: assert '2d2f7779e21424f5f75481912a8fd566ba5a8c9153d1f219e3f654e42acc3179' != '2d2f7779e21424f5f75481912a8fd566ba5a8c9153d1f219e3f654e42acc3179'
+E        +  where '2d2f7779e21424f5f75481912a8fd566ba5a8c9153d1f219e3f654e42acc3179' = source_digest(PosixPath('/tmp/pytest-of-root/pytest-0/test_abi_and_rust_changes_inva0'))
+
+integrations/cayleypy_native/tests/test_build.py:42: AssertionError
+__ test_abi_and_rust_changes_invalidate_native_cache[native/beam_native.cpp] ___
+
+tmp_path = PosixPath('/tmp/pytest-of-root/pytest-0/test_abi_and_rust_changes_inva1')
+relative = 'native/beam_native.cpp'
+
+    @pytest.mark.parametrize('relative', ['native/beam_native.h', 'native/beam_native.cpp',
+        'rust/beam-runtime/src/lib.rs', 'rust/beam-runtime/Cargo.toml', 'Cargo.toml', 'Cargo.lock'])
+    def test_abi_and_rust_changes_invalidate_native_cache(tmp_path, relative):
+        (tmp_path/'CMakeLists.txt').write_text('project(example)')
+        path=tmp_path/relative
+        path.parent.mkdir(parents=True,exist_ok=True)
+        path.write_text('first source')
+        first=source_digest(tmp_path)
+        path.write_text('changed source')
+>       assert source_digest(tmp_path)!=first
+E       AssertionError: assert '2d2f7779e21424f5f75481912a8fd566ba5a8c9153d1f219e3f654e42acc3179' != '2d2f7779e21424f5f75481912a8fd566ba5a8c9153d1f219e3f654e42acc3179'
+E        +  where '2d2f7779e21424f5f75481912a8fd566ba5a8c9153d1f219e3f654e42acc3179' = source_digest(PosixPath('/tmp/pytest-of-root/pytest-0/test_abi_and_rust_changes_inva1'))
+
+integrations/cayleypy_native/tests/test_build.py:42: AssertionError
+_ test_abi_and_rust_changes_invalidate_native_cache[rust/beam-runtime/src/lib.rs] _
+
+tmp_path = PosixPath('/tmp/pytest-of-root/pytest-0/test_abi_and_rust_changes_inva2')
+relative = 'rust/beam-runtime/src/lib.rs'
+
+    @pytest.mark.parametrize('relative', ['native/beam_native.h', 'native/beam_native.cpp',
+        'rust/beam-runtime/src/lib.rs', 'rust/beam-runtime/Cargo.toml', 'Cargo.toml', 'Cargo.lock'])
+    def test_abi_and_rust_changes_invalidate_native_cache(tmp_path, relative):
+        (tmp_path/'CMakeLists.txt').write_text('project(example)')
+        path=tmp_path/relative
+        path.parent.mkdir(parents=True,exist_ok=True)
+        path.write_text('first source')
+        first=source_digest(tmp_path)
+        path.write_text('changed source')
+>       assert source_digest(tmp_path)!=first
+E       AssertionError: assert '2d2f7779e21424f5f75481912a8fd566ba5a8c9153d1f219e3f654e42acc3179' != '2d2f7779e21424f5f75481912a8fd566ba5a8c9153d1f219e3f654e42acc3179'
+E        +  where '2d2f7779e21424f5f75481912a8fd566ba5a8c9153d1f219e3f654e42acc3179' = source_digest(PosixPath('/tmp/pytest-of-root/pytest-0/test_abi_and_rust_changes_inva2'))
+
+integrations/cayleypy_native/tests/test_build.py:42: AssertionError
+_ test_abi_and_rust_changes_invalidate_native_cache[rust/beam-runtime/Cargo.toml] _
+
+tmp_path = PosixPath('/tmp/pytest-of-root/pytest-0/test_abi_and_rust_changes_inva3')
+relative = 'rust/beam-runtime/Cargo.toml'
+
+    @pytest.mark.parametrize('relative', ['native/beam_native.h', 'native/beam_native.cpp',
+        'rust/beam-runtime/src/lib.rs', 'rust/beam-runtime/Cargo.toml', 'Cargo.toml', 'Cargo.lock'])
+    def test_abi_and_rust_changes_invalidate_native_cache(tmp_path, relative):
+        (tmp_path/'CMakeLists.txt').write_text('project(example)')
+        path=tmp_path/relative
+        path.parent.mkdir(parents=True,exist_ok=True)
+        path.write_text('first source')
+        first=source_digest(tmp_path)
+        path.write_text('changed source')
+>       assert source_digest(tmp_path)!=first
+E       AssertionError: assert '2d2f7779e21424f5f75481912a8fd566ba5a8c9153d1f219e3f654e42acc3179' != '2d2f7779e21424f5f75481912a8fd566ba5a8c9153d1f219e3f654e42acc3179'
+E        +  where '2d2f7779e21424f5f75481912a8fd566ba5a8c9153d1f219e3f654e42acc3179' = source_digest(PosixPath('/tmp/pytest-of-root/pytest-0/test_abi_and_rust_changes_inva3'))
+
+integrations/cayleypy_native/tests/test_build.py:42: AssertionError
+________ test_abi_and_rust_changes_invalidate_native_cache[Cargo.toml] _________
+
+tmp_path = PosixPath('/tmp/pytest-of-root/pytest-0/test_abi_and_rust_changes_inva4')
+relative = 'Cargo.toml'
+
+    @pytest.mark.parametrize('relative', ['native/beam_native.h', 'native/beam_native.cpp',
+        'rust/beam-runtime/src/lib.rs', 'rust/beam-runtime/Cargo.toml', 'Cargo.toml', 'Cargo.lock'])
+    def test_abi_and_rust_changes_invalidate_native_cache(tmp_path, relative):
+        (tmp_path/'CMakeLists.txt').write_text('project(example)')
+        path=tmp_path/relative
+        path.parent.mkdir(parents=True,exist_ok=True)
+        path.write_text('first source')
+        first=source_digest(tmp_path)
+        path.write_text('changed source')
+>       assert source_digest(tmp_path)!=first
+E       AssertionError: assert '2d2f7779e21424f5f75481912a8fd566ba5a8c9153d1f219e3f654e42acc3179' != '2d2f7779e21424f5f75481912a8fd566ba5a8c9153d1f219e3f654e42acc3179'
+E        +  where '2d2f7779e21424f5f75481912a8fd566ba5a8c9153d1f219e3f654e42acc3179' = source_digest(PosixPath('/tmp/pytest-of-root/pytest-0/test_abi_and_rust_changes_inva4'))
+
+integrations/cayleypy_native/tests/test_build.py:42: AssertionError
+________ test_abi_and_rust_changes_invalidate_native_cache[Cargo.lock] _________
+
+tmp_path = PosixPath('/tmp/pytest-of-root/pytest-0/test_abi_and_rust_changes_inva5')
+relative = 'Cargo.lock'
+
+    @pytest.mark.parametrize('relative', ['native/beam_native.h', 'native/beam_native.cpp',
+        'rust/beam-runtime/src/lib.rs', 'rust/beam-runtime/Cargo.toml', 'Cargo.toml', 'Cargo.lock'])
+    def test_abi_and_rust_changes_invalidate_native_cache(tmp_path, relative):
+        (tmp_path/'CMakeLists.txt').write_text('project(example)')
+        path=tmp_path/relative
+        path.parent.mkdir(parents=True,exist_ok=True)
+        path.write_text('first source')
+        first=source_digest(tmp_path)
+        path.write_text('changed source')
+>       assert source_digest(tmp_path)!=first
+E       AssertionError: assert '2d2f7779e21424f5f75481912a8fd566ba5a8c9153d1f219e3f654e42acc3179' != '2d2f7779e21424f5f75481912a8fd566ba5a8c9153d1f219e3f654e42acc3179'
+E        +  where '2d2f7779e21424f5f75481912a8fd566ba5a8c9153d1f219e3f654e42acc3179' = source_digest(PosixPath('/tmp/pytest-of-root/pytest-0/test_abi_and_rust_changes_inva5'))
+
+integrations/cayleypy_native/tests/test_build.py:42: AssertionError
+=========================== short test summary info ============================
+FAILED integrations/cayleypy_native/tests/test_build.py::test_abi_and_rust_changes_invalidate_native_cache[native/beam_native.h]
+FAILED integrations/cayleypy_native/tests/test_build.py::test_abi_and_rust_changes_invalidate_native_cache[native/beam_native.cpp]
+FAILED integrations/cayleypy_native/tests/test_build.py::test_abi_and_rust_changes_invalidate_native_cache[rust/beam-runtime/src/lib.rs]
+FAILED integrations/cayleypy_native/tests/test_build.py::test_abi_and_rust_changes_invalidate_native_cache[rust/beam-runtime/Cargo.toml]
+FAILED integrations/cayleypy_native/tests/test_build.py::test_abi_and_rust_changes_invalidate_native_cache[Cargo.toml]
+FAILED integrations/cayleypy_native/tests/test_build.py::test_abi_and_rust_changes_invalidate_native_cache[Cargo.lock]
+6 failed, 19 deselected in 4.84s

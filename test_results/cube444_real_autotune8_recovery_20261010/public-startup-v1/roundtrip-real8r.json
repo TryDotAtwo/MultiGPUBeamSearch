@@ -1,0 +1,10 @@
+{
+  "status": "PASS",
+  "artifact_commit": "28ced2e52b5f7386ce7b0ddab7250d0ae11142a2",
+  "prefix": "test_results/cube444_real_autotune8_recovery_20261010/public-startup-v1/",
+  "archive_sha256": "a7fcc8bf7695b5c01afa6cd021a97c19f6e1f7f7ca99157893eb531cba31db2e",
+  "bytes": 1452720,
+  "parts_verified": 20,
+  "files_verified": 611,
+  "scope": "independent GitHub download, all archive part and tar file bytes verified, no GPU tensors copied to Windows"
+}

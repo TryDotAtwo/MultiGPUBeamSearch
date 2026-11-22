@@ -1,0 +1,9 @@
+{
+  "bytes": 6934273,
+  "sha256": "6e4793a76073dbee54dcd3d72b91efad2812733564bc169ea614f71bc4b78dd2",
+  "runner_sha256": "611ccc84844dde1b0d110bf2015420d1b230340013c2aee6346fecc81dbe1cef",
+  "source_commit": "d52f81ff7d1b3240996a07fa4ab369b55f84f01f",
+  "part_bytes": 300000,
+  "parts": 24,
+  "archive": "fast-artifact-v2.tar.gz"
+}

@@ -1,0 +1,26 @@
+[
+  {
+    "backend": "cutlass",
+    "world": 1,
+    "solutions": 3,
+    "equal": true
+  },
+  {
+    "backend": "cutlass",
+    "world": 2,
+    "solutions": 3,
+    "equal": true
+  },
+  {
+    "backend": "libtorch",
+    "world": 1,
+    "solutions": 3,
+    "equal": true
+  },
+  {
+    "backend": "libtorch",
+    "world": 2,
+    "solutions": 3,
+    "equal": true
+  }
+]

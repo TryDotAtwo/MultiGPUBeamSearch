@@ -1,0 +1,1 @@
+["/opt/conda/bin/cmake", "--build", "/workspace/rust-cluster-native-evidence/search/cache/builds/c015d74762ba0de8054a66dffd14e6a8123c0b8dd0dceaf70dd52199e985ca51", "--target", "production_runner", "--parallel", "4"]

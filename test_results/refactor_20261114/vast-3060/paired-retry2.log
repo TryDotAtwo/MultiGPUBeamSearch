@@ -1,0 +1,17 @@
+NCCL_PAIR cold pair=None mode=baseline wall=2.029080
+NCCL_PAIR cold pair=None mode=parallel wall=1.947310
+NCCL_PAIR warmup pair=None mode=baseline wall=0.592296
+NCCL_PAIR warmup pair=None mode=parallel wall=0.425043
+NCCL_PAIR repeat pair=0 mode=baseline wall=0.579843
+NCCL_PAIR repeat pair=0 mode=parallel wall=0.427945
+NCCL_PAIR repeat pair=1 mode=parallel wall=0.420453
+NCCL_PAIR repeat pair=1 mode=baseline wall=0.577081
+NCCL_PAIR repeat pair=2 mode=baseline wall=0.562723
+NCCL_PAIR repeat pair=2 mode=parallel wall=0.428234
+NCCL_PAIR repeat pair=3 mode=parallel wall=0.431885
+NCCL_PAIR repeat pair=3 mode=baseline wall=0.587470
+NCCL_PAIR repeat pair=4 mode=baseline wall=0.590885
+NCCL_PAIR repeat pair=4 mode=parallel wall=0.430066
+NCCL_PAIR solved pair=None mode=baseline wall=0.434658
+NCCL_PAIR solved pair=None mode=parallel wall=0.284435
+NCCL_IDENTITY_PAIR_GPU_OK

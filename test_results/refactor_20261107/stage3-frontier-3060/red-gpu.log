@@ -1,0 +1,8 @@
+Traceback (most recent call last):
+  File "/workspace/beam-work/tests/native_frontier_job_gpu.py", line 90, in <module>
+    if __name__=='__main__':main()
+                            ^^^^^^
+  File "/workspace/beam-work/tests/native_frontier_job_gpu.py", line 16, in main
+    assert hasattr(native,'FrontierCalibration'),'Rust frontier job owner is missing'
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: Rust frontier job owner is missing

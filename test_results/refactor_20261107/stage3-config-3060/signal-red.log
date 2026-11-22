@@ -1,0 +1,16 @@
+Traceback (most recent call last):
+  File "/workspace/beam-work/rust/beam-python/tests/interrupt.py", line 26, in <module>
+    try:owner.run()
+        ^^^^^^^^^^^
+RuntimeError: inference calibration cancelled or closed
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/workspace/beam-work/rust/beam-python/tests/interrupt.py", line 33, in <module>
+    finally:finished.set();owner.cancel();thread.join()
+            ^^^^^^^^^^^^^^
+  File "/opt/conda/lib/python3.11/threading.py", line 590, in set
+    def set(self):
+
+KeyboardInterrupt

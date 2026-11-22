@@ -1,0 +1,13 @@
+{
+  "passed": true,
+  "engine": "98bd0d1ed44db8906744d4f21e6bfeff60a8d2b0",
+  "source_bundle_sha256": "908a08ca9e40386c1b8f3d3504ca15b7706edd7eb5ce2482d150ce4a99ab465d",
+  "library_sha256": "efd751477ade2bcd73c79876b732341244ef26df0fa2485b76054ddf20ac8332",
+  "checkpoint_sha256": "92f3ec8e6a6ef831916a9d3ba9bbdae9307c9850d61334916a2b3e690c0020c4",
+  "runtime": "2.9.0+cu128",
+  "native_toolkit": "12.8.1",
+  "modes": [
+    "qhat",
+    "proposal"
+  ]
+}

@@ -1,0 +1,9 @@
+   Compiling beam-native-sys v0.1.0 (/workspace/beam-work/rust/beam-native-sys)
+error[E0432]: unresolved import `beam_native_sys::history`
+ --> rust/beam-native-sys/tests/context.rs:2:22
+  |
+2 | use beam_native_sys::history::HistorySink;
+  |                      ^^^^^^^ could not find `history` in `beam_native_sys`
+
+For more information about this error, try `rustc --explain E0432`.
+error: could not compile `beam-native-sys` (test "context") due to 1 previous error

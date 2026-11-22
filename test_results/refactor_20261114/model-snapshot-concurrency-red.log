@@ -1,0 +1,95 @@
+FF.                                                                      [100%]
+================================== FAILURES ===================================
+________________ test_run_rechecks_closed_after_acquiring_lock ________________
+
+tmp_path = WindowsPath('D:/100XH100/.local/cache/session-snapshot/pytest-concurrency-red-20261114/test_run_rechecks_closed_after0')
+
+    def test_run_rechecks_closed_after_acquiring_lock(tmp_path):
+        from types import SimpleNamespace
+    
+        session = NativeSession()
+        class CloseBeforeAcquire:
+            def acquire(self, blocking):
+                session.closed = True
+                return True
+            def release(self):
+                pass
+        session._lock = CloseBeforeAcquire()
+        with pytest.raises(RuntimeError, match='closed'):
+>           session.run(lambda *a, **k: None, None, None, None, 1, 1, tmp_path, (0,))
+
+integrations\cayleypy_native\tests\test_persistent_search.py:187: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <multigpubeamsearch.persistent.NativeSession object at 0x000002CA294230D0>
+execute = <function test_run_rechecks_closed_after_acquiring_lock.<locals>.<lambda> at 0x000002CA29822B60>
+contract = None, model = None, options = None, beam_width = 1, max_steps = 1
+run_dir = WindowsPath('D:/100XH100/.local/cache/session-snapshot/pytest-concurrency-red-20261114/test_run_rechecks_closed_after0')
+devices = (0,)
+
+    def run(self, execute, contract, model, options, beam_width, max_steps, run_dir, devices, *, runtime=None):
+        from .backend import parse_terminal
+        from .models import verify_prepared_model
+        self._check_owner()
+        if self.closed:raise RuntimeError('native session is closed')
+        if not self._lock.acquire(blocking=False):raise RuntimeError('concurrent native session searches are unsupported')
+        try:
+            # Runtime preparation already verifies executable bytes. Start state
+            # is intentionally absent; all other search geometry stays fixed.
+>           identity=(contract.graph_hash,model.artifact_hash,model.backend,tuple(devices),
+                      ^^^^^^^^^^^^^^^^^^^
+                beam_width,max_steps,repr(options),
+                os.environ.get('CUDA_VISIBLE_DEVICES'),os.environ.get('CUDA_DEVICE_ORDER'),
+                json.dumps(runtime.build_metadata,sort_keys=True) if runtime is not None else None)
+E               AttributeError: 'NoneType' object has no attribute 'graph_hash'
+
+integrations\cayleypy_native\multigpubeamsearch\persistent.py:173: AttributeError
+____________ test_session_cannot_close_during_runtime_preparation _____________
+
+fixture = (WindowsPath('D:/100XH100/.local/cache/session-snapshot/pytest-concurrency-red-20261114/test_session_cannot_close_duri...4ce4be91c992b27616266f038d13980d6b7e6dc40bf7eb927fcb0c502f'), <function fixture.<locals>.search at 0x000002CA2941A840>)
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x000002CA29777F50>
+
+    def test_session_cannot_close_during_runtime_preparation(fixture, monkeypatch):
+        _, _, _, search = fixture
+        with NativeSession(experimental_reuse_model_snapshot=True) as session:
+            def prepare(*args, **kwargs):
+                with pytest.raises(RuntimeError, match='during a search'):
+                    session.close()
+                return SimpleNamespace(build_metadata={'inference_backend': 'cutlass'})
+            monkeypatch.setattr(dispatch, 'prepare_runtime', prepare)
+>           search(session)
+
+integrations\cayleypy_native\tests\test_session_model_snapshot.py:189: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+integrations\cayleypy_native\tests\test_session_model_snapshot.py:33: in search
+    return session.beam_search(graph, backend=backend, native_options=native_options, start_state=start,
+integrations\cayleypy_native\multigpubeamsearch\persistent.py:95: in beam_search
+    return beam_search(graph,**kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+integrations\cayleypy_native\multigpubeamsearch\dispatch.py:292: in beam_search
+    return _search(original, graph, kwargs, options, backend)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+integrations\cayleypy_native\multigpubeamsearch\dispatch.py:227: in _search
+    runtime = prepare_runtime(contract, model, options, run_dir, devices, **runtime_kwargs)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+args = (GraphContract(state_len=4, num_classes=4, generators=((1, 2, 3, 0), (3, 0, 1, 2), (1, 0, 2, 3)), generator_names=('L'...ot/pytest-concurrency-red-20261114/test_session_cannot_close_duri0/cache/runs/1423d11cf1a54696bad2b8fb5c3cb4e1'), (0,))
+kwargs = {'touch_bfs_radius': 0}
+
+    def prepare(*args, **kwargs):
+>       with pytest.raises(RuntimeError, match='during a search'):
+E       Failed: DID NOT RAISE <class 'RuntimeError'>
+
+integrations\cayleypy_native\tests\test_session_model_snapshot.py:185: Failed
+============================== warnings summary ===============================
+C:\Users\���� ������\AppData\Local\Programs\Python\Python311\Lib\site-packages\asttokens\util.py:202
+C:\Users\���� ������\AppData\Local\Programs\Python\Python311\Lib\site-packages\asttokens\util.py:202
+  C:\Users\���� ������\AppData\Local\Programs\Python\Python311\Lib\site-packages\asttokens\util.py:202: DeprecationWarning: importing 'Const' from 'astroid' is deprecated and will be removed in v5, import it from 'astroid.nodes' instead
+    from astroid import Const
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+FAILED integrations\cayleypy_native\tests\test_persistent_search.py::test_run_rechecks_closed_after_acquiring_lock
+FAILED integrations\cayleypy_native\tests\test_session_model_snapshot.py::test_session_cannot_close_during_runtime_preparation
+2 failed, 1 passed, 2 warnings in 9.73s

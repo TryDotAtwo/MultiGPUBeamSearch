@@ -1,0 +1,41 @@
+{
+  "checked_epoch": 1791615494.183327,
+  "scope": "Only exact owned instance IDs; unrelated leases neither inspected nor changed",
+  "rows": [
+    {
+      "instance": 55105798,
+      "absent": true,
+      "actual_status": null,
+      "label": null,
+      "intended_status": null
+    },
+    {
+      "instance": 55101031,
+      "absent": true,
+      "actual_status": null,
+      "label": null,
+      "intended_status": null
+    },
+    {
+      "instance": 55160534,
+      "absent": true,
+      "actual_status": null,
+      "label": null,
+      "intended_status": null
+    },
+    {
+      "instance": 55160866,
+      "absent": true,
+      "actual_status": null,
+      "label": null,
+      "intended_status": null
+    },
+    {
+      "instance": 55162682,
+      "absent": false,
+      "actual_status": null,
+      "label": "cube444-inference-first-stable-2x3060-20261010",
+      "intended_status": "running"
+    }
+  ]
+}

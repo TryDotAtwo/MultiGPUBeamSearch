@@ -1,0 +1,5 @@
+#!/opt/conda/bin/python
+import os,sys,time
+from pathlib import Path
+Path('/workspace/beam-results/frontier/final3-libtorch_eager',"blocked-"+sys.argv[4]).write_text(str(os.getpid()))
+time.sleep(30)

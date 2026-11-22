@@ -1,0 +1,505 @@
+{
+  "bytes": 19289,
+  "sha256": "29ae8b2172ca299b3b0b9cecaf313b6364e17b9741e37896d86d9c93b7360703",
+  "files": [
+    {
+      "path": "cpu-ring-geometry.py",
+      "bytes": 987,
+      "sha256": "399af72a3f34157a12fca364de4e967fb2791c5f63dd1de1429be52f2aa31982"
+    },
+    {
+      "path": "diagnostics-v1-roundtrip.json",
+      "bytes": 442,
+      "sha256": "ea6af7eaf9f2d2a6d5cc845795a2fc4221e39fd549ff7eb3efd41dde47d552c8"
+    },
+    {
+      "path": "results/cpu-ring-geometry/pytest.log",
+      "bytes": 432,
+      "sha256": "31fe866d64aa4343c2736f0295c9c2b9f0f4d33ccadc3cfaa7292ff12e94f96b"
+    },
+    {
+      "path": "results/cpu-ring-geometry/report.json",
+      "bytes": 554,
+      "sha256": "5eb7d5c11e232a219bf34e72afdd3f06618591bf9993c780217763ace055c1df"
+    },
+    {
+      "path": "results/ring-overlap-deeper/baseline-rejected.json",
+      "bytes": 263,
+      "sha256": "2108683ccacc7a90f28774008abd6bfb7bd487707be2010ee753bf043c3fdafb"
+    },
+    {
+      "path": "results/ring-overlap-deeper/near-plateau-micro-2048-rings-4/env0.json",
+      "bytes": 1668,
+      "sha256": "140169d5f5803193312f9ff1ed7a03969c7afa70c777b5b26a13e467c6fd4872"
+    },
+    {
+      "path": "results/ring-overlap-deeper/near-plateau-micro-2048-rings-4/env1.json",
+      "bytes": 1668,
+      "sha256": "245c8ba4e5166758faa174f0d5c88f5d9152ce786a9175b584872e9caf3703fa"
+    },
+    {
+      "path": "results/ring-overlap-deeper/near-plateau-micro-2048-rings-4/env2.json",
+      "bytes": 1668,
+      "sha256": "42077af006b837b4ed961e8428d7adc9deb665673bca11d210e40543494d17d1"
+    },
+    {
+      "path": "results/ring-overlap-deeper/near-plateau-micro-2048-rings-4/env3.json",
+      "bytes": 1668,
+      "sha256": "5c28693e6d4d2037e373a644b655c332065ef28b793a97169df5ef7c355d71df"
+    },
+    {
+      "path": "results/ring-overlap-deeper/near-plateau-micro-2048-rings-4/env4.json",
+      "bytes": 1668,
+      "sha256": "7f03f8c70262bbc925547c28e57d61349bcbec6d56024f79cfef0f65688e8e2f"
+    },
+    {
+      "path": "results/ring-overlap-deeper/near-plateau-micro-2048-rings-4/env5.json",
+      "bytes": 1668,
+      "sha256": "8799361f61fba9e46a855b3299ea71dcf4e2262f1362715fbafbc727c1a17bb2"
+    },
+    {
+      "path": "results/ring-overlap-deeper/near-plateau-micro-2048-rings-4/env6.json",
+      "bytes": 1668,
+      "sha256": "e7869de387a3247e366941834d4cc7c7e8f2757121bf6e15994644f241f9b219"
+    },
+    {
+      "path": "results/ring-overlap-deeper/near-plateau-micro-2048-rings-4/env7.json",
+      "bytes": 1668,
+      "sha256": "a198821660dd0070324e5de569265bc279533ea2792c119ec77d6e3c7a031da7"
+    },
+    {
+      "path": "results/ring-overlap-deeper/near-plateau-micro-2048-rings-4/exit.json",
+      "bytes": 1001,
+      "sha256": "4f36426eae33000a590fcc84684106a6b0e40e5a8c992c65a86612e9672c83ee"
+    },
+    {
+      "path": "results/ring-overlap-deeper/near-plateau-micro-2048-rings-4/nccl",
+      "bytes": 179,
+      "sha256": "85b77455398513be968e4d2e60cefd2720e76f4c07e3f072dfb7239a0e349fbb"
+    },
+    {
+      "path": "results/ring-overlap-deeper/near-plateau-micro-2048-rings-4/rank0.log",
+      "bytes": 8740,
+      "sha256": "86051dc0cdb0938e7a7cc5dafd18a21bfc0001220136d7334a95b83d82f99d6d"
+    },
+    {
+      "path": "results/ring-overlap-deeper/near-plateau-micro-2048-rings-4/rank1.log",
+      "bytes": 8741,
+      "sha256": "ddf384d7991bdafe2b4c83be3adc9b81ae8487ea5b0ab20cd2390be8b1a0723a"
+    },
+    {
+      "path": "results/ring-overlap-deeper/near-plateau-micro-2048-rings-4/rank2.log",
+      "bytes": 8740,
+      "sha256": "4146d6efa90321ff3816d69dd8fb65da77e07d7b3736ce2391f9e2d5ef45fe98"
+    },
+    {
+      "path": "results/ring-overlap-deeper/near-plateau-micro-2048-rings-4/rank3.log",
+      "bytes": 8741,
+      "sha256": "a8cd4d0b122a0245feb22a2b4e3a82a1a3d9e41c4d415bf66838b4b2085888bb"
+    },
+    {
+      "path": "results/ring-overlap-deeper/near-plateau-micro-2048-rings-4/rank4.log",
+      "bytes": 8741,
+      "sha256": "6b3d7cb20b9e33f953bc9a7b1dd8ef987568b7ea8afbf54d55fc854435993b69"
+    },
+    {
+      "path": "results/ring-overlap-deeper/near-plateau-micro-2048-rings-4/rank5.log",
+      "bytes": 8739,
+      "sha256": "6165736028c9172b18171ee6b515d0130d6094680d0032e72f6fbd221514a60a"
+    },
+    {
+      "path": "results/ring-overlap-deeper/near-plateau-micro-2048-rings-4/rank6.log",
+      "bytes": 8739,
+      "sha256": "7f0eb7f1affad5b48a4edc2ca4c69549a45ea5d06a1ec92f34bf6dabe76f8cbf"
+    },
+    {
+      "path": "results/ring-overlap-deeper/near-plateau-micro-2048-rings-4/rank7.log",
+      "bytes": 8738,
+      "sha256": "deee8bbb68777fd67788bb90ce533f5151a55d7be40c6170c6fd5a6e9cebadeb"
+    },
+    {
+      "path": "results/ring-overlap-deeper/near-plateau-micro-2048-rings-4/test_results/unsolved_run_1791595056160481622_r7_0/no_solution_p0_d6_b1048576.log",
+      "bytes": 348,
+      "sha256": "6af1ebb8c806653fc309f4143170299be526497a9009aeb7dc2ac14e77fe208b"
+    },
+    {
+      "path": "results/ring-overlap-deeper/near-plateau-micro-2048-rings-4/test_results/unsolved_run_1791595056160734270_r5_0/no_solution_p0_d6_b1048576.log",
+      "bytes": 348,
+      "sha256": "3cbe85dca796bcda84efc223d7de2b042e751febc9607356487d7a66539572f6"
+    },
+    {
+      "path": "results/ring-overlap-deeper/near-plateau-micro-2048-rings-4/test_results/unsolved_run_1791595056161479175_r3_0/no_solution_p0_d6_b1048576.log",
+      "bytes": 348,
+      "sha256": "555991eb222464cfd1bf5ed6a8b11344097629d97e20e41ffde10be9ca4ce270"
+    },
+    {
+      "path": "results/ring-overlap-deeper/near-plateau-micro-2048-rings-4/test_results/unsolved_run_1791595056161496791_r2_0/no_solution_p0_d6_b1048576.log",
+      "bytes": 348,
+      "sha256": "6ae389d43b4a4a95719a4f379f538a5b41a80deddef415f08f498ead37957ba5"
+    },
+    {
+      "path": "results/ring-overlap-deeper/near-plateau-micro-2048-rings-4/test_results/unsolved_run_1791595056167310435_r4_0/no_solution_p0_d6_b1048576.log",
+      "bytes": 348,
+      "sha256": "9493bc10f43a25d4e4ad1e5405d7e29d13db7ec1cf66f0f2ed04366467f28a88"
+    },
+    {
+      "path": "results/ring-overlap-deeper/near-plateau-micro-2048-rings-4/test_results/unsolved_run_1791595056171694983_r6_0/no_solution_p0_d6_b1048576.log",
+      "bytes": 348,
+      "sha256": "5e852ee5489b25c4d232e52a8a95cb70a0a5c6aef05730454f6c9ff5df523202"
+    },
+    {
+      "path": "results/ring-overlap-deeper/near-plateau-micro-2048-rings-4/test_results/unsolved_run_1791595056205217590_r1_0/no_solution_p0_d6_b1048576.log",
+      "bytes": 348,
+      "sha256": "fdaed6e689fd8da7a1496feb3a375ab8beda39d61dc2c8621fda120bc1a57773"
+    },
+    {
+      "path": "results/ring-overlap-deeper/near-plateau-micro-2048-rings-4/test_results/unsolved_run_1791595056205552856_r0_0/no_solution_p0_d6_b1048576.log",
+      "bytes": 348,
+      "sha256": "bdf754ac75458460cde37bc47adebbf434fb3abcad27c46c06bc30495d1d1375"
+    },
+    {
+      "path": "results/ring-overlap-deeper/near-plateau-micro-2048-rings-4.json",
+      "bytes": 10298,
+      "sha256": "2bb3acf2ee7faa2084e4504d4def58289d636031e976dd0481a88c4e0cfc4ded"
+    },
+    {
+      "path": "results/ring-overlap-deeper/near-plateau-micro-2048-rings-8/env0.json",
+      "bytes": 1668,
+      "sha256": "098e297dbd7a703b93b9b122094ebb62b6f21f8596d3e9d5d7e11f8cbc0b56da"
+    },
+    {
+      "path": "results/ring-overlap-deeper/near-plateau-micro-2048-rings-8/env1.json",
+      "bytes": 1668,
+      "sha256": "891cce3bdd51185629baf3c897f6d22b7ab4444fea4bb5b3df3a568e094d10c1"
+    },
+    {
+      "path": "results/ring-overlap-deeper/near-plateau-micro-2048-rings-8/env2.json",
+      "bytes": 1668,
+      "sha256": "6cdac94f7a0cde9505df91d0449ab8945ce57ec28622b4f03c9dcb57c82edc2b"
+    },
+    {
+      "path": "results/ring-overlap-deeper/near-plateau-micro-2048-rings-8/env3.json",
+      "bytes": 1668,
+      "sha256": "0a21779a4a0f2b4ea2bb8df3e7bd5459dfb6c5a1226745ce02de67a7494ffbcc"
+    },
+    {
+      "path": "results/ring-overlap-deeper/near-plateau-micro-2048-rings-8/env4.json",
+      "bytes": 1668,
+      "sha256": "fa3c4ac96c5e467f7f0c9d951eddac09eaf13ddb766378afecd6dd95da0d58d5"
+    },
+    {
+      "path": "results/ring-overlap-deeper/near-plateau-micro-2048-rings-8/env5.json",
+      "bytes": 1668,
+      "sha256": "f5b2e775eacf9530c638a03d6e43c4be818deb08df0793fd89332dc315a0b7b5"
+    },
+    {
+      "path": "results/ring-overlap-deeper/near-plateau-micro-2048-rings-8/env6.json",
+      "bytes": 1668,
+      "sha256": "d735aeb4503be81732350405bbf5dfc6246b7ea56da0c72881d99c0c1fcb561e"
+    },
+    {
+      "path": "results/ring-overlap-deeper/near-plateau-micro-2048-rings-8/env7.json",
+      "bytes": 1668,
+      "sha256": "2c85b9503d7cdf5ac18c8801d768d45d5ddb7361c25aaec452a4ac828805d80c"
+    },
+    {
+      "path": "results/ring-overlap-deeper/near-plateau-micro-2048-rings-8/exit.json",
+      "bytes": 997,
+      "sha256": "3ac698a9ed1576b2d7e94b50358c3b965528732e08065415d247920365095c48"
+    },
+    {
+      "path": "results/ring-overlap-deeper/near-plateau-micro-2048-rings-8/nccl",
+      "bytes": 179,
+      "sha256": "135018b38e4921acf326dff6bcc02cf6077d734a6c0376bb2ed0d24a5a77ec15"
+    },
+    {
+      "path": "results/ring-overlap-deeper/near-plateau-micro-2048-rings-8/rank0.log",
+      "bytes": 8742,
+      "sha256": "e5c9c96387fde1da80a2c41632b77a9bc9d9c482d6ad0b53c645dc5ce5907c0b"
+    },
+    {
+      "path": "results/ring-overlap-deeper/near-plateau-micro-2048-rings-8/rank1.log",
+      "bytes": 8736,
+      "sha256": "92ee9ff0bf82ad97f30ea5ec804a82caf128c73d3896eb92f66d5c30deaaf3f6"
+    },
+    {
+      "path": "results/ring-overlap-deeper/near-plateau-micro-2048-rings-8/rank2.log",
+      "bytes": 8741,
+      "sha256": "8ae30f1eb85f2c144382afcb1f5dfd184665055ab2121b32b60e8e98e727d731"
+    },
+    {
+      "path": "results/ring-overlap-deeper/near-plateau-micro-2048-rings-8/rank3.log",
+      "bytes": 8740,
+      "sha256": "e111f24a480ad025685c6faf08250f97447889ac73ca98925b5e6b7ad053d0f2"
+    },
+    {
+      "path": "results/ring-overlap-deeper/near-plateau-micro-2048-rings-8/rank4.log",
+      "bytes": 8739,
+      "sha256": "0cb6d86f249122eba46ef48e0cebac8ea7553afc94cb831bb4462c342abe4d02"
+    },
+    {
+      "path": "results/ring-overlap-deeper/near-plateau-micro-2048-rings-8/rank5.log",
+      "bytes": 8741,
+      "sha256": "73fac59898554c298211de7633f0c71438f22465239e9dbda9c76ac0f8f3b11c"
+    },
+    {
+      "path": "results/ring-overlap-deeper/near-plateau-micro-2048-rings-8/rank6.log",
+      "bytes": 8737,
+      "sha256": "f6af641a170461353a6d82fbc54bced9b4b491aad525f1227e2308c388e5812d"
+    },
+    {
+      "path": "results/ring-overlap-deeper/near-plateau-micro-2048-rings-8/rank7.log",
+      "bytes": 8740,
+      "sha256": "7acf56c36d422a4dd0ef9fc796e7529c95bee47982a91a9a838aec71cd153955"
+    },
+    {
+      "path": "results/ring-overlap-deeper/near-plateau-micro-2048-rings-8/test_results/unsolved_run_1791595159294425787_r7_0/no_solution_p0_d6_b1048576.log",
+      "bytes": 348,
+      "sha256": "e7e43c841d43fbb5a516146b113575b3282d99c38120e6034a52a079bd23b4a5"
+    },
+    {
+      "path": "results/ring-overlap-deeper/near-plateau-micro-2048-rings-8/test_results/unsolved_run_1791595159294908014_r3_0/no_solution_p0_d6_b1048576.log",
+      "bytes": 348,
+      "sha256": "b639e66c398c367367b803812d4f6144bbcd69bc9b189125fa0155306268a2d9"
+    },
+    {
+      "path": "results/ring-overlap-deeper/near-plateau-micro-2048-rings-8/test_results/unsolved_run_1791595159294958580_r4_0/no_solution_p0_d6_b1048576.log",
+      "bytes": 348,
+      "sha256": "e620c6af177ae149c3c2c7f4e21d2cff7433344165f1f2e9df12ef6f12584f83"
+    },
+    {
+      "path": "results/ring-overlap-deeper/near-plateau-micro-2048-rings-8/test_results/unsolved_run_1791595159295675683_r0_0/no_solution_p0_d6_b1048576.log",
+      "bytes": 348,
+      "sha256": "29c377e02672a977dcca7f0ab36437bcb72ce49faab9e2b3aa8cbaf4b795735f"
+    },
+    {
+      "path": "results/ring-overlap-deeper/near-plateau-micro-2048-rings-8/test_results/unsolved_run_1791595159296945548_r2_0/no_solution_p0_d6_b1048576.log",
+      "bytes": 348,
+      "sha256": "b58558950bc73eb2530fc6e173a4f01557d315ba5bec0d177aa42edbff452c4b"
+    },
+    {
+      "path": "results/ring-overlap-deeper/near-plateau-micro-2048-rings-8/test_results/unsolved_run_1791595159333992161_r5_0/no_solution_p0_d6_b1048576.log",
+      "bytes": 348,
+      "sha256": "05973ec709deded00d46c369af27c93cb037a95b565a36972681d3542f99fa78"
+    },
+    {
+      "path": "results/ring-overlap-deeper/near-plateau-micro-2048-rings-8/test_results/unsolved_run_1791595159335592969_r6_0/no_solution_p0_d6_b1048576.log",
+      "bytes": 348,
+      "sha256": "da6982da87bc00fba1982fd11e6719f26fff3183cece83824858a71ca25a23ca"
+    },
+    {
+      "path": "results/ring-overlap-deeper/near-plateau-micro-2048-rings-8/test_results/unsolved_run_1791595159337231321_r1_0/no_solution_p0_d6_b1048576.log",
+      "bytes": 348,
+      "sha256": "a82ca9643161538bb3c7e63b4421f9558017a97b58ee4fe1bebeb53057e66124"
+    },
+    {
+      "path": "results/ring-overlap-deeper/near-plateau-micro-2048-rings-8.json",
+      "bytes": 10293,
+      "sha256": "a68004a4c15d4676be170239c998c74e1dc3c4d4945a0d3616ce4367f7d061d8"
+    },
+    {
+      "path": "results/ring-overlap-deeper/new-admission-near-plateau-micro-2048-rings-4/nccl-id.bin",
+      "bytes": 192,
+      "sha256": "57267892d3c3ca0b547716a77d79143c4326585ed4288b47816f0a8e97a04c8a"
+    },
+    {
+      "path": "results/ring-overlap-deeper/new-admission-near-plateau-micro-2048-rings-4/rank-0.log",
+      "bytes": 792,
+      "sha256": "ae70432c1860482cd9275df4052db495dbbb84b35d702a2d1ed322a5c7facfc7"
+    },
+    {
+      "path": "results/ring-overlap-deeper/new-admission-near-plateau-micro-2048-rings-4/rank-1.log",
+      "bytes": 792,
+      "sha256": "0dabb19c1927d630d80ed77aa1a10e842013422973aa0440a4cd1e4eb2ee4949"
+    },
+    {
+      "path": "results/ring-overlap-deeper/new-admission-near-plateau-micro-2048-rings-4/rank-2.log",
+      "bytes": 792,
+      "sha256": "a5a45758a9bd134baccae0d33b88c0a6f830092d16ee14b35200dd17f9fb3725"
+    },
+    {
+      "path": "results/ring-overlap-deeper/new-admission-near-plateau-micro-2048-rings-4/rank-3.log",
+      "bytes": 792,
+      "sha256": "d3eaa385c91b67ce32da9409524e101d9486108a0bf20088f6efdea04e22de96"
+    },
+    {
+      "path": "results/ring-overlap-deeper/new-admission-near-plateau-micro-2048-rings-4/rank-4.log",
+      "bytes": 792,
+      "sha256": "33a2a7c0fffd7383a431149b6ab8f749c8fdadbf8cd00c2df7b92123c4a4a7a3"
+    },
+    {
+      "path": "results/ring-overlap-deeper/new-admission-near-plateau-micro-2048-rings-4/rank-5.log",
+      "bytes": 792,
+      "sha256": "392faa255915812e808b24b6d62adef18d3f691bcefcc71833b9457a4eaabeff"
+    },
+    {
+      "path": "results/ring-overlap-deeper/new-admission-near-plateau-micro-2048-rings-4/rank-6.log",
+      "bytes": 792,
+      "sha256": "6b7d7bec3108dca6a0711f8ffbc665a7e1866e9061c6ce21575e5a8f0833d59e"
+    },
+    {
+      "path": "results/ring-overlap-deeper/new-admission-near-plateau-micro-2048-rings-4/rank-7.log",
+      "bytes": 792,
+      "sha256": "125a01493ab27e13e5f56edd7c0de87130219f11e50734734352eb1f13fe133f"
+    },
+    {
+      "path": "results/ring-overlap-deeper/new-admission-near-plateau-micro-2048-rings-8/nccl-id.bin",
+      "bytes": 192,
+      "sha256": "3dc015b626969dcfe06dc33d6fe1710abd02da5449e5a9ab6686cda0738395b5"
+    },
+    {
+      "path": "results/ring-overlap-deeper/new-admission-near-plateau-micro-2048-rings-8/rank-0.log",
+      "bytes": 792,
+      "sha256": "ea5b0813612b655a78291be9c16d7aee741f0b0135b65d5bc4ee4ae045b01627"
+    },
+    {
+      "path": "results/ring-overlap-deeper/new-admission-near-plateau-micro-2048-rings-8/rank-1.log",
+      "bytes": 792,
+      "sha256": "34cea458b4fbd13b1d4153d6737616a6e64b301525c7f00835e39a0573466312"
+    },
+    {
+      "path": "results/ring-overlap-deeper/new-admission-near-plateau-micro-2048-rings-8/rank-2.log",
+      "bytes": 792,
+      "sha256": "329e2d86fbb3b8239e6dfac55285cdff3e770f2c252f2fcc60fb1aa9c32fac6c"
+    },
+    {
+      "path": "results/ring-overlap-deeper/new-admission-near-plateau-micro-2048-rings-8/rank-3.log",
+      "bytes": 792,
+      "sha256": "05ec49d97b7a46857e3bbcc7c6f8c1e7a77266ff08deb99dc4c612041408b328"
+    },
+    {
+      "path": "results/ring-overlap-deeper/new-admission-near-plateau-micro-2048-rings-8/rank-4.log",
+      "bytes": 792,
+      "sha256": "32d53cebab0412796bc0cfcc2874a2fb93960c32dc0e43c136f00c3b1ed420fe"
+    },
+    {
+      "path": "results/ring-overlap-deeper/new-admission-near-plateau-micro-2048-rings-8/rank-5.log",
+      "bytes": 792,
+      "sha256": "366f90314fb1a21b5b394f2c41e92cd7c64d2f54e1e3fddd404e86d132b97b73"
+    },
+    {
+      "path": "results/ring-overlap-deeper/new-admission-near-plateau-micro-2048-rings-8/rank-6.log",
+      "bytes": 792,
+      "sha256": "5139402320f95f1d043a7d125eccd7d2a1641253247e552724916325ab549fd7"
+    },
+    {
+      "path": "results/ring-overlap-deeper/new-admission-near-plateau-micro-2048-rings-8/rank-7.log",
+      "bytes": 792,
+      "sha256": "3bbd0b2cb870c1a9b0c68dcc24dbb6a0045df8d6399f129d6c51fd551f046c38"
+    },
+    {
+      "path": "results/ring-overlap-deeper/old-admission-near-plateau-micro-2048-rings-4/nccl-id.bin",
+      "bytes": 192,
+      "sha256": "615bf81576815ceb81d4e9a85cb408a2d92b10aeee2c88c231ad7a91958b138b"
+    },
+    {
+      "path": "results/ring-overlap-deeper/old-admission-near-plateau-micro-2048-rings-4/rank-0.log",
+      "bytes": 792,
+      "sha256": "19b51fc80fd6aeb70697527fcbac59c2d2ee846f8e91810edac75154aaf7bcc8"
+    },
+    {
+      "path": "results/ring-overlap-deeper/old-admission-near-plateau-micro-2048-rings-4/rank-1.log",
+      "bytes": 792,
+      "sha256": "76d77efc55cb0b934c6e5418b3676b75bbfc9b0f3433247142b2a7d4c75185fb"
+    },
+    {
+      "path": "results/ring-overlap-deeper/old-admission-near-plateau-micro-2048-rings-4/rank-2.log",
+      "bytes": 792,
+      "sha256": "87b9ab70e3ebd05bd3c6020755625f55c5158f255e87a00c998e5bb367c210a4"
+    },
+    {
+      "path": "results/ring-overlap-deeper/old-admission-near-plateau-micro-2048-rings-4/rank-3.log",
+      "bytes": 792,
+      "sha256": "806116f63eba376b2e4249c273f322f20b88e5f60cd6d3cc1a400ca8d213fcdf"
+    },
+    {
+      "path": "results/ring-overlap-deeper/old-admission-near-plateau-micro-2048-rings-4/rank-4.log",
+      "bytes": 792,
+      "sha256": "bae36b4e5def048db66287cad5ca73b679726af7af742a1825ebb31bb14ebd03"
+    },
+    {
+      "path": "results/ring-overlap-deeper/old-admission-near-plateau-micro-2048-rings-4/rank-5.log",
+      "bytes": 792,
+      "sha256": "8159968687ef70f0810166dc399b80c5f1c77cd65914b5364f8d9df47d642f42"
+    },
+    {
+      "path": "results/ring-overlap-deeper/old-admission-near-plateau-micro-2048-rings-4/rank-6.log",
+      "bytes": 792,
+      "sha256": "2bc7b53a7101d01f94d8078d90c6a1bff1702696bc876192c3670856ef370a95"
+    },
+    {
+      "path": "results/ring-overlap-deeper/old-admission-near-plateau-micro-2048-rings-4/rank-7.log",
+      "bytes": 792,
+      "sha256": "f328d328d5f21920e51759e18d2fec69fa6c44e9259eb3e94a30ecfc5d4e04c6"
+    },
+    {
+      "path": "results/ring-overlap-deeper/old-admission-near-plateau-micro-2048-rings-8/nccl-id.bin",
+      "bytes": 192,
+      "sha256": "eb79517520711548129a7b74e33bd66bce46266fac6c64a8cb63e61035d85ea3"
+    },
+    {
+      "path": "results/ring-overlap-deeper/old-admission-near-plateau-micro-2048-rings-8/rank-0.log",
+      "bytes": 792,
+      "sha256": "46dd021aa66347a7ff862e087d54da340978cffa9d50e900f3ffd8342e9a0937"
+    },
+    {
+      "path": "results/ring-overlap-deeper/old-admission-near-plateau-micro-2048-rings-8/rank-1.log",
+      "bytes": 792,
+      "sha256": "c3842d72aac662e7009f2a994e3088a0595bbbff0f586b5820196cc63457b854"
+    },
+    {
+      "path": "results/ring-overlap-deeper/old-admission-near-plateau-micro-2048-rings-8/rank-2.log",
+      "bytes": 792,
+      "sha256": "5d3476af0c1cf3b6c6a06c6bb43eb237d50dd3133f2dcee3c7dcc6fe8794bb4e"
+    },
+    {
+      "path": "results/ring-overlap-deeper/old-admission-near-plateau-micro-2048-rings-8/rank-3.log",
+      "bytes": 792,
+      "sha256": "b1404ed8318fa5b35f0a263f10d8aa751e421157bde52f0445d0c2934a99f8d9"
+    },
+    {
+      "path": "results/ring-overlap-deeper/old-admission-near-plateau-micro-2048-rings-8/rank-4.log",
+      "bytes": 792,
+      "sha256": "f0ada521f2e40d13a135681b900b87156386936154763299a5d1caca57f4cc20"
+    },
+    {
+      "path": "results/ring-overlap-deeper/old-admission-near-plateau-micro-2048-rings-8/rank-5.log",
+      "bytes": 792,
+      "sha256": "5b047e9676e6dc3236368dc2737efb822ea970c14a7955fabe369a19bb42bf91"
+    },
+    {
+      "path": "results/ring-overlap-deeper/old-admission-near-plateau-micro-2048-rings-8/rank-6.log",
+      "bytes": 792,
+      "sha256": "47d7c8a07ece121e03a9f28da5ffd23f7b9def927ac44771f814f7feccde1c95"
+    },
+    {
+      "path": "results/ring-overlap-deeper/old-admission-near-plateau-micro-2048-rings-8/rank-7.log",
+      "bytes": 792,
+      "sha256": "09aaf8790efd0fa3cfef1d4e40398763998f18285a3181d3b39ccb7ce5df8197"
+    },
+    {
+      "path": "results/ring-overlap-deeper/report.json",
+      "bytes": 23876,
+      "sha256": "ccfedeff7576016c14c7072fdd9942fef7147727b7b30216b953935b85cc4ff7"
+    },
+    {
+      "path": "results/timeline-1m/api-blocking-analysis.json",
+      "bytes": 2613,
+      "sha256": "75602f2eb6f240bb69cef90482eb696df744d7ccd420e38266eaffc351c6725e"
+    },
+    {
+      "path": "ring-overlap-deeper.py",
+      "bytes": 3670,
+      "sha256": "b21268de389f305f110dbe22bffbc02cd749e73a80c005cca06497c24373cc39"
+    }
+  ],
+  "parts": [
+    {
+      "name": "part-000",
+      "bytes": 19289,
+      "sha256": "29ae8b2172ca299b3b0b9cecaf313b6364e17b9741e37896d86d9c93b7360703"
+    }
+  ],
+  "epoch": 1791595214.4705684,
+  "scope": "terminal supplement: ring4/8 causal timings, CPU336 Python source aed, API blocking analysis; parent diagnostics archive d4e14e3650b4434420881c85df83facf07f05e04"
+}

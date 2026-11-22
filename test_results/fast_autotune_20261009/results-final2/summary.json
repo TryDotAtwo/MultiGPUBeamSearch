@@ -1,0 +1,180 @@
+[
+  {
+    "file": "default-public-1048576.json",
+    "requested_beam": 1048576,
+    "effective_beam": 1048576,
+    "replay_valid": true,
+    "path_length": 4,
+    "public_call_wall_seconds": 23.668261551996693,
+    "calibration_total_wall_seconds": 19.801212555001257,
+    "inference_batch": 8192,
+    "inference_curve_parents_per_second": 12830794.427897558,
+    "inference_calibration_wall_seconds": 5.393213217990706,
+    "pipeline_phase": "pipeline_measured",
+    "environment": {
+      "BEAM_B_MICRO": "8192",
+      "BEAM_ENSEMBLE_INFERENCE_MICRO": "8192",
+      "BEAM_SHARD_COUNT": "4",
+      "BEAM_STREAM3_RING_SLOTS": "8",
+      "BEAM_STREAM4_ACTIVE_SORT_SLOTS": "4",
+      "BEAM_STREAM4_BATCH_CANDIDATES": "131072"
+    },
+    "matched": {
+      "parents": 1048576,
+      "world_size": 2,
+      "measurement_scope": "matched_full_frontier",
+      "stream1_seconds": 0.07744509124755859,
+      "full_step_seconds": 0.181746,
+      "stream1_parents_per_second": 13539605.714300914,
+      "full_step_parents_per_second": 5769458.475014581,
+      "throughput_loss_fraction": 0.5738828296217875,
+      "relative_time_overhead": 1.3467723657143913
+    },
+    "selection": "baseline-full-verified",
+    "search_policy": "baseline plus at most five exact-capacity candidates; frozen inference microbatch",
+    "capacity_fields": {}
+  },
+  {
+    "file": "default-public-65536.json",
+    "requested_beam": 65536,
+    "effective_beam": 65536,
+    "replay_valid": true,
+    "path_length": 4,
+    "public_call_wall_seconds": 19.44226912499289,
+    "calibration_total_wall_seconds": 15.264827578997938,
+    "inference_batch": 8192,
+    "inference_curve_parents_per_second": 12697153.444660306,
+    "inference_calibration_wall_seconds": 5.462424671000917,
+    "pipeline_phase": "pipeline_measured",
+    "environment": {
+      "BEAM_B_MICRO": "8192",
+      "BEAM_ENSEMBLE_INFERENCE_MICRO": "8192",
+      "BEAM_SHARD_COUNT": "4",
+      "BEAM_STREAM3_RING_SLOTS": "6",
+      "BEAM_STREAM4_ACTIVE_SORT_SLOTS": "4",
+      "BEAM_STREAM4_BATCH_CANDIDATES": "65536"
+    },
+    "matched": {
+      "parents": 65536,
+      "world_size": 2,
+      "measurement_scope": "matched_full_frontier",
+      "stream1_seconds": 0.004882431983947754,
+      "full_step_seconds": 0.0231988,
+      "stream1_parents_per_second": 13422818.836077265,
+      "full_step_parents_per_second": 2824973.7055364936,
+      "throughput_loss_fraction": 0.7895394596294742,
+      "relative_time_overhead": 3.7514845217039374
+    },
+    "selection": "baseline-full-verified",
+    "search_policy": "baseline plus at most five exact-capacity candidates; frozen inference microbatch",
+    "capacity_fields": {}
+  },
+  {
+    "file": "default-public-max.json",
+    "requested_beam": "max",
+    "effective_beam": 88891392,
+    "replay_valid": true,
+    "path_length": 4,
+    "public_call_wall_seconds": 264.0554552789981,
+    "calibration_total_wall_seconds": 256.9166170480021,
+    "inference_batch": 8192,
+    "inference_curve_parents_per_second": 12872083.304291941,
+    "inference_calibration_wall_seconds": 5.392788505996577,
+    "pipeline_phase": "pipeline_measured",
+    "environment": {
+      "BEAM_B_MICRO": "8192",
+      "BEAM_ENSEMBLE_INFERENCE_MICRO": "8192",
+      "BEAM_SHARD_COUNT": "4",
+      "BEAM_STREAM3_RING_SLOTS": "2",
+      "BEAM_STREAM4_ACTIVE_SORT_SLOTS": "1",
+      "BEAM_STREAM4_BATCH_CANDIDATES": "8334336"
+    },
+    "matched": {
+      "parents": 88891392,
+      "world_size": 2,
+      "measurement_scope": "matched_full_frontier",
+      "stream1_seconds": 6.528677734375,
+      "full_step_seconds": 14.63,
+      "stream1_parents_per_second": 13615527.617784875,
+      "full_step_parents_per_second": 6075966.643882433,
+      "throughput_loss_fraction": 0.5537472498718388,
+      "relative_time_overhead": 1.2408825485396013
+    },
+    "selection": "throughput-batch",
+    "search_policy": "baseline plus at most five exact-capacity candidates; frozen inference microbatch",
+    "capacity_fields": {
+      "maximum_beam": {
+        "requested_beam": 88891392,
+        "effective_beam": 88891392,
+        "profile": {
+          "BEAM_B_MICRO": "8192",
+          "BEAM_SHARD_COUNT": "4",
+          "BEAM_STREAM3_RING_SLOTS": "2",
+          "BEAM_STREAM4_ACTIVE_SORT_SLOTS": "1",
+          "BEAM_STREAM4_BATCH_CANDIDATES": "8192"
+        },
+        "plans": [
+          {
+            "BEAM_WIDTH_ALIGNMENT": 8192,
+            "B_MICRO": 8192,
+            "GLOBAL_BEAM_WIDTH_EFFECTIVE": 88891392,
+            "LOCAL_RANK": 0,
+            "RING_COUNT": 453,
+            "SHARD_CAPACITY_CANDIDATES": 13889536,
+            "SHARD_COUNT": 4,
+            "STREAM3_RING_SLOTS": 2,
+            "STREAM4_ACTIVE_SORT_SLOTS": 1,
+            "STREAM4_BATCH_ALIGNMENT": 1024,
+            "STREAM4_BATCH_CANDIDATES": 8192,
+            "WORLD_SIZE": 2,
+            "estimated_required_device_bytes": 10757887494,
+            "frontier_state_capacity": 44445696,
+            "gpu_budget_bytes": 10758127616
+          },
+          {
+            "BEAM_WIDTH_ALIGNMENT": 8192,
+            "B_MICRO": 8192,
+            "GLOBAL_BEAM_WIDTH_EFFECTIVE": 88891392,
+            "LOCAL_RANK": 1,
+            "RING_COUNT": 453,
+            "SHARD_CAPACITY_CANDIDATES": 13889536,
+            "SHARD_COUNT": 4,
+            "STREAM3_RING_SLOTS": 2,
+            "STREAM4_ACTIVE_SORT_SLOTS": 1,
+            "STREAM4_BATCH_ALIGNMENT": 1024,
+            "STREAM4_BATCH_CANDIDATES": 8192,
+            "WORLD_SIZE": 2,
+            "estimated_required_device_bytes": 10757887494,
+            "frontier_state_capacity": 44445696,
+            "gpu_budget_bytes": 10889330688
+          }
+        ],
+        "probes": 1662,
+        "upper_rejected_beam": 88899584,
+        "search_complete": true,
+        "full_step_verified": true,
+        "wall_seconds": 1.7113516179961152,
+        "profiles": "shards 1..128, two staging slots, one active sort slot",
+        "upper_bound_source": "minimum of smallest GPU VRAM / state storage and multiset permutation bound",
+        "capacity_scope": "full-step verified",
+        "rejected": [],
+        "inference_refinement": [
+          {
+            "beam": 88891392,
+            "parent_batch": 8192,
+            "reserve_bytes": 597688320,
+            "readmitted": false
+          }
+        ],
+        "execution_profile": {
+          "BEAM_B_MICRO": "8192",
+          "BEAM_ENSEMBLE_INFERENCE_MICRO": "8192",
+          "BEAM_SHARD_COUNT": "4",
+          "BEAM_STREAM3_RING_SLOTS": "2",
+          "BEAM_STREAM4_ACTIVE_SORT_SLOTS": "1",
+          "BEAM_STREAM4_BATCH_CANDIDATES": "8334336"
+        }
+      }
+    }
+  }
+]

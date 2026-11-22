@@ -1,0 +1,2 @@
+NATIVE_ABI_PROBE_OK {"abi_version": 1, "candidate_alignment": 32, "candidate_bytes": 32, "hash_alignment": 16, "hash_bytes": 16, "move_count": 24, "state_alignment": 16, "state_len": 96, "storage_len": 112}
+NATIVE_ABI_PROBE_OK {"abi_version": 1, "candidate_alignment": 32, "candidate_bytes": 32, "hash_alignment": 16, "hash_bytes": 16, "move_count": 24, "state_alignment": 16, "state_len": 96, "storage_len": 112}

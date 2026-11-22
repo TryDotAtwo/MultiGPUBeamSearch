@@ -1,0 +1,2 @@
+gpu=0 bounded_graph_equivalence=pass cases=36
+gpu=1 bounded_graph_equivalence=pass cases=36

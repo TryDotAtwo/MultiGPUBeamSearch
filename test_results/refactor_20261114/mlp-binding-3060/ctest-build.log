@@ -1,0 +1,4 @@
+[ 33%] Building CXX object CMakeFiles/mlp_artifact_binding_cpu_tests.dir/workspace/beam-work/tests/mlp_artifact_binding_cpu.cpp.o
+[ 66%] Building CXX object CMakeFiles/mlp_artifact_binding_cpu_tests.dir/workspace/beam-work/src/native_input.cpp.o
+[100%] Linking CXX executable mlp_artifact_binding_cpu_tests
+[100%] Built target mlp_artifact_binding_cpu_tests

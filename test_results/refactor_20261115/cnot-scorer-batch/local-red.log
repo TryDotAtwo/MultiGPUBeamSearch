@@ -1,0 +1,30 @@
+F                                                                        [100%]
+================================== FAILURES ===================================
+______ test_experimental_native_batch_rejects_an_old_scorer_before_open _______
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x00000254B390B710>
+tmp_path = WindowsPath('D:/100XH100/.local/tmp/pytest-of-���� ������/pytest-1/test_experimental_native_batch0')
+
+    def test_experimental_native_batch_rejects_an_old_scorer_before_open(monkeypatch, tmp_path):
+        opened = []
+        old_api = SimpleNamespace(mgbs_tqp_open=lambda *_: opened.append(True))
+        monkeypatch.setattr(cnot_scorer, "_load_api", lambda _: old_api)
+        monkeypatch.setattr(torch, "__version__", "2.9.0")
+        monkeypatch.setattr(torch.version, "cuda", "12.8")
+        monkeypatch.setattr(torch.cuda, "device", lambda _: nullcontext())
+        manifest = tmp_path / "manifest.json"
+        manifest.write_text("{}", encoding="utf-8")
+    
+        with pytest.raises(RuntimeError, match="batch scorer ABI"):
+>           cnot_scorer.TQPScorer("old-library", manifest, n=4, device="cuda:0",
+                                  experimental_native_batch=True)
+E           TypeError: TQPScorer.__init__() got an unexpected keyword argument 'experimental_native_batch'
+
+integrations\cayleypy_native\tests\test_cnot_scorer_batch_api.py:22: TypeError
+=========================== short test summary info ===========================
+FAILED integrations\cayleypy_native\tests\test_cnot_scorer_batch_api.py::test_experimental_native_batch_rejects_an_old_scorer_before_open
+1 failed in 2.89s
+Exception ignored in: <function Console.__del__ at 0x00000254877AF4C0>
+Traceback (most recent call last):
+  File "C:\Users\���� ������\AppData\Local\Programs\Python\Python311\Lib\site-packages\pyreadline3\console\console.py", line 255, in __del__
+OSError: [WinError -1073741816] Windows Error 0xc0000008

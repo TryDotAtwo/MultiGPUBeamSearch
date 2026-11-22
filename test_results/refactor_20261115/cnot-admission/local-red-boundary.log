@@ -1,0 +1,155 @@
+FF                                                                       [100%]
+================================== FAILURES ===================================
+_ test_metadata_exceptions_stay_inside_the_admission_failure_boundary[property] _
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x000002678DF43710>
+failure = 'property'
+
+    @pytest.mark.parametrize("failure", ["property", "json"])
+    def test_metadata_exceptions_stay_inside_the_admission_failure_boundary(monkeypatch, failure):
+        from multigpubeamsearch import cnot
+    
+        class Scorer:
+            @property
+            def metadata(self):
+                if failure == "property":
+                    raise ValueError("metadata unavailable")
+                return {"checkpoint_sha256": object()}
+    
+        class CollectiveProbe:
+            def __init__(self, device):
+                self.device = device
+    
+            def __enter__(self):
+                return self
+    
+            def __exit__(self, *_):
+                pass
+    
+            def checked(self, stage, fn):
+                try:
+                    return fn()
+                except Exception as error:
+                    raise RuntimeError(f"{stage} failed: rank 0: {error}") from error
+    
+            def gather_fixed(self, _):
+                raise AssertionError("a failing rank must not enter the digest exchange")
+    
+        monkeypatch.setattr(cnot, "World", CollectiveProbe)
+        with pytest.raises(RuntimeError, match="validate CNOT input failed: rank 0:"):
+>           search_cnot(pack_rows((1, 2)), Scorer(), width=1, shortlist=1, max_depth=1)
+
+integrations\cayleypy_native\tests\test_cnot_collective_admission.py:47: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+C:\Users\���� ������\AppData\Local\Programs\Python\Python311\Lib\site-packages\torch\utils\_contextlib.py:120: in decorate_context
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+C:\Users\���� ������\AppData\Local\Programs\Python\Python311\Lib\site-packages\torch\utils\_contextlib.py:120: in decorate_context
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+integrations\cayleypy_native\multigpubeamsearch\cnot.py:200: in search_cnot
+    metadata = getattr(scorer, "metadata", {})
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <test_cnot_collective_admission.test_metadata_exceptions_stay_inside_the_admission_failure_boundary.<locals>.Scorer object at 0x000002678D861450>
+
+    @property
+    def metadata(self):
+        if failure == "property":
+>           raise ValueError("metadata unavailable")
+E           ValueError: metadata unavailable
+
+integrations\cayleypy_native\tests\test_cnot_collective_admission.py:23: ValueError
+__ test_metadata_exceptions_stay_inside_the_admission_failure_boundary[json] __
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x000002678E088CD0>
+failure = 'json'
+
+    @pytest.mark.parametrize("failure", ["property", "json"])
+    def test_metadata_exceptions_stay_inside_the_admission_failure_boundary(monkeypatch, failure):
+        from multigpubeamsearch import cnot
+    
+        class Scorer:
+            @property
+            def metadata(self):
+                if failure == "property":
+                    raise ValueError("metadata unavailable")
+                return {"checkpoint_sha256": object()}
+    
+        class CollectiveProbe:
+            def __init__(self, device):
+                self.device = device
+    
+            def __enter__(self):
+                return self
+    
+            def __exit__(self, *_):
+                pass
+    
+            def checked(self, stage, fn):
+                try:
+                    return fn()
+                except Exception as error:
+                    raise RuntimeError(f"{stage} failed: rank 0: {error}") from error
+    
+            def gather_fixed(self, _):
+                raise AssertionError("a failing rank must not enter the digest exchange")
+    
+        monkeypatch.setattr(cnot, "World", CollectiveProbe)
+        with pytest.raises(RuntimeError, match="validate CNOT input failed: rank 0:"):
+>           search_cnot(pack_rows((1, 2)), Scorer(), width=1, shortlist=1, max_depth=1)
+
+integrations\cayleypy_native\tests\test_cnot_collective_admission.py:47: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+C:\Users\���� ������\AppData\Local\Programs\Python\Python311\Lib\site-packages\torch\utils\_contextlib.py:120: in decorate_context
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+C:\Users\���� ������\AppData\Local\Programs\Python\Python311\Lib\site-packages\torch\utils\_contextlib.py:120: in decorate_context
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+integrations\cayleypy_native\multigpubeamsearch\cnot.py:206: in search_cnot
+    hasher.update(json.dumps(config).encode())
+                  ^^^^^^^^^^^^^^^^^^
+C:\Users\���� ������\AppData\Local\Programs\Python\Python311\Lib\json\__init__.py:231: in dumps
+    return _default_encoder.encode(obj)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\���� ������\AppData\Local\Programs\Python\Python311\Lib\json\encoder.py:200: in encode
+    chunks = self.iterencode(o, _one_shot=True)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\���� ������\AppData\Local\Programs\Python\Python311\Lib\json\encoder.py:258: in iterencode
+    return _iterencode(o, 0)
+           ^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <json.encoder.JSONEncoder object at 0x00000267E14C8A90>
+o = <object object at 0x000002678DF01CC0>
+
+    def default(self, o):
+        """Implement this method in a subclass such that it returns
+        a serializable object for ``o``, or calls the base implementation
+        (to raise a ``TypeError``).
+    
+        For example, to support arbitrary iterators, you could
+        implement default like this::
+    
+            def default(self, o):
+                try:
+                    iterable = iter(o)
+                except TypeError:
+                    pass
+                else:
+                    return list(iterable)
+                # Let the base class default method raise the TypeError
+                return JSONEncoder.default(self, o)
+    
+        """
+>       raise TypeError(f'Object of type {o.__class__.__name__} '
+                        f'is not JSON serializable')
+E       TypeError: Object of type object is not JSON serializable
+
+C:\Users\���� ������\AppData\Local\Programs\Python\Python311\Lib\json\encoder.py:180: TypeError
+=========================== short test summary info ===========================
+FAILED integrations\cayleypy_native\tests\test_cnot_collective_admission.py::test_metadata_exceptions_stay_inside_the_admission_failure_boundary[property]
+FAILED integrations\cayleypy_native\tests\test_cnot_collective_admission.py::test_metadata_exceptions_stay_inside_the_admission_failure_boundary[json]
+2 failed, 2 deselected in 4.88s

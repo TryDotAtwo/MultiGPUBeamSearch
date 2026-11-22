@@ -1,0 +1,22 @@
+-- Beam state logical bytes: 96
+-- Beam state physical bytes: 112
+-- Beam state alignment: 16
+-- Beam move count: 24
+-- The CXX compiler identification is GNU 11.4.0
+-- The CUDA compiler identification is NVIDIA 12.8.93 with host compiler GNU 11.4.0
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: /usr/bin/x86_64-linux-gnu-g++-11 - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- Detecting CUDA compiler ABI info
+-- Detecting CUDA compiler ABI info - done
+-- Check for working CUDA compiler: /usr/local/cuda-12.8/bin/nvcc - skipped
+-- Detecting CUDA compile features
+-- Detecting CUDA compile features - done
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD - Success
+-- Found Threads: TRUE
+-- Configuring done (3.9s)
+-- Generating done (0.3s)
+-- Build files have been written to: /workspace/beam-results/native-library/actual/build/cache/builds/781fea7ede40aa0238becdd7943374a36f32606b7ea29b4cac7ea86a5b687985

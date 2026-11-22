@@ -1,0 +1,1104 @@
+#include "stream4.hpp"
+
+#include "hash_sort.cuh"
+#include "nvtx_ranges.hpp"
+#include "score_sort_bits.cuh"
+#include "stream4_index.cuh"
+#include "stream4_merge.cuh"
+#include "stream4_scan.cuh"
+
+#include <cub/device/device_merge_sort.cuh>
+#include <cub/device/device_radix_sort.cuh>
+#include <cub/device/device_reduce.cuh>
+#include <cuda_runtime.h>
+
+#include <stdexcept>
+#include <climits>
+#include <cstdlib>
+#include <cstring>
+#include <string>
+
+namespace beam {
+
+namespace {
+
+struct Stream4HashLess {
+    __host__ __device__ bool operator()(Hash128 a, Hash128 b) const {
+        if (a.hi != b.hi) {
+            return a.hi < b.hi;
+        }
+        return a.lo < b.lo;
+    }
+};
+
+struct Stream4BestCandidate {
+    __host__ __device__ CandidateMeta operator()(CandidateMeta a, CandidateMeta b) const {
+        if (a.score_key != b.score_key) {
+            return a.score_key < b.score_key ? a : b;
+        }
+        if (a.parent_idx != b.parent_idx) {
+            return a.parent_idx < b.parent_idx ? a : b;
+        }
+        return a.route_packed <= b.route_packed ? a : b;
+    }
+};
+
+struct Stream4ScoreCountSum {
+    __host__ __device__ std::uint64_t operator()(std::uint64_t a, std::uint64_t b) const {
+        return a + b;
+    }
+};
+
+__device__ CandidateMeta stream4_invalid_candidate_device() {
+    return CandidateMeta{Hash128{UINT64_MAX, UINT64_MAX}, UINT64_MAX, UINT32_MAX, UINT32_MAX};
+}
+
+__global__ void stream4_clear_inactive_histogram_kernel(
+    std::uint32_t* shard_score_hist_a,
+    std::uint32_t* shard_score_hist_b,
+    const std::uint32_t* shard_score_hist_active_index) {
+    const std::uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i >= SCORE_BIN_COUNT) {
+        return;
+    }
+    std::uint32_t* inactive_hist =
+        ((*shard_score_hist_active_index & 1U) == 0U) ? shard_score_hist_b : shard_score_hist_a;
+    inactive_hist[i] = 0;
+}
+
+__global__ void stream4_fill_score_histogram_pairs_kernel(
+    const CandidateMeta* clean_survivor,
+    const std::uint32_t* clean_count,
+    std::uint32_t* score_key,
+    std::uint64_t* score_count,
+    std::uint32_t capacity) {
+    const std::uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i >= capacity) {
+        return;
+    }
+    const std::uint32_t count = *clean_count;
+    if (i < count && clean_survivor[i].score_key < SCORE_BIN_COUNT) {
+        score_key[i] = clean_survivor[i].score_key;
+        score_count[i] = 1ULL;
+    } else {
+        score_key[i] = SCORE_BIN_COUNT;
+        score_count[i] = 0ULL;
+    }
+}
+
+__global__ void stream4_scatter_score_histogram_kernel(
+    const std::uint32_t* score_key,
+    const std::uint64_t* score_count,
+    const std::uint32_t* unique_count,
+    std::uint32_t* shard_score_hist_a,
+    std::uint32_t* shard_score_hist_b,
+    const std::uint32_t* shard_score_hist_active_index,
+    std::uint32_t capacity) {
+    const std::uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i >= capacity || i >= *unique_count) {
+        return;
+    }
+    const std::uint32_t key = score_key[i];
+    if (key < SCORE_BIN_COUNT) {
+        std::uint32_t* inactive_hist =
+            ((*shard_score_hist_active_index & 1U) == 0U) ? shard_score_hist_b : shard_score_hist_a;
+        inactive_hist[key] = static_cast<std::uint32_t>(score_count[i]);
+    }
+}
+
+__global__ void stream4_finalize_score_histogram_kernel(
+    std::uint32_t* shard_score_hist_active_index,
+    std::uint32_t* processing_flag) {
+    if (blockIdx.x == 0 && threadIdx.x == 0) {
+        *shard_score_hist_active_index = (*shard_score_hist_active_index ^ 1U) & 1U;
+        *processing_flag = 0;
+    }
+}
+
+void check_cub(cudaError_t status, const char* op) {
+    if (status != cudaSuccess) {
+        throw std::runtime_error(std::string(op) + ": " + cudaGetErrorString(status));
+    }
+}
+
+#if CUDART_VERSION >= 12040
+// Set every handle before any body can overwrite scratch_count. Exactly one
+// body executes, including count=0; no host readback or candidate truncation.
+__global__ void stream4_choose_sort_body_kernel(
+    const std::uint32_t* count, std::uint32_t quarter, std::uint32_t half,
+    std::uint32_t capacity, cudaGraphConditionalHandle small,
+    cudaGraphConditionalHandle medium, cudaGraphConditionalHandle full) {
+    if (blockIdx.x || threadIdx.x) return;
+    const auto n = *count;
+    if (n > capacity) asm("trap;");
+    cudaGraphSetConditional(small, n <= quarter);
+    cudaGraphSetConditional(medium, n > quarter && n <= half);
+    cudaGraphSetConditional(full, n > half);
+}
+#endif
+
+__global__ void stream4_mark_threshold_counts_kernel(
+    const CandidateMeta* input,
+    const std::uint32_t* clean_count,
+    const std::uint32_t* dirty_count,
+    std::uint32_t* keep_flags,
+    std::uint32_t* block_counts,
+    const std::uint32_t* threshold_device,
+    const std::uint32_t* threshold_active_index,
+    std::uint32_t threshold_value,
+    std::uint32_t capacity) {
+    __shared__ std::uint32_t flags[256];
+    const std::uint32_t tid = threadIdx.x;
+    const std::uint32_t i = blockIdx.x * blockDim.x + tid;
+    const std::uint32_t input_count = *clean_count + *dirty_count;
+    const std::uint32_t threshold =
+        threshold_device == nullptr
+            ? threshold_value
+            : threshold_device[threshold_active_index == nullptr ? 0U : (*threshold_active_index & 1U)];
+    std::uint32_t keep = 0;
+    if (i < capacity) {
+        keep = i < input_count && input[i].score_key <= threshold ? 1U : 0U;
+        keep_flags[i] = keep;
+    }
+    flags[tid] = keep;
+    __syncthreads();
+    for (std::uint32_t stride = blockDim.x / 2; stride > 0; stride >>= 1) {
+        if (tid < stride) {
+            flags[tid] += flags[tid + stride];
+        }
+        __syncthreads();
+    }
+    if (tid == 0) {
+        block_counts[blockIdx.x] = flags[0];
+    }
+}
+
+__global__ void stream4_mark_union_counts_kernel(
+    const CandidateMeta* input, const std::uint32_t* clean_count,
+    std::uint32_t* keep_flags, std::uint32_t* block_counts,
+    std::uint32_t threshold, std::uint32_t physical_capacity) {
+    __shared__ std::uint32_t flags[256];
+    const auto tid = threadIdx.x;
+    const auto i = blockIdx.x * blockDim.x + tid;
+    if (clean_count[0] > physical_capacity || clean_count[1] > physical_capacity) {
+        asm("trap;");
+        return;
+    }
+    std::uint32_t keep = 0;
+    if (i < 2U * physical_capacity) {
+        const auto physical = i / physical_capacity;
+        keep = i % physical_capacity < clean_count[physical] && input[i].score_key <= threshold;
+        keep_flags[i] = keep;
+    }
+    flags[tid] = keep;
+    __syncthreads();
+    for (unsigned stride = 128; stride; stride >>= 1) {
+        if (tid < stride) flags[tid] += flags[tid + stride];
+        __syncthreads();
+    }
+    if (tid == 0) block_counts[blockIdx.x] = flags[0];
+}
+
+__global__ void stream4_split_union_counts_kernel(
+    std::uint32_t* clean, std::uint32_t* dirty, std::uint32_t* processing,
+    const std::uint32_t* total, std::uint32_t capacity) {
+    if (threadIdx.x == 0 && blockIdx.x == 0) {
+        const auto n = *total;
+        clean[0] = n < capacity ? n : capacity;
+        clean[1] = n - clean[0];
+        dirty[0] = dirty[1] = 0;
+        processing[0] = processing[1] = 0;
+    }
+}
+
+#if !BEAM_EXPERIMENTAL_STREAM4_SCAN
+__global__ void stream4_scan_block_counts_kernel(
+    const std::uint32_t* block_counts,
+    std::uint32_t* block_offsets,
+    std::uint32_t* output_count,
+    std::uint32_t block_count) {
+    if (blockIdx.x != 0 || threadIdx.x != 0) {
+        return;
+    }
+    std::uint32_t running = 0;
+    for (std::uint32_t block = 0; block < block_count; ++block) {
+        block_offsets[block] = running;
+        running += block_counts[block];
+    }
+    *output_count = running;
+}
+#endif
+
+void stream4_scan_block_counts(const std::uint32_t* counts, std::uint32_t* offsets,
+                               std::uint32_t* total, std::uint32_t blocks,
+                               void* temp, std::size_t temp_bytes, cudaStream_t stream) {
+#if BEAM_EXPERIMENTAL_STREAM4_SCAN
+    const auto status = detail::stream4_scan_counts(counts, offsets, total, blocks, temp, temp_bytes, stream);
+    if (status != cudaSuccess) {
+        std::size_t required = 0;
+        const auto query = detail::stream4_scan_temp_bytes(blocks, required);
+        throw std::runtime_error(std::string("CUB stream4 block-count scan: ") + cudaGetErrorString(status) +
+            " required=" + (query == cudaSuccess ? std::to_string(required) : std::string("unknown")) +
+            " available=" + std::to_string(temp_bytes));
+    }
+#else
+    (void)temp; (void)temp_bytes;
+    stream4_scan_block_counts_kernel<<<1, 1, 0, stream>>>(counts, offsets, total, blocks);
+#endif
+}
+
+__global__ void stream4_compact_threshold_kernel(
+    const CandidateMeta* input,
+    const std::uint32_t* keep_flags,
+    const std::uint32_t* block_offsets,
+    Hash128* compact_key,
+    CandidateMeta* compact_value,
+    std::uint32_t capacity) {
+    const std::uint32_t tid = threadIdx.x;
+    const std::uint32_t i = blockIdx.x * blockDim.x + tid;
+    const std::uint32_t keep = i < capacity ? keep_flags[i] : 0U;
+#if BEAM_EXPERIMENTAL_STREAM4_SCAN
+    const std::uint32_t prefix = detail::stream4_block_prefix(keep);
+#else
+    __shared__ std::uint32_t scan[256];
+    scan[tid] = keep;
+    __syncthreads();
+    for (std::uint32_t offset = 1; offset < blockDim.x; offset <<= 1) {
+        const std::uint32_t add = tid >= offset ? scan[tid - offset] : 0U;
+        __syncthreads();
+        scan[tid] += add;
+        __syncthreads();
+    }
+    const std::uint32_t prefix = scan[tid] - keep;
+#endif
+    if (keep != 0U) {
+        const CandidateMeta candidate = input[i];
+        const std::uint32_t out = block_offsets[blockIdx.x] + prefix;
+        compact_key[out] = candidate.hash;
+        compact_value[out] = candidate;
+    }
+}
+
+__global__ void stream4_check_sort_bound_kernel(const std::uint32_t* compact_count,
+                                               std::uint32_t bound) {
+    // Unconditional device failure, independent of NDEBUG: never truncate.
+    if (*compact_count > bound) asm("trap;");
+}
+
+__global__ void stream4_fill_sort_tail_kernel(
+    Hash128* key,
+    CandidateMeta* value,
+    const std::uint32_t* compact_count,
+    std::uint32_t capacity) {
+    const std::uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
+    const std::uint32_t count = *compact_count;
+    if (i >= count && i < capacity) {
+        key[i] = Hash128{UINT64_MAX, UINT64_MAX};
+        value[i] = stream4_invalid_candidate_device();
+    }
+}
+
+__global__ void stream4_mark_valid_unique_counts_kernel(
+    const CandidateMeta* reduced_value,
+    std::uint32_t* keep_flags,
+    std::uint32_t* block_counts,
+    const std::uint32_t* reduced_count,
+    std::uint32_t capacity) {
+    __shared__ std::uint32_t flags[256];
+    const std::uint32_t tid = threadIdx.x;
+    const std::uint32_t i = blockIdx.x * blockDim.x + tid;
+    const std::uint32_t count = *reduced_count;
+    std::uint32_t keep = 0;
+    if (i < count) {
+        keep = reduced_value[i].score_key != UINT32_MAX ? 1U : 0U;
+        keep_flags[i] = keep;
+    } else if (i < capacity) {
+        keep_flags[i] = 0;
+    }
+    flags[tid] = keep;
+    __syncthreads();
+    for (std::uint32_t stride = blockDim.x / 2; stride > 0; stride >>= 1) {
+        if (tid < stride) {
+            flags[tid] += flags[tid + stride];
+        }
+        __syncthreads();
+    }
+    if (tid == 0) {
+        block_counts[blockIdx.x] = flags[0];
+    }
+}
+
+__global__ void stream4_compact_valid_unique_kernel(
+    const CandidateMeta* reduced_value,
+    const std::uint32_t* keep_flags,
+    const std::uint32_t* block_offsets,
+    CandidateMeta* output,
+    std::uint32_t* clean_count,
+    std::uint32_t* dirty_count,
+    const std::uint32_t* output_count,
+    std::uint32_t capacity) {
+    const std::uint32_t tid = threadIdx.x;
+    const std::uint32_t i = blockIdx.x * blockDim.x + tid;
+    const std::uint32_t keep = i < capacity ? keep_flags[i] : 0U;
+#if BEAM_EXPERIMENTAL_STREAM4_SCAN
+    const std::uint32_t prefix = detail::stream4_block_prefix(keep);
+#else
+    __shared__ std::uint32_t scan[256];
+    scan[tid] = keep;
+    __syncthreads();
+    for (std::uint32_t offset = 1; offset < blockDim.x; offset <<= 1) {
+        const std::uint32_t add = tid >= offset ? scan[tid - offset] : 0U;
+        __syncthreads();
+        scan[tid] += add;
+        __syncthreads();
+    }
+    const std::uint32_t prefix = scan[tid] - keep;
+#endif
+    if (keep != 0U) {
+        output[block_offsets[blockIdx.x] + prefix] = reduced_value[i];
+    }
+    if (blockIdx.x == 0 && threadIdx.x == 0) {
+        *clean_count = *output_count;
+        *dirty_count = 0;
+    }
+}
+
+#if BEAM_EXPERIMENTAL_INDEX_SORT || BEAM_EXPERIMENTAL_DIRTY_MERGE
+__global__ void stream4_fill_index_pairs_kernel(
+    Hash128* keys, std::uint32_t* indices,
+    const std::uint32_t* compact_count, std::uint32_t sort_items) {
+    const std::uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i >= sort_items) return;
+    if (i == 0 && *compact_count > sort_items) asm("trap;");
+    if (i < *compact_count) {
+        indices[i] = i;
+    } else {
+        keys[i] = Hash128{UINT64_MAX, UINT64_MAX};
+        indices[i] = UINT32_MAX;
+    }
+}
+
+__global__ void stream4_mark_valid_unique_indices_kernel(
+    const CandidateMeta* metadata, const std::uint32_t* indices,
+    std::uint32_t* keep_flags, std::uint32_t* block_counts,
+    const std::uint32_t* reduced_count, const std::uint32_t* compact_count,
+    std::uint32_t sort_items) {
+    __shared__ std::uint32_t flags[256];
+    const std::uint32_t tid = threadIdx.x;
+    const std::uint32_t i = blockIdx.x * blockDim.x + tid;
+    std::uint32_t keep = 0;
+    if (i < sort_items) {
+        if (i < *reduced_count) {
+            const std::uint32_t index = indices[i];
+            if (index != UINT32_MAX) {
+                if (index >= sort_items || index >= *compact_count) asm("trap;");
+                else keep = metadata[index].score_key != UINT32_MAX ? 1U : 0U;
+            }
+        }
+        keep_flags[i] = keep;
+    }
+    flags[tid] = keep;
+    __syncthreads();
+    for (std::uint32_t stride = blockDim.x / 2; stride > 0; stride >>= 1) {
+        if (tid < stride) flags[tid] += flags[tid + stride];
+        __syncthreads();
+    }
+    if (tid == 0) block_counts[blockIdx.x] = flags[0];
+}
+
+__global__ void stream4_compact_valid_unique_indices_kernel(
+    const CandidateMeta* metadata, const std::uint32_t* indices,
+    const std::uint32_t* keep_flags, const std::uint32_t* block_offsets,
+    CandidateMeta* output, std::uint32_t* clean_count, std::uint32_t* dirty_count,
+    const std::uint32_t* output_count, std::uint32_t sort_items) {
+    const std::uint32_t tid = threadIdx.x;
+    const std::uint32_t i = blockIdx.x * blockDim.x + tid;
+    const std::uint32_t keep = i < sort_items ? keep_flags[i] : 0U;
+#if BEAM_EXPERIMENTAL_STREAM4_SCAN
+    const std::uint32_t prefix = detail::stream4_block_prefix(keep);
+#else
+    __shared__ std::uint32_t scan[256];
+    scan[tid] = keep;
+    __syncthreads();
+    for (std::uint32_t offset = 1; offset < blockDim.x; offset <<= 1) {
+        const std::uint32_t add = tid >= offset ? scan[tid - offset] : 0U;
+        __syncthreads();
+        scan[tid] += add;
+        __syncthreads();
+    }
+    const std::uint32_t prefix = scan[tid] - keep;
+#endif
+    if (keep) output[block_offsets[blockIdx.x] + prefix] = metadata[indices[i]];
+    if (blockIdx.x == 0 && tid == 0) {
+        *clean_count = *output_count;
+        *dirty_count = 0;
+    }
+}
+
+#if BEAM_EXPERIMENTAL_INDEX_SORT
+void stream4_sort_reduce_indices(
+    Hash128* sort_key, Hash128* reduce_key, CandidateMeta* metadata,
+    CandidateMeta* value_workspace, CandidateMeta* output,
+    std::uint32_t* clean_count, std::uint32_t* dirty_count,
+    std::uint32_t* keep_flags, std::uint32_t* block_counts,
+    std::uint32_t* block_offsets, std::uint32_t* scratch_count,
+    std::uint32_t physical_capacity, std::uint32_t sort_items,
+    void* temp, std::size_t temp_bytes, cudaStream_t stream) {
+    if (!sort_items || sort_items > physical_capacity || sort_items > static_cast<std::uint32_t>(INT_MAX))
+        throw std::invalid_argument("stream4 index sort exceeds fixed capacity or CUB count range");
+    static_assert(sizeof(CandidateMeta) >= 2 * sizeof(std::uint32_t));
+    static_assert(alignof(CandidateMeta) >= alignof(std::uint32_t));
+    // The existing value-B arena is capacity * sizeof(CandidateMeta) bytes.
+    // These two disjoint uint32 arrays use its first 8 * capacity bytes; the
+    // metadata-A arena remains read-only until the gather to output completes.
+    auto* index_a = reinterpret_cast<std::uint32_t*>(value_workspace);
+    auto* index_b = index_a + physical_capacity;
+    const std::uint32_t blocks = sort_items / 256U + (sort_items % 256U != 0U);
+    stream4_fill_index_pairs_kernel<<<blocks, 256, 0, stream>>>(sort_key, index_a, scratch_count, sort_items);
+    std::size_t bytes = temp_bytes;
+    check_cub(radix128_sort_pairs(temp, bytes, sort_key, reduce_key, index_a, index_b,
+                                  static_cast<int>(sort_items), stream),
+              "CUB stream4 index sort");
+    bytes = temp_bytes;
+    check_cub(cub::DeviceReduce::ReduceByKey(temp, bytes, reduce_key, sort_key,
+        index_b, index_a, block_offsets,
+        Stream4BestIndex{metadata, scratch_count, sort_items},
+        static_cast<int>(sort_items), stream), "CUB stream4 index reduction");
+    // block_offsets held the first compaction offsets, which are dead now.
+    // CUB writes the unique count there while scratch_count remains an
+    // immutable bound for every reducer invocation. The next scan overwrites
+    // both only after the marker kernel has finished reading them.
+    stream4_mark_valid_unique_indices_kernel<<<blocks, 256, 0, stream>>>(
+        metadata, index_a, keep_flags, block_counts, block_offsets, scratch_count, sort_items);
+    stream4_scan_block_counts(block_counts, block_offsets, scratch_count, blocks, temp, temp_bytes, stream);
+    stream4_compact_valid_unique_indices_kernel<<<blocks, 256, 0, stream>>>(
+        metadata, index_a, keep_flags, block_offsets, output,
+        clean_count, dirty_count, scratch_count, sort_items);
+}
+#endif
+#endif
+
+#if BEAM_EXPERIMENTAL_DIRTY_MERGE
+// Compaction is stable: threshold-filtered clean entries precede every dirty
+// entry. The preceding block scan and compaction have finished on this stream.
+// The output scalars borrow two histogram workspaces until histogram creation.
+__global__ void stream4_count_clean_and_dirty_kernel(
+    const std::uint32_t* clean, const std::uint32_t* dirty,
+    const std::uint32_t* flags, const std::uint32_t* offsets,
+    const std::uint32_t* total, std::uint32_t capacity,
+    std::uint32_t* kept_clean, std::uint32_t* kept_dirty) {
+    if (blockIdx.x || threadIdx.x) return;
+    const auto nc = *clean;
+    const auto nd = *dirty;
+    if (nc > capacity || nd > capacity - nc || *total > capacity) {
+        asm("trap;");
+        return;
+    }
+    std::uint32_t accepted = 0;
+    if (nc) {
+        const auto last_block = (nc - 1U) / 256U;
+        accepted = offsets[last_block];
+        for (auto i = last_block * 256U; i < nc; ++i) accepted += flags[i];
+    }
+    if (accepted > *total) {
+        asm("trap;");
+        return;
+    }
+    *kept_clean = accepted;
+    *kept_dirty = *total - accepted;
+}
+
+__global__ void stream4_fill_dirty_pairs_kernel(
+    const CandidateMeta* metadata, const std::uint32_t* kept_clean,
+    const std::uint32_t* kept_dirty, Hash128* keys, std::uint32_t* indices,
+    std::uint32_t sort_items) {
+    const auto i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i >= sort_items) return;
+    if (*kept_dirty > sort_items) {
+        asm("trap;");
+        return;
+    }
+    if (i < *kept_dirty) {
+        const auto source = *kept_clean + i;
+        keys[i] = metadata[source].hash;
+        indices[i] = source;
+    } else {
+        keys[i] = Hash128{UINT64_MAX, UINT64_MAX};
+        indices[i] = UINT32_MAX;
+    }
+}
+
+// Each CTA owns a consecutive output tile. Two global merge-path searches
+// find the tile boundaries, then threads load the two runs coalesced into
+// shared memory and merge there. Input metadata stays stationary. The padded
+// output tail contains invalid indices, including when a real hash is all ones.
+__global__ void stream4_merge_clean_and_dirty_kernel(
+    const CandidateMeta* metadata, const Hash128* dirty_keys,
+    const std::uint32_t* dirty_indices, const std::uint32_t* kept_clean,
+    const std::uint32_t* total, Hash128* merged_keys,
+    std::uint32_t* merged_indices, std::uint32_t capacity) {
+    __shared__ Hash128 tile_keys[256];
+    __shared__ std::uint32_t tile_indices[256];
+    __shared__ std::uint32_t left_begin, left_end;
+    const auto tid = threadIdx.x;
+    const auto first = blockIdx.x * blockDim.x;
+    const auto n = *total;
+    const auto nc = *kept_clean;
+    if (n > capacity || nc > n) {
+        asm("trap;");
+        return;
+    }
+    const auto nd = n - nc;
+    const auto begin = first < n ? first : n;
+    const auto end = first + blockDim.x < n ? first + blockDim.x : n;
+    const detail::Stream4CandidateKeys left{metadata};
+    const detail::Stream4HashKeys right{dirty_keys};
+    if (tid == 0) left_begin = detail::stream4_merge_partition(left, nc, right, nd, begin);
+    if (tid == 1) left_end = detail::stream4_merge_partition(left, nc, right, nd, end);
+    __syncthreads();
+    const auto right_begin = begin - left_begin;
+    const auto right_end = end - left_end;
+    const auto left_size = left_end - left_begin;
+    const auto right_size = right_end - right_begin;
+    if (tid < left_size) {
+        tile_keys[tid] = metadata[left_begin + tid].hash;
+        tile_indices[tid] = left_begin + tid;
+    }
+    if (tid < right_size) {
+        tile_keys[left_size + tid] = dirty_keys[right_begin + tid];
+        tile_indices[left_size + tid] = dirty_indices[right_begin + tid];
+    }
+    __syncthreads();
+    const auto out = first + tid;
+    if (out >= capacity) return;
+    if (out >= n) {
+        merged_keys[out] = Hash128{UINT64_MAX, UINT64_MAX};
+        merged_indices[out] = UINT32_MAX;
+        return;
+    }
+    const detail::Stream4HashKeys tile_left{tile_keys};
+    const detail::Stream4HashKeys tile_right{tile_keys + left_size};
+    const auto li = detail::stream4_merge_partition(tile_left, left_size, tile_right, right_size, tid);
+    const auto ri = tid - li;
+    const bool take_left = li < left_size &&
+        (ri >= right_size || !detail::stream4_hash_less(tile_right(ri), tile_left(li)));
+    const auto tile_i = take_left ? li : left_size + ri;
+    merged_keys[out] = tile_keys[tile_i];
+    merged_indices[out] = tile_indices[tile_i];
+}
+
+void stream4_sort_dirty_merge_reduce(
+    Hash128* key_a, Hash128* key_b, CandidateMeta* metadata,
+    CandidateMeta* value_workspace, CandidateMeta* output,
+    std::uint32_t* clean, std::uint32_t* dirty, std::uint32_t* flags,
+    std::uint32_t* counts, std::uint32_t* offsets, std::uint32_t* total,
+    const std::uint32_t* kept_clean, const std::uint32_t* kept_dirty,
+    std::uint32_t capacity, std::uint32_t sort_items,
+    void* temp, std::size_t temp_bytes, cudaStream_t stream) {
+    if (!sort_items || sort_items > capacity || capacity > static_cast<std::uint32_t>(INT_MAX))
+        throw std::invalid_argument("stream4 dirty sort exceeds fixed capacity or CUB count range");
+    // value-B has 32*capacity bytes; both index ranges occupy 8*capacity.
+    // metadata/value-A stays immutable until the gather into survivor finishes.
+    auto* index_a = reinterpret_cast<std::uint32_t*>(value_workspace);
+    auto* index_b = index_a + capacity;
+    const auto sort_blocks = sort_items / 256U + (sort_items % 256U != 0U);
+    const auto blocks = capacity / 256U + (capacity % 256U != 0U);
+    stream4_fill_dirty_pairs_kernel<<<sort_blocks, 256, 0, stream>>>(
+        metadata, kept_clean, kept_dirty, key_a, index_a, sort_items);
+    std::size_t bytes = temp_bytes;
+    check_cub(radix128_sort_pairs(temp, bytes, key_a, key_b, index_a, index_b,
+                                 static_cast<int>(sort_items), stream), "CUB stream4 dirty sort");
+    stream4_merge_clean_and_dirty_kernel<<<blocks, 256, 0, stream>>>(
+        metadata, key_b, index_b, kept_clean, total, key_a, index_a, capacity);
+    bytes = temp_bytes;
+    check_cub(cub::DeviceReduce::ReduceByKey(temp, bytes, key_a, key_b, index_a, index_b,
+        offsets, Stream4BestIndex{metadata, total, capacity}, static_cast<int>(capacity), stream),
+        "CUB stream4 dirty merge reduction");
+    // The first compaction offsets die before the reducer writes its unique
+    // count there. Its reader completes before the scan reuses both scalars.
+    stream4_mark_valid_unique_indices_kernel<<<blocks, 256, 0, stream>>>(
+        metadata, index_b, flags, counts, offsets, total, capacity);
+    stream4_scan_block_counts(counts, offsets, total, blocks, temp, temp_bytes, stream);
+    stream4_compact_valid_unique_indices_kernel<<<blocks, 256, 0, stream>>>(
+        metadata, index_b, flags, offsets, output, clean, dirty, total, capacity);
+}
+#endif
+
+void stream4_write_shard_histogram(
+    CandidateMeta* survivor_shard,
+    const std::uint32_t* clean_count,
+    std::uint32_t capacity,
+    std::uint32_t* score_key_a,
+    std::uint32_t* score_key_b,
+    std::uint64_t* score_count_a,
+    std::uint64_t* score_count_b,
+    std::uint32_t* score_unique_count,
+    std::uint32_t* shard_score_hist_a,
+    std::uint32_t* shard_score_hist_b,
+    std::uint32_t* shard_score_hist_active_index,
+    std::uint32_t* processing_flag,
+    void* cub_temp_storage,
+    std::size_t cub_temp_storage_bytes,
+    cudaStream_t stream) {
+    const std::uint32_t block_size = 256;
+    const std::uint32_t block_count = capacity / block_size + (capacity % block_size != 0U);
+    const dim3 block(block_size);
+    const dim3 grid(block_count);
+    const dim3 hist_grid((SCORE_BIN_COUNT + block_size - 1U) / block_size);
+
+    stream4_clear_inactive_histogram_kernel<<<hist_grid, block, 0, stream>>>(
+        shard_score_hist_a,
+        shard_score_hist_b,
+        shard_score_hist_active_index);
+    stream4_fill_score_histogram_pairs_kernel<<<grid, block, 0, stream>>>(
+        survivor_shard,
+        clean_count,
+        score_key_a,
+        score_count_a,
+        capacity);
+
+    std::size_t sort_temp_bytes = cub_temp_storage_bytes;
+    check_cub(
+        cub::DeviceRadixSort::SortPairs(
+            cub_temp_storage,
+            sort_temp_bytes,
+            score_key_a,
+            score_key_b,
+            score_count_a,
+            score_count_b,
+            static_cast<int>(capacity),
+            0,
+            detail::SCORE_HISTOGRAM_SORT_END_BIT,
+            stream),
+        "cub::DeviceRadixSort::SortPairs stream4 score histogram");
+
+    std::size_t reduce_temp_bytes = cub_temp_storage_bytes;
+    check_cub(
+        cub::DeviceReduce::ReduceByKey(
+            cub_temp_storage,
+            reduce_temp_bytes,
+            score_key_b,
+            score_key_a,
+            score_count_b,
+            score_count_a,
+            score_unique_count,
+            Stream4ScoreCountSum{},
+            static_cast<int>(capacity),
+            stream),
+        "cub::DeviceReduce::ReduceByKey stream4 score histogram");
+
+    stream4_scatter_score_histogram_kernel<<<grid, block, 0, stream>>>(
+        score_key_a,
+        score_count_a,
+        score_unique_count,
+        shard_score_hist_a,
+        shard_score_hist_b,
+        shard_score_hist_active_index,
+        capacity);
+    stream4_finalize_score_histogram_kernel<<<1, 1, 0, stream>>>(
+        shard_score_hist_active_index,
+        processing_flag);
+}
+
+} // namespace
+
+void stream4_finalize_logical_shard_union_cuda(
+    CandidateMeta* survivors, std::uint32_t* clean, std::uint32_t* dirty,
+    std::uint32_t* processing, std::uint32_t threshold, std::uint32_t physical_capacity,
+    Hash128* sort_key, Hash128* reduce_key,
+    CandidateMeta* sort_value, CandidateMeta* reduce_value,
+    std::uint32_t* score_key_a, std::uint32_t* score_key_b,
+    std::uint64_t* score_count_a, std::uint64_t* score_count_b,
+    std::uint32_t* keep, std::uint32_t* counts, std::uint32_t* offsets,
+    std::uint32_t* scratch_count, std::uint32_t* hist_a, std::uint32_t* hist_b,
+    std::uint32_t* active, void* temp, std::size_t temp_bytes, cudaStream_t stream,
+    std::uint32_t sort_item_bound) {
+    if (!physical_capacity || physical_capacity > static_cast<unsigned>(INT_MAX / 2) || !temp || !temp_bytes)
+        throw std::invalid_argument("logical union requires fixed 2*capacity CUB scratch in int range");
+    const auto capacity = 2U * physical_capacity;
+    const auto sort_items = sort_item_bound == 0 ? capacity : sort_item_bound;
+    if (sort_items > capacity)
+        throw std::invalid_argument("logical union sort bound exceeds physical arena");
+    const auto blocks = (capacity + 255U) / 256U;
+    stream4_mark_union_counts_kernel<<<blocks, 256, 0, stream>>>(
+        survivors, clean, keep, counts, threshold, physical_capacity);
+    stream4_scan_block_counts(counts, offsets, scratch_count, blocks, temp, temp_bytes, stream);
+    stream4_compact_threshold_kernel<<<blocks, 256, 0, stream>>>(
+        survivors, keep, offsets, sort_key, sort_value, capacity);
+    if (sort_item_bound != 0)
+        stream4_check_sort_bound_kernel<<<1, 1, 0, stream>>>(scratch_count, sort_items);
+#if BEAM_EXPERIMENTAL_INDEX_SORT
+    stream4_sort_reduce_indices(sort_key, reduce_key, sort_value, reduce_value, survivors,
+        clean, dirty, keep, counts, offsets, scratch_count, capacity, sort_items, temp, temp_bytes, stream);
+#else
+    stream4_fill_sort_tail_kernel<<<blocks, 256, 0, stream>>>(sort_key, sort_value, scratch_count, capacity);
+    const HashSortBuffers<CandidateMeta> hash_buffers{sort_key, reduce_key, sort_value, reduce_value};
+    const auto hash_views = hash_reduction_views(hash_buffers);
+    auto bytes = temp_bytes;
+    check_cub(hash_sort_pairs(temp, bytes, hash_buffers, sort_items, Stream4HashLess{}, stream),
+              "CUB final logical union sort");
+    bytes = temp_bytes;
+    check_cub(cub::DeviceReduce::ReduceByKey(temp, bytes, hash_views.sorted_keys,
+        hash_views.reduced_keys, hash_views.sorted_values, hash_views.reduced_values,
+        scratch_count, Stream4BestCandidate{}, sort_items, stream), "CUB final logical union reduce");
+    stream4_mark_valid_unique_counts_kernel<<<blocks, 256, 0, stream>>>(
+        hash_views.reduced_values, keep, counts, scratch_count, capacity);
+    stream4_scan_block_counts(counts, offsets, scratch_count, blocks, temp, temp_bytes, stream);
+    stream4_compact_valid_unique_kernel<<<blocks, 256, 0, stream>>>(
+        hash_views.reduced_values, keep, offsets, survivors, clean, dirty, scratch_count, capacity);
+#endif
+    stream4_split_union_counts_kernel<<<1, 1, 0, stream>>>(clean, dirty, processing, scratch_count, physical_capacity);
+    // No reader may consume histograms until both publications complete.
+    for (unsigned physical = 0; physical < 2; ++physical) {
+        stream4_write_shard_histogram(survivors + physical * physical_capacity, clean + physical,
+            physical_capacity, score_key_a, score_key_b, score_count_a, score_count_b, scratch_count,
+            hist_a + static_cast<std::uint64_t>(physical) * SCORE_BIN_COUNT,
+            hist_b + static_cast<std::uint64_t>(physical) * SCORE_BIN_COUNT,
+            active + physical, processing + physical, temp, temp_bytes, stream);
+    }
+}
+
+void stream4_shard_job_cuda(
+    CandidateMeta* survivor_shard,
+    std::uint32_t* clean_count,
+    std::uint32_t* dirty_count,
+    std::uint32_t* processing_flag,
+    std::uint32_t threshold,
+    std::uint32_t capacity,
+    Hash128* sort_key,
+    Hash128* reduce_key,
+    CandidateMeta* sort_value,
+    CandidateMeta* reduce_value,
+    std::uint32_t* score_key_a,
+    std::uint32_t* score_key_b,
+    std::uint64_t* score_count_a,
+    std::uint64_t* score_count_b,
+    std::uint32_t* keep_flags,
+    std::uint32_t* block_counts,
+    std::uint32_t* block_offsets,
+    std::uint32_t* scratch_count,
+    std::uint32_t* shard_score_hist_a,
+    std::uint32_t* shard_score_hist_b,
+    std::uint32_t* shard_score_hist_active_index,
+    void* cub_temp_storage,
+    std::size_t cub_temp_storage_bytes,
+    cudaStream_t stream) {
+    NvtxRange range("Stream4_threshold_compact_cub_sort_reduce_launch");
+    if (capacity == 0) {
+        throw std::invalid_argument("stream4 shard job capacity must be greater than zero");
+    }
+    if (cub_temp_storage == nullptr || cub_temp_storage_bytes == 0) {
+        throw std::invalid_argument("stream4 CUB fixed temp storage is required");
+    }
+    const std::uint32_t block_size = 256;
+    const std::uint32_t block_count = capacity / block_size + (capacity % block_size != 0U);
+    const dim3 block(block_size);
+    const dim3 grid(block_count);
+
+    stream4_mark_threshold_counts_kernel<<<grid, block, 0, stream>>>(
+        survivor_shard,
+        clean_count,
+        dirty_count,
+        keep_flags,
+        block_counts,
+        nullptr,
+        nullptr,
+        threshold,
+        capacity);
+    stream4_scan_block_counts(
+        block_counts,
+        block_offsets,
+        scratch_count,
+        block_count, cub_temp_storage, cub_temp_storage_bytes, stream);
+    stream4_compact_threshold_kernel<<<grid, block, 0, stream>>>(
+        survivor_shard,
+        keep_flags,
+        block_offsets,
+        sort_key,
+        sort_value,
+        capacity);
+#if BEAM_EXPERIMENTAL_INDEX_SORT
+    stream4_sort_reduce_indices(sort_key, reduce_key, sort_value, reduce_value, survivor_shard,
+        clean_count, dirty_count, keep_flags, block_counts, block_offsets, scratch_count,
+        capacity, capacity, cub_temp_storage, cub_temp_storage_bytes, stream);
+#else
+    stream4_fill_sort_tail_kernel<<<grid, block, 0, stream>>>(sort_key, sort_value, scratch_count, capacity);
+
+    const HashSortBuffers<CandidateMeta> hash_buffers{sort_key, reduce_key, sort_value, reduce_value};
+    const auto hash_views = hash_reduction_views(hash_buffers);
+    std::size_t sort_temp_bytes = cub_temp_storage_bytes;
+    check_cub(hash_sort_pairs(cub_temp_storage, sort_temp_bytes, hash_buffers,
+                              capacity, Stream4HashLess{}, stream),
+              "CUB hash sort stream4");
+
+    std::size_t reduce_temp_bytes = cub_temp_storage_bytes;
+    check_cub(
+        cub::DeviceReduce::ReduceByKey(
+            cub_temp_storage,
+            reduce_temp_bytes,
+            hash_views.sorted_keys,
+            hash_views.reduced_keys,
+            hash_views.sorted_values,
+            hash_views.reduced_values,
+            scratch_count,
+            Stream4BestCandidate{},
+            capacity,
+            stream),
+        "cub::DeviceReduce::ReduceByKey stream4");
+
+    stream4_mark_valid_unique_counts_kernel<<<grid, block, 0, stream>>>(
+        hash_views.reduced_values,
+        keep_flags,
+        block_counts,
+        scratch_count,
+        capacity);
+    stream4_scan_block_counts(
+        block_counts,
+        block_offsets,
+        scratch_count,
+        block_count, cub_temp_storage, cub_temp_storage_bytes, stream);
+    stream4_compact_valid_unique_kernel<<<grid, block, 0, stream>>>(
+        hash_views.reduced_values,
+        keep_flags,
+        block_offsets,
+        survivor_shard,
+        clean_count,
+        dirty_count,
+        scratch_count,
+        capacity);
+#endif
+    stream4_write_shard_histogram(
+        survivor_shard,
+        clean_count,
+        capacity,
+        score_key_a,
+        score_key_b,
+        score_count_a,
+        score_count_b,
+        scratch_count,
+        shard_score_hist_a,
+        shard_score_hist_b,
+        shard_score_hist_active_index,
+        processing_flag,
+        cub_temp_storage,
+        cub_temp_storage_bytes,
+        stream);
+}
+
+void stream4_shard_job_device_threshold_cuda(
+    CandidateMeta* survivor_shard,
+    std::uint32_t* clean_count,
+    std::uint32_t* dirty_count,
+    std::uint32_t* processing_flag,
+    const std::uint32_t* threshold,
+    const std::uint32_t* threshold_active_index,
+    std::uint32_t capacity,
+    Hash128* sort_key,
+    Hash128* reduce_key,
+    CandidateMeta* sort_value,
+    CandidateMeta* reduce_value,
+    std::uint32_t* score_key_a,
+    std::uint32_t* score_key_b,
+    std::uint64_t* score_count_a,
+    std::uint64_t* score_count_b,
+    std::uint32_t* keep_flags,
+    std::uint32_t* block_counts,
+    std::uint32_t* block_offsets,
+    std::uint32_t* scratch_count,
+    std::uint32_t* shard_score_hist_a,
+    std::uint32_t* shard_score_hist_b,
+    std::uint32_t* shard_score_hist_active_index,
+    void* cub_temp_storage,
+    std::size_t cub_temp_storage_bytes,
+    cudaStream_t stream) {
+    NvtxRange range("Stream4_threshold_compact_cub_sort_reduce_device_threshold_launch");
+    if (capacity == 0) {
+        throw std::invalid_argument("stream4 shard job capacity must be greater than zero");
+    }
+    if (cub_temp_storage == nullptr || cub_temp_storage_bytes == 0) {
+        throw std::invalid_argument("stream4 CUB fixed temp storage is required");
+    }
+    const std::uint32_t block_size = 256;
+    const std::uint32_t block_count = capacity / block_size + (capacity % block_size != 0U);
+    const dim3 block(block_size);
+    const dim3 grid(block_count);
+
+    stream4_mark_threshold_counts_kernel<<<grid, block, 0, stream>>>(
+        survivor_shard,
+        clean_count,
+        dirty_count,
+        keep_flags,
+        block_counts,
+        threshold,
+        threshold_active_index,
+        UINT32_MAX,
+        capacity);
+    stream4_scan_block_counts(
+        block_counts,
+        block_offsets,
+        scratch_count,
+        block_count, cub_temp_storage, cub_temp_storage_bytes, stream);
+    stream4_compact_threshold_kernel<<<grid, block, 0, stream>>>(
+        survivor_shard,
+        keep_flags,
+        block_offsets,
+        sort_key,
+        sort_value,
+        capacity);
+#if BEAM_EXPERIMENTAL_DIRTY_MERGE
+    // These scalar borrows end before stream4_write_shard_histogram reuses
+    // either histogram workspace. Each Stream 4 slot has private workspaces.
+    auto* kept_clean = reinterpret_cast<std::uint32_t*>(score_count_a);
+    auto* kept_dirty = score_key_a;
+    stream4_count_clean_and_dirty_kernel<<<1, 1, 0, stream>>>(
+        clean_count, dirty_count, keep_flags, block_offsets, scratch_count,
+        capacity, kept_clean, kept_dirty);
+#endif
+    const auto finish = [&](std::uint32_t sort_items, cudaStream_t stream) {
+        const auto sort_blocks = sort_items / block_size + (sort_items % block_size != 0U);
+        const dim3 sort_grid(sort_blocks);
+#if BEAM_EXPERIMENTAL_DIRTY_MERGE
+    stream4_sort_dirty_merge_reduce(sort_key, reduce_key, sort_value, reduce_value, survivor_shard,
+        clean_count, dirty_count, keep_flags, block_counts, block_offsets, scratch_count,
+        kept_clean, kept_dirty, capacity, sort_items, cub_temp_storage, cub_temp_storage_bytes, stream);
+#elif BEAM_EXPERIMENTAL_INDEX_SORT
+    stream4_sort_reduce_indices(sort_key, reduce_key, sort_value, reduce_value, survivor_shard,
+        clean_count, dirty_count, keep_flags, block_counts, block_offsets, scratch_count,
+        capacity, sort_items, cub_temp_storage, cub_temp_storage_bytes, stream);
+#else
+    stream4_fill_sort_tail_kernel<<<sort_grid, block, 0, stream>>>(sort_key, sort_value, scratch_count, sort_items);
+
+    const HashSortBuffers<CandidateMeta> hash_buffers{sort_key, reduce_key, sort_value, reduce_value};
+    const auto hash_views = hash_reduction_views(hash_buffers);
+    std::size_t sort_temp_bytes = cub_temp_storage_bytes;
+    check_cub(hash_sort_pairs(cub_temp_storage, sort_temp_bytes, hash_buffers,
+                              sort_items, Stream4HashLess{}, stream),
+              "CUB hash sort stream4");
+
+    std::size_t reduce_temp_bytes = cub_temp_storage_bytes;
+    check_cub(
+        cub::DeviceReduce::ReduceByKey(
+            cub_temp_storage,
+            reduce_temp_bytes,
+            hash_views.sorted_keys,
+            hash_views.reduced_keys,
+            hash_views.sorted_values,
+            hash_views.reduced_values,
+            scratch_count,
+            Stream4BestCandidate{},
+            sort_items,
+            stream),
+        "cub::DeviceReduce::ReduceByKey stream4");
+
+    stream4_mark_valid_unique_counts_kernel<<<sort_grid, block, 0, stream>>>(
+        hash_views.reduced_values,
+        keep_flags,
+        block_counts,
+        scratch_count,
+        sort_items);
+    stream4_scan_block_counts(
+        block_counts,
+        block_offsets,
+        scratch_count,
+        sort_blocks, cub_temp_storage, cub_temp_storage_bytes, stream);
+    stream4_compact_valid_unique_kernel<<<sort_grid, block, 0, stream>>>(
+        hash_views.reduced_values,
+        keep_flags,
+        block_offsets,
+        survivor_shard,
+        clean_count,
+        dirty_count,
+        scratch_count,
+        sort_items);
+#endif
+    stream4_write_shard_histogram(
+        survivor_shard,
+        clean_count,
+#if BEAM_EXPERIMENTAL_DIRTY_MERGE
+        capacity,
+#else
+        sort_items,
+#endif
+        score_key_a,
+        score_key_b,
+        score_count_a,
+        score_count_b,
+        scratch_count,
+        shard_score_hist_a,
+        shard_score_hist_b,
+        shard_score_hist_active_index,
+        processing_flag,
+        cub_temp_storage,
+        cub_temp_storage_bytes,
+        stream);
+    };
+    const char* selector = std::getenv("BEAM_STREAM4_BOUNDED_SORT");
+    if (selector && std::strcmp(selector, "0") && std::strcmp(selector, "1"))
+        throw std::invalid_argument("BEAM_STREAM4_BOUNDED_SORT must be 0 or 1");
+    if (!selector || std::strcmp(selector, "1")) {
+        finish(capacity, stream);
+        return;
+    }
+#if CUDART_VERSION >= 12040
+    cudaStreamCaptureStatus capture_status;
+    cudaGraph_t parent = nullptr;
+    check_cub(cudaStreamGetCaptureInfo_v2(stream, &capture_status, nullptr,
+        &parent, nullptr, nullptr), "stream4 conditional parent");
+    if (capture_status != cudaStreamCaptureStatusActive)
+        throw std::invalid_argument("bounded Stream4 requires graph capture");
+    cudaGraphConditionalHandle handles[3];
+    for (auto& handle : handles)
+        check_cub(cudaGraphConditionalHandleCreate(&handle, parent, 0,
+            cudaGraphCondAssignDefault), "stream4 conditional handle");
+    const std::uint32_t bounds[3] = {
+        capacity / 4U + (capacity % 4U != 0U),
+        capacity / 2U + (capacity % 2U != 0U), capacity};
+    stream4_choose_sort_body_kernel<<<1, 1, 0, stream>>>(
+#if BEAM_EXPERIMENTAL_DIRTY_MERGE
+        kept_dirty,
+#else
+        scratch_count,
+#endif
+        bounds[0], bounds[1], capacity, handles[0], handles[1], handles[2]);
+    // Capture each alternative at startup only. The bodies share one fixed
+    // scratch slot and are chained; mutual exclusion is decided on the GPU.
+    for (unsigned alternative = 0; alternative < 3; ++alternative) {
+        const cudaGraphNode_t* dependencies = nullptr;
+        std::size_t dependency_count = 0;
+        check_cub(cudaStreamGetCaptureInfo_v2(stream, &capture_status, nullptr,
+            &parent, &dependencies, &dependency_count), "stream4 conditional dependencies");
+        cudaGraphNodeParams parameters{};
+        parameters.type = cudaGraphNodeTypeConditional;
+        parameters.conditional.handle = handles[alternative];
+        parameters.conditional.type = cudaGraphCondTypeIf;
+        parameters.conditional.size = 1;
+        cudaGraphNode_t conditional;
+        check_cub(cudaGraphAddNode(&conditional, parent, dependencies,
+            dependency_count, &parameters), "stream4 conditional node");
+        cudaStream_t body_stream = nullptr;
+        check_cub(cudaStreamCreateWithFlags(&body_stream, cudaStreamNonBlocking), "stream4 body stream");
+        try {
+            check_cub(cudaStreamBeginCaptureToGraph(body_stream,
+                parameters.conditional.phGraph_out[0], nullptr, nullptr, 0,
+                cudaStreamCaptureModeThreadLocal), "stream4 body capture");
+            finish(bounds[alternative], body_stream);
+            cudaGraph_t body = nullptr;
+            check_cub(cudaStreamEndCapture(body_stream, &body), "stream4 body end capture");
+            // Parent graph owns body; never destroy it separately.
+            check_cub(cudaStreamDestroy(body_stream), "stream4 body stream destroy");
+        } catch (...) {
+            cudaGraph_t ignored = nullptr;
+            cudaStreamEndCapture(body_stream, &ignored);
+            cudaStreamDestroy(body_stream);
+            throw;
+        }
+        check_cub(cudaStreamUpdateCaptureDependencies(stream, &conditional, 1,
+            cudaStreamSetCaptureDependencies), "stream4 conditional continuation");
+    }
+#else
+    throw std::invalid_argument("bounded Stream4 requires CUDA 12.4 or newer");
+#endif
+
+}
+
+} // namespace beam

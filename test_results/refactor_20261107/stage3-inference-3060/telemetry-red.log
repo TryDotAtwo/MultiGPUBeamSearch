@@ -1,0 +1,26 @@
+   Compiling beam-core v0.1.0 (/workspace/beam-work/rust/beam-core)
+   Compiling beam-native-sys v0.1.0 (/workspace/beam-work/rust/beam-native-sys)
+   Compiling beam-runtime v0.1.0 (/workspace/beam-work/rust/beam-runtime)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3.34s
+     Running tests/telemetry.rs (/workspace/target/debug/deps/telemetry-f3e3a81dc2ea5f49)
+
+running 1 test
+test telemetry_requires_selected_cohorts_and_rejects_missing_or_throttled_rows ... FAILED
+
+failures:
+
+---- telemetry_requires_selected_cohorts_and_rejects_missing_or_throttled_rows stdout ----
+
+thread 'telemetry_requires_selected_cohorts_and_rejects_missing_or_throttled_rows' (32742) panicked at rust/beam-runtime/tests/telemetry.rs:11:5:
+assertion `left == right` failed
+  left: Null
+ right: false
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    telemetry_requires_selected_cohorts_and_rejects_missing_or_throttled_rows
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `-p beam-runtime --test telemetry`

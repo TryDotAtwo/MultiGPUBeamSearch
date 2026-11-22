@@ -1,0 +1,2 @@
+[1/2] Building CUDA object CMakeFiles/final_union_dispatcher_cuda_tests.dir/tests/final_union_dispatcher_cuda_tests.cu.o
+[2/2] Linking CXX executable final_union_dispatcher_cuda_tests

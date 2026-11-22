@@ -1,0 +1,20 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+______________ test_build_once_reuse_and_detect_library_tampering ______________
+
+tmp_path = PosixPath('/tmp/pytest-of-root/pytest-36/test_build_once_reuse_and_dete0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7fcc86219d90>
+
+    def test_build_once_reuse_and_detect_library_tampering(tmp_path, monkeypatch):
+        native, graph, model, options, runner, metadata, calls, _ = fixture(tmp_path, monkeypatch)
+        library, receipt = native.ensure_native_library(graph, model, options, (86,), tmp_path, runner, metadata)
+>       assert library.name == 'libbeam_native.so' and len(calls) == 2
+E       AssertionError: assert ('libbeam_native.so' == 'libbeam_native.so'
+E         
+E           libbeam_native.so and 1 == 2)
+E        +  where 1 = len([['cmake', '--build', '/tmp/pytest-of-root/pytest-36/test_build_once_reuse_and_dete0/build', '--target', 'beam_native', '--parallel', ...]])
+
+integrations/cayleypy_native/tests/test_native_library.py:67: AssertionError
+=========================== short test summary info ============================
+FAILED integrations/cayleypy_native/tests/test_native_library.py::test_build_once_reuse_and_detect_library_tampering
+1 failed in 4.78s

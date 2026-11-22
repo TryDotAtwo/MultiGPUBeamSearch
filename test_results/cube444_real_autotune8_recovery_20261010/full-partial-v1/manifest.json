@@ -1,0 +1,1880 @@
+{
+  "bytes": 325213,
+  "sha256": "6ba8c62dce2174bc2a63012f4af595d1046858db97c93984a04081e526b70a46",
+  "parts": [
+    {
+      "name": "part-000",
+      "bytes": 75000,
+      "sha256": "729b911d302dd7a6a41a66faa286e0cf0d8cde565af0cd53b882d9b6849f628c"
+    },
+    {
+      "name": "part-001",
+      "bytes": 75000,
+      "sha256": "a2adc328f6f730866a6c8eb1a42cfe66a29e0484ff45f234a951b61683ddf30e"
+    },
+    {
+      "name": "part-002",
+      "bytes": 75000,
+      "sha256": "fd04b4f62e354ab072e7240a1c1e249726e8ad743b970ab84276c70c6e28351f"
+    },
+    {
+      "name": "part-003",
+      "bytes": 75000,
+      "sha256": "ddbb56279104ac2577914a6e8bf9a8db02429af552498e1d9915a7d4df1eb818"
+    },
+    {
+      "name": "part-004",
+      "bytes": 25213,
+      "sha256": "887147561b894d9e2ee859f26d7e1f84a1c0b0c81eb8f3f96db59fa174a9ad73"
+    }
+  ],
+  "files": [
+    {
+      "path": "bootstrap.py",
+      "bytes": 4273,
+      "sha256": "7b7055f0b976f444222c6f9a1160ae7d04ad2cc428c46f895f5d3bea5e17f098"
+    },
+    {
+      "path": "bundle/blend.json",
+      "bytes": 18021,
+      "sha256": "8346586b1ef183e25d2bcbfeec571ced2ffa02eadf31d273525dcff1b5f24a78"
+    },
+    {
+      "path": "bundle/tensors.tsv",
+      "bytes": 12238,
+      "sha256": "69bb79be355a07c727ad0d83cbb202b8b517395fe4d5e267ee46735ce676f29e"
+    },
+    {
+      "path": "cpu-suite.py",
+      "bytes": 1450,
+      "sha256": "f9d27a3fbbdbc5303363e22d1480ad7173aa410f04120c7c4605d78e84cc066c"
+    },
+    {
+      "path": "export_cube444_blend.py",
+      "bytes": 2186,
+      "sha256": "8fd8342c1dfd607ce9059ff2b8723170d0b9f8a2b8bb313a6adf628e6dc6ab57"
+    },
+    {
+      "path": "fixture-gen.py",
+      "bytes": 2267,
+      "sha256": "df8aa19ebc4e2912c33c857f6ed948489f15e14a98aaf2c4db506b64294aea17"
+    },
+    {
+      "path": "freeze-completed.py",
+      "bytes": 2905,
+      "sha256": "6f46d1f40f808e3bc08f368b5437d3f7a996ef6918ca6b22748d9826d5d6d47e"
+    },
+    {
+      "path": "full-verification.py",
+      "bytes": 9412,
+      "sha256": "51052890123db8ec7f29133d51eb9f04840f01430a501b487628af8e444c1ccc"
+    },
+    {
+      "path": "isolation.py",
+      "bytes": 3465,
+      "sha256": "277a9e67fe4e9fd6c4721754adfcac8543822c372d8ed73a4f0d73c1834cdb36"
+    },
+    {
+      "path": "maximum-control.json",
+      "bytes": 78,
+      "sha256": "3c0a0ab88d9f99208eacea92d139355d506c2dbd458e6811df93408541c70eb7"
+    },
+    {
+      "path": "maximum-run.py",
+      "bytes": 14143,
+      "sha256": "95cc9bec7c0d340602b0703ca07ad140c33077a2cc002c9ad88b20f746ebcf7e"
+    },
+    {
+      "path": "public-calibration.py",
+      "bytes": 6171,
+      "sha256": "363cf123bde559c247655fd479fde3d57d5d053c2f2d2d156f28c6d1f80a01df"
+    },
+    {
+      "path": "results/full-verification/1048576/component-probes/1/components.json",
+      "bytes": 10231,
+      "sha256": "78afa02abd3a77d117db9f759acde0f98f861bb77a4f0c9bf75816cfb2a78077"
+    },
+    {
+      "path": "results/full-verification/1048576/component-probes/1/gpu-telemetry.json",
+      "bytes": 3813,
+      "sha256": "698351110c962c6f5742657d800743e9bd44e9ffcd339f96fc9134bee8d329d2"
+    },
+    {
+      "path": "results/full-verification/1048576/component-probes/2/components.json",
+      "bytes": 10229,
+      "sha256": "bc0cb7ebb700eb34f1450c1ec9fb0f56c0738ec2089ea0f9c59eaeea0d1a2e8d"
+    },
+    {
+      "path": "results/full-verification/1048576/component-probes/2/gpu-telemetry.json",
+      "bytes": 2593,
+      "sha256": "5619a7a5857399deef4c58ed325354b12c7e654829b9af53a222404cd4235b5b"
+    },
+    {
+      "path": "results/full-verification/1048576/component-probes/3/components.json",
+      "bytes": 10215,
+      "sha256": "79d8a29d46cce1cf049a52f5306a8036101d8cb1a50d9f14166541b01277d9a5"
+    },
+    {
+      "path": "results/full-verification/1048576/component-probes/3/gpu-telemetry.json",
+      "bytes": 2593,
+      "sha256": "723e5175d66c99a3c5102a2a90ca119100cc995be909a6f2718599d502d7757f"
+    },
+    {
+      "path": "results/full-verification/1048576/component-probes/4/components.json",
+      "bytes": 10282,
+      "sha256": "c340e985344396160a180f53a61efe5a3e7910679e819a15d512210b90ebf56b"
+    },
+    {
+      "path": "results/full-verification/1048576/component-probes/4/gpu-telemetry.json",
+      "bytes": 2593,
+      "sha256": "d05f3b3b6956d7511accfd91ed0db83b8c5bf3b08d6cc560bcaca2f083330220"
+    },
+    {
+      "path": "results/full-verification/1048576/component-probes/5/components.json",
+      "bytes": 10216,
+      "sha256": "4af5d4c03ab666655f05a1841e9dfa362886e51cda8c5bc5c132b1714cb00d88"
+    },
+    {
+      "path": "results/full-verification/1048576/component-probes/5/gpu-telemetry.json",
+      "bytes": 2593,
+      "sha256": "00f080b85c5a4dc3518849748abd923f7fbae2f1cdaaab53a215f4a9794de7ab"
+    },
+    {
+      "path": "results/full-verification/1048576/component-probes/6/components.json",
+      "bytes": 10253,
+      "sha256": "4235a9e74c0dc77685a00d2a1943438bfe5a31bf5d38a1911abc783313684b0f"
+    },
+    {
+      "path": "results/full-verification/1048576/component-probes/6/gpu-telemetry.json",
+      "bytes": 2593,
+      "sha256": "e8cbbd5a491376f9042297ec50d83a920132a244d0712e29736d68e10816756e"
+    },
+    {
+      "path": "results/full-verification/1048576/component-selection.json",
+      "bytes": 111865,
+      "sha256": "c966093777c16dc7af26bd08aab4787a78ac3be90987eff1a0cb2b289a9922cf"
+    },
+    {
+      "path": "results/full-verification/1048576/components/nccl-id.bin",
+      "bytes": 192,
+      "sha256": "8cec3bb783d71e65469ab27d0fc6572bb4edb1a43d73fd6f952b072342ab0d28"
+    },
+    {
+      "path": "results/full-verification/1048576/components/rank-0.log",
+      "bytes": 8400,
+      "sha256": "4dbd0cfbeed6680f9ab620807fa12b04e726ca46524ca99db89cde5640a86d11"
+    },
+    {
+      "path": "results/full-verification/1048576/components/rank-1.log",
+      "bytes": 8384,
+      "sha256": "5291ba81136595ba774ebca4de221ec8a68620472747830c1782ba860882e8fc"
+    },
+    {
+      "path": "results/full-verification/1048576/components/rank-2.log",
+      "bytes": 8401,
+      "sha256": "c44f3b1ec66e5b5f1aff6bfdaff8fb9a6de3383f5c2bdca01c4d6b0e5d09540e"
+    },
+    {
+      "path": "results/full-verification/1048576/components/rank-3.log",
+      "bytes": 8391,
+      "sha256": "45d65678eb5ead93533b4d24560c5c8a877b07e2bc77b6b0e8ed9dc2217c3a48"
+    },
+    {
+      "path": "results/full-verification/1048576/components/rank-4.log",
+      "bytes": 8402,
+      "sha256": "b86a667f10070111c90a728a3a4a1d8b9995c7fb1f637f63e2b37e1d736ccff7"
+    },
+    {
+      "path": "results/full-verification/1048576/components/rank-5.log",
+      "bytes": 8369,
+      "sha256": "a1aec69f4af281d10afe7b7891fb5c436274f74476c34966e863681ae63f7ff5"
+    },
+    {
+      "path": "results/full-verification/1048576/components/rank-6.log",
+      "bytes": 8399,
+      "sha256": "b3d94318bb4f2654cadecadf2a79df0f74cf618ff582f6441588ad5f2f6f5fcd"
+    },
+    {
+      "path": "results/full-verification/1048576/components/rank-7.log",
+      "bytes": 8396,
+      "sha256": "73ef73ff36ba63c503e8d61323de69a4cd51b5d70ef5a0c24f8b6df33cc0d490"
+    },
+    {
+      "path": "results/full-verification/1048576/fixture-generation.log",
+      "bytes": 66,
+      "sha256": "a67c22b04b48ea035e24c2e21dd77ae110290c96c44b5ec02ff4e9c6f0dd11fd"
+    },
+    {
+      "path": "results/full-verification/1048576/full/env0.json",
+      "bytes": 1515,
+      "sha256": "ea71be61fe71ffe92bc62a1707748c402c104ccdc676b79a510a03f736ece480"
+    },
+    {
+      "path": "results/full-verification/1048576/full/env1.json",
+      "bytes": 1515,
+      "sha256": "899313ae00ed62761bb8e2995ab6ccbe9ec578349b27b0f7aae95f2a49ebd596"
+    },
+    {
+      "path": "results/full-verification/1048576/full/env2.json",
+      "bytes": 1515,
+      "sha256": "ceda613fb5af9a154f9a8d6f93c7efbd5e852628703672707d99819e1273fa79"
+    },
+    {
+      "path": "results/full-verification/1048576/full/env3.json",
+      "bytes": 1515,
+      "sha256": "bdb430b3368cfdf62e6af1f0d34c76e8ef1b70f6cd360ee3e6bd9f8eb0e62a33"
+    },
+    {
+      "path": "results/full-verification/1048576/full/env4.json",
+      "bytes": 1515,
+      "sha256": "8a2917673a40f9d59fc25f913a103d3d2aa6973669132e3b930305e904fa0cc0"
+    },
+    {
+      "path": "results/full-verification/1048576/full/env5.json",
+      "bytes": 1515,
+      "sha256": "a9b3faf762fa1b0c83f97cdbfc941205ec54f56a616911a1a3f48965e13807e9"
+    },
+    {
+      "path": "results/full-verification/1048576/full/env6.json",
+      "bytes": 1515,
+      "sha256": "4b8468ae2843442564f1eb4ddc2729a726a7c554155fe86d99deaf935642b7df"
+    },
+    {
+      "path": "results/full-verification/1048576/full/env7.json",
+      "bytes": 1515,
+      "sha256": "7c39a96150b41849e80c42cce888f6a8f01fad08debcc4e0bba7f658ea4d0646"
+    },
+    {
+      "path": "results/full-verification/1048576/full/exit.json",
+      "bytes": 1001,
+      "sha256": "e27d3196497f03b6dda90e5549320470db9c72834a0d8b77d41c86f2b8dfa184"
+    },
+    {
+      "path": "results/full-verification/1048576/full/nccl",
+      "bytes": 179,
+      "sha256": "b7c73295dde1d67a236d511d93be9446434c9bdca9c424e3cc35643f85a5766e"
+    },
+    {
+      "path": "results/full-verification/1048576/full/rank0.log",
+      "bytes": 8714,
+      "sha256": "59b19d235a2fd6a51291b1f845e0bb07a4f72be237cc77412ad33b75fa2dfe21"
+    },
+    {
+      "path": "results/full-verification/1048576/full/rank1.log",
+      "bytes": 8714,
+      "sha256": "3a5fd1f13b6d64a7bc118d6f1ff60096bd1f93b76879392a56c3fce2ddf1e8da"
+    },
+    {
+      "path": "results/full-verification/1048576/full/rank2.log",
+      "bytes": 8714,
+      "sha256": "648767bfd9b4079c76a5de6ed5a6690ce16e3b325b26743d362cbdc9c0319090"
+    },
+    {
+      "path": "results/full-verification/1048576/full/rank3.log",
+      "bytes": 8715,
+      "sha256": "1a2703dbcc75d53ac541381efbc313db6007e34311d7bc8ae7db52071795489a"
+    },
+    {
+      "path": "results/full-verification/1048576/full/rank4.log",
+      "bytes": 8712,
+      "sha256": "583d6e30755f657e3cdf4dcb884e39990826651b46b5947451df2b80646b1eb1"
+    },
+    {
+      "path": "results/full-verification/1048576/full/rank5.log",
+      "bytes": 8716,
+      "sha256": "5c6c57d039b2290b4e245290b38318e16d66f50111b1e0cbe30b709232b34b4c"
+    },
+    {
+      "path": "results/full-verification/1048576/full/rank6.log",
+      "bytes": 8716,
+      "sha256": "7f24f8ee5a3fd009cbc2a4d0e17c83b45c523b02d043ce5e2283ad611c6c07dd"
+    },
+    {
+      "path": "results/full-verification/1048576/full/rank7.log",
+      "bytes": 8716,
+      "sha256": "cc9f6d23fdf8ac7c8660e956b68ffc9d068d1774edd71dd6d05dc1ff2dd8442e"
+    },
+    {
+      "path": "results/full-verification/1048576/full/test_results/unsolved_run_1791586315391058568_r2_0/no_solution_p0_d6_b1048576.log",
+      "bytes": 327,
+      "sha256": "2f1fcb38a8c57feae217ec99f1ebd0dec8c2d9539199314e66e6ebbb940de462"
+    },
+    {
+      "path": "results/full-verification/1048576/full/test_results/unsolved_run_1791586315403294723_r6_0/no_solution_p0_d6_b1048576.log",
+      "bytes": 327,
+      "sha256": "badf8d550983695069944c3da5c738ae48aafdb3f4dcb9f558a1381b0dd29226"
+    },
+    {
+      "path": "results/full-verification/1048576/full/test_results/unsolved_run_1791586315435827587_r3_0/no_solution_p0_d6_b1048576.log",
+      "bytes": 327,
+      "sha256": "215bac428f851b3bf3bdfde36c83382ab3eafb6d3515736aa3f087a336104f5c"
+    },
+    {
+      "path": "results/full-verification/1048576/full/test_results/unsolved_run_1791586315446821250_r4_0/no_solution_p0_d6_b1048576.log",
+      "bytes": 327,
+      "sha256": "7aa7dfd3121194c2157ff6bc3996a3e9d1bb10e974df75a9d0e60c289ebc6eff"
+    },
+    {
+      "path": "results/full-verification/1048576/full/test_results/unsolved_run_1791586315447402359_r5_0/no_solution_p0_d6_b1048576.log",
+      "bytes": 327,
+      "sha256": "a5f26e5a2211aafeeee5704862018192247921a9a4cf2bea153d9070987960d1"
+    },
+    {
+      "path": "results/full-verification/1048576/full/test_results/unsolved_run_1791586315450148617_r7_0/no_solution_p0_d6_b1048576.log",
+      "bytes": 327,
+      "sha256": "2f6f50c98585a831f80ac10232a30ee06171306749d7b5b0191000cc031bdfa2"
+    },
+    {
+      "path": "results/full-verification/1048576/full/test_results/unsolved_run_1791586315457990062_r1_0/no_solution_p0_d6_b1048576.log",
+      "bytes": 327,
+      "sha256": "ea388fc5070299930706078e9aacf550b5b04adb6f761738868af4eaf5610c7b"
+    },
+    {
+      "path": "results/full-verification/1048576/full/test_results/unsolved_run_1791586315458908109_r0_0/no_solution_p0_d6_b1048576.log",
+      "bytes": 327,
+      "sha256": "fefce077b61f4e2316aeec8881ee4449416ccbfe1c8cf3a822e0f5ad62b719c9"
+    },
+    {
+      "path": "results/full-verification/1048576/matched-receipts.json",
+      "bytes": 5330,
+      "sha256": "79262e70807ea5291d73fc319336f367c30b232caf2081abe0400ecef257a09e"
+    },
+    {
+      "path": "results/full-verification/1048576/report.json",
+      "bytes": 155601,
+      "sha256": "e280ce7b71da0cf22fa9aef71abdd253063a98baef292e17877aa5533db014d9"
+    },
+    {
+      "path": "results/full-verification/1048576/stream1/inputs-0/ensemble.json",
+      "bytes": 744,
+      "sha256": "7047b48232bef0a08a7692432aaf84367506aca2fc84f125edb260c6cc31979f"
+    },
+    {
+      "path": "results/full-verification/1048576/stream1/inputs-1/ensemble.json",
+      "bytes": 744,
+      "sha256": "0dfd3ab4bad2a0cf65b6647111e224511a09a320f766f676b50a33a03920ab5d"
+    },
+    {
+      "path": "results/full-verification/1048576/stream1/inputs-2/ensemble.json",
+      "bytes": 744,
+      "sha256": "f753db6798ed4ed0d71b79d24ceecfc9f0225f2fe6c4f638a52acccce1b6a797"
+    },
+    {
+      "path": "results/full-verification/1048576/stream1/inputs-3/ensemble.json",
+      "bytes": 744,
+      "sha256": "b99d175b8d48aa0b31d45e6eaca22d76c7367dd2d5b50d735902630b34fd16fc"
+    },
+    {
+      "path": "results/full-verification/1048576/stream1/inputs-4/ensemble.json",
+      "bytes": 744,
+      "sha256": "615ccc87a09f4a4158d25c15feb1d4cae91f3f63f6099bb462890daa3c5bc491"
+    },
+    {
+      "path": "results/full-verification/1048576/stream1/inputs-5/ensemble.json",
+      "bytes": 744,
+      "sha256": "a8721110364a5489830b5a67b70fe6c26afff7787ee9a90e04c44cfbd53c76fc"
+    },
+    {
+      "path": "results/full-verification/1048576/stream1/inputs-6/ensemble.json",
+      "bytes": 744,
+      "sha256": "4ad0bfbcb59c1b49a802aac6f98f491136bc15a62bb0954683f4429c4e366289"
+    },
+    {
+      "path": "results/full-verification/1048576/stream1/inputs-7/ensemble.json",
+      "bytes": 744,
+      "sha256": "c1b30e406ae2d2904b73e3763f001eab1bdce598980964e7750e1ad780f90914"
+    },
+    {
+      "path": "results/full-verification/1048576/stream1/rank0.log",
+      "bytes": 399,
+      "sha256": "f7edf5351561ef05f34ddcdd23a14d63889f7f30ac3a47a79a9d53ca2ef3bf82"
+    },
+    {
+      "path": "results/full-verification/1048576/stream1/rank1.log",
+      "bytes": 408,
+      "sha256": "a88453abc37955ade8f36a8193ef4b600e15de6a369231d0ef76a52372f52b55"
+    },
+    {
+      "path": "results/full-verification/1048576/stream1/rank2.log",
+      "bytes": 403,
+      "sha256": "17036366634a3468b92bce8a4b645eb66ec45a9d51a3e3aee7425249300586c7"
+    },
+    {
+      "path": "results/full-verification/1048576/stream1/rank3.log",
+      "bytes": 404,
+      "sha256": "c912989c9dc60dac1ef50fbf283940fff68e7607e647341aeb24480e7104f7b0"
+    },
+    {
+      "path": "results/full-verification/1048576/stream1/rank4.log",
+      "bytes": 400,
+      "sha256": "0987ea544885cde1e77089016c26983e5be3f7c1d0991c6d7d101569fa59d543"
+    },
+    {
+      "path": "results/full-verification/1048576/stream1/rank5.log",
+      "bytes": 405,
+      "sha256": "4e7b929bb10e6bf5a69f4d825fda7f86853f27d3b8f489c23c2bd2d50ab7cfea"
+    },
+    {
+      "path": "results/full-verification/1048576/stream1/rank6.log",
+      "bytes": 406,
+      "sha256": "5d8670d240bb7d488f7530dff69879d481600be753654257fd8e962cf99d9918"
+    },
+    {
+      "path": "results/full-verification/1048576/stream1/rank7.log",
+      "bytes": 402,
+      "sha256": "a8db385d403cd8eae64b10fd278e39610d23961d933e0a0a1daf16d78e7db4e5"
+    },
+    {
+      "path": "results/full-verification/1048576/stream1/receipt.json",
+      "bytes": 4717,
+      "sha256": "1accd0c0ce3efcb77844509fbe1a29db3cb1d8faa8bbb775bf7892350f39bac1"
+    },
+    {
+      "path": "results/full-verification/8388608/component-probes/1/components.json",
+      "bytes": 10304,
+      "sha256": "b0ed377f34ca3e0c3d59066df81f23432425bb869dde0deda5c30b489b374238"
+    },
+    {
+      "path": "results/full-verification/8388608/component-probes/1/gpu-telemetry.json",
+      "bytes": 2593,
+      "sha256": "8c272adbea4e11b5d7a855c6a22eddb0bff9c2e06b8eeac7c293c5e52bfdde96"
+    },
+    {
+      "path": "results/full-verification/8388608/component-probes/2/components.json",
+      "bytes": 10311,
+      "sha256": "6355a77cbab93c35ef042f4d1473c9b453d969b41970206830d041774a4374cb"
+    },
+    {
+      "path": "results/full-verification/8388608/component-probes/3/components.json",
+      "bytes": 10321,
+      "sha256": "086c9962e4c8d9438197c9def83d5cd89d6592676a6c62e33ad85150e47f92a8"
+    },
+    {
+      "path": "results/full-verification/8388608/component-probes/3/gpu-telemetry.json",
+      "bytes": 2593,
+      "sha256": "55b756a8d7ac0cba8a21562c48f2cb3606001b5319e423f431ff5e34c4e29d60"
+    },
+    {
+      "path": "results/full-verification/8388608/component-probes/4/components.json",
+      "bytes": 10333,
+      "sha256": "1bf23a5c72555505fe35f891aeb71847041230a91775df27393827af30333b4f"
+    },
+    {
+      "path": "results/full-verification/8388608/component-selection.json",
+      "bytes": 38348,
+      "sha256": "6f00f43a6f877747e5c4e6dac4a210507c64d232291a969a0438edae91250b6f"
+    },
+    {
+      "path": "results/full-verification/8388608/components/nccl-id.bin",
+      "bytes": 192,
+      "sha256": "4c8d4f8ba333f3a0924e1b5fa14fe291da8ae620cb2db2d911d9c4056047d9a2"
+    },
+    {
+      "path": "results/full-verification/8388608/components/rank-0.log",
+      "bytes": 6082,
+      "sha256": "f3d54eb88eb7cb9076c680b99f6d3c60238e49957abf018eab92bf66af865f82"
+    },
+    {
+      "path": "results/full-verification/8388608/components/rank-1.log",
+      "bytes": 6088,
+      "sha256": "165ab7ad7916f0eac7240bec53c179d0e6f5bc70ecc8dc530be84e4148510921"
+    },
+    {
+      "path": "results/full-verification/8388608/components/rank-2.log",
+      "bytes": 6080,
+      "sha256": "3e3641de7fd1a86207b26b71bb88e6a4db9f4c5419be4809115f1b54de7ad606"
+    },
+    {
+      "path": "results/full-verification/8388608/components/rank-3.log",
+      "bytes": 6078,
+      "sha256": "5e415884b2642829c6a14bd834e70b7730def3b60a2b682f456612f6aaf0c1ac"
+    },
+    {
+      "path": "results/full-verification/8388608/components/rank-4.log",
+      "bytes": 6087,
+      "sha256": "3cde16756b83014d15089f26a77db53867d04d70e7f0962f7e9a123fa81eb0cc"
+    },
+    {
+      "path": "results/full-verification/8388608/components/rank-5.log",
+      "bytes": 6080,
+      "sha256": "0ba6c4e059e8549372bb6a17dc702c8f976660b95b0e5b97fb631fac0fd729c7"
+    },
+    {
+      "path": "results/full-verification/8388608/components/rank-6.log",
+      "bytes": 6081,
+      "sha256": "2b6cc7ae0d7144342491ffc1e866b528d9b22ff67cbe8f691f1bc22d32f66c99"
+    },
+    {
+      "path": "results/full-verification/8388608/components/rank-7.log",
+      "bytes": 6085,
+      "sha256": "00a650a75c7989f3ac37c09446adb29e63ed0f2fe203a5f7411e423183d45c59"
+    },
+    {
+      "path": "results/full-verification/8388608/fixture-generation.log",
+      "bytes": 67,
+      "sha256": "6615fbc8d8e3bff029b8636f4c5b950cfad32808df9756452745f456ab05c83a"
+    },
+    {
+      "path": "results/full-verification/8388608/full/env0.json",
+      "bytes": 1515,
+      "sha256": "2af634429c2bb9f16a04ead0f39335761cfdf14722f670e9a23004bacabfbdd0"
+    },
+    {
+      "path": "results/full-verification/8388608/full/env1.json",
+      "bytes": 1515,
+      "sha256": "c2e07e3a7107947208e8fec73a3c67b7a9502d2c3410a9a40b48dcd5aa25cf88"
+    },
+    {
+      "path": "results/full-verification/8388608/full/env2.json",
+      "bytes": 1515,
+      "sha256": "aba3975170a4db0354a77410d312cc067cfe77a195635377366da0acb785f0b2"
+    },
+    {
+      "path": "results/full-verification/8388608/full/env3.json",
+      "bytes": 1515,
+      "sha256": "a886d2724323ae8f33ae5b0f314766f0b157f324b416e62151ae86f184868730"
+    },
+    {
+      "path": "results/full-verification/8388608/full/env4.json",
+      "bytes": 1515,
+      "sha256": "bb7fa54958211f5b2d4464f3e048426b0c24de6a4b40913e1203b7acd107a242"
+    },
+    {
+      "path": "results/full-verification/8388608/full/env5.json",
+      "bytes": 1515,
+      "sha256": "96bbb4977be8a1495266e2f0af581f04ab99f6751b0a705d51374db1407a4278"
+    },
+    {
+      "path": "results/full-verification/8388608/full/env6.json",
+      "bytes": 1515,
+      "sha256": "7382b3a52a3fc32a2c69ff3a7f54fadf0974169025fb3707f8a47ec7669460a5"
+    },
+    {
+      "path": "results/full-verification/8388608/full/env7.json",
+      "bytes": 1515,
+      "sha256": "afb7c8f66d29df2ba78c5dec06ddf3d78e893a438b25f407bf6eaae835fa8249"
+    },
+    {
+      "path": "results/full-verification/8388608/full/exit.json",
+      "bytes": 1005,
+      "sha256": "aaa19c54768120795bc4d6331cf00d39a80e122c8b56c62d332a90919abb158a"
+    },
+    {
+      "path": "results/full-verification/8388608/full/nccl",
+      "bytes": 179,
+      "sha256": "cdf692034396c60d8cf16e8f5cdadaf75bf7450a4f65d0a25ccb546558284dbb"
+    },
+    {
+      "path": "results/full-verification/8388608/full/rank0.log",
+      "bytes": 8803,
+      "sha256": "052dafe00b44e85386cd03876a1c2cfa5a578bbd019dbe1369625e761ef30823"
+    },
+    {
+      "path": "results/full-verification/8388608/full/rank1.log",
+      "bytes": 8801,
+      "sha256": "169cbca0cb565975de21bd6a8c4c22322bb019ab58a707b18fc9a30293c1b622"
+    },
+    {
+      "path": "results/full-verification/8388608/full/rank2.log",
+      "bytes": 8799,
+      "sha256": "1e76392293bb2e27598e69d92528a5c2ab042731c717b6bda97da85668d471f7"
+    },
+    {
+      "path": "results/full-verification/8388608/full/rank3.log",
+      "bytes": 8801,
+      "sha256": "214c417ae59792f34d924d410aa8a99a4ffd97b51ff2f4993f7aba888f0bf3a1"
+    },
+    {
+      "path": "results/full-verification/8388608/full/rank4.log",
+      "bytes": 8801,
+      "sha256": "e7b15b97794e31aa54190c35cbef5042eb332ece97b242a4ea563f34be992a96"
+    },
+    {
+      "path": "results/full-verification/8388608/full/rank5.log",
+      "bytes": 8802,
+      "sha256": "a18f2a9006fc0a59bd3d078b03519bbc963a1b66c1a17da2a112692a578a1081"
+    },
+    {
+      "path": "results/full-verification/8388608/full/rank6.log",
+      "bytes": 8803,
+      "sha256": "e6c24207e342c3376cfa4bafc742aac1a07d0234f74ad3ce21988f8340051c98"
+    },
+    {
+      "path": "results/full-verification/8388608/full/rank7.log",
+      "bytes": 8803,
+      "sha256": "f4600e25d9bd60909c90aaaa93300d725bf612591438c835e055156d2d050df9"
+    },
+    {
+      "path": "results/full-verification/8388608/full/test_results/unsolved_run_1791586956483294048_r1_0/no_solution_p0_d6_b8388608.log",
+      "bytes": 330,
+      "sha256": "3b3e32695e6ecbf1f1aa1d157c8a2449b4d75e6125b46759dd291278b0dfa6ed"
+    },
+    {
+      "path": "results/full-verification/8388608/full/test_results/unsolved_run_1791586956510685202_r0_0/no_solution_p0_d6_b8388608.log",
+      "bytes": 330,
+      "sha256": "394f26336b6750b0eae4e1b408f0de942ba3c29cfe1878eea146dd2751e37942"
+    },
+    {
+      "path": "results/full-verification/8388608/full/test_results/unsolved_run_1791586956520490575_r7_0/no_solution_p0_d6_b8388608.log",
+      "bytes": 330,
+      "sha256": "cca8d5cd0c0967b96f5237878b90c703427b700af9ec1287244721e1bda0401e"
+    },
+    {
+      "path": "results/full-verification/8388608/full/test_results/unsolved_run_1791586957025999274_r4_0/no_solution_p0_d6_b8388608.log",
+      "bytes": 330,
+      "sha256": "a3bdcf032834bbdf93a79a8ef11df055c61b0e5d865df1179a9e9244297518b5"
+    },
+    {
+      "path": "results/full-verification/8388608/full/test_results/unsolved_run_1791586957120371654_r6_0/no_solution_p0_d6_b8388608.log",
+      "bytes": 330,
+      "sha256": "efc6ae6be52930062782e9b63fdc6aba7d29e38052b7caf26e2b45888a1c54c8"
+    },
+    {
+      "path": "results/full-verification/8388608/full/test_results/unsolved_run_1791586957142873001_r5_0/no_solution_p0_d6_b8388608.log",
+      "bytes": 330,
+      "sha256": "6163c3fa0e992b6971cea70d5e68f11b112fcde803b5f478a5850829e51012be"
+    },
+    {
+      "path": "results/full-verification/8388608/full/test_results/unsolved_run_1791586957213315614_r2_0/no_solution_p0_d6_b8388608.log",
+      "bytes": 330,
+      "sha256": "a16a391aa06c47d949116905c684452021030bf1d4634295fb5aea03f6e9e925"
+    },
+    {
+      "path": "results/full-verification/8388608/full/test_results/unsolved_run_1791586957213655262_r3_0/no_solution_p0_d6_b8388608.log",
+      "bytes": 330,
+      "sha256": "9054d3deca5ea4ad42c5129e41027b2a6840b21b71e99f6f6067629a0581b2d5"
+    },
+    {
+      "path": "results/full-verification/8388608/matched-receipts.json",
+      "bytes": 5189,
+      "sha256": "a978f4f5bd9e1ae7056e360234e85970e683a50347a6ca3043e926a510855cf8"
+    },
+    {
+      "path": "results/full-verification/8388608/report.json",
+      "bytes": 155613,
+      "sha256": "c0782ccb6da74828af42d9ce1f16f786f6a055d62158c274ab99cb5103ea2103"
+    },
+    {
+      "path": "results/full-verification/8388608/stream1/inputs-0/ensemble.json",
+      "bytes": 744,
+      "sha256": "7207e20e67f365e87e578ee414240e11e295581947f9cf06770175b6cdebb1bf"
+    },
+    {
+      "path": "results/full-verification/8388608/stream1/inputs-1/ensemble.json",
+      "bytes": 744,
+      "sha256": "163193a288598e3efe4d6eaf7fd62e9b3b529f918d35f82a510dad4647878884"
+    },
+    {
+      "path": "results/full-verification/8388608/stream1/inputs-2/ensemble.json",
+      "bytes": 744,
+      "sha256": "a34b8cf87a99c960c61f0c05a2b3acc83f1ce111ed6da3d34009488aa3678f2e"
+    },
+    {
+      "path": "results/full-verification/8388608/stream1/inputs-3/ensemble.json",
+      "bytes": 744,
+      "sha256": "eaec620f2e490e94f01af492c686ae46756b3986f0c99c3ca0ebd76ee8fc8798"
+    },
+    {
+      "path": "results/full-verification/8388608/stream1/inputs-4/ensemble.json",
+      "bytes": 744,
+      "sha256": "4a5ffe3ecebfee67aaa3999dae11e6a5e5f2ff9847a8e84d87de541caf46e157"
+    },
+    {
+      "path": "results/full-verification/8388608/stream1/inputs-5/ensemble.json",
+      "bytes": 744,
+      "sha256": "b108a6e821108855a37c4c305b814091adf1167397e99d48556231f830191cf9"
+    },
+    {
+      "path": "results/full-verification/8388608/stream1/inputs-6/ensemble.json",
+      "bytes": 744,
+      "sha256": "95299de63990854e649ffa5c20e5638295110d9124e867c90aab43dbe0ce4625"
+    },
+    {
+      "path": "results/full-verification/8388608/stream1/inputs-7/ensemble.json",
+      "bytes": 744,
+      "sha256": "3b2a4816f1690c02a5cf0e055cd693fa6526fc4481d304349514ad8748ac057d"
+    },
+    {
+      "path": "results/full-verification/8388608/stream1/rank0.log",
+      "bytes": 396,
+      "sha256": "98b694e31c6ef4a718cb22f96cad5a3bcdb35bc97f5ba89b122e9231fc6fa3b6"
+    },
+    {
+      "path": "results/full-verification/8388608/stream1/rank1.log",
+      "bytes": 395,
+      "sha256": "55858ac33fddfdb9be12f1250be6d306f1751310c3da4b69f52a82fa3790412e"
+    },
+    {
+      "path": "results/full-verification/8388608/stream1/rank2.log",
+      "bytes": 380,
+      "sha256": "811d4c904e60a08bb8f0cd7b175954b9d50688a333e28024195bcf7eba989373"
+    },
+    {
+      "path": "results/full-verification/8388608/stream1/rank3.log",
+      "bytes": 379,
+      "sha256": "a895d04e6ff088cb0a972e9c226d44f37317f4df108237a338ffdc62b16fe876"
+    },
+    {
+      "path": "results/full-verification/8388608/stream1/rank4.log",
+      "bytes": 384,
+      "sha256": "0887aecd784349e88a32a34db10dc4e03a1c43256e26b5b681e37ce525ad07dd"
+    },
+    {
+      "path": "results/full-verification/8388608/stream1/rank5.log",
+      "bytes": 387,
+      "sha256": "48661b50471a658e51945090dd42b85ef3eaecb56429d068a636453fbd3042ff"
+    },
+    {
+      "path": "results/full-verification/8388608/stream1/rank6.log",
+      "bytes": 381,
+      "sha256": "de0d9d43f6c9b12eab34129830573dab86f99dbaac0541a4553e8acdbc42ae34"
+    },
+    {
+      "path": "results/full-verification/8388608/stream1/rank7.log",
+      "bytes": 388,
+      "sha256": "a3de82a1ec4dc79a614174f61121a570bd219d6774ccf4e82457e1406e163ead"
+    },
+    {
+      "path": "results/full-verification/8388608/stream1/receipt.json",
+      "bytes": 4576,
+      "sha256": "acf1270c56b73ecfe54fe9b5b043339e2f49849c1f6691e22788f3dbefe74675"
+    },
+    {
+      "path": "results/hardware.json",
+      "bytes": 6001,
+      "sha256": "68e7274c5038f9368aa5e89ce6c008a56fa8d440f6d1bab76c62c2201dc1e818"
+    },
+    {
+      "path": "results/preparation.json",
+      "bytes": 1351,
+      "sha256": "9aacad16b58b22ebb6f8c2d35360ffe821a9b2804a093b6de6359b6893187e0c"
+    },
+    {
+      "path": "results/public-calibration/prepared/weights/ensemble.json",
+      "bytes": 612,
+      "sha256": "5b32bf60af95fd072a1198da136508d6e4d7cb9d7392de96b46d07c86d57e0d3"
+    },
+    {
+      "path": "results/public-calibration-attempt2/prepared/weights/ensemble.json",
+      "bytes": 612,
+      "sha256": "5b32bf60af95fd072a1198da136508d6e4d7cb9d7392de96b46d07c86d57e0d3"
+    },
+    {
+      "path": "results/public-calibration-attempt2/w2-beam1048576/admit-8192/nccl-id.bin",
+      "bytes": 192,
+      "sha256": "41da5c84b3e12ea4e049046221c709d2f8bfed607d6007c9eda83c6263a87305"
+    },
+    {
+      "path": "results/public-calibration-attempt2/w2-beam1048576/admit-8192/rank-0.log",
+      "bytes": 792,
+      "sha256": "435f45e5ab59c8ba8fff4e129dfae6678d0485c6d88045c035d7f32045c38d79"
+    },
+    {
+      "path": "results/public-calibration-attempt2/w2-beam1048576/admit-8192/rank-1.log",
+      "bytes": 792,
+      "sha256": "5acc99cfdbf341e8d4b162209f8e20188050002939d908dd6d68f4f8be4dc663"
+    },
+    {
+      "path": "results/public-calibration-attempt2/w2-beam1048576/calibration/batch-1024-receipt.json",
+      "bytes": 5561,
+      "sha256": "3f34630bf23f4feec53e0234651f3606bdbd5b65dca88a24559d6ea5901f717d"
+    },
+    {
+      "path": "results/public-calibration-attempt2/w2-beam1048576/calibration/batch-128-receipt.json",
+      "bytes": 5568,
+      "sha256": "02ff736c7992ed1dc72628c7f60dcdd046a50cf5fefd2c813c12c985edafd98f"
+    },
+    {
+      "path": "results/public-calibration-attempt2/w2-beam1048576/calibration/batch-2048-receipt.json",
+      "bytes": 5576,
+      "sha256": "026fb43668c0b30b153bff8a53804ae6a7a1437c53d78d44204f099e887c6908"
+    },
+    {
+      "path": "results/public-calibration-attempt2/w2-beam1048576/calibration/batch-256-receipt.json",
+      "bytes": 9529,
+      "sha256": "c968880d39cab963b9300069a0683fff286ce97218ea70c08308efae647f3ccf"
+    },
+    {
+      "path": "results/public-calibration-attempt2/w2-beam1048576/calibration/batch-32-receipt.json",
+      "bytes": 8200,
+      "sha256": "067946c2750c63ddd8dda1ce899b34f555d7db656db2db14df53f51cbce0be2b"
+    },
+    {
+      "path": "results/public-calibration-attempt2/w2-beam1048576/calibration/batch-4096-receipt.json",
+      "bytes": 6879,
+      "sha256": "f83eca982b1ef46e8003c885dec66d613a04fc5b30241d8cd683b36dbf7bf331"
+    },
+    {
+      "path": "results/public-calibration-attempt2/w2-beam1048576/calibration/batch-512-receipt.json",
+      "bytes": 5559,
+      "sha256": "65eb625b14f9d43fefaa2ad252907bf8aebf3fc00d4598b0beca140c33ba6b52"
+    },
+    {
+      "path": "results/public-calibration-attempt2/w2-beam1048576/calibration/batch-5120-receipt.json",
+      "bytes": 6885,
+      "sha256": "8f4f55afa676dc05e4c9a4d21917b8913313448487c9f24af2c04e093d5d690a"
+    },
+    {
+      "path": "results/public-calibration-attempt2/w2-beam1048576/calibration/batch-6144-receipt.json",
+      "bytes": 6889,
+      "sha256": "cd14a74200d28917816c40192e86a38588b5e091b35f0730843b68086ab44289"
+    },
+    {
+      "path": "results/public-calibration-attempt2/w2-beam1048576/calibration/batch-64-receipt.json",
+      "bytes": 6876,
+      "sha256": "bfb1ae84e6600e6246d4a954005e87a6d978fe84f59079471b48eab3c1136a25"
+    },
+    {
+      "path": "results/public-calibration-attempt2/w2-beam1048576/calibration/batch-7168-receipt.json",
+      "bytes": 6891,
+      "sha256": "f880154d0801c1a8b5460f90b8dff0efd7c24d7dc60796d442cc86880b40e241"
+    },
+    {
+      "path": "results/public-calibration-attempt2/w2-beam1048576/calibration/batch-8192-receipt.json",
+      "bytes": 6896,
+      "sha256": "4bb38e3cb9a4b549ae1ebee5071e840fdce02c1ad67702c6c19c88669cfc4c4a"
+    },
+    {
+      "path": "results/public-calibration-attempt2/w2-beam1048576/calibration/inference-selection.json",
+      "bytes": 68520,
+      "sha256": "07bcbc341f416625227924983b4fdabcbf8e77f9f6a2c8c7b8fc4cbc6a179703"
+    },
+    {
+      "path": "results/public-calibration-attempt2/w2-beam1048576/calibration/inputs/ensemble.json",
+      "bytes": 46851,
+      "sha256": "9a346e39eef9fa9dbae0e7559376bdf65c33746b4a8fa897f879fe8aadb58eb7"
+    },
+    {
+      "path": "results/public-calibration-attempt2/w2-beam1048576/calibration/session-1-rank-0.log",
+      "bytes": 4987,
+      "sha256": "c6af65ab37a76703babbd276240400350d552d24a140bfc7a8f5a904a4aa3585"
+    },
+    {
+      "path": "results/public-calibration-attempt2/w2-beam1048576/calibration/session-2-rank-1.log",
+      "bytes": 4989,
+      "sha256": "3c5999666631302cc011e748499cb9ff56bea036deaa043e287a290dd9f7d27d"
+    },
+    {
+      "path": "results/public-calibration-attempt2/w2-beam1048576/report.json",
+      "bytes": 1816,
+      "sha256": "c7a358d3881be5ae353ea1906232f1f3ae730c0d2ca9dda4323daf72dc2be514"
+    },
+    {
+      "path": "results/public-calibration-attempt2/w2-beam8388608/admit-8192/nccl-id.bin",
+      "bytes": 192,
+      "sha256": "b85b9312265ce9b11dc6dcd071e3ec636fbb4fe7a33fb9244cb7d44a7bf85c0c"
+    },
+    {
+      "path": "results/public-calibration-attempt2/w2-beam8388608/admit-8192/rank-0.log",
+      "bytes": 794,
+      "sha256": "ec7238a55257a21d5d0d93173a326b322b23639c1939ce5c406f3f2f86445a09"
+    },
+    {
+      "path": "results/public-calibration-attempt2/w2-beam8388608/admit-8192/rank-1.log",
+      "bytes": 794,
+      "sha256": "8a3d162d1f1de1d42c626fc50f7c001ab09c1aa0aded2d113e3f88bdd9c2dae8"
+    },
+    {
+      "path": "results/public-calibration-attempt2/w2-beam8388608/calibration/batch-1024-receipt.json",
+      "bytes": 5574,
+      "sha256": "de1aab38ec4a2787c9032a8f6f41f9f535bbda143bb122e39992a6e090ec0f81"
+    },
+    {
+      "path": "results/public-calibration-attempt2/w2-beam8388608/calibration/batch-128-receipt.json",
+      "bytes": 5569,
+      "sha256": "f5394be5a80bc578660b3fca4d1e8de3fbc753998bed9ab8738ce909ed7c0a67"
+    },
+    {
+      "path": "results/public-calibration-attempt2/w2-beam8388608/calibration/batch-2048-receipt.json",
+      "bytes": 5570,
+      "sha256": "0261dc5b780f490432a098b1930adcec556d1c3477de09545519eb8239a1601b"
+    },
+    {
+      "path": "results/public-calibration-attempt2/w2-beam8388608/calibration/batch-256-receipt.json",
+      "bytes": 9519,
+      "sha256": "926f475656979324def84ba39cea3e5bebfc297fd96953a23baf781ade088ed8"
+    },
+    {
+      "path": "results/public-calibration-attempt2/w2-beam8388608/calibration/batch-32-receipt.json",
+      "bytes": 6869,
+      "sha256": "addec4c439c0fd3832b78164db3649ed7ebff1957697d9ecf5bbb632668b2ad2"
+    },
+    {
+      "path": "results/public-calibration-attempt2/w2-beam8388608/calibration/batch-4096-receipt.json",
+      "bytes": 6895,
+      "sha256": "4ff94455ea7940e19d8f96b290bbf1cbcc377dc86fbb960156fcdc4fb9a6f896"
+    },
+    {
+      "path": "results/public-calibration-attempt2/w2-beam8388608/calibration/batch-512-receipt.json",
+      "bytes": 5562,
+      "sha256": "aec2e97ba76bc4da8523e09caf9b360ef2aec28d6f726883cf5dd4483a274ff5"
+    },
+    {
+      "path": "results/public-calibration-attempt2/w2-beam8388608/calibration/batch-5120-receipt.json",
+      "bytes": 6887,
+      "sha256": "d6ffe143e67a65eb1be4de2d838d7ece5b028c11c5cc654a448077514d3f080a"
+    },
+    {
+      "path": "results/public-calibration-attempt2/w2-beam8388608/calibration/batch-6144-receipt.json",
+      "bytes": 6890,
+      "sha256": "60722d53b88e9b704d45ebb3684cecf02d9a352caf6964ebfcb36db3aafdb48a"
+    },
+    {
+      "path": "results/public-calibration-attempt2/w2-beam8388608/calibration/batch-64-receipt.json",
+      "bytes": 5564,
+      "sha256": "78359ec8377fd7ec1e30abf8ca2c1f551a5e25c5c270fe73e53c7128c4242c6f"
+    },
+    {
+      "path": "results/public-calibration-attempt2/w2-beam8388608/calibration/batch-7168-receipt.json",
+      "bytes": 6884,
+      "sha256": "a863509f3f904261d7dd2b3c9d58fe3192ce0bedf6d252a4b1094f4c1b87199a"
+    },
+    {
+      "path": "results/public-calibration-attempt2/w2-beam8388608/calibration/batch-8192-receipt.json",
+      "bytes": 6890,
+      "sha256": "78f7591243dc995c98b6d15611da37b4354a460a47bf1b3b1109f5eaf0cb7e63"
+    },
+    {
+      "path": "results/public-calibration-attempt2/w2-beam8388608/calibration/inference-selection.json",
+      "bytes": 65677,
+      "sha256": "e42406dee633f5bc23cb65c26dcfb5351baded3d84355a1e9c8e672323ac1753"
+    },
+    {
+      "path": "results/public-calibration-attempt2/w2-beam8388608/calibration/inputs/ensemble.json",
+      "bytes": 46851,
+      "sha256": "9a346e39eef9fa9dbae0e7559376bdf65c33746b4a8fa897f879fe8aadb58eb7"
+    },
+    {
+      "path": "results/public-calibration-attempt2/w2-beam8388608/calibration/session-1-rank-0.log",
+      "bytes": 4979,
+      "sha256": "7788104be9290e3e4d7ca762353a4a12b8e7da9697cffede06d59f2b58b53ac7"
+    },
+    {
+      "path": "results/public-calibration-attempt2/w2-beam8388608/calibration/session-2-rank-1.log",
+      "bytes": 5001,
+      "sha256": "652a193205827754492b8fc4f2c768ae76cefbf40e12edabb0c1e2767583b34f"
+    },
+    {
+      "path": "results/public-calibration-attempt2/w2-beam8388608/report.json",
+      "bytes": 1806,
+      "sha256": "633fb665332ae78c0c4523defdd6a2f0471ee5292c36ae51178109c7f49f9dbd"
+    },
+    {
+      "path": "results/public-calibration-attempt2/w8-beam1048576/admit-2048/nccl-id.bin",
+      "bytes": 192,
+      "sha256": "7820e686260c858d1b27b8b9cbc2624fdc1c3ab71c3a2c5d3a53566d654b89b1"
+    },
+    {
+      "path": "results/public-calibration-attempt2/w8-beam1048576/admit-2048/rank-0.log",
+      "bytes": 792,
+      "sha256": "b48e98318e55fbaac424a09f6d677d0d77171d312f81ef74f0347222be81d106"
+    },
+    {
+      "path": "results/public-calibration-attempt2/w8-beam1048576/admit-2048/rank-1.log",
+      "bytes": 792,
+      "sha256": "a56fd56a2652b73849d2363bd79e6e93f4d8c3866c91818df404500561248c31"
+    },
+    {
+      "path": "results/public-calibration-attempt2/w8-beam1048576/admit-2048/rank-2.log",
+      "bytes": 792,
+      "sha256": "98e86e99287a0f7a6dd7d3a4a832af3b29f2225c3d79d319c09ac05107069472"
+    },
+    {
+      "path": "results/public-calibration-attempt2/w8-beam1048576/admit-2048/rank-3.log",
+      "bytes": 792,
+      "sha256": "56b6e535b354c7d4f41c4386d6dcc41db4d23b5936cf08dca370cd1f6299eaa8"
+    },
+    {
+      "path": "results/public-calibration-attempt2/w8-beam1048576/admit-2048/rank-4.log",
+      "bytes": 792,
+      "sha256": "83f619805dcf2e145aa8c29d676864ab5bd45c1cf5911642ce552f7640937dfb"
+    },
+    {
+      "path": "results/public-calibration-attempt2/w8-beam1048576/admit-2048/rank-5.log",
+      "bytes": 792,
+      "sha256": "4a9a022e840c5abc1e01216ae67c0fa0f3eb01c66a7ef4d6b856fec2d7512b79"
+    },
+    {
+      "path": "results/public-calibration-attempt2/w8-beam1048576/admit-2048/rank-6.log",
+      "bytes": 792,
+      "sha256": "b3f33bff0c6026f8647fa441a1c7203e304d25da78cfb39f0717a4d95402b76d"
+    },
+    {
+      "path": "results/public-calibration-attempt2/w8-beam1048576/admit-2048/rank-7.log",
+      "bytes": 792,
+      "sha256": "2969f235077f4d60f9fd510db12dd2c1a6d190cc6be34083985257727a59ebdb"
+    },
+    {
+      "path": "results/public-calibration-attempt2/w8-beam1048576/calibration/batch-1024-receipt.json",
+      "bytes": 10880,
+      "sha256": "f4f773777f1381987e36f7eae5702d2316c5e35f2c09141b40cb8b828e8a1bb1"
+    },
+    {
+      "path": "results/public-calibration-attempt2/w8-beam1048576/calibration/batch-128-receipt.json",
+      "bytes": 10854,
+      "sha256": "c8df972a96c8bdbf196e8b8751cde7ec478c5545cfa65090edacccdc7c46e1a8"
+    },
+    {
+      "path": "results/public-calibration-attempt2/w8-beam1048576/calibration/batch-2048-receipt.json",
+      "bytes": 10887,
+      "sha256": "e6d47cf26280d5aacf0f816830e0b82652b5f45984742ba4c7cea7a702d91c6e"
+    },
+    {
+      "path": "results/public-calibration-attempt2/w8-beam1048576/calibration/batch-2304-receipt.json",
+      "bytes": 14444,
+      "sha256": "82d9984a33885aa2a73e278f60b07c4f164ec816b4aec4dc581fd267effe2073"
+    },
+    {
+      "path": "results/public-calibration-attempt2/w8-beam1048576/calibration/batch-256-receipt.json",
+      "bytes": 20099,
+      "sha256": "ca2f328a4ac7dc93c2f75cabb393a6444d9f1f946ff6f0bff4003e14e0782819"
+    },
+    {
+      "path": "results/public-calibration-attempt2/w8-beam1048576/calibration/batch-32-receipt.json",
+      "bytes": 13489,
+      "sha256": "6c160584aa56eeec955432707f7af16d89f89c59d08c59075eb7b48fea342274"
+    },
+    {
+      "path": "results/public-calibration-attempt2/w8-beam1048576/calibration/batch-64-receipt.json",
+      "bytes": 12182,
+      "sha256": "f2c87cd0c675398f53afd543df522adb33691679c796c05f2094fb60c010b657"
+    },
+    {
+      "path": "results/public-calibration-attempt2/w8-beam1048576/calibration/batch-8192-receipt.json",
+      "bytes": 9477,
+      "sha256": "c6d7268a70674daf253e5db00961144d918a358471d14faed73bd60443d74ea7"
+    },
+    {
+      "path": "results/public-calibration-attempt2/w8-beam1048576/calibration/inference-selection.json",
+      "bytes": 83146,
+      "sha256": "fb9e82dc3df7fff54f39c81e92a49da0dfe11335a2eb56a12d61e578e55c6cc6"
+    },
+    {
+      "path": "results/public-calibration-attempt2/w8-beam1048576/calibration/inputs/ensemble.json",
+      "bytes": 46851,
+      "sha256": "9a346e39eef9fa9dbae0e7559376bdf65c33746b4a8fa897f879fe8aadb58eb7"
+    },
+    {
+      "path": "results/public-calibration-attempt2/w8-beam1048576/calibration/session-1-rank-0.log",
+      "bytes": 2510,
+      "sha256": "54bdddf41ba5ed3abea79ecc4cdcecaef9b1e9de0dade05874a93677be381d8f"
+    },
+    {
+      "path": "results/public-calibration-attempt2/w8-beam1048576/calibration/session-10-rank-1.log",
+      "bytes": 42,
+      "sha256": "aef19f9466e44583758292e2e4c1cde3026206f121f10260b677364b80a7b2e0"
+    },
+    {
+      "path": "results/public-calibration-attempt2/w8-beam1048576/calibration/session-11-rank-2.log",
+      "bytes": 42,
+      "sha256": "7e06ad2dff01ac65261feb97c162712a4890d8e3d3c5c0291015c7d01e580045"
+    },
+    {
+      "path": "results/public-calibration-attempt2/w8-beam1048576/calibration/session-12-rank-3.log",
+      "bytes": 42,
+      "sha256": "0c3eb7328a1c3bcfcb5ff398635113593f02a2e5ba2b83cb1f7ee38f25bbc069"
+    },
+    {
+      "path": "results/public-calibration-attempt2/w8-beam1048576/calibration/session-13-rank-4.log",
+      "bytes": 42,
+      "sha256": "e75947981dce6c833eecc1201e83574c1e6face7f88ba44485558a026c402c6c"
+    },
+    {
+      "path": "results/public-calibration-attempt2/w8-beam1048576/calibration/session-2-rank-1.log",
+      "bytes": 2519,
+      "sha256": "72e9aafab6812cf68ad6e093f06b9f58ad979ca9785c11bfb4f28110aeb8a1fd"
+    },
+    {
+      "path": "results/public-calibration-attempt2/w8-beam1048576/calibration/session-3-rank-2.log",
+      "bytes": 2527,
+      "sha256": "f700cb95c62de0a80e7ba52d1f253ce0fc51d71ece46a96c6f607465d4887dac"
+    },
+    {
+      "path": "results/public-calibration-attempt2/w8-beam1048576/calibration/session-4-rank-3.log",
+      "bytes": 2515,
+      "sha256": "531f3d2e5633ff35c1ef69a975c8bc340c1215ef137a99e02794b7cbee743939"
+    },
+    {
+      "path": "results/public-calibration-attempt2/w8-beam1048576/calibration/session-5-rank-4.log",
+      "bytes": 2504,
+      "sha256": "a23c68de9dff6686bd236662944b14d8aade04b9b2887ef2946daf6db74864b6"
+    },
+    {
+      "path": "results/public-calibration-attempt2/w8-beam1048576/calibration/session-6-rank-5.log",
+      "bytes": 2928,
+      "sha256": "80f03e141fdefc7f91123509e3f8b4b200e051f9f2c96ed2dc998396b835b383"
+    },
+    {
+      "path": "results/public-calibration-attempt2/w8-beam1048576/calibration/session-7-rank-6.log",
+      "bytes": 2923,
+      "sha256": "05c2b7d85af177e4e7096d29f201c07c661d7d8dcd5da33d2b98f0f01e4ae73f"
+    },
+    {
+      "path": "results/public-calibration-attempt2/w8-beam1048576/calibration/session-8-rank-7.log",
+      "bytes": 2928,
+      "sha256": "f806a1f206fdca6724e18beccaa77b74153723c9aa278e57d3081da10167ea6d"
+    },
+    {
+      "path": "results/public-calibration-attempt2/w8-beam1048576/calibration/session-9-rank-0.log",
+      "bytes": 42,
+      "sha256": "2773fa86343f9a999cd05fded0ead2087176d16b18d29afd26ff25fe583b78cf"
+    },
+    {
+      "path": "results/public-calibration-attempt2/w8-beam1048576/report.json",
+      "bytes": 1748,
+      "sha256": "3a28c1bd7d4218841815274eaebf4246b50a0b635902281615ccee92621333c9"
+    },
+    {
+      "path": "results/public-calibration-attempt2/w8-beam8388608/admit-2048/nccl-id.bin",
+      "bytes": 192,
+      "sha256": "c6a605b730b48305a027d2cb5720a7c8105462f4c429e13356115bea0a7ca749"
+    },
+    {
+      "path": "results/public-calibration-attempt2/w8-beam8388608/admit-2048/rank-0.log",
+      "bytes": 794,
+      "sha256": "445723d73dddc326dbfe4143b26e694699837362dfa9228d9f6411cc2020c6a3"
+    },
+    {
+      "path": "results/public-calibration-attempt2/w8-beam8388608/admit-2048/rank-1.log",
+      "bytes": 794,
+      "sha256": "9438f24728ba00952080e7b96e47ebefde8df0459dd5922873599449d7c26d17"
+    },
+    {
+      "path": "results/public-calibration-attempt2/w8-beam8388608/admit-2048/rank-2.log",
+      "bytes": 794,
+      "sha256": "0be909399ca3a332bada00f17b1147efdcf42e56a99f6e1a125c951b3d1d890b"
+    },
+    {
+      "path": "results/public-calibration-attempt2/w8-beam8388608/admit-2048/rank-3.log",
+      "bytes": 794,
+      "sha256": "20dd45bc9a590be3f134611415f946f283701b1299325bf7c631de9bc079dd23"
+    },
+    {
+      "path": "results/public-calibration-attempt2/w8-beam8388608/admit-2048/rank-4.log",
+      "bytes": 794,
+      "sha256": "6d7798de1c2e9cf14225921b2efb2a481702aadc38b928c678cc4a247fd0fe58"
+    },
+    {
+      "path": "results/public-calibration-attempt2/w8-beam8388608/admit-2048/rank-5.log",
+      "bytes": 794,
+      "sha256": "209d3df71ddc48146188f036634a458b296350e0811b17fcc848118beadf9ba9"
+    },
+    {
+      "path": "results/public-calibration-attempt2/w8-beam8388608/admit-2048/rank-6.log",
+      "bytes": 794,
+      "sha256": "fff649479f15eaea61e275e9d2bd6ce1ba9248212fd971e3fda87ab5a973a3a8"
+    },
+    {
+      "path": "results/public-calibration-attempt2/w8-beam8388608/admit-2048/rank-7.log",
+      "bytes": 794,
+      "sha256": "5527a7ac2d911accada660776dd517c48d7dd5b5cbcb0c54a7403a2a3eb90ba7"
+    },
+    {
+      "path": "results/public-calibration-attempt2/w8-beam8388608/calibration/batch-1024-receipt.json",
+      "bytes": 10870,
+      "sha256": "63071e68f3974e3a4578c67ab57950ffa6c5f568af58de42215fdb93736b9bde"
+    },
+    {
+      "path": "results/public-calibration-attempt2/w8-beam8388608/calibration/batch-128-receipt.json",
+      "bytes": 10864,
+      "sha256": "5041c0756294b87d3aa02df015a7ec3102fc098b9b6f7ac315f03fe6f64db391"
+    },
+    {
+      "path": "results/public-calibration-attempt2/w8-beam8388608/calibration/batch-2048-receipt.json",
+      "bytes": 10896,
+      "sha256": "84af470d314e0546f5008b59e5ea40bfd607b4e3acf84c7c9210fe043c8e2c24"
+    },
+    {
+      "path": "results/public-calibration-attempt2/w8-beam8388608/calibration/batch-2304-receipt.json",
+      "bytes": 14444,
+      "sha256": "fbee66b612ba5a219c4e23274de8708a0b8d6b1d1652dfee88d222784ec910d1"
+    },
+    {
+      "path": "results/public-calibration-attempt2/w8-beam8388608/calibration/batch-256-receipt.json",
+      "bytes": 21421,
+      "sha256": "d0cef1e7e45d5a5bbb8550657bb29da8fc777f1db374303ad0fe855b908cb870"
+    },
+    {
+      "path": "results/public-calibration-attempt2/w8-beam8388608/calibration/batch-32-receipt.json",
+      "bytes": 13442,
+      "sha256": "c5aac6f71363e04dd7d005fa34f08752b1025fa841b5b5980b4734f1e299d5eb"
+    },
+    {
+      "path": "results/public-calibration-attempt2/w8-beam8388608/calibration/batch-64-receipt.json",
+      "bytes": 12178,
+      "sha256": "a4fe4cafacf105e2eec0601cb3eb15eebc50661c28db7749946938527a701c26"
+    },
+    {
+      "path": "results/public-calibration-attempt2/w8-beam8388608/calibration/batch-8192-receipt.json",
+      "bytes": 8936,
+      "sha256": "b3608547945eaaed147840943fd36ad4b8580c3b90eb2c3adf56a44612f3fea1"
+    },
+    {
+      "path": "results/public-calibration-attempt2/w8-beam8388608/calibration/inference-selection.json",
+      "bytes": 83988,
+      "sha256": "5d4461af201eac448150cc53b8684af772097eb5c80d1098d5683411a3d54597"
+    },
+    {
+      "path": "results/public-calibration-attempt2/w8-beam8388608/calibration/inputs/ensemble.json",
+      "bytes": 46851,
+      "sha256": "9a346e39eef9fa9dbae0e7559376bdf65c33746b4a8fa897f879fe8aadb58eb7"
+    },
+    {
+      "path": "results/public-calibration-attempt2/w8-beam8388608/calibration/session-1-rank-0.log",
+      "bytes": 2500,
+      "sha256": "fa63417262fef824434a6ce55d4201211118a1ce521a27ea993a46c838c79337"
+    },
+    {
+      "path": "results/public-calibration-attempt2/w8-beam8388608/calibration/session-10-rank-1.log",
+      "bytes": 42,
+      "sha256": "aef19f9466e44583758292e2e4c1cde3026206f121f10260b677364b80a7b2e0"
+    },
+    {
+      "path": "results/public-calibration-attempt2/w8-beam8388608/calibration/session-11-rank-2.log",
+      "bytes": 42,
+      "sha256": "7e06ad2dff01ac65261feb97c162712a4890d8e3d3c5c0291015c7d01e580045"
+    },
+    {
+      "path": "results/public-calibration-attempt2/w8-beam8388608/calibration/session-12-rank-3.log",
+      "bytes": 42,
+      "sha256": "0c3eb7328a1c3bcfcb5ff398635113593f02a2e5ba2b83cb1f7ee38f25bbc069"
+    },
+    {
+      "path": "results/public-calibration-attempt2/w8-beam8388608/calibration/session-13-rank-4.log",
+      "bytes": 42,
+      "sha256": "e75947981dce6c833eecc1201e83574c1e6face7f88ba44485558a026c402c6c"
+    },
+    {
+      "path": "results/public-calibration-attempt2/w8-beam8388608/calibration/session-14-rank-5.log",
+      "bytes": 42,
+      "sha256": "483d9d783dfc05629d3e0e901ec1e10e11522e3decdd4956cf775912586b259c"
+    },
+    {
+      "path": "results/public-calibration-attempt2/w8-beam8388608/calibration/session-2-rank-1.log",
+      "bytes": 2509,
+      "sha256": "a04af81cfc3526b326be3cfdf9d73e5e635e461379837e6fd6bb3e3f6518b340"
+    },
+    {
+      "path": "results/public-calibration-attempt2/w8-beam8388608/calibration/session-3-rank-2.log",
+      "bytes": 2508,
+      "sha256": "e66287b9a6e8b36795de03e1704fbd3e8f8f799c598197e9f64ce18517284bb4"
+    },
+    {
+      "path": "results/public-calibration-attempt2/w8-beam8388608/calibration/session-4-rank-3.log",
+      "bytes": 2510,
+      "sha256": "d43ea6873e9d712e232c82e1a28ac5fb0f3aaf5f6cbac6b1e8b5d5c81e63016b"
+    },
+    {
+      "path": "results/public-calibration-attempt2/w8-beam8388608/calibration/session-5-rank-4.log",
+      "bytes": 2501,
+      "sha256": "14b9fe5fb54f403479e70dcbeda8ec2a1f649f704865d5e8142cfb3492bd79f2"
+    },
+    {
+      "path": "results/public-calibration-attempt2/w8-beam8388608/calibration/session-6-rank-5.log",
+      "bytes": 2518,
+      "sha256": "8fd86804401e028b9c5a9c3c12571c6c49ba4e3fbf7a268e93e5535c07a1ef7a"
+    },
+    {
+      "path": "results/public-calibration-attempt2/w8-beam8388608/calibration/session-7-rank-6.log",
+      "bytes": 2920,
+      "sha256": "16fffe51c245e8132903ca6f7a83262e58ff58e57bc0a6f3df7dc196be2498d3"
+    },
+    {
+      "path": "results/public-calibration-attempt2/w8-beam8388608/calibration/session-8-rank-7.log",
+      "bytes": 2937,
+      "sha256": "3d9dec5c241e4857a6fe00a27050daa73d6df3f7bfab586da5b25119a3b1617c"
+    },
+    {
+      "path": "results/public-calibration-attempt2/w8-beam8388608/calibration/session-9-rank-0.log",
+      "bytes": 42,
+      "sha256": "2773fa86343f9a999cd05fded0ead2087176d16b18d29afd26ff25fe583b78cf"
+    },
+    {
+      "path": "results/public-calibration-attempt2/w8-beam8388608/report.json",
+      "bytes": 1756,
+      "sha256": "b2b661f6c56a0d25120d905bc52cb3cf1fb1a11ff9b69ed2252fc665d1a4b824"
+    },
+    {
+      "path": "results/public-calibration-attempt3/prepared/weights/ensemble.json",
+      "bytes": 612,
+      "sha256": "5b32bf60af95fd072a1198da136508d6e4d7cb9d7392de96b46d07c86d57e0d3"
+    },
+    {
+      "path": "results/public-calibration-attempt3/w2-beam1048576/admit-8192/nccl-id.bin",
+      "bytes": 192,
+      "sha256": "55f8102cb1ade70251d98b1aee8f9b0fe516f963a674b697a8b4f2f2c04078fd"
+    },
+    {
+      "path": "results/public-calibration-attempt3/w2-beam1048576/admit-8192/rank-0.log",
+      "bytes": 792,
+      "sha256": "18daf8e3ce9c28d4e4be136068b57df3ab2055ff14afd898b345fbdcd98bf2e3"
+    },
+    {
+      "path": "results/public-calibration-attempt3/w2-beam1048576/admit-8192/rank-1.log",
+      "bytes": 792,
+      "sha256": "6ac58dab0af5b5a34ddf2e0a42804ba52bb76a61646585ad96c7c6050505135f"
+    },
+    {
+      "path": "results/public-calibration-attempt3/w2-beam1048576/calibration/batch-1024-receipt.json",
+      "bytes": 5584,
+      "sha256": "562f17d94962bbbe1b7b293bebe070688b9c1ca8b6c999290c84cdcbe5f53e22"
+    },
+    {
+      "path": "results/public-calibration-attempt3/w2-beam1048576/calibration/batch-128-receipt.json",
+      "bytes": 5570,
+      "sha256": "99cf615346c0c6f0febf3b423df4023175ea5c3d84f2579194d15587ddbdc4a0"
+    },
+    {
+      "path": "results/public-calibration-attempt3/w2-beam1048576/calibration/batch-2048-receipt.json",
+      "bytes": 5581,
+      "sha256": "0ed5b977cd6205ef9a2de30c650daf6521e55e5a5aac27bf1be3e0cefc2cec52"
+    },
+    {
+      "path": "results/public-calibration-attempt3/w2-beam1048576/calibration/batch-256-receipt.json",
+      "bytes": 9530,
+      "sha256": "e73ac4ae0b65f66ad57765ac3e9bcaba94508d93b39a0432bdd77c9948ce9daa"
+    },
+    {
+      "path": "results/public-calibration-attempt3/w2-beam1048576/calibration/batch-32-receipt.json",
+      "bytes": 6880,
+      "sha256": "ad6edda4618e7c0c4887e915ecb89a9cf869a27613c415f5f2c6b7f1094fb8d1"
+    },
+    {
+      "path": "results/public-calibration-attempt3/w2-beam1048576/calibration/batch-4096-receipt.json",
+      "bytes": 5582,
+      "sha256": "b23d62b25fa425d596331a2e05e1b6b1b393b4ff8b9f895e06b0b66fd8c3f667"
+    },
+    {
+      "path": "results/public-calibration-attempt3/w2-beam1048576/calibration/batch-512-receipt.json",
+      "bytes": 5570,
+      "sha256": "a24f0857e95ef6e4d9def1c0ab3137104257fe938a8adac90ed89cf8feb2497c"
+    },
+    {
+      "path": "results/public-calibration-attempt3/w2-beam1048576/calibration/batch-5120-receipt.json",
+      "bytes": 6903,
+      "sha256": "bc69de325f60fcf9b845f4ba0faca96a80541478e59535ee939f3526f2ccf7f8"
+    },
+    {
+      "path": "results/public-calibration-attempt3/w2-beam1048576/calibration/batch-6144-receipt.json",
+      "bytes": 6896,
+      "sha256": "ed4bd87024e3dad8ba1b399ccf44e97ae7cf5323543a930ffba85414ec94645b"
+    },
+    {
+      "path": "results/public-calibration-attempt3/w2-beam1048576/calibration/batch-64-receipt.json",
+      "bytes": 5571,
+      "sha256": "9a3981ae5772fc63bc0d01d01e4b9f45ccf1024d662d2741e6efe0a888ad1314"
+    },
+    {
+      "path": "results/public-calibration-attempt3/w2-beam1048576/calibration/batch-7168-receipt.json",
+      "bytes": 6896,
+      "sha256": "026a930f2f7e01a293b804780583574430e799d0009a1b3a113172a18179162d"
+    },
+    {
+      "path": "results/public-calibration-attempt3/w2-beam1048576/calibration/batch-8192-receipt.json",
+      "bytes": 6903,
+      "sha256": "343f726187e6c5cce5c063bf49dabae5c619cead147fdab2fd99e7058aeb5d4d"
+    },
+    {
+      "path": "results/public-calibration-attempt3/w2-beam1048576/calibration/inference-selection.json",
+      "bytes": 64266,
+      "sha256": "82d680bbac37b401c574e87bb27d499d0ca317e0b4d2f521291bc7176a1529d9"
+    },
+    {
+      "path": "results/public-calibration-attempt3/w2-beam1048576/calibration/inputs/ensemble.json",
+      "bytes": 46851,
+      "sha256": "2520aa6f449101589e40ff754109cbd98c1a59b71f519cb7247f142c676567c4"
+    },
+    {
+      "path": "results/public-calibration-attempt3/w2-beam1048576/calibration/session-1-rank-0.log",
+      "bytes": 4978,
+      "sha256": "ed020ea34a3291c30fdf31131b736f51a1dbf51b989077992d31dedca4f28591"
+    },
+    {
+      "path": "results/public-calibration-attempt3/w2-beam1048576/calibration/session-2-rank-1.log",
+      "bytes": 4995,
+      "sha256": "623af69c23ba195b6856fa78dbbe5b4bfb1381970e2d5c50d6e0a548fab447c1"
+    },
+    {
+      "path": "results/public-calibration-attempt3/w2-beam1048576/report.json",
+      "bytes": 1818,
+      "sha256": "8019dddad7502d7e699dc7712e48c2e3399d037d517b5ccdce050e2d4add6c62"
+    },
+    {
+      "path": "results/public-calibration-attempt4/prepared/weights/ensemble.json",
+      "bytes": 612,
+      "sha256": "5b32bf60af95fd072a1198da136508d6e4d7cb9d7392de96b46d07c86d57e0d3"
+    },
+    {
+      "path": "results/public-calibration-attempt4/report.json",
+      "bytes": 7917,
+      "sha256": "d2be1d2cf89ddd2e77d1c2b73a78c0ee2536db00173fbd07c89080774571a6d0"
+    },
+    {
+      "path": "results/public-calibration-attempt4/w8-beam1048576/admit-8192/nccl-id.bin",
+      "bytes": 192,
+      "sha256": "e4b9026662f972100d2bc9c1e3154425f3a89a4f496269e0f6e3ec7037bea315"
+    },
+    {
+      "path": "results/public-calibration-attempt4/w8-beam1048576/admit-8192/rank-0.log",
+      "bytes": 793,
+      "sha256": "6f0abb384550b963d31f9f29b8190d6a6ebddfc7b4b20dae631d64bdb94f4965"
+    },
+    {
+      "path": "results/public-calibration-attempt4/w8-beam1048576/admit-8192/rank-1.log",
+      "bytes": 793,
+      "sha256": "e1d3bb0825ca6812b2293985c3ff7257a2e461f996a0b45248153f342029af00"
+    },
+    {
+      "path": "results/public-calibration-attempt4/w8-beam1048576/admit-8192/rank-2.log",
+      "bytes": 793,
+      "sha256": "dac2c1e48a9ed8d2ade847f9d60ef7858da7a0542a8e9d8931ecaae28d928fc1"
+    },
+    {
+      "path": "results/public-calibration-attempt4/w8-beam1048576/admit-8192/rank-3.log",
+      "bytes": 793,
+      "sha256": "44487d616fa0b7069807c9fa21dbb6b35ad243933433b24cc6e29d28ba08cd40"
+    },
+    {
+      "path": "results/public-calibration-attempt4/w8-beam1048576/admit-8192/rank-4.log",
+      "bytes": 793,
+      "sha256": "31958331f6e5dc0f32e22412fb04aa829f965f541fcc25b2b9ddf96eea9513aa"
+    },
+    {
+      "path": "results/public-calibration-attempt4/w8-beam1048576/admit-8192/rank-5.log",
+      "bytes": 793,
+      "sha256": "b3e68e308adcb049ad13ef67a8ad585d008b870a1d4e8a3acdebfe6b95198c5a"
+    },
+    {
+      "path": "results/public-calibration-attempt4/w8-beam1048576/admit-8192/rank-6.log",
+      "bytes": 793,
+      "sha256": "53c78b9b51a7fbeec40c34f10b5672813e2d9fed80b0b3f58d12ce8067e12317"
+    },
+    {
+      "path": "results/public-calibration-attempt4/w8-beam1048576/admit-8192/rank-7.log",
+      "bytes": 793,
+      "sha256": "57b48724e949acbd2833763ecc66200ea7edfcbad05f51875c1e45ea06d51969"
+    },
+    {
+      "path": "results/public-calibration-attempt4/w8-beam1048576/calibration/batch-2048-receipt.json",
+      "bytes": 10911,
+      "sha256": "88949027c96912d94bd8e81582bc686dcd179834c920c335ccfa90f168473c4c"
+    },
+    {
+      "path": "results/public-calibration-attempt4/w8-beam1048576/calibration/batch-256-receipt.json",
+      "bytes": 20140,
+      "sha256": "42c9ce627a4ea849d68ba6efcafe91952e96dbf728cd1429a1d3624f13e57af6"
+    },
+    {
+      "path": "results/public-calibration-attempt4/w8-beam1048576/calibration/batch-512-receipt.json",
+      "bytes": 10872,
+      "sha256": "0d6378da40ae8e93f88388857cfdd5d5baf0941f1888bc1b114fe8080e21934c"
+    },
+    {
+      "path": "results/public-calibration-attempt4/w8-beam1048576/calibration/batch-5120-receipt.json",
+      "bytes": 12213,
+      "sha256": "ce466ff6ce7fec7a6d36ec7a69e98fbf465cdbed6d876a3f6539fde1ebc26a42"
+    },
+    {
+      "path": "results/public-calibration-attempt4/w8-beam1048576/calibration/batch-6144-receipt.json",
+      "bytes": 12215,
+      "sha256": "1000cf0020940b1304eb002150b582bfcb1beda38e4be90644e8a139d950db1b"
+    },
+    {
+      "path": "results/public-calibration-attempt4/w8-beam1048576/calibration/batch-7168-receipt.json",
+      "bytes": 12222,
+      "sha256": "e32cb386e72cdeb6c087590c9597c6633043f9d2293899f9d1eae410689aecfa"
+    },
+    {
+      "path": "results/public-calibration-attempt4/w8-beam1048576/calibration/batch-8192-receipt.json",
+      "bytes": 12227,
+      "sha256": "b62b9a049c634244eaded3ee1c6daa53658d3a0692fcad74ee9f4210f1af13e8"
+    },
+    {
+      "path": "results/public-calibration-attempt4/w8-beam1048576/calibration/inference-selection.json",
+      "bytes": 74421,
+      "sha256": "00674570b36d12924571744847775994049bbb4761b805aa7801d103580688e5"
+    },
+    {
+      "path": "results/public-calibration-attempt4/w8-beam1048576/calibration/inputs/ensemble.json",
+      "bytes": 46851,
+      "sha256": "d4f35cf1bcf7e6ea750d3fde6de058e924065a45f7b183350e9218a8e0177135"
+    },
+    {
+      "path": "results/public-calibration-attempt4/w8-beam1048576/calibration/session-1-rank-0.log",
+      "bytes": 2928,
+      "sha256": "389d53a42f932339d04ea1992107af6cfd8cf3bbe3cdce9a24685b3d8d1cee33"
+    },
+    {
+      "path": "results/public-calibration-attempt4/w8-beam1048576/calibration/session-2-rank-1.log",
+      "bytes": 2931,
+      "sha256": "2989370800dcb88e139aaa3a6103de9bfdd2854ba19d25c6eb517bd6b55435d9"
+    },
+    {
+      "path": "results/public-calibration-attempt4/w8-beam1048576/calibration/session-3-rank-2.log",
+      "bytes": 2951,
+      "sha256": "5a108057c70c4dfc28c54fe898bff332b890c637ac1e3adf2d8922696b6f6b80"
+    },
+    {
+      "path": "results/public-calibration-attempt4/w8-beam1048576/calibration/session-4-rank-3.log",
+      "bytes": 2944,
+      "sha256": "ef5056bfb13b48c6f276bc7deb138882798d8e6b7427da80978bf656ea9fe6a0"
+    },
+    {
+      "path": "results/public-calibration-attempt4/w8-beam1048576/calibration/session-5-rank-4.log",
+      "bytes": 2923,
+      "sha256": "b8d0df434f51def72690468df52798e341d2e28040ae0e7b989b7fde05d83384"
+    },
+    {
+      "path": "results/public-calibration-attempt4/w8-beam1048576/calibration/session-6-rank-5.log",
+      "bytes": 2930,
+      "sha256": "d0cd828180c927a14225722cf395c100227cf09cdf51dd8e848d0c791f264e22"
+    },
+    {
+      "path": "results/public-calibration-attempt4/w8-beam1048576/calibration/session-7-rank-6.log",
+      "bytes": 2945,
+      "sha256": "ecdc793c93b8025b8f0e504923621d1941b477b54297cd6b03b1c12c0e759df5"
+    },
+    {
+      "path": "results/public-calibration-attempt4/w8-beam1048576/calibration/session-8-rank-7.log",
+      "bytes": 2936,
+      "sha256": "62bb92ad64197520c8d5d3304992ccf21169f034fdbcb25e5b4caadc3c2a4b90"
+    },
+    {
+      "path": "results/public-calibration-attempt4/w8-beam1048576/report.json",
+      "bytes": 1765,
+      "sha256": "e35b91eb634695c1ce2bef5caa31db96296a20937890dfe89723e73ebbb6a13f"
+    },
+    {
+      "path": "results/public-calibration-attempt4/w8-beam33554432/admit-2048/nccl-id.bin",
+      "bytes": 192,
+      "sha256": "7ff0507ce6f4ce9007bfdd2f32510c0c2b36f647e2a910c93feedd24e53768da"
+    },
+    {
+      "path": "results/public-calibration-attempt4/w8-beam33554432/admit-2048/rank-0.log",
+      "bytes": 797,
+      "sha256": "17e82fab30767e1e7457f3a4355e9285bd309c2059b4a86ca1bd27269cd55e04"
+    },
+    {
+      "path": "results/public-calibration-attempt4/w8-beam33554432/admit-2048/rank-1.log",
+      "bytes": 797,
+      "sha256": "1c5ed1e61e6407b665c3ddeb9e54b83095585c9d2476a407f0385642e9a0078a"
+    },
+    {
+      "path": "results/public-calibration-attempt4/w8-beam33554432/admit-2048/rank-2.log",
+      "bytes": 797,
+      "sha256": "818d54e587e470cc89a7dfc6c97f77052739826a03ad3d5c4f879df7bfaaac5d"
+    },
+    {
+      "path": "results/public-calibration-attempt4/w8-beam33554432/admit-2048/rank-3.log",
+      "bytes": 797,
+      "sha256": "2c87a9ec3a8dd3a2b43f6a5684d525f8fed02e09ce21cfa3e561dba7d4583ab7"
+    },
+    {
+      "path": "results/public-calibration-attempt4/w8-beam33554432/admit-2048/rank-4.log",
+      "bytes": 797,
+      "sha256": "8f16a319ab6964faa2903579aadebeb488354f1cd1a9b4b8c9f7621cb98d01d3"
+    },
+    {
+      "path": "results/public-calibration-attempt4/w8-beam33554432/admit-2048/rank-5.log",
+      "bytes": 797,
+      "sha256": "05cd508243ac11dbece58db3eae029d214f2b026884a3b1de086495e5656e8c0"
+    },
+    {
+      "path": "results/public-calibration-attempt4/w8-beam33554432/admit-2048/rank-6.log",
+      "bytes": 797,
+      "sha256": "595841f88d14022aed9bcea44f74fcaf4a52c1916181eed3c18a6fd6d01294d4"
+    },
+    {
+      "path": "results/public-calibration-attempt4/w8-beam33554432/admit-2048/rank-7.log",
+      "bytes": 797,
+      "sha256": "1018518c010c97304091f2281b72fc72c187edf09c9648434230e1edbde2eb85"
+    },
+    {
+      "path": "results/public-calibration-attempt4/w8-beam33554432/admit-8192/nccl-id.bin",
+      "bytes": 192,
+      "sha256": "e5be3f524aedf4680ef21b01099bd8b12b39c7865cef1e69f27a8d3f90dfc591"
+    },
+    {
+      "path": "results/public-calibration-attempt4/w8-beam33554432/admit-8192/rank-0.log",
+      "bytes": 524,
+      "sha256": "c9c79f89beb4838c4f0832ca0274dfcbd85dfe6c0ac686425ddac7fd021d314b"
+    },
+    {
+      "path": "results/public-calibration-attempt4/w8-beam33554432/admit-8192/rank-1.log",
+      "bytes": 524,
+      "sha256": "a4af2c075d66856f888e6d821c077e1b6ac6b3cd9c15764daadf7791ef86c5a3"
+    },
+    {
+      "path": "results/public-calibration-attempt4/w8-beam33554432/admit-8192/rank-2.log",
+      "bytes": 524,
+      "sha256": "f77b9be06db88f4609023654e452987542d9a319d70ab30b494e0001c645d2dc"
+    },
+    {
+      "path": "results/public-calibration-attempt4/w8-beam33554432/admit-8192/rank-3.log",
+      "bytes": 524,
+      "sha256": "9ec5dd5c412fea161e1449aa14c057417c0a8776aebd1477fd2c7348aec65028"
+    },
+    {
+      "path": "results/public-calibration-attempt4/w8-beam33554432/admit-8192/rank-4.log",
+      "bytes": 524,
+      "sha256": "66282e4718c497f64c935f5cc957da741b6b7ac3378296fc1cc04cabb08bf7b7"
+    },
+    {
+      "path": "results/public-calibration-attempt4/w8-beam33554432/admit-8192/rank-5.log",
+      "bytes": 524,
+      "sha256": "2a03ede87c3b5978ed770d33fd9cddfdf891f42b2d31bad1672a948285364ae2"
+    },
+    {
+      "path": "results/public-calibration-attempt4/w8-beam33554432/admit-8192/rank-6.log",
+      "bytes": 524,
+      "sha256": "8b299bccc8d974eab8e9293212fe77a4b1251df70a11df61645dd413b04f3e3d"
+    },
+    {
+      "path": "results/public-calibration-attempt4/w8-beam33554432/admit-8192/rank-7.log",
+      "bytes": 524,
+      "sha256": "be6bdfe3a544ce546a1909a11f34b181d3c65940711e3d8b757d2e2ff5a18efa"
+    },
+    {
+      "path": "results/public-calibration-attempt4/w8-beam33554432/calibration/batch-2048-receipt.json",
+      "bytes": 10893,
+      "sha256": "4c7a91bead2a59e495ca3a28c386ba66266b1d7c1dc80d0b36de92809c1a5083"
+    },
+    {
+      "path": "results/public-calibration-attempt4/w8-beam33554432/calibration/batch-256-receipt.json",
+      "bytes": 20126,
+      "sha256": "44e36cdc98ecd3cfaef7b0aef3f88caf37bb6c8f54e103e5c89afd52768bc307"
+    },
+    {
+      "path": "results/public-calibration-attempt4/w8-beam33554432/calibration/batch-4096-receipt.json",
+      "bytes": 10904,
+      "sha256": "6dc57443d21ebe1678e3a94b77e2e4ce350625333710cee56fd93d6f6a2f6080"
+    },
+    {
+      "path": "results/public-calibration-attempt4/w8-beam33554432/calibration/batch-512-receipt.json",
+      "bytes": 10882,
+      "sha256": "1da8d68578d772b5ec0bded787898c22f8f9d5b0afe9d6000dfcd4263d2beb43"
+    },
+    {
+      "path": "results/public-calibration-attempt4/w8-beam33554432/calibration/batch-5120-receipt.json",
+      "bytes": 12209,
+      "sha256": "00169bf86f3c892282d8280df2744f2fe428976c8a024d18d43f0b9b315c65ab"
+    },
+    {
+      "path": "results/public-calibration-attempt4/w8-beam33554432/calibration/batch-6144-receipt.json",
+      "bytes": 12218,
+      "sha256": "48354f2d358ea8467ec44bbcb148ca43ada4ef644dc1f948f9cd66e338aa0dc6"
+    },
+    {
+      "path": "results/public-calibration-attempt4/w8-beam33554432/calibration/batch-7168-receipt.json",
+      "bytes": 12222,
+      "sha256": "aab8cf22b9c041dd0ebb3939d8e9b7a6870d72f187811bf4c164f36ffa1f35fe"
+    },
+    {
+      "path": "results/public-calibration-attempt4/w8-beam33554432/calibration/batch-8192-receipt.json",
+      "bytes": 12227,
+      "sha256": "52871c4aef7efb8f266998e13f55698fbb56b6f1a5bfaf501722d31b5c01c770"
+    },
+    {
+      "path": "results/public-calibration-attempt4/w8-beam33554432/calibration/inference-selection.json",
+      "bytes": 81882,
+      "sha256": "0951c8e312acd3055e90efb17614928479d87320e6b676b4ac7d5e8fb56c7e5c"
+    },
+    {
+      "path": "results/public-calibration-attempt4/w8-beam33554432/calibration/inputs/ensemble.json",
+      "bytes": 46851,
+      "sha256": "d4f35cf1bcf7e6ea750d3fde6de058e924065a45f7b183350e9218a8e0177135"
+    },
+    {
+      "path": "results/public-calibration-attempt4/w8-beam33554432/calibration/session-1-rank-0.log",
+      "bytes": 3343,
+      "sha256": "e5a60343d2ba62d7278961468a4fa7aa1ff30c8bbee220fc0c6ac44ac16b6782"
+    },
+    {
+      "path": "results/public-calibration-attempt4/w8-beam33554432/calibration/session-2-rank-1.log",
+      "bytes": 3360,
+      "sha256": "d16117d0e6aa4e059cd174eb5dff57d7e3804e65fd9c271b39695c02c9bd8105"
+    },
+    {
+      "path": "results/public-calibration-attempt4/w8-beam33554432/calibration/session-3-rank-2.log",
+      "bytes": 3358,
+      "sha256": "4ac34067372bfd1a26fcfc98f3f87a095a15b59980a5b1b25826fcc9150368c3"
+    },
+    {
+      "path": "results/public-calibration-attempt4/w8-beam33554432/calibration/session-4-rank-3.log",
+      "bytes": 3346,
+      "sha256": "ab6b53575898d9aeaf46b06c8be632cfe7338ea4b538a3b167f9338433180bce"
+    },
+    {
+      "path": "results/public-calibration-attempt4/w8-beam33554432/calibration/session-5-rank-4.log",
+      "bytes": 3345,
+      "sha256": "56554957e494bd501d4b1d4fd3ef558f94e0f4dbba793f6ba86918e6af60e83a"
+    },
+    {
+      "path": "results/public-calibration-attempt4/w8-beam33554432/calibration/session-6-rank-5.log",
+      "bytes": 3351,
+      "sha256": "fdd21284d4a79023a6c3ff8e6ea509461ebf88548f192862b36a8efc24e29da4"
+    },
+    {
+      "path": "results/public-calibration-attempt4/w8-beam33554432/calibration/session-7-rank-6.log",
+      "bytes": 3358,
+      "sha256": "7740554e308aa556e9fccb5e393650b5838bbe1b02c5c071384db846f5a6caa9"
+    },
+    {
+      "path": "results/public-calibration-attempt4/w8-beam33554432/calibration/session-8-rank-7.log",
+      "bytes": 3344,
+      "sha256": "19032d0ccde30a26ce39b2d0c8d102def4c806348a3b17c8a80b38d74d1d8dd2"
+    },
+    {
+      "path": "results/public-calibration-attempt4/w8-beam33554432/report.json",
+      "bytes": 3041,
+      "sha256": "cbf78ec5f207f740a94e53555fe0368040ba264342df53d019c54984453c86b5"
+    },
+    {
+      "path": "results/public-calibration-attempt4/w8-beam8388608/admit-8192/nccl-id.bin",
+      "bytes": 192,
+      "sha256": "b18c4a986ce24f3219c93160babac364f460fdd9d225108d35bde8f132ce9d95"
+    },
+    {
+      "path": "results/public-calibration-attempt4/w8-beam8388608/admit-8192/rank-0.log",
+      "bytes": 793,
+      "sha256": "65439c8654eb4a14603fce92bd6df536a73f3a19794fbb2e24c8b91a364d78aa"
+    },
+    {
+      "path": "results/public-calibration-attempt4/w8-beam8388608/admit-8192/rank-1.log",
+      "bytes": 793,
+      "sha256": "c77d1eb8024d0324e2170bde90fd2c2605eb56e66fe192a16b333371939574e7"
+    },
+    {
+      "path": "results/public-calibration-attempt4/w8-beam8388608/admit-8192/rank-2.log",
+      "bytes": 793,
+      "sha256": "c956601f0d38025a985e7b6df1936456f5e90efbdac389882ef9349bd451e478"
+    },
+    {
+      "path": "results/public-calibration-attempt4/w8-beam8388608/admit-8192/rank-3.log",
+      "bytes": 793,
+      "sha256": "646a3a893b61ffe2d5e4b823b817d0f00c50836da72dfb0c328ee104742aa32d"
+    },
+    {
+      "path": "results/public-calibration-attempt4/w8-beam8388608/admit-8192/rank-4.log",
+      "bytes": 793,
+      "sha256": "81505841b0784002cb0ee1486a44a7d273ab771913e3baa82f57623ad6a5391e"
+    },
+    {
+      "path": "results/public-calibration-attempt4/w8-beam8388608/admit-8192/rank-5.log",
+      "bytes": 793,
+      "sha256": "e6ef498531c90204cbb650d399404aad1b6432dc00cddc7c697e69d365dbd0c7"
+    },
+    {
+      "path": "results/public-calibration-attempt4/w8-beam8388608/admit-8192/rank-6.log",
+      "bytes": 793,
+      "sha256": "ee468bfe33a5bffad5bde28e88958e4826d34b9f302f5f98959c77142444485b"
+    },
+    {
+      "path": "results/public-calibration-attempt4/w8-beam8388608/admit-8192/rank-7.log",
+      "bytes": 793,
+      "sha256": "029c46fc2a930e7660ae2bd0fc10db915f0f29dd95532790482898847fce639b"
+    },
+    {
+      "path": "results/public-calibration-attempt4/w8-beam8388608/calibration/batch-2048-receipt.json",
+      "bytes": 10920,
+      "sha256": "3cf9788844e437990b575bbcc74e07bd68f93220946d034ea6c8d8410dab4627"
+    },
+    {
+      "path": "results/public-calibration-attempt4/w8-beam8388608/calibration/batch-256-receipt.json",
+      "bytes": 20121,
+      "sha256": "25d6f5e21dee528972b9cd93569ff0c60a0a2ad488c7bc6b9fc97ac1a598b37d"
+    },
+    {
+      "path": "results/public-calibration-attempt4/w8-beam8388608/calibration/batch-512-receipt.json",
+      "bytes": 10873,
+      "sha256": "e0c05547aec74585a3332d75373f0482d9ac98dbb86f87856e26e0b891c40ceb"
+    },
+    {
+      "path": "results/public-calibration-attempt4/w8-beam8388608/calibration/batch-5120-receipt.json",
+      "bytes": 12202,
+      "sha256": "64e8a980ae362efb9b06fba6f98e98798663e38d8de4159b33af88f52d780227"
+    },
+    {
+      "path": "results/public-calibration-attempt4/w8-beam8388608/calibration/batch-7168-receipt.json",
+      "bytes": 12214,
+      "sha256": "96094a55c46a56f3eebed1cac6ffb6a85895a94dc54cc28da523e2a9bf72a5a7"
+    },
+    {
+      "path": "results/public-calibration-attempt4/w8-beam8388608/calibration/batch-8192-receipt.json",
+      "bytes": 12240,
+      "sha256": "251c4f17185900a5433020a943ed25a7e0d3ee8f1014e12aec6550a93c46ef08"
+    },
+    {
+      "path": "results/public-calibration-attempt4/w8-beam8388608/calibration/inference-selection.json",
+      "bytes": 65168,
+      "sha256": "412bd74907a49e6739c949fe60dff66efda9b643863f058c7bb567b5f15901b1"
+    },
+    {
+      "path": "results/public-calibration-attempt4/w8-beam8388608/calibration/inputs/ensemble.json",
+      "bytes": 46851,
+      "sha256": "d4f35cf1bcf7e6ea750d3fde6de058e924065a45f7b183350e9218a8e0177135"
+    },
+    {
+      "path": "results/public-calibration-attempt4/w8-beam8388608/calibration/session-1-rank-0.log",
+      "bytes": 2513,
+      "sha256": "3e6319a06120411eb8e3ebbe4b36806b986b786ede7179ccccf9e27ce12b173d"
+    },
+    {
+      "path": "results/public-calibration-attempt4/w8-beam8388608/calibration/session-2-rank-1.log",
+      "bytes": 2519,
+      "sha256": "5cc77cef6be7ddc666889e06975d11c6b5ff581d1689d55fa66bb3903463d970"
+    },
+    {
+      "path": "results/public-calibration-attempt4/w8-beam8388608/calibration/session-3-rank-2.log",
+      "bytes": 2526,
+      "sha256": "610f3aae36a733bc0f01aad8b51a0ddec4df70b49eff78ad6d8571dbeb1f0ba4"
+    },
+    {
+      "path": "results/public-calibration-attempt4/w8-beam8388608/calibration/session-4-rank-3.log",
+      "bytes": 2517,
+      "sha256": "a29a2b2765005a9f12a405db826be43bd342a8d267854ab33a03e7f234ee5f6c"
+    },
+    {
+      "path": "results/public-calibration-attempt4/w8-beam8388608/calibration/session-5-rank-4.log",
+      "bytes": 2520,
+      "sha256": "7e7d750d246e197fa09d57697df93fa8b37eac0c847f23c9720aa280fede38d5"
+    },
+    {
+      "path": "results/public-calibration-attempt4/w8-beam8388608/calibration/session-6-rank-5.log",
+      "bytes": 2533,
+      "sha256": "0a8ea8cc5f831d0684ec94a6ba07ea8a9fb5e85e118d757c8d89d7ffa1449414"
+    },
+    {
+      "path": "results/public-calibration-attempt4/w8-beam8388608/calibration/session-7-rank-6.log",
+      "bytes": 2517,
+      "sha256": "458cd0da8a4789477a01c4e6929978d0101def8a83dfa8b41e80125fd637f645"
+    },
+    {
+      "path": "results/public-calibration-attempt4/w8-beam8388608/calibration/session-8-rank-7.log",
+      "bytes": 2519,
+      "sha256": "8dd6b80ad6d864f17ef2b4e48b3f245af7b92af6961e612813debaae649e9685"
+    },
+    {
+      "path": "results/public-calibration-attempt4/w8-beam8388608/report.json",
+      "bytes": 1755,
+      "sha256": "e70d383baff7eba373681f93538853c08c38378f8876e2dca872b936c2db374e"
+    },
+    {
+      "path": "runtime-receipt.json",
+      "bytes": 1265,
+      "sha256": "b9e0d8a290e5dbf1e01bb178fcef03102f57cfc0f23a65ec8abbd15cb9696b8d"
+    },
+    {
+      "path": "setup.json",
+      "bytes": 201,
+      "sha256": "8b43bb26a90c9c80e09aa421697e027a670bde3ebcd367e3195e901e59109390"
+    },
+    {
+      "path": "timeline.py",
+      "bytes": 3913,
+      "sha256": "7d94a7d72f28536546750ff8449c2202d67f42649b6cae3d8e7f760ddf71962c"
+    }
+  ],
+  "snapshot": "completed cases only, immutable copied bytes",
+  "created_utc_epoch": 1791588461.1716805
+}

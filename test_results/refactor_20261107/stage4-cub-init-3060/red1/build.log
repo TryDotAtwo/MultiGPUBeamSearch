@@ -1,0 +1,15 @@
+[1/9] Building CUDA object CMakeFiles/beam_cuda.dir/cuda/stream4.cu.o
+[2/9] Building CUDA object CMakeFiles/beam_cuda.dir/cuda/stream3.cu.o
+/workspace/beam-native-source/cuda/stream3.cu(132): warning #177-D: function "beam::<unnamed>::stream3_debug_store_count_kernel" was declared but never referenced
+  __attribute__((global)) void stream3_debug_store_count_kernel(
+                               ^
+
+Remark: The warnings can be suppressed with "-diag-suppress <warning-number>"
+
+[3/9] Building CUDA object CMakeFiles/beam_cuda.dir/cuda/dispatcher.cu.o
+[4/9] Building CUDA object CMakeFiles/score_histogram_cuda_tests.dir/tests/score_histogram_cuda_tests.cu.o
+[5/9] Building CUDA object CMakeFiles/static_memory_cuda_tests.dir/tests/static_memory_cuda_tests.cu.o
+[6/9] Building CUDA object CMakeFiles/beam_cuda.dir/cuda/static_memory.cu.o
+[7/9] Linking CXX static library libbeam_cuda.a
+[8/9] Linking CXX executable static_memory_cuda_tests
+[9/9] Linking CXX executable score_histogram_cuda_tests

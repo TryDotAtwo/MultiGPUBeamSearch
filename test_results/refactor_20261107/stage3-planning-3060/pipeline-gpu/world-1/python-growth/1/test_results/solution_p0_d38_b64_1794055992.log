@@ -1,0 +1,15 @@
+solution_found=1
+solution_valid=1
+solution_depth=20
+solution_path=m13.m12.m4.m3.m0.m1.m14.m18.m16.m2.m19.m11.m7.m9.m5.m6.m10.m17.m15.m8
+solution_state="0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5"
+history_mode=ram
+history_dir=/workspace/beam-results/planning/pipeline-gpu/world-1/python-growth/1/history
+history_depth_count=19
+history_bytes_received=37632
+history_bytes_stored=4528
+history_bytes_stored_ram=18816
+history_bytes_stored_disk=0
+history_bytes_pruned=14288
+solved_count=15
+solved_overflow=0

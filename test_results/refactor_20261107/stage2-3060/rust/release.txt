@@ -1,0 +1,35 @@
+   Compiling proc-macro2 v1.0.107
+   Compiling target-lexicon v0.13.5
+   Compiling unicode-ident v1.0.27
+   Compiling quote v1.0.47
+   Compiling once_cell v1.21.4
+   Compiling serde_core v1.0.229
+   Compiling libc v0.2.191
+   Compiling thiserror v2.0.21
+   Compiling serde v1.0.229
+   Compiling cfg-if v1.0.5
+   Compiling zmij v1.0.23
+   Compiling autocfg v1.5.1
+   Compiling serde_json v1.0.154
+   Compiling libloading v0.8.9
+   Compiling memchr v2.8.3
+   Compiling heck v0.5.0
+   Compiling itoa v1.0.18
+   Compiling unindent v0.2.4
+   Compiling indoc v2.0.8
+   Compiling memoffset v0.9.1
+   Compiling pyo3-build-config v0.24.2
+   Compiling syn v3.0.9
+   Compiling syn v2.0.119
+   Compiling pyo3-macros-backend v0.24.2
+   Compiling pyo3-ffi v0.24.2
+   Compiling pyo3 v0.24.2
+   Compiling thiserror-impl v2.0.21
+   Compiling serde_derive v1.0.229
+   Compiling beam-native-sys v0.1.0 (/workspace/beam-work/rust/beam-native-sys)
+   Compiling beam-core v0.1.0 (/workspace/beam-work/rust/beam-core)
+   Compiling beam-runtime v0.1.0 (/workspace/beam-work/rust/beam-runtime)
+   Compiling beam-cli v0.1.0 (/workspace/beam-work/rust/beam-cli)
+   Compiling pyo3-macros v0.24.2
+   Compiling beam-python v0.1.0 (/workspace/beam-work/rust/beam-python)
+    Finished `release` profile [optimized] target(s) in 12.04s

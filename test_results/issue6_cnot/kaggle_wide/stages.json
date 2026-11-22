@@ -1,0 +1,58 @@
+{
+  "gpu_inventory": {
+    "status": "pass",
+    "result": null,
+    "seconds": 1.577
+  },
+  "native_toolchain": {
+    "status": "pass",
+    "result": null,
+    "seconds": 0.042
+  },
+  "native_prebuild": {
+    "status": "pass",
+    "result": null,
+    "seconds": 25.631
+  },
+  "nccl2_qhat": {
+    "status": "pass",
+    "result": {
+      "world": 2,
+      "backend": "nccl",
+      "mode": "qhat",
+      "status": "pass",
+      "report": "world2-nccl-qhat.json",
+      "topology": "one Kaggle host"
+    },
+    "seconds": 8.676
+  },
+  "nccl2_proposal": {
+    "status": "pass",
+    "result": {
+      "world": 2,
+      "backend": "nccl",
+      "mode": "proposal",
+      "status": "pass",
+      "report": "world2-nccl-proposal.json",
+      "topology": "one Kaggle host"
+    },
+    "seconds": 7.444
+  },
+  "gloo16_qhat": {
+    "status": "pass",
+    "result": {
+      "world": 16,
+      "backend": "gloo",
+      "mode": "qhat",
+      "status": "pass",
+      "report": "world16-gloo-qhat.json",
+      "topology": "one Kaggle host"
+    },
+    "seconds": 3.375
+  },
+  "gloo2_regressions": {
+    "status": "pass",
+    "result": null,
+    "seconds": 4.873
+  }
+}

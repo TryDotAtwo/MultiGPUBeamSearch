@@ -1,0 +1,9 @@
+DOWNSTREAM_JOB_OK world=1 full=False attempt=first
+DOWNSTREAM_JOB_OK world=1 full=False attempt=hit
+DOWNSTREAM_JOB_OK world=1 full=True attempt=first
+DOWNSTREAM_JOB_OK world=1 full=True attempt=hit
+DOWNSTREAM_JOB_OK world=2 full=False attempt=first
+DOWNSTREAM_JOB_OK world=2 full=False attempt=hit
+DOWNSTREAM_JOB_OK world=2 full=True attempt=first
+DOWNSTREAM_JOB_OK world=2 full=True attempt=hit
+NATIVE_DOWNSTREAM_JOB_GPU_OK

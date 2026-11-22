@@ -1,0 +1,760 @@
+{
+  "scope": "synthetic public session correctness and five paired full-call timings; not saturated-step measurements",
+  "correctness": [
+    {
+      "world": 1,
+      "engine": "python",
+      "case": "first",
+      "path": [
+        0,
+        1,
+        2
+      ],
+      "model_hash": "a39de318eeefd2b640ea464007c9d6e4a344efc2f7f01411f04f5fb13a5f8010",
+      "snapshot": {
+        "reused": false,
+        "copied_bytes": 148215,
+        "snapshot_dir": "/workspace/beam-results/public-index-20261114/cache-cutlass/runs/61e8d99cb2ed4e11ad0158627f0996b6/weights"
+      },
+      "persistent": {
+        "reused": false,
+        "worker_pids": [
+          3448
+        ],
+        "request_count": 1
+      },
+      "run_dir": "/workspace/beam-results/public-index-20261114/cache-cutlass/runs/61e8d99cb2ed4e11ad0158627f0996b6",
+      "build_key": "87a1d1625048e59360040fa204ff5418c7f01a6e53fd8134b23f17c858bf3c66"
+    },
+    {
+      "world": 1,
+      "engine": "python",
+      "case": "repeat",
+      "path": [
+        0,
+        3,
+        1,
+        2
+      ],
+      "model_hash": "a39de318eeefd2b640ea464007c9d6e4a344efc2f7f01411f04f5fb13a5f8010",
+      "snapshot": {
+        "reused": true,
+        "copied_bytes": 0,
+        "snapshot_dir": "/workspace/beam-results/public-index-20261114/cache-cutlass/runs/61e8d99cb2ed4e11ad0158627f0996b6/weights"
+      },
+      "persistent": {
+        "reused": true,
+        "worker_pids": [
+          3448
+        ],
+        "request_count": 2
+      },
+      "run_dir": "/workspace/beam-results/public-index-20261114/cache-cutlass/runs/b7219a0e3fb44cc1940d6e4e32cd35f6",
+      "build_key": "87a1d1625048e59360040fa204ff5418c7f01a6e53fd8134b23f17c858bf3c66"
+    },
+    {
+      "world": 1,
+      "engine": "python",
+      "case": "unsolved",
+      "path": null,
+      "model_hash": "a39de318eeefd2b640ea464007c9d6e4a344efc2f7f01411f04f5fb13a5f8010",
+      "snapshot": {
+        "reused": true,
+        "copied_bytes": 0,
+        "snapshot_dir": "/workspace/beam-results/public-index-20261114/cache-cutlass/runs/61e8d99cb2ed4e11ad0158627f0996b6/weights"
+      },
+      "persistent": {
+        "reused": true,
+        "worker_pids": [
+          3448
+        ],
+        "request_count": 3
+      },
+      "run_dir": "/workspace/beam-results/public-index-20261114/cache-cutlass/runs/203494c9051e41da91f0a7e30b99bc59",
+      "build_key": "87a1d1625048e59360040fa204ff5418c7f01a6e53fd8134b23f17c858bf3c66"
+    },
+    {
+      "world": 1,
+      "engine": "python",
+      "case": "model-change",
+      "path": [
+        0,
+        1,
+        2
+      ],
+      "model_hash": "26af94ec7bc63c21213dcc57b32930d99b8418b724f074f693c99669041c9e5d",
+      "snapshot": {
+        "reused": false,
+        "copied_bytes": 148215,
+        "snapshot_dir": "/workspace/beam-results/public-index-20261114/cache-cutlass/runs/e7ce8c9aa05a4f0889cbc0ad69b39126/weights"
+      },
+      "persistent": {
+        "reused": false,
+        "worker_pids": [
+          3483
+        ],
+        "request_count": 1
+      },
+      "run_dir": "/workspace/beam-results/public-index-20261114/cache-cutlass/runs/e7ce8c9aa05a4f0889cbc0ad69b39126",
+      "build_key": "87a1d1625048e59360040fa204ff5418c7f01a6e53fd8134b23f17c858bf3c66"
+    },
+    {
+      "world": 1,
+      "engine": "python",
+      "case": "beam-change",
+      "path": [
+        0,
+        1,
+        2
+      ],
+      "model_hash": "26af94ec7bc63c21213dcc57b32930d99b8418b724f074f693c99669041c9e5d",
+      "snapshot": {
+        "reused": false,
+        "copied_bytes": 148215,
+        "snapshot_dir": "/workspace/beam-results/public-index-20261114/cache-cutlass/runs/faef1ea300cb48ed8be9d190b55484d3/weights"
+      },
+      "persistent": {
+        "reused": false,
+        "worker_pids": [
+          3497
+        ],
+        "request_count": 1
+      },
+      "run_dir": "/workspace/beam-results/public-index-20261114/cache-cutlass/runs/faef1ea300cb48ed8be9d190b55484d3",
+      "build_key": "87a1d1625048e59360040fa204ff5418c7f01a6e53fd8134b23f17c858bf3c66"
+    },
+    {
+      "world": 1,
+      "engine": "rust",
+      "case": "first",
+      "path": [
+        0,
+        1,
+        2
+      ],
+      "model_hash": "a39de318eeefd2b640ea464007c9d6e4a344efc2f7f01411f04f5fb13a5f8010",
+      "snapshot": {
+        "reused": false,
+        "copied_bytes": 148215,
+        "snapshot_dir": "/workspace/beam-results/public-index-20261114/cache-cutlass/runs/c3cc0aa07cec42399305901a963818ca/weights"
+      },
+      "persistent": {
+        "reused": false,
+        "worker_pids": [
+          3513
+        ],
+        "request_count": 1
+      },
+      "run_dir": "/workspace/beam-results/public-index-20261114/cache-cutlass/runs/c3cc0aa07cec42399305901a963818ca",
+      "build_key": "87a1d1625048e59360040fa204ff5418c7f01a6e53fd8134b23f17c858bf3c66"
+    },
+    {
+      "world": 1,
+      "engine": "rust",
+      "case": "repeat",
+      "path": [
+        0,
+        3,
+        1,
+        2
+      ],
+      "model_hash": "a39de318eeefd2b640ea464007c9d6e4a344efc2f7f01411f04f5fb13a5f8010",
+      "snapshot": {
+        "reused": true,
+        "copied_bytes": 0,
+        "snapshot_dir": "/workspace/beam-results/public-index-20261114/cache-cutlass/runs/c3cc0aa07cec42399305901a963818ca/weights"
+      },
+      "persistent": {
+        "reused": true,
+        "worker_pids": [
+          3513
+        ],
+        "request_count": 2
+      },
+      "run_dir": "/workspace/beam-results/public-index-20261114/cache-cutlass/runs/2bb7990498fd42cb964627d55b71117b",
+      "build_key": "87a1d1625048e59360040fa204ff5418c7f01a6e53fd8134b23f17c858bf3c66"
+    },
+    {
+      "world": 1,
+      "engine": "rust",
+      "case": "unsolved",
+      "path": null,
+      "model_hash": "a39de318eeefd2b640ea464007c9d6e4a344efc2f7f01411f04f5fb13a5f8010",
+      "snapshot": {
+        "reused": true,
+        "copied_bytes": 0,
+        "snapshot_dir": "/workspace/beam-results/public-index-20261114/cache-cutlass/runs/c3cc0aa07cec42399305901a963818ca/weights"
+      },
+      "persistent": {
+        "reused": true,
+        "worker_pids": [
+          3513
+        ],
+        "request_count": 3
+      },
+      "run_dir": "/workspace/beam-results/public-index-20261114/cache-cutlass/runs/7d762ee492144bad8fc67aea73343582",
+      "build_key": "87a1d1625048e59360040fa204ff5418c7f01a6e53fd8134b23f17c858bf3c66"
+    },
+    {
+      "world": 1,
+      "engine": "rust",
+      "case": "model-change",
+      "path": [
+        0,
+        1,
+        2
+      ],
+      "model_hash": "26af94ec7bc63c21213dcc57b32930d99b8418b724f074f693c99669041c9e5d",
+      "snapshot": {
+        "reused": false,
+        "copied_bytes": 148215,
+        "snapshot_dir": "/workspace/beam-results/public-index-20261114/cache-cutlass/runs/2adf1abf33b84b988fa34e37ce667a1a/weights"
+      },
+      "persistent": {
+        "reused": false,
+        "worker_pids": [
+          3557
+        ],
+        "request_count": 1
+      },
+      "run_dir": "/workspace/beam-results/public-index-20261114/cache-cutlass/runs/2adf1abf33b84b988fa34e37ce667a1a",
+      "build_key": "87a1d1625048e59360040fa204ff5418c7f01a6e53fd8134b23f17c858bf3c66"
+    },
+    {
+      "world": 1,
+      "engine": "rust",
+      "case": "beam-change",
+      "path": [
+        0,
+        1,
+        2
+      ],
+      "model_hash": "26af94ec7bc63c21213dcc57b32930d99b8418b724f074f693c99669041c9e5d",
+      "snapshot": {
+        "reused": false,
+        "copied_bytes": 148215,
+        "snapshot_dir": "/workspace/beam-results/public-index-20261114/cache-cutlass/runs/deab523146ac4b818c78645d2560567c/weights"
+      },
+      "persistent": {
+        "reused": false,
+        "worker_pids": [
+          3578
+        ],
+        "request_count": 1
+      },
+      "run_dir": "/workspace/beam-results/public-index-20261114/cache-cutlass/runs/deab523146ac4b818c78645d2560567c",
+      "build_key": "87a1d1625048e59360040fa204ff5418c7f01a6e53fd8134b23f17c858bf3c66"
+    },
+    {
+      "world": 2,
+      "engine": "python",
+      "case": "first",
+      "path": [
+        0,
+        1,
+        2
+      ],
+      "model_hash": "a39de318eeefd2b640ea464007c9d6e4a344efc2f7f01411f04f5fb13a5f8010",
+      "snapshot": {
+        "reused": false,
+        "copied_bytes": 148215,
+        "snapshot_dir": "/workspace/beam-results/public-index-20261114/cache-cutlass/runs/58cb53ed9a8b48e1a79757b8dc7879c2/weights"
+      },
+      "persistent": {
+        "reused": false,
+        "worker_pids": [
+          3589,
+          3590
+        ],
+        "request_count": 1
+      },
+      "run_dir": "/workspace/beam-results/public-index-20261114/cache-cutlass/runs/58cb53ed9a8b48e1a79757b8dc7879c2",
+      "build_key": "87a1d1625048e59360040fa204ff5418c7f01a6e53fd8134b23f17c858bf3c66"
+    },
+    {
+      "world": 2,
+      "engine": "python",
+      "case": "repeat",
+      "path": [
+        1,
+        0,
+        2,
+        3
+      ],
+      "model_hash": "a39de318eeefd2b640ea464007c9d6e4a344efc2f7f01411f04f5fb13a5f8010",
+      "snapshot": {
+        "reused": true,
+        "copied_bytes": 0,
+        "snapshot_dir": "/workspace/beam-results/public-index-20261114/cache-cutlass/runs/58cb53ed9a8b48e1a79757b8dc7879c2/weights"
+      },
+      "persistent": {
+        "reused": true,
+        "worker_pids": [
+          3589,
+          3590
+        ],
+        "request_count": 2
+      },
+      "run_dir": "/workspace/beam-results/public-index-20261114/cache-cutlass/runs/1722ccee265f40c398ed491a4611d7f0",
+      "build_key": "87a1d1625048e59360040fa204ff5418c7f01a6e53fd8134b23f17c858bf3c66"
+    },
+    {
+      "world": 2,
+      "engine": "python",
+      "case": "unsolved",
+      "path": null,
+      "model_hash": "a39de318eeefd2b640ea464007c9d6e4a344efc2f7f01411f04f5fb13a5f8010",
+      "snapshot": {
+        "reused": true,
+        "copied_bytes": 0,
+        "snapshot_dir": "/workspace/beam-results/public-index-20261114/cache-cutlass/runs/58cb53ed9a8b48e1a79757b8dc7879c2/weights"
+      },
+      "persistent": {
+        "reused": true,
+        "worker_pids": [
+          3589,
+          3590
+        ],
+        "request_count": 3
+      },
+      "run_dir": "/workspace/beam-results/public-index-20261114/cache-cutlass/runs/83b20405757144c9b1e544ea5803d4c5",
+      "build_key": "87a1d1625048e59360040fa204ff5418c7f01a6e53fd8134b23f17c858bf3c66"
+    },
+    {
+      "world": 2,
+      "engine": "python",
+      "case": "model-change",
+      "path": [
+        0,
+        1,
+        2
+      ],
+      "model_hash": "26af94ec7bc63c21213dcc57b32930d99b8418b724f074f693c99669041c9e5d",
+      "snapshot": {
+        "reused": false,
+        "copied_bytes": 148215,
+        "snapshot_dir": "/workspace/beam-results/public-index-20261114/cache-cutlass/runs/77538f5883fa4e4ebd745b63560405e4/weights"
+      },
+      "persistent": {
+        "reused": false,
+        "worker_pids": [
+          3648,
+          3649
+        ],
+        "request_count": 1
+      },
+      "run_dir": "/workspace/beam-results/public-index-20261114/cache-cutlass/runs/77538f5883fa4e4ebd745b63560405e4",
+      "build_key": "87a1d1625048e59360040fa204ff5418c7f01a6e53fd8134b23f17c858bf3c66"
+    },
+    {
+      "world": 2,
+      "engine": "python",
+      "case": "beam-change",
+      "path": [
+        0,
+        1,
+        2
+      ],
+      "model_hash": "26af94ec7bc63c21213dcc57b32930d99b8418b724f074f693c99669041c9e5d",
+      "snapshot": {
+        "reused": false,
+        "copied_bytes": 148215,
+        "snapshot_dir": "/workspace/beam-results/public-index-20261114/cache-cutlass/runs/e84d03bf597a475d9eb5d7902b44eb2a/weights"
+      },
+      "persistent": {
+        "reused": false,
+        "worker_pids": [
+          3679,
+          3680
+        ],
+        "request_count": 1
+      },
+      "run_dir": "/workspace/beam-results/public-index-20261114/cache-cutlass/runs/e84d03bf597a475d9eb5d7902b44eb2a",
+      "build_key": "87a1d1625048e59360040fa204ff5418c7f01a6e53fd8134b23f17c858bf3c66"
+    },
+    {
+      "world": 2,
+      "engine": "rust",
+      "case": "first",
+      "path": [
+        0,
+        1,
+        2
+      ],
+      "model_hash": "a39de318eeefd2b640ea464007c9d6e4a344efc2f7f01411f04f5fb13a5f8010",
+      "snapshot": {
+        "reused": false,
+        "copied_bytes": 148215,
+        "snapshot_dir": "/workspace/beam-results/public-index-20261114/cache-cutlass/runs/b30454b7661648d4a12005d2ab3c0583/weights"
+      },
+      "persistent": {
+        "reused": false,
+        "worker_pids": [
+          3712,
+          3713
+        ],
+        "request_count": 1
+      },
+      "run_dir": "/workspace/beam-results/public-index-20261114/cache-cutlass/runs/b30454b7661648d4a12005d2ab3c0583",
+      "build_key": "87a1d1625048e59360040fa204ff5418c7f01a6e53fd8134b23f17c858bf3c66"
+    },
+    {
+      "world": 2,
+      "engine": "rust",
+      "case": "repeat",
+      "path": [
+        1,
+        0,
+        2,
+        3
+      ],
+      "model_hash": "a39de318eeefd2b640ea464007c9d6e4a344efc2f7f01411f04f5fb13a5f8010",
+      "snapshot": {
+        "reused": true,
+        "copied_bytes": 0,
+        "snapshot_dir": "/workspace/beam-results/public-index-20261114/cache-cutlass/runs/b30454b7661648d4a12005d2ab3c0583/weights"
+      },
+      "persistent": {
+        "reused": true,
+        "worker_pids": [
+          3712,
+          3713
+        ],
+        "request_count": 2
+      },
+      "run_dir": "/workspace/beam-results/public-index-20261114/cache-cutlass/runs/07f6c438f52548249b56cb24aa6fad43",
+      "build_key": "87a1d1625048e59360040fa204ff5418c7f01a6e53fd8134b23f17c858bf3c66"
+    },
+    {
+      "world": 2,
+      "engine": "rust",
+      "case": "unsolved",
+      "path": null,
+      "model_hash": "a39de318eeefd2b640ea464007c9d6e4a344efc2f7f01411f04f5fb13a5f8010",
+      "snapshot": {
+        "reused": true,
+        "copied_bytes": 0,
+        "snapshot_dir": "/workspace/beam-results/public-index-20261114/cache-cutlass/runs/b30454b7661648d4a12005d2ab3c0583/weights"
+      },
+      "persistent": {
+        "reused": true,
+        "worker_pids": [
+          3712,
+          3713
+        ],
+        "request_count": 3
+      },
+      "run_dir": "/workspace/beam-results/public-index-20261114/cache-cutlass/runs/13aab2b1a3e54740b53ea7d2b09d68f7",
+      "build_key": "87a1d1625048e59360040fa204ff5418c7f01a6e53fd8134b23f17c858bf3c66"
+    },
+    {
+      "world": 2,
+      "engine": "rust",
+      "case": "model-change",
+      "path": [
+        0,
+        1,
+        2
+      ],
+      "model_hash": "26af94ec7bc63c21213dcc57b32930d99b8418b724f074f693c99669041c9e5d",
+      "snapshot": {
+        "reused": false,
+        "copied_bytes": 148215,
+        "snapshot_dir": "/workspace/beam-results/public-index-20261114/cache-cutlass/runs/9a61f9cd6a304d58811845d2a9c2edf1/weights"
+      },
+      "persistent": {
+        "reused": false,
+        "worker_pids": [
+          3781,
+          3782
+        ],
+        "request_count": 1
+      },
+      "run_dir": "/workspace/beam-results/public-index-20261114/cache-cutlass/runs/9a61f9cd6a304d58811845d2a9c2edf1",
+      "build_key": "87a1d1625048e59360040fa204ff5418c7f01a6e53fd8134b23f17c858bf3c66"
+    },
+    {
+      "world": 2,
+      "engine": "rust",
+      "case": "beam-change",
+      "path": [
+        0,
+        1,
+        2
+      ],
+      "model_hash": "26af94ec7bc63c21213dcc57b32930d99b8418b724f074f693c99669041c9e5d",
+      "snapshot": {
+        "reused": false,
+        "copied_bytes": 148215,
+        "snapshot_dir": "/workspace/beam-results/public-index-20261114/cache-cutlass/runs/625aa600cc38477bbe99a7d9de510ea0/weights"
+      },
+      "persistent": {
+        "reused": false,
+        "worker_pids": [
+          3821,
+          3822
+        ],
+        "request_count": 1
+      },
+      "run_dir": "/workspace/beam-results/public-index-20261114/cache-cutlass/runs/625aa600cc38477bbe99a7d9de510ea0",
+      "build_key": "87a1d1625048e59360040fa204ff5418c7f01a6e53fd8134b23f17c858bf3c66"
+    }
+  ],
+  "model_bytes": 18369835,
+  "model": "synthetic Hamming FP16 width 512, 8 residual blocks",
+  "width": 4096,
+  "max_steps": 6,
+  "num_gpus": 2,
+  "median_seconds": {
+    "baseline": {
+      "wall_seconds": 0.8187077840557322,
+      "worker_seconds": 0.306277367
+    },
+    "reuse": {
+      "wall_seconds": 0.8244585309876129,
+      "worker_seconds": 0.305963808
+    }
+  },
+  "paired_wall_changes": [
+    -0.012768839857977388,
+    0.024990658868360827,
+    0.045331821093387736,
+    -0.017186021297334264,
+    0.005781020240156476
+  ],
+  "median_paired_wall_change": 0.005781020240156476,
+  "rows": [
+    {
+      "mode": "baseline",
+      "phase": "cold",
+      "pair": null,
+      "wall_seconds": 3.1503513160860166,
+      "worker_seconds": 1.163111787,
+      "path": null,
+      "run_dir": "/workspace/beam-results/public-index-20261114/cache-cutlass/runs/bf4406486f0346ff9b483b1e61c1734c",
+      "model_hash": "cea74ca4469a88ed40b48b5c45544645d29c9feb85cbf15de8a97f6daf174f87",
+      "pids": [
+        3857,
+        3858
+      ]
+    },
+    {
+      "mode": "reuse",
+      "phase": "cold",
+      "pair": null,
+      "wall_seconds": 3.10777024703566,
+      "worker_seconds": 1.091058321,
+      "path": null,
+      "run_dir": "/workspace/beam-results/public-index-20261114/cache-cutlass/runs/672cc068e856411dba6e76c24a8ff08c",
+      "model_hash": "cea74ca4469a88ed40b48b5c45544645d29c9feb85cbf15de8a97f6daf174f87",
+      "pids": [
+        3915,
+        3916
+      ]
+    },
+    {
+      "mode": "baseline",
+      "phase": "warmup",
+      "pair": null,
+      "wall_seconds": 0.7560558969853446,
+      "worker_seconds": 0.305681276,
+      "path": null,
+      "run_dir": "/workspace/beam-results/public-index-20261114/cache-cutlass/runs/703fe6375fab41619b702a2835db3480",
+      "model_hash": "cea74ca4469a88ed40b48b5c45544645d29c9feb85cbf15de8a97f6daf174f87",
+      "pids": [
+        3857,
+        3858
+      ]
+    },
+    {
+      "mode": "reuse",
+      "phase": "warmup",
+      "pair": null,
+      "wall_seconds": 0.7672965340316296,
+      "worker_seconds": 0.306165543,
+      "path": null,
+      "run_dir": "/workspace/beam-results/public-index-20261114/cache-cutlass/runs/edfc1effb70b43cca8c9ee14c2c28849",
+      "model_hash": "cea74ca4469a88ed40b48b5c45544645d29c9feb85cbf15de8a97f6daf174f87",
+      "pids": [
+        3915,
+        3916
+      ]
+    },
+    {
+      "mode": "baseline",
+      "phase": "repeat",
+      "pair": 0,
+      "wall_seconds": 0.835122070973739,
+      "worker_seconds": 0.307212182,
+      "path": null,
+      "run_dir": "/workspace/beam-results/public-index-20261114/cache-cutlass/runs/5c524b6523c44f678b62ea90faa30907",
+      "model_hash": "cea74ca4469a88ed40b48b5c45544645d29c9feb85cbf15de8a97f6daf174f87",
+      "pids": [
+        3857,
+        3858
+      ]
+    },
+    {
+      "mode": "reuse",
+      "phase": "repeat",
+      "pair": 0,
+      "wall_seconds": 0.8244585309876129,
+      "worker_seconds": 0.305963808,
+      "path": null,
+      "run_dir": "/workspace/beam-results/public-index-20261114/cache-cutlass/runs/9037c19721c8458f89c3f6d3c5715c69",
+      "model_hash": "cea74ca4469a88ed40b48b5c45544645d29c9feb85cbf15de8a97f6daf174f87",
+      "pids": [
+        3915,
+        3916
+      ]
+    },
+    {
+      "mode": "reuse",
+      "phase": "repeat",
+      "pair": 1,
+      "wall_seconds": 0.8391678309999406,
+      "worker_seconds": 0.306373893,
+      "path": null,
+      "run_dir": "/workspace/beam-results/public-index-20261114/cache-cutlass/runs/330e6cfad6c94fcdbffd968f3eb552eb",
+      "model_hash": "cea74ca4469a88ed40b48b5c45544645d29c9feb85cbf15de8a97f6daf174f87",
+      "pids": [
+        3915,
+        3916
+      ]
+    },
+    {
+      "mode": "baseline",
+      "phase": "repeat",
+      "pair": 1,
+      "wall_seconds": 0.8187077840557322,
+      "worker_seconds": 0.305152757,
+      "path": null,
+      "run_dir": "/workspace/beam-results/public-index-20261114/cache-cutlass/runs/89e366e78cdf4b7ebc5dea62a7bf674b",
+      "model_hash": "cea74ca4469a88ed40b48b5c45544645d29c9feb85cbf15de8a97f6daf174f87",
+      "pids": [
+        3857,
+        3858
+      ]
+    },
+    {
+      "mode": "baseline",
+      "phase": "repeat",
+      "pair": 2,
+      "wall_seconds": 0.7912179570412263,
+      "worker_seconds": 0.306277367,
+      "path": null,
+      "run_dir": "/workspace/beam-results/public-index-20261114/cache-cutlass/runs/d5d32c25421643019feee99869fc1c11",
+      "model_hash": "cea74ca4469a88ed40b48b5c45544645d29c9feb85cbf15de8a97f6daf174f87",
+      "pids": [
+        3857,
+        3858
+      ]
+    },
+    {
+      "mode": "reuse",
+      "phase": "repeat",
+      "pair": 2,
+      "wall_seconds": 0.827085307915695,
+      "worker_seconds": 0.30665602,
+      "path": null,
+      "run_dir": "/workspace/beam-results/public-index-20261114/cache-cutlass/runs/d33dc0eef36c4ebeb95b64e126d6674c",
+      "model_hash": "cea74ca4469a88ed40b48b5c45544645d29c9feb85cbf15de8a97f6daf174f87",
+      "pids": [
+        3915,
+        3916
+      ]
+    },
+    {
+      "mode": "reuse",
+      "phase": "repeat",
+      "pair": 3,
+      "wall_seconds": 0.8177264709956944,
+      "worker_seconds": 0.305893541,
+      "path": null,
+      "run_dir": "/workspace/beam-results/public-index-20261114/cache-cutlass/runs/9d874e04464644e3ae6c4d64c63659e6",
+      "model_hash": "cea74ca4469a88ed40b48b5c45544645d29c9feb85cbf15de8a97f6daf174f87",
+      "pids": [
+        3915,
+        3916
+      ]
+    },
+    {
+      "mode": "baseline",
+      "phase": "repeat",
+      "pair": 3,
+      "wall_seconds": 0.8320256820879877,
+      "worker_seconds": 0.30657562,
+      "path": null,
+      "run_dir": "/workspace/beam-results/public-index-20261114/cache-cutlass/runs/c388c10506fb421bb3881dafd4764813",
+      "model_hash": "cea74ca4469a88ed40b48b5c45544645d29c9feb85cbf15de8a97f6daf174f87",
+      "pids": [
+        3857,
+        3858
+      ]
+    },
+    {
+      "mode": "baseline",
+      "phase": "repeat",
+      "pair": 4,
+      "wall_seconds": 0.8128229670692235,
+      "worker_seconds": 0.30463741,
+      "path": null,
+      "run_dir": "/workspace/beam-results/public-index-20261114/cache-cutlass/runs/835d131b2bd04af98f10dd5ef18211b2",
+      "model_hash": "cea74ca4469a88ed40b48b5c45544645d29c9feb85cbf15de8a97f6daf174f87",
+      "pids": [
+        3857,
+        3858
+      ]
+    },
+    {
+      "mode": "reuse",
+      "phase": "repeat",
+      "pair": 4,
+      "wall_seconds": 0.8175219130935147,
+      "worker_seconds": 0.305779589,
+      "path": null,
+      "run_dir": "/workspace/beam-results/public-index-20261114/cache-cutlass/runs/9fa4ebbbf1624c87846cab604ec957ea",
+      "model_hash": "cea74ca4469a88ed40b48b5c45544645d29c9feb85cbf15de8a97f6daf174f87",
+      "pids": [
+        3915,
+        3916
+      ]
+    },
+    {
+      "mode": "baseline",
+      "phase": "solved",
+      "pair": null,
+      "wall_seconds": 0.5984597610076889,
+      "worker_seconds": 0.083181772,
+      "path": [
+        0,
+        1,
+        2
+      ],
+      "run_dir": "/workspace/beam-results/public-index-20261114/cache-cutlass/runs/464c148d91c249cfa37517efeee3ed63",
+      "model_hash": "cea74ca4469a88ed40b48b5c45544645d29c9feb85cbf15de8a97f6daf174f87",
+      "pids": [
+        3857,
+        3858
+      ]
+    },
+    {
+      "mode": "reuse",
+      "phase": "solved",
+      "pair": null,
+      "wall_seconds": 0.5764033839805052,
+      "worker_seconds": 0.082128701,
+      "path": [
+        0,
+        1,
+        2
+      ],
+      "run_dir": "/workspace/beam-results/public-index-20261114/cache-cutlass/runs/d1606942f5694c178cfe11d22fd06596",
+      "model_hash": "cea74ca4469a88ed40b48b5c45544645d29c9feb85cbf15de8a97f6daf174f87",
+      "pids": [
+        3915,
+        3916
+      ]
+    }
+  ]
+}

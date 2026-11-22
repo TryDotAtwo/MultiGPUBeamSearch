@@ -1,0 +1,9 @@
+   Compiling pyo3-build-config v0.24.2
+   Compiling beam-runtime v0.1.0 (/workspace/beam-work/rust/beam-runtime)
+   Compiling pyo3-macros-backend v0.24.2
+   Compiling pyo3-ffi v0.24.2
+   Compiling pyo3 v0.24.2
+   Compiling beam-cli v0.1.0 (/workspace/beam-work/rust/beam-cli)
+   Compiling pyo3-macros v0.24.2
+   Compiling beam-python v0.1.0 (/workspace/beam-work/rust/beam-python)
+    Finished `release` profile [optimized] target(s) in 8.93s

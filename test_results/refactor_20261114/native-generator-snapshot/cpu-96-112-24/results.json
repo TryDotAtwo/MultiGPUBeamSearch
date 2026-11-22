@@ -1,0 +1,116 @@
+{
+  "state_len": 96,
+  "moves": 24,
+  "fixture_sha256": "dc9f2498e2b3b14bcccd7d82544f080f95b85b3d7efa46b0621e3ac129f68981",
+  "binaries": {
+    "baseline": "ceee8e5e76ca8f43221e72ee88d9bccf72acac7944d6c4c2fdf6744fd0299ca1",
+    "candidate": "f4edf7fad175844ccb356f072090a794c98810fde171411a858cb231603bfbb5"
+  },
+  "pairs": [
+    {
+      "baseline": {
+        "repeats": 20,
+        "seconds": 0.0373133,
+        "ordinary_allocations": 109880,
+        "ordinary_requested_bytes": 13884880,
+        "ordinary_peak_live_bytes": 78761,
+        "checksum": 2984920
+      },
+      "candidate": {
+        "repeats": 20,
+        "seconds": 0.0143804,
+        "ordinary_allocations": 8520,
+        "ordinary_requested_bytes": 4964220,
+        "ordinary_peak_live_bytes": 74665,
+        "checksum": 2984920
+      }
+    },
+    {
+      "candidate": {
+        "repeats": 20,
+        "seconds": 0.0142398,
+        "ordinary_allocations": 8520,
+        "ordinary_requested_bytes": 4964220,
+        "ordinary_peak_live_bytes": 74665,
+        "checksum": 2984920
+      },
+      "baseline": {
+        "repeats": 20,
+        "seconds": 0.0368632,
+        "ordinary_allocations": 109880,
+        "ordinary_requested_bytes": 13884880,
+        "ordinary_peak_live_bytes": 78761,
+        "checksum": 2984920
+      }
+    },
+    {
+      "baseline": {
+        "repeats": 20,
+        "seconds": 0.0371737,
+        "ordinary_allocations": 109880,
+        "ordinary_requested_bytes": 13884880,
+        "ordinary_peak_live_bytes": 78761,
+        "checksum": 2984920
+      },
+      "candidate": {
+        "repeats": 20,
+        "seconds": 0.014386,
+        "ordinary_allocations": 8520,
+        "ordinary_requested_bytes": 4964220,
+        "ordinary_peak_live_bytes": 74665,
+        "checksum": 2984920
+      }
+    },
+    {
+      "candidate": {
+        "repeats": 20,
+        "seconds": 0.0142852,
+        "ordinary_allocations": 8520,
+        "ordinary_requested_bytes": 4964220,
+        "ordinary_peak_live_bytes": 74665,
+        "checksum": 2984920
+      },
+      "baseline": {
+        "repeats": 20,
+        "seconds": 0.0368385,
+        "ordinary_allocations": 109880,
+        "ordinary_requested_bytes": 13884880,
+        "ordinary_peak_live_bytes": 78761,
+        "checksum": 2984920
+      }
+    },
+    {
+      "baseline": {
+        "repeats": 20,
+        "seconds": 0.0372386,
+        "ordinary_allocations": 109880,
+        "ordinary_requested_bytes": 13884880,
+        "ordinary_peak_live_bytes": 78761,
+        "checksum": 2984920
+      },
+      "candidate": {
+        "repeats": 20,
+        "seconds": 0.0169455,
+        "ordinary_allocations": 8520,
+        "ordinary_requested_bytes": 4964220,
+        "ordinary_peak_live_bytes": 74665,
+        "checksum": 2984920
+      }
+    }
+  ],
+  "medians": {
+    "baseline": {
+      "seconds": 0.0371737,
+      "ordinary_allocations": 109880,
+      "ordinary_requested_bytes": 13884880,
+      "ordinary_peak_live_bytes": 78761
+    },
+    "candidate": {
+      "seconds": 0.0143804,
+      "ordinary_allocations": 8520,
+      "ordinary_requested_bytes": 4964220,
+      "ordinary_peak_live_bytes": 74665
+    }
+  },
+  "scope": "ordinary C++ new/delete only; five alternating 20-load CPU pairs"
+}

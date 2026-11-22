@@ -1,0 +1,121 @@
+{
+  "base": "65a1952c265bd60c6d69a7ee90687c0a7d336888",
+  "previous_rust_source_commit": "a3b6e8b0dd0e2c2ba8a83ff708578523e9f1a09f",
+  "files": {
+    "ARCHITECTURE_NEED.md": {
+      "sha256": "bddce1c22bd63c824a7b060d23e4fa898370a69e8136a854487eb516c0931c27",
+      "bytes": 82812,
+      "mode": 420
+    },
+    "CMakeLists.txt": {
+      "sha256": "e0255bf088e09e567aea70adeb74da73dccf0ccc480503a4159401c756aadf8a",
+      "bytes": 45627,
+      "mode": 420,
+      "normalized_lf_sha256": "b5d5e8c57a208594aa9dc1ef55d859933ec011161b1d08266c09257c1bcd968b"
+    },
+    "cmake/BeamMlpBindingTests.cmake": {
+      "sha256": "fd74bb28f33d07466ec3e65ca97f7424f9650cb6f9a3b669faa99bebcc192115",
+      "bytes": 1342,
+      "mode": 420,
+      "normalized_lf_sha256": "fd74bb28f33d07466ec3e65ca97f7424f9650cb6f9a3b669faa99bebcc192115"
+    },
+    "integrations/cayleypy_native/README.md": {
+      "sha256": "dcb4830f019f1fb9b7b2653811c5509a5bdbe6f2703f545ea594dcb2815a5119",
+      "bytes": 51869,
+      "mode": 420
+    },
+    "integrations/cayleypy_native/multigpubeamsearch/_beam_runtime.abi3.so": {
+      "sha256": "aa503ccb6a98366c89223e084ad32d7222acabe652662b07407e0bb9c5368707",
+      "bytes": 3721192,
+      "mode": 420
+    },
+    "integrations/cayleypy_native/multigpubeamsearch/_bin/beam-runner": {
+      "sha256": "befe0900a286c56bd150a0bd0b6a479e31d7b3f7901f7ef4b7819e86fe7b469b",
+      "bytes": 853400,
+      "mode": 493
+    },
+    "integrations/cayleypy_native/multigpubeamsearch/backend.py": {
+      "sha256": "5ca2b87342a538b1b842efb90d03099912cd6fb6db8f842962e77579cca407f5",
+      "bytes": 48620,
+      "mode": 420,
+      "normalized_lf_sha256": "5ca2b87342a538b1b842efb90d03099912cd6fb6db8f842962e77579cca407f5"
+    },
+    "integrations/cayleypy_native/multigpubeamsearch/model_snapshot.py": {
+      "sha256": "a03beed2c95ba11101100bb0e470ea7c86c1d1d20b13d91d170c78442f148d5b",
+      "bytes": 4432,
+      "mode": 420,
+      "normalized_lf_sha256": "a03beed2c95ba11101100bb0e470ea7c86c1d1d20b13d91d170c78442f148d5b"
+    },
+    "integrations/cayleypy_native/multigpubeamsearch/persistent.py": {
+      "sha256": "db162d0bfea6559c86f0b6de4902ed4755b9a284ef7628da50d64f61e7974fb2",
+      "bytes": 15112,
+      "mode": 420,
+      "normalized_lf_sha256": "db162d0bfea6559c86f0b6de4902ed4755b9a284ef7628da50d64f61e7974fb2"
+    },
+    "integrations/cayleypy_native/tests/test_mlp_host_binding.py": {
+      "sha256": "a0b3fd7afc9b9641ee3ef599cf9447386ecbcdba52d1ada28e3de4ab75901ba1",
+      "bytes": 3888,
+      "mode": 420,
+      "normalized_lf_sha256": "a0b3fd7afc9b9641ee3ef599cf9447386ecbcdba52d1ada28e3de4ab75901ba1"
+    },
+    "integrations/cayleypy_native/tests/test_persistent_search.py": {
+      "sha256": "62eed4a2c9937e6d5c172a13b61a1a69e53af984360472322dce5c350c2f4409",
+      "bytes": 17509,
+      "mode": 420,
+      "normalized_lf_sha256": "63c6b5f9efae5db06209de79f39df280501a7dc76c9e24316e2e427b361e8909"
+    },
+    "memory/CHANGELOG.md": {
+      "sha256": "73d26b9f601f2800efaab8ed2555ab52000fe968e565d2039ee1bf5af9fe14c9",
+      "bytes": 129217,
+      "mode": 420
+    },
+    "src/native_input.cpp": {
+      "sha256": "c56fd624f00a5bf7c9e3804d8972a0e04d4d08634ea6340ea364353dc2bd91e1",
+      "bytes": 14269,
+      "mode": 420,
+      "normalized_lf_sha256": "ad5966d9576823ebc6b9aa543db0f2a1e9bb1f6ee0e7deb36cd7352c46b62d7f"
+    },
+    "src/native_input.hpp": {
+      "sha256": "cfc23b43db522dc859181f27c1759f62bd9c8aec47535595b47f643f4b998355",
+      "bytes": 2142,
+      "mode": 420,
+      "normalized_lf_sha256": "7313fc0ca7088614aac3786abdd3fae6c4b989f9487b8ca1540addcfbba9cc7f"
+    },
+    "tests/mlp_artifact_binding_cpu.cpp": {
+      "sha256": "03400ba5c8437f1e5407655f764ff150b9fa1f99954a7c8f91297bbb82adf4e6",
+      "bytes": 2502,
+      "mode": 420,
+      "normalized_lf_sha256": "03400ba5c8437f1e5407655f764ff150b9fa1f99954a7c8f91297bbb82adf4e6"
+    },
+    "tests/mlp_artifact_binding_cpu.py": {
+      "sha256": "1a6c8c3e9964a235dbccb54389ddeae7ba59664be61cf9d9527d5caeef52466f",
+      "bytes": 5225,
+      "mode": 420,
+      "normalized_lf_sha256": "1a6c8c3e9964a235dbccb54389ddeae7ba59664be61cf9d9527d5caeef52466f"
+    },
+    "tests/mlp_binding_host/CMakeLists.txt": {
+      "sha256": "b38193346ff259529ad92c923ebe4af2982f8e41aaa48d5fbf6c47d5f485d4e4",
+      "bytes": 203,
+      "mode": 420,
+      "normalized_lf_sha256": "b38193346ff259529ad92c923ebe4af2982f8e41aaa48d5fbf6c47d5f485d4e4"
+    },
+    "tests/public_model_snapshot_gpu.py": {
+      "sha256": "d83e7b89c292537f1be9ed692ee4f89ef14c69dca03490d677f1262fabbb6c6a",
+      "bytes": 12585,
+      "mode": 420,
+      "normalized_lf_sha256": "d83e7b89c292537f1be9ed692ee4f89ef14c69dca03490d677f1262fabbb6c6a"
+    },
+    "tools/production_runner.cu": {
+      "sha256": "3eac2be2adf8c90c792b978d0149a749aabf9397dc8f7ccff256b759596d3921",
+      "bytes": 256611,
+      "mode": 420,
+      "normalized_lf_sha256": "610081326bdbe291d3f0104b1995b892848124f3cbcca17979700c3c909e57dc"
+    },
+    "tools/stream1_weight_io.hpp": {
+      "sha256": "2397e0f38a8d7ed49c944d874b0e18778aec440c22cbd7dad83c01639cfb9a85",
+      "bytes": 65161,
+      "mode": 420,
+      "normalized_lf_sha256": "a8629e5a4beac56bc7e53301539a7437e0d0f43a5fad3c86a23f8328a8a7f9e0"
+    }
+  }
+}

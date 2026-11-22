@@ -1,0 +1,15 @@
+{
+  "instance": 60975486,
+  "label": "codex-cnot-native-stages-20261117",
+  "before": {
+    "id": 60975486,
+    "label": "codex-cnot-native-stages-20261117",
+    "actual_status": "running",
+    "duration": 1903.3004212379456,
+    "dph_total": 0.13481481481481483,
+    "start_date": 1794864016.3912797
+  },
+  "destroy_returncode": 0,
+  "provider_absence_verified": true,
+  "unix_time": 1794865940.1391428
+}

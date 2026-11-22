@@ -1,0 +1,9 @@
+Traceback (most recent call last):
+  File "/workspace/beam-work/tests/rust_distribution_check.py", line 142, in <module>
+    main()
+  File "/workspace/beam-work/tests/rust_distribution_check.py", line 122, in main
+    checkout_result = check_wheel(checkout_wheel, source, checkout, env)
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/beam-work/tests/rust_distribution_check.py", line 49, in check_wheel
+    raise AssertionError(f"wheel missing package files: {sorted(missing)}")
+AssertionError: wheel missing package files: ['multigpubeamsearch/_bin/beam-runner']
