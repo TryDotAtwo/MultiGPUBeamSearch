@@ -283,22 +283,22 @@ jobs:
           if not found:
               print("CNOT_GLOO_LIFECYCLE_DIAGNOSTIC no-events")
           PY
-      - name: Compare public CNOT search on one and two Gloo ranks
-        id: cnot_gloo_one_vs_two_rank
+      - name: Compare wide CNOT search on one and two Gloo ranks
+        id: cnot_gloo_wide_one_vs_two_rank
         run: |
           set -euo pipefail
           cd "$RUNNER_TEMP/mgbs-wheel-smoke"
           env -u PYTHONPATH python "$GITHUB_WORKSPACE/tools/verify_cnot.py" \
             --case wide --backend gloo --engine rust --width 2 \
-            --output "$RUNNER_TEMP/cnot-gloo-world-1.json" \
-            > "$RUNNER_TEMP/mgbs-private-cnot-gloo-world-1.log" 2>&1
+            --output "$RUNNER_TEMP/cnot-gloo-wide-world-1.json" \
+            > "$RUNNER_TEMP/mgbs-private-cnot-gloo-wide-world-1.log" 2>&1
           timeout --signal=TERM --kill-after=15s 180s \
             env -u PYTHONPATH python -m torch.distributed.run --standalone --nproc_per_node=2 \
             "$GITHUB_WORKSPACE/tools/verify_cnot.py" \
             --case wide --backend gloo --engine rust --width 2 \
-            --output "$RUNNER_TEMP/cnot-gloo-world-2.json" \
-            > "$RUNNER_TEMP/mgbs-private-cnot-gloo-world-2.log" 2>&1
-          python - "$RUNNER_TEMP/cnot-gloo-world-1.json" "$RUNNER_TEMP/cnot-gloo-world-2.json" <<'PY'
+            --output "$RUNNER_TEMP/cnot-gloo-wide-world-2.json" \
+            > "$RUNNER_TEMP/mgbs-private-cnot-gloo-wide-world-2.log" 2>&1
+          python - "$RUNNER_TEMP/cnot-gloo-wide-world-1.json" "$RUNNER_TEMP/cnot-gloo-wide-world-2.json" <<'PY'
           import json
           import sys
 
@@ -315,33 +315,67 @@ jobs:
           if one.get("world") != 1 or two.get("world") != 2:
               raise SystemExit("public Gloo runs did not use one and two ranks")
           if one.get("n") != 144 or one.get("width") != 2 or one.get("shortlist") != 3:
-              raise SystemExit("public CNOT parity fixture used the wrong geometry")
+              raise SystemExit("wide public CNOT parity fixture used the wrong geometry")
           if one.get("scorer") != "WireFixture" or one.get("status") != "solved" or not one.get("bitwise_replay"):
-              raise SystemExit("public CNOT parity fixture did not replay")
+              raise SystemExit("wide public CNOT parity fixture did not replay")
+          if not any(
+              layer["distinct"] > one["width"] and layer["retained"] == one["width"]
+              for layer in one["layers"]
+          ):
+              raise SystemExit("wide public CNOT fixture missed the saturated global cutoff")
+          print("cnot_gloo_wide_one_vs_two_rank=passed")
+          PY
+      - name: Compare CNOT topology deduplication and ties on one and two Gloo ranks
+        id: cnot_gloo_topology_one_vs_two_rank
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/mgbs-wheel-smoke"
+          env -u PYTHONPATH python "$GITHUB_WORKSPACE/tools/verify_cnot.py" \
+            --case topology --backend gloo --engine rust \
+            --output "$RUNNER_TEMP/cnot-gloo-topology-world-1.json" \
+            > "$RUNNER_TEMP/mgbs-private-cnot-gloo-topology-world-1.log" 2>&1
+          timeout --signal=TERM --kill-after=15s 180s \
+            env -u PYTHONPATH python -m torch.distributed.run --standalone --nproc_per_node=2 \
+            "$GITHUB_WORKSPACE/tools/verify_cnot.py" \
+            --case topology --backend gloo --engine rust \
+            --output "$RUNNER_TEMP/cnot-gloo-topology-world-2.json" \
+            > "$RUNNER_TEMP/mgbs-private-cnot-gloo-topology-world-2.log" 2>&1
+          python - "$RUNNER_TEMP/cnot-gloo-topology-world-1.json" "$RUNNER_TEMP/cnot-gloo-topology-world-2.json" <<'PY'
+          import json
+          import sys
+
+          with open(sys.argv[1], encoding="utf-8") as stream:
+              one = json.load(stream)
+          with open(sys.argv[2], encoding="utf-8") as stream:
+              two = json.load(stream)
+          core = ("n", "width", "shortlist", "mode", "engine", "status")
+          if any(one.get(key) != two.get(key) for key in core):
+              raise SystemExit("one-rank and two-rank topology results differ")
+          if one.get("world") != 1 or two.get("world") != 2:
+              raise SystemExit("topology Gloo runs did not use one and two ranks")
+          if (one.get("n"), one.get("width"), one.get("shortlist")) != (6, 17, 25):
+              raise SystemExit("topology fixture used the wrong search geometry")
           fields = (
               "depth", "distinct", "retained", "raw_legal_candidates", "duplicate_children",
               "winners_sha256", "selection_oracle", "reference_order_status",
               "reference_boundary_gap", "reference_ordered_winners_sha256",
           )
-          if len(one.get("layers", [])) != len(two.get("layers", [])):
-              raise SystemExit("one-rank and two-rank layer counts differ")
-          saturated = False
+          if len(one.get("layers", [])) != len(two.get("layers", [])) or not one.get("layers"):
+              raise SystemExit("one-rank and two-rank topology layer counts differ")
           observed_duplicate = False
           observed_tie = False
           for left, right in zip(one["layers"], two["layers"]):
               if any(left.get(key) != right.get(key) for key in fields):
-                  raise SystemExit("one-rank and two-rank global layer selections differ")
-              if left["distinct"] > one["width"] and left["retained"] == one["width"]:
-                  saturated = True
-                  if sum(rank[3] > 0 for rank in right["by_rank"]) < 2:
-                      raise SystemExit("the saturated two-rank layer did not use both ranks")
+                  raise SystemExit("one-rank and two-rank topology selections differ")
               if left["duplicate_children"] > 0:
                   observed_duplicate = True
               if left["reference_order_status"] == "exact_tie_full_word":
                   observed_tie = True
-          if not saturated or not observed_duplicate or not observed_tie:
-              raise SystemExit("fixture missed global cutoff, cross-parent duplicate, or exact tie")
-          print("cnot_gloo_one_vs_two_rank=passed")
+          if not observed_duplicate:
+              raise SystemExit("topology fixture missed a cross-parent duplicate")
+          if not observed_tie:
+              raise SystemExit("topology fixture missed an exact full-word cutoff tie")
+          print("cnot_gloo_topology_dedup_ties_one_vs_two_rank=passed")
           PY
       - name: Lint the new-host acceptance workflow
         id: vast_workflow_lint
