@@ -154,6 +154,17 @@ def worker(rank, rendezvous, output_dir, phase, fail_rank):
         original, injection = inject_identity_failure(rank, fail_rank)
     else:
         original, injection = inject_history_edge_failure(rank, fail_rank)
+    transport_attempt = {"phase": "injected failure", "started": False}
+    original_start_transport = None
+    if phase == "compatibility dispatch identity":
+        original_start_transport = World.start_transport
+
+        def track_transport_start(world, *, prefer_rust):
+            if transport_attempt["phase"] == "injected failure":
+                transport_attempt["started"] = True
+            return original_start_transport(world, prefer_rust=prefer_rust)
+
+        World.start_transport = track_transport_start
     try:
         with World("cpu"):
             compatibility_stages = (
@@ -175,7 +186,10 @@ def worker(rank, rendezvous, output_dir, phase, fail_rank):
             if rank == fail_rank and not injection["fired"]:
                 raise AssertionError(f"the {phase} failure was not injected in its Rust phase")
 
-            # The failed stage must vote before its next data-plane collective.
+            # Identity setup must finish its rank-wide vote before transport starts.
+            if compatibility_dispatch and transport_attempt["started"]:
+                raise AssertionError("transport started before identity initialization was admitted")
+            transport_attempt["phase"] = "healthy retry"
             # A second public search proves the process group remains usable.
             result = public_search(
                 validation,
@@ -206,6 +220,7 @@ def worker(rank, rendezvous, output_dir, phase, fail_rank):
         elif phase == "history row decode":
             World.broadcast = original
         elif phase == "compatibility dispatch identity":
+            World.start_transport = original_start_transport
             cnot_module.native.cnot_identity = original
         else:
             World.longs = original

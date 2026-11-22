@@ -50,3 +50,9 @@
 ## 2026-11-22 - Split panel-v2 producer feedback and build caches
 
 - Hosted routing contracts inspect the actual venv-qualified handoff command and require preparation to precede Rust/PyTorch setup.
+
+## 2026-11-22 - Coordinate compatibility-route CNOT identity setup
+
+- Moved CNOT identity construction in the admitted Rust compatibility route into a rank-wide checked Gloo phase before transport startup. A rank-local allocation/initialization error now returns the same phase and cause on every rank.
+- The installed-wheel Gloo test hides the newer controller ABI, injects the identity failure independently on rank 0 and rank 1, confirms transport does not start for the failed request, and retries a public search on the same process group.
+- Search rules, packed state representation, scorer, CUDA kernels, precision, and collective transport are unchanged.

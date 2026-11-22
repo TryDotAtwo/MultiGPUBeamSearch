@@ -366,8 +366,11 @@ def _search_cnot_compat(world, root, scorer, width, shortlist, max_depth,
     )
     root = input_matrix.root
     world.require_consensus(digest)
+    identity = world.checked(
+        "initialize CNOT identity",
+        lambda: native.cnot_identity(input_matrix.n, device=world.device),
+    )
     world.start_transport(prefer_rust=runner is not None)
-    identity = native.cnot_identity(input_matrix.n, device=world.device)
     if runner is not None:
         native_stage_runner = bindings["run_cnot_native"]
         use_native = (
