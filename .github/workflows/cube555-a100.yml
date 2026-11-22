@@ -1,0 +1,64 @@
+name: Verify Cube555 standalone on two Vast A100s
+
+on:
+  push:
+    branches:
+      - codex/cube555-standalone-20261122
+    paths:
+      - .github/workflows/cube555-a100.yml
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: cube555-standalone-vast-a100
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 250
+    env:
+      CUBE555_BUNDLE_RUN: '45001314619'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          sparse-checkout: .github/scripts
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Download the verified standalone archive
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          run-id: ${{ env.CUBE555_BUNDLE_RUN }}
+          name: cube555-standalone-max-linux-x86_64-py311
+          path: ${{ runner.temp }}/cube555-bundle
+      - name: Check archive and prepare the Vast CLI
+        run: |
+          bash -n .github/scripts/cube555-vast.sh
+          bash -n .github/scripts/cube555-a100-host.sh
+          cd "$RUNNER_TEMP/cube555-bundle"
+          sha256sum -c cube555-standalone-linux-x86_64-py311.tar.sha256
+          python -m pip install 'vastai==1.10.0'
+      - name: Rent two A100s and test cold and warm startup
+        timeout-minutes: 215
+        env:
+          VAST_API_KEY: ${{ secrets.VAST_API_KEY }}
+        run: bash .github/scripts/cube555-vast.sh
+      - name: Verify that the rental has been removed
+        if: always()
+        timeout-minutes: 4
+        env:
+          VAST_API_KEY: ${{ secrets.VAST_API_KEY }}
+        run: bash .github/scripts/cube555-vast.sh --cleanup
+      - name: Save the validation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cube555-a100-validation
+          path: ${{ runner.temp }}/cube555-a100-evidence/
+          if-no-files-found: warn
+          retention-days: 14

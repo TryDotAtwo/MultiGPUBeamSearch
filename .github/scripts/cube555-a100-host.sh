@@ -1,0 +1,67 @@
+#!/usr/bin/env bash
+set -euo pipefail
+archive=cube555-standalone-linux-x86_64-py311.tar
+mkdir -p evidence python-tool
+evidence="$PWD/evidence"
+
+collect_evidence() {
+    if [[ -d cube555-standalone/beam_run ]]; then
+        cd cube555-standalone
+        find beam_run -type f -size -4M \
+            \( -name adapter-result.json -o -name '*capacity*.json' -o -name '*budget*.json' \
+               -o -name runtime-config.json -o -name 'verification*.json' \
+               -o -name profile-grid.json -o -name '*calibration*.json' \) -print0 \
+            | tar -cf "$evidence/native-receipts.tar" --null -T -
+    fi
+}
+trap 'status=$?; collect_evidence || true; exit "$status"' EXIT
+
+sha256sum -c "$archive.sha256" | tee "$evidence/archive-checksums.txt"
+tar -xf "$archive"
+nvcc --version | tee "$evidence/nvcc.txt"
+for tool in curl cmake c++ make flock; do
+    if ! command -v "$tool" >/dev/null; then
+        export DEBIAN_FRONTEND=noninteractive
+        apt-get -qq update
+        apt-get -qq install -y --no-install-recommends ca-certificates curl cmake g++ make util-linux
+        break
+    fi
+done
+cmake --version | tee "$evidence/cmake.txt"
+curl --fail --silent --show-error --location --retry 2 --max-time 90 \
+    https://github.com/astral-sh/uv/releases/download/0.8.15/uv-x86_64-unknown-linux-musl.tar.gz \
+    | tar -xz -C python-tool --strip-components=1
+./python-tool/uv python install 3.11
+export PYTHON="$(./python-tool/uv python find 3.11)"
+"$PYTHON" --version | tee "$evidence/python.txt"
+cd cube555-standalone
+root="$PWD"
+trap 'status=$?; cd "$root/.."; collect_evidence || true; exit "$status"' EXIT
+
+bash run.sh --check |& tee "$evidence/check.log"
+for stage in cold warm; do
+    echo "Running $stage beam_width=max on $(date -u +%FT%TZ)"
+    started="$(date +%s)"
+    bash run.sh --beam-width max --max-steps 2 --bfs-radius 0 |& tee "$evidence/$stage.log"
+    printf '%s\n' "$(( $(date +%s) - started ))" > "$evidence/$stage-seconds.txt"
+    cp beam_run/cache/profile-grid.json "$evidence/$stage-grid.json"
+done
+
+"$PYTHON" - "$evidence" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+evidence = Path(sys.argv[1])
+cold = json.loads((evidence / "cold-grid.json").read_text())
+warm = json.loads((evidence / "warm-grid.json").read_text())
+assert cold["max"]["requested_beam"] == warm["max"]["requested_beam"] == "max"
+assert cold["grid_reused"] is False and warm["grid_reused"] is True
+assert cold["profiles"] == warm["profiles"]
+assert warm["max"]["inference_cache_hit"] and warm["max"]["pipeline_cache_hit"]
+for stage, grid in (("cold", cold), ("warm", warm)):
+    print(f"{stage}: beam {grid['max']['effective_beam']:,}; "
+          f"inference cache {grid['max']['inference_cache_hit']}; "
+          f"pipeline cache {grid['max']['pipeline_cache_hit']}; "
+          f"{len(grid['profiles'])} numeric profiles")
+PY
