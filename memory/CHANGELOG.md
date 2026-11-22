@@ -1,3 +1,10 @@
+## 2026-11-22 - Require rank-common CNOT stage bindings
+
+- Fixed Rust dispatch admission so the native controller is selected only when every rank exposes the complete required native-stage set. When that set is absent, `auto` selects the agreed compatibility route; explicit Rust reports a common error before transport if no Rust route is available.
+- Added a RED unit regression for a rank missing a native-stage binding and an installed-wheel two-rank Gloo regression for the same missing symbol on rank 0 and rank 1. The regression checks strict rejection before the data plane, the common auto route, explicit Rust rejection when no shared Rust route exists, and a healthy auto retry on the same process group.
+- On tested source SHA `87e1726e9aad31bae211e7ee07c3ee077729dfc6`, the installed PEP 517 wheel passed [run 44981755387](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44981755387), including CNOT rank-consistent dispatch and one/two-rank Gloo cutoff, topology deduplication and tie fixtures. The hosted acceptance harness passed [run 44981755539](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44981755539); panel-v2 CPU compile/handoff passed [run 44981758527](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44981758527). The physical CUDA/NCCL job was skipped.
+- Search order, scoring, kernels, precision and public API are unchanged. Hardware execution remains unverified.
+
 ## 2026-11-22 - Bind CNOT requests to rank geometry
 
 - Added `RankedCnotRequest` in `beam-runtime`. The validated request is bound to the active `rank/world` during the existing collective input-admission phase; invalid topology (`world=0`, `rank >= world`, or `world > 65536`) is rejected before native backend admission. Private fields and accessors preserve the validated contract.
