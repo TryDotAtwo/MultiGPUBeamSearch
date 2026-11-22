@@ -155,17 +155,24 @@ def admitted_backend_mode_worker(rank, rendezvous, output_dir):
         timeout=timedelta(seconds=30),
     )
     old_value = os.environ.pop("MGBS_CNOT_STRICT_BACKEND", None)
-    original_runner = cnot_module._native_stages_runner
+    original_gather_fixed = World.gather_fixed
+    injection = {"fired": False}
 
-    def flip_after_admission():
-        if rank == 0:
+    def flip_after_admission(world, tensor):
+        gathered = original_gather_fixed(world, tensor)
+        if rank == 0 and not injection["fired"]:
+            # The Rust controller has completed backend admission and the
+            # input digest vote; Stream 5 startup follows this call.
             os.environ["MGBS_CNOT_STRICT_BACKEND"] = "1"
-        return original_runner()
+            injection["fired"] = True
+        return gathered
 
-    cnot_module._native_stages_runner = flip_after_admission
+    World.gather_fixed = flip_after_admission
     try:
         with World("cpu"):
             result = public_search()
+            if not injection["fired"]:
+                raise AssertionError("strict mode was not changed after backend admission")
             if (
                 result.status != "solved"
                 or replay_cnot(3, result.gates) != replay_cnot(3, (0, 1))
@@ -181,7 +188,7 @@ def admitted_backend_mode_worker(rank, rendezvous, output_dir):
                 encoding="utf-8",
             )
     finally:
-        cnot_module._native_stages_runner = original_runner
+        World.gather_fixed = original_gather_fixed
         if old_value is None:
             os.environ.pop("MGBS_CNOT_STRICT_BACKEND", None)
         else:
