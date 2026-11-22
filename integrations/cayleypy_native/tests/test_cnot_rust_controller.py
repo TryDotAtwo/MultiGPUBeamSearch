@@ -334,7 +334,7 @@ def test_rust_top_level_controller_preserves_compatibility_stage_fallback(monkey
         _stream5_library = None
 
     world = World()
-    support_votes = iter((False, True, False, True, False, False))
+    support_votes = iter((False, True, False, True, False, True))
     monkeypatch.delenv("MGBS_CNOT_STRICT_BACKEND", raising=False)
 
     def prepare_input(*args):

@@ -1,3 +1,9 @@
+## 2026-11-22 - Correct CNOT test fixture expectations
+
+- The installed two-rank Gloo check now asserts that the post-admission strict-mode mutation occurs on rank 0 only; rank 1 remains unchanged while both ranks complete the same search.
+- Corrected the controller unit-test support-vote fixture to select the expected Rust compatibility stages. No production search path changed.
+- The preceding hosted runs exposed the fixture mismatches: [installed wheel](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44994192433) and [CNOT CPU tests](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44994192473).
+
 ## 2026-11-22 - Require rank-common CNOT stage bindings
 
 - Fixed Rust dispatch admission so the native controller is selected only when every rank exposes the complete required native-stage set. When that set is absent, `auto` selects the agreed compatibility route; explicit Rust reports a common error before transport if no Rust route is available.

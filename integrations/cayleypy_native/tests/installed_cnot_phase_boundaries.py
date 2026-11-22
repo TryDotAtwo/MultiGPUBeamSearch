@@ -181,8 +181,10 @@ def admitted_backend_mode_worker(rank, rendezvous, output_dir):
     try:
         with World("cpu"):
             result = public_search()
-            if not injection["fired"]:
-                raise AssertionError("strict mode was not changed after backend admission")
+            if injection["fired"] != (rank == 0):
+                raise AssertionError(
+                    "strict-mode mutation did not occur only on rank 0 after backend admission"
+                )
             if (
                 result.status != "solved"
                 or replay_cnot(3, result.gates) != replay_cnot(3, (0, 1))
