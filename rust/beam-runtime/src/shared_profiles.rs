@@ -95,7 +95,10 @@ pub fn find_profile(profiles_root: &Path, identity: &Value) -> Option<Value> {
         };
         let evidence = evidence_value.as_object()?;
         if evidence.get("status").and_then(Value::as_str) != Some("verified")
-            || evidence.get("source_commit").and_then(Value::as_str).is_none()
+            || evidence
+                .get("source_commit")
+                .and_then(Value::as_str)
+                .is_none()
         {
             continue;
         }

@@ -59,11 +59,12 @@ fn write_record(root: &Path, identity: &Value, value: &Value) -> String {
     fs::create_dir_all(root.join("records")).unwrap();
     let payload = serde_json::to_vec(value).unwrap();
     let digest = sha256_bytes(&payload);
-    fs::write(root.join("records").join(format!("{digest}.json")), &payload).unwrap();
-    write_index(
-        root,
-        json!([{"compatibility": identity, "sha256": digest}]),
-    );
+    fs::write(
+        root.join("records").join(format!("{digest}.json")),
+        &payload,
+    )
+    .unwrap();
+    write_index(root, json!([{"compatibility": identity, "sha256": digest}]));
     digest
 }
 
@@ -86,13 +87,11 @@ fn rejects_workload_mismatch_and_tampered_record_bytes() {
     let identity = identity();
     let digest = write_record(&root, &identity, &record(&identity));
 
-    assert!(
-        find_profile(
-            &root,
-            &json!({"backend": "cutlass", "beam": 8, "world_size": 2})
-        )
-        .is_none()
-    );
+    assert!(find_profile(
+        &root,
+        &json!({"backend": "cutlass", "beam": 8, "world_size": 2})
+    )
+    .is_none());
     fs::write(root.join("records").join(format!("{digest}.json")), b"{}").unwrap();
     assert!(find_profile(&root, &identity).is_none());
 }
@@ -135,7 +134,12 @@ fn rejects_record_symlinks_and_resolved_paths_outside_the_registry() {
     );
     assert!(find_profile(&root, &value["compatibility"]).is_none());
 
-    fs::remove_file(root.join("records").join(format!("{digest}.json")).as_path()).unwrap();
+    fs::remove_file(
+        root.join("records")
+            .join(format!("{digest}.json"))
+            .as_path(),
+    )
+    .unwrap();
     fs::remove_dir(root.join("records")).unwrap();
     std::os::unix::fs::symlink(&external, root.join("records")).unwrap();
     assert!(find_profile(&root, &value["compatibility"]).is_none());
