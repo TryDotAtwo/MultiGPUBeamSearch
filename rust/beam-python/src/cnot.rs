@@ -914,7 +914,7 @@ fn run_cnot_native_search<'py>(
         )?;
     }
 
-    let wires = request.task.wires;
+    let wires = request.wires();
     let identity_args = PyDict::new(py);
     identity_args.set_item("device", world.getattr("device")?)?;
     let identity_result = identity_builder.call((wires,), Some(&identity_args));
@@ -943,10 +943,10 @@ fn run_cnot_native_search<'py>(
                 "strict CNOT acceptance requires the Rust native stage runner on every rank",
             ));
         }
-        let width = request.task.width;
-        let shortlist_value = request.task.shortlist;
-        let depth = request.task.max_depth;
-        let mode = PyString::new(py, request.task.mode.as_str()).into_any();
+        let width = request.width();
+        let shortlist_value = request.shortlist();
+        let depth = request.max_depth();
+        let mode = PyString::new(py, request.mode().as_str()).into_any();
 
         if supports_native {
             let native_root = input_matrix.getattr("root")?;
