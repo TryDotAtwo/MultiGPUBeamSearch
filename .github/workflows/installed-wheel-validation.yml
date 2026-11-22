@@ -47,6 +47,9 @@ on:
       - tools/fixtures/cnot_acceptance_event_v1.jsonl
       - integrations/cayleypy_native/tests/cnot_device_domain_admission_fixture.c
       - tools/verify_cnot.py
+      - tools/cnot_panel_snapshot.py
+      - tools/test_cnot_panel_snapshot.py
+      - tools/validate_cnot_handoff.py
       - tools/test_cnot_reference_order.py
       - integrations/cayleypy_native/multigpubeamsearch/cnot_acceptance.py
       - integrations/cayleypy_native/pyproject.toml
@@ -109,6 +112,11 @@ jobs:
           path: cnot-emitter
           fetch-depth: 1
           persist-credentials: false
+      - name: Count full dataset reads at the CNOT handoff boundary
+        id: cnot_handoff_snapshot_reads
+        run: |
+          set -euo pipefail
+          python3 "$GITHUB_WORKSPACE/tools/test_cnot_panel_snapshot.py"
       - name: Verify receipt-driven CNOT panel endpoint with the installed CPU wheel
         id: cnot_handoff_endpoint
         env:

@@ -67,13 +67,13 @@ export LIBTORCH_USE_PYTORCH=1
 wheel_dir="${run_root}/wheel-dist"
 venv="${run_root}/venv"
 mkdir -p "$wheel_dir" "${run_root}/wheel-smoke" "$result_dir"
-handoff_receipt="${handoff_run_root}/reports/learning-curve.private.json"
 handoff_preflight="${result_dir}/handoff-preflight.json"
 panel_result_dir="${result_dir}/panel"
 [[ ! -e "$handoff_preflight" && ! -L "$handoff_preflight" && ! -e "$panel_result_dir" && ! -L "$panel_result_dir" ]]
 mkdir -p "$panel_result_dir"
 "$python_bin" "$source_dir/tools/validate_cnot_handoff.py" \
   --run-root "$handoff_run_root" --source-root "$source_dir" --output "$handoff_preflight"
+handoff_preflight_sha="$(sha256sum "$handoff_preflight" | awk '{print $1}')"
 mapfile -t panel_pins < <("$python_bin" - "$handoff_preflight" "$handoff_run_root" <<'PY'
 import json
 import pathlib
@@ -244,8 +244,8 @@ run_panel_case() {
     "$wheel_python" -m torch.distributed.run --standalone --nproc_per_node="$nproc" \
     "$source_dir/tools/verify_cnot.py" \
     --case panel --backend nccl --mode qhat --engine rust --require-rust-scorer \
-    --library "$scorer_library" --handoff-receipt "$handoff_receipt" \
-    --run-root "$handoff_run_root" --output "${panel_result_dir}/${case_id}.json" \
+     --library "$scorer_library" --handoff-preflight "$handoff_preflight" \
+     --handoff-preflight-sha256 "$handoff_preflight_sha" \
     >"$case_log" 2>&1; then
     cat "$case_log"
   else

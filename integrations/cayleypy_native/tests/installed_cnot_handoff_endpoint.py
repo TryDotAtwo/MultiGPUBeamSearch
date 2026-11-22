@@ -23,6 +23,16 @@ from test_handoff import PanelV2HandoffTests  # noqa: E402
 import multigpubeamsearch  # noqa: E402
 
 
+def load_preflight_endpoint():
+    path = ROOT / "tools" / "validate_cnot_handoff.py"
+    spec = importlib.util.spec_from_file_location("validate_cnot_handoff_installed_endpoint", path)
+    if spec is None or spec.loader is None:
+        raise AssertionError("standard CNOT handoff preflight is unavailable")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 def load_verify_endpoint():
     path = ROOT / "tools" / "verify_cnot.py"
     spec = importlib.util.spec_from_file_location("verify_cnot_installed_endpoint", path)
@@ -54,7 +64,7 @@ def _synthetic_scorer_factory(library, manifest, *, n, device, inference_batch=4
     return SyntheticScorer()
 
 
-def _run_panel_endpoint_rank(rank, world_size, run_root, output_path, rendezvous):
+def _run_panel_endpoint_rank(rank, world_size, run_root, output_path, rendezvous, snapshot_path, snapshot_sha):
     dist.init_process_group(
         backend="gloo",
         init_method=f"file://{rendezvous}",
@@ -70,7 +80,8 @@ def _run_panel_endpoint_rank(rank, world_size, run_root, output_path, rendezvous
                 "--engine", "rust",
                 "--library", str(Path(run_root) / "synthetic-scorer.so"),
                 "--run-root", run_root,
-                "--handoff-receipt", str(Path(run_root) / "reports" / "learning-curve.private.json"),
+                "--handoff-preflight", snapshot_path,
+                "--handoff-preflight-sha256", snapshot_sha,
                 "--output", output_path,
             ],
             scorer_factory=_synthetic_scorer_factory,
@@ -160,18 +171,43 @@ class InstalledHandoffEndpointTests(unittest.TestCase):
                 os.environ[key] = value
         self.fixture.tearDown()
 
-    def invoke(self, *, fixture=None, receipt=None, output_name="consumer-panel.private.json", extra=()):
+    def make_preflight_snapshot(self, fixture=None):
+        target = self.fixture if fixture is None else fixture
+        preflight = load_preflight_endpoint()
+        snapshot_path = target.reports / "resolved-panel-preflight.private.json"
+        summary = preflight.resolve_handoff(target.root, ROOT)
+        preflight.write_summary(summary, snapshot_path)
+        snapshot_sha = hashlib.sha256(snapshot_path.read_bytes()).hexdigest()
+        return snapshot_path, snapshot_sha
+
+    def invoke(
+        self, *, fixture=None, receipt=None, output_name="consumer-panel.private.json",
+        extra=(), use_preflight_snapshot=False, preflight_snapshot=None,
+    ):
         target = self.fixture if fixture is None else fixture
         library = target.root / "synthetic-scorer.so"
         if not library.exists():
             library.write_bytes(b"synthetic CNOT scorer library fixture")
+        handoff_args = []
+        if use_preflight_snapshot:
+            snapshot_path, snapshot_sha = (
+                self.make_preflight_snapshot(target)
+                if preflight_snapshot is None
+                else preflight_snapshot
+            )
+            handoff_args = [
+                "--handoff-preflight", str(snapshot_path),
+                "--handoff-preflight-sha256", snapshot_sha,
+            ]
+        else:
+            handoff_args = ["--handoff-receipt", str(receipt or target.receipt)]
         args = [
             "--case", "panel",
             "--backend", "gloo",
             "--engine", "rust",
             "--library", str(library),
             "--run-root", str(target.root),
-            "--handoff-receipt", str(receipt or target.receipt),
+            *handoff_args,
             "--output", str(target.reports / output_name),
             *extra,
         ]
@@ -317,8 +353,13 @@ class InstalledHandoffEndpointTests(unittest.TestCase):
         ))
 
     def test_installed_public_panel_endpoint_matches_one_and_two_gloo_ranks(self):
+        snapshot_path, snapshot_sha = self.make_preflight_snapshot()
         one_path = self.fixture.reports / "consumer-panel-one-rank.private.json"
-        self.invoke(output_name=one_path.name)
+        self.invoke(
+            output_name=one_path.name,
+            use_preflight_snapshot=True,
+            preflight_snapshot=(snapshot_path, snapshot_sha),
+        )
         one = json.loads(one_path.read_text(encoding="utf-8"))
         self.assertEqual(one["world"], 1)
         self.assertEqual(one["execution_backend"], "cpu_gloo")
@@ -331,7 +372,8 @@ class InstalledHandoffEndpointTests(unittest.TestCase):
         rendezvous.unlink(missing_ok=True)
         mp.spawn(
             _run_panel_endpoint_rank,
-            args=(2, str(self.fixture.root), str(two_path), str(rendezvous)),
+            args=(2, str(self.fixture.root), str(two_path), str(rendezvous),
+                  str(snapshot_path), snapshot_sha),
             nprocs=2,
             join=True,
         )

@@ -47,6 +47,7 @@ def build_summary(resolved: Any, run_root: Path) -> dict[str, Any]:
         raise ValueError("sealed panel roots differ from the ordered panel")
     cases = []
     root_pins = []
+    panel_roots = []
     for index, case_id in zip(resolved.panel_indices, resolved.panel_ids):
         root_row = roots[case_id]
         candidate_row = candidate_cases[case_id]
@@ -87,6 +88,14 @@ def build_summary(resolved: Any, run_root: Path) -> dict[str, Any]:
             "orientation": root_row["orientation"],
             "start_packed_rows_sha256": row_digest,
         })
+        panel_roots.append({
+            "panel_index": index,
+            "case_id": case_id,
+            "dimension": root_row["dimension"],
+            "alphabet_id": root_row["alphabet_id"],
+            "orientation": root_row["orientation"],
+            "start_packed_rows": list(lanes),
+        })
 
     if not isinstance(baseline, dict):
         raise ValueError("locked-test baseline metrics are missing")
@@ -121,7 +130,9 @@ def build_summary(resolved: Any, run_root: Path) -> dict[str, Any]:
         "panel_ids": list(resolved.panel_ids),
         "panel_digest": resolved.panel_digest,
         "search": dict(resolved.search),
+        "expansion_upper_bound": resolved.expansion_upper_bound,
         "orientation": resolved.orientation,
+        "panel_roots": panel_roots,
         "artifact_path_policy": resolved.artifact_path_policy,
         "baseline_solved_count": baseline.get("solved_count"),
         "baseline_total_physical_cost": baseline.get("total_physical_cost"),

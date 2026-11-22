@@ -250,6 +250,17 @@ def validate_distribution(device, engine="auto"):
         return world.checked("all-rank validation", inspect)
 
 
+def _load_handoff_snapshot_loader():
+    path = Path(__file__).with_name("cnot_panel_snapshot.py")
+    spec = importlib.util.spec_from_file_location("mgbs_cnot_panel_snapshot", path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError("resolved CNOT panel snapshot loader is unavailable")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
 def _load_handoff_resolver():
     root = Path(__file__).resolve().parents[1]
     path = root / "integrations" / "cnot_scorer" / "handoff.py"
@@ -290,8 +301,10 @@ def main(argv=None, *, scorer_factory=None, manage_process_group=True):
     parser.add_argument("--width", type=int)
     parser.add_argument("--library")
     parser.add_argument("--manifest", help="direct checkpoint manifest for isolated smoke cases only")
-    parser.add_argument("--handoff-receipt", help="private producer learning-curve receipt for paired panel acceptance")
-    parser.add_argument("--run-root", help="private run root containing the pinned dataset and manifests")
+    parser.add_argument("--handoff-receipt", help="private producer learning-curve receipt for direct panel acceptance")
+    parser.add_argument("--handoff-preflight", help="immutable resolved panel summary from the single preflight pass")
+    parser.add_argument("--handoff-preflight-sha256", help="SHA-256 of the exact resolved panel summary bytes")
+    parser.add_argument("--run-root", help="private run root containing the pinned manifest and related artifacts")
     parser.add_argument("--engine", choices=("auto", "python", "rust"), default="auto",
                         help="select the search controller; rust fails closed when unavailable")
     parser.add_argument("--require-rust-scorer", action="store_true",
@@ -300,10 +313,16 @@ def main(argv=None, *, scorer_factory=None, manage_process_group=True):
     args = parser.parse_args(argv)
     resolved_handoff = None
     if args.case == "panel":
-        if args.handoff_receipt is None or args.run_root is None:
-            parser.error("--case panel requires --handoff-receipt and --run-root")
+        direct_receipt = args.handoff_receipt is not None
+        resolved_snapshot = args.handoff_preflight is not None
+        if args.run_root is None or direct_receipt == resolved_snapshot:
+            parser.error("--case panel requires --run-root and exactly one of --handoff-receipt or --handoff-preflight")
+        if resolved_snapshot and args.handoff_preflight_sha256 is None:
+            parser.error("--handoff-preflight requires --handoff-preflight-sha256")
+        if not resolved_snapshot and args.handoff_preflight_sha256 is not None:
+            parser.error("--handoff-preflight-sha256 requires --handoff-preflight")
         if args.manifest is not None:
-            parser.error("--case panel accepts the producer receipt, not a direct manifest")
+            parser.error("--case panel accepts a resolved handoff, not a direct manifest")
         if args.library is None:
             parser.error("--case panel requires the compiled CNOT scorer library")
         if args.mode != "qhat" or args.audit or args.inference_batch != 4 or args.width is not None:
@@ -313,17 +332,31 @@ def main(argv=None, *, scorer_factory=None, manage_process_group=True):
         args.engine = "rust"
         args.require_rust_scorer = True
         try:
-            resolver = _load_handoff_resolver()
-            resolved_handoff = resolver.resolve_panel_v2_handoff(
-                args.run_root, args.handoff_receipt
-            )
+            if args.handoff_preflight is not None:
+                snapshot_loader = _load_handoff_snapshot_loader()
+                resolved_handoff = snapshot_loader.load_panel_v2_snapshot(
+                    args.handoff_preflight,
+                    args.run_root,
+                    args.handoff_preflight_sha256,
+                    expected_checkpoint_sha256=os.environ.get(
+                        "MGBS_CNOT_EXPECTED_CHECKPOINT_SHA256"
+                    ),
+                    expected_search_manifest_sha256=os.environ.get(
+                        "MGBS_CNOT_EXPECTED_SEARCH_MANIFEST_SHA256"
+                    ),
+                )
+            else:
+                resolver = _load_handoff_resolver()
+                resolved_handoff = resolver.resolve_panel_v2_handoff(
+                    args.run_root, args.handoff_receipt
+                )
             for variable, expected in (
                 ("MGBS_CNOT_EXPECTED_CHECKPOINT_SHA256", resolved_handoff.checkpoint_sha256),
                 ("MGBS_CNOT_EXPECTED_SEARCH_MANIFEST_SHA256", resolved_handoff.search_manifest_sha256),
             ):
                 current = os.environ.get(variable)
                 if current is not None and current != expected:
-                    raise ValueError(f"{variable} differs from the pinned producer handoff")
+                    raise ValueError(f"{variable} differs from the resolved producer handoff")
                 os.environ[variable] = expected
             os.environ["MGBS_TQP_MANIFEST"] = str(resolved_handoff.search_manifest)
             output_root = Path(args.run_root).resolve(strict=True)
@@ -333,8 +366,13 @@ def main(argv=None, *, scorer_factory=None, manage_process_group=True):
                 raise ValueError("private panel result path already exists")
         except (OSError, ValueError, RuntimeError) as error:
             parser.error(str(error))
-    elif args.handoff_receipt is not None or args.run_root is not None:
-        parser.error("--handoff-receipt and --run-root are valid only for --case panel")
+    elif (
+        args.handoff_receipt is not None
+        or args.handoff_preflight is not None
+        or args.handoff_preflight_sha256 is not None
+        or args.run_root is not None
+    ):
+        parser.error("handoff inputs and --run-root are valid only for --case panel")
     elif args.case in ("trained", "trained-deep") and (args.manifest is None or args.library is None):
         parser.error("direct smoke cases require --manifest and --library")
     if args.require_rust_scorer:

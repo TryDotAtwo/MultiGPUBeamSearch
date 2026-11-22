@@ -132,3 +132,6 @@ Keep an active goal until the migration and required verification are complete.
 
 
 2026-11-22 producer compatibility follow-up: Support the exact producer source revision 42ed72f587ab70fc74a85cf0a25001efb29cb994 while retaining legacy receipts from 7310b1eb5ec07c76c131ba8c60b105ff4aad7a9c. Bind each supported source revision to its emitter ABI hash; reject unsupported revisions and mismatched ABI. Test the new actual emitter through the normal resolver and public installed-wheel verifier without changing producer code or running training/paid compute.
+
+
+- 2026-11-22: In the Vast CNOT panel path, resolve and hash the sealed producer dataset once at preflight, then pass selected roots, search settings and pins through a SHA-bound compact snapshot to world-size 1/2 workers. Include a CPU read-count check. Keep source-to-emitter ABI admission strict, and update the baseline Hamming manifest digest and comparison pins in producer revision fixtures.

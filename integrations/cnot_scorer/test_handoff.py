@@ -247,8 +247,18 @@ class PanelV2HandoffTests(unittest.TestCase):
             "candidate_metrics": {**metrics, "receipt_pins": candidate_pins},
         }
 
+    def _pin_baseline_source_revision(self, revision):
+        baseline = json.loads(self.baseline_search_manifest.read_bytes())
+        baseline["source_revision"] = revision
+        write_json(self.baseline_search_manifest, baseline)
+        self.handoff["baseline_search_manifest"] = {
+            "path": "manifests/baseline-test-hamming.json",
+            "sha256": digest_bytes(self.baseline_search_manifest.read_bytes()),
+        }
+
     def pin_producer_revision(self, revision):
         self.handoff["producer_source_revision"] = revision
+        self._pin_baseline_source_revision(revision)
         self.receipt_source_revision = revision
         self.comparison = self._comparison_fixture()
         self.handoff["locked_test_status"] = self.comparison["status"]
@@ -506,8 +516,11 @@ class PanelV2HandoffTests(unittest.TestCase):
         finally:
             sys.path.remove(str(scripts))
 
-        comparison = copy.deepcopy(self.comparison)
-        comparison["baseline_metrics"]["receipt_pins"]["source_revision"] = expected_sha
+        self.handoff["producer_source_revision"] = expected_sha
+        self._pin_baseline_source_revision(expected_sha)
+        comparison = self._comparison_fixture()
+        self.handoff["locked_test_status"] = comparison["status"]
+        self.handoff["locked_test_comparison_sha256"] = canonical_digest(comparison)
         emitted = producer.build_multigpu_beam_handoff(
             root=self.root,
             source_revision=expected_sha,
