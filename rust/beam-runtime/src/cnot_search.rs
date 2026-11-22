@@ -114,6 +114,19 @@ impl CnotRequest {
         self.wires * (self.wires - 1)
     }
 
+    /// Convert the admitted request into the generic runtime search options.
+    /// The shortlist is already capped to the request's directed-gate alphabet.
+    pub fn search_options(self, rank: u32, world: u32) -> Options {
+        Options {
+            rank,
+            world,
+            width: self.width,
+            shortlist: self.shortlist,
+            alphabet: self.alphabet(),
+            max_depth: self.max_depth,
+        }
+    }
+
     pub fn selected_engine(self) -> SelectedEngine {
         match self.requested_engine {
             RequestedEngine::Python => SelectedEngine::Python,
