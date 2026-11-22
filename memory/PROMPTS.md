@@ -119,3 +119,5 @@ Keep an active goal until the migration and required verification are complete.
 
 
 - 2026-11-22 follow-up: Move CNOT scalar search settings into a Rust-owned `beam_runtime::cnot_search::CnotRequest`, validate them during the existing rank-wide admission phase, and use the typed request for native stage execution without changing CNOT tensors, kernels, scoring, or collective order.
+
+- 2026-11-22 follow-up: Preserve the public scheduler worker for torchrun and Slurm, both `--local-rank` spellings, Python compatibility and explicit Rust rank supervision. Validate the installed wheel outside the checkout; keep the Python default until physical 1/2-GPU parity is accepted.
