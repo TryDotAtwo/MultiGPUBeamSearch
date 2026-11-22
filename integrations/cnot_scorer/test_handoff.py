@@ -51,7 +51,11 @@ class PanelV2HandoffTests(unittest.TestCase):
         records = [
             {
                 "lineage_id": "locked-case-a" if index == 3 else "locked-case-b" if index == 9 else f"other-{index}",
-                "state": {"n": 2, "alphabet_id": "all_to_all_unit_cnot:2", "packed_rows": [1, 2]},
+                "state": {
+                    "n": 2,
+                    "alphabet_id": "all_to_all_unit_cnot:2",
+                    "packed_rows": [1, 3] if index == 3 else [3, 2] if index == 9 else [1, 2],
+                },
             }
             for index in range(10)
         ]
@@ -232,6 +236,11 @@ class PanelV2HandoffTests(unittest.TestCase):
              for root in resolved.panel_roots],
             [(3, "locked-case-a", 2, "row_target_xor_row_control"),
              (9, "locked-case-b", 2, "row_target_xor_row_control")],
+        )
+        self.assertEqual(
+            [root["start_packed_rows"] for root in resolved.panel_roots],
+            [[1, 3], [3, 2]],
+        )
         )
 
     def test_supported_search_geometry_has_exact_v13_frontier_bound(self):
