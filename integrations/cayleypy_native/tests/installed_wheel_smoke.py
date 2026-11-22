@@ -42,6 +42,78 @@ if not hasattr(runtime, "TQPScorer"):
 if not hasattr(runtime, "InferenceCalibration"):
     raise AssertionError("the installed Rust module does not expose InferenceCalibration")
 
+device_resolver = getattr(runtime, "resolve_runtime_devices", None)
+if not callable(device_resolver):
+    raise AssertionError("the installed Rust runtime does not own CUDA device selection")
+device_cases = (
+    (2, None, None, [], [0, 1]),
+    (2, None, None, [("cpu", None)], [0, 1]),
+    (2, None, None, [("cuda", 1)], [1]),
+    (2, None, None, [("cuda", None)], [0]),
+    (2, None, 1, [], [0]),
+    (2, [1], None, [], [1]),
+)
+for visible_count, explicit, requested, graph_devices, expected in device_cases:
+    actual = device_resolver(visible_count, explicit, requested, graph_devices)
+    if actual != expected:
+        raise AssertionError(
+            f"Rust device selection mismatch: {graph_devices!r}, {explicit!r}, "
+            f"{requested!r} returned {actual!r}, expected {expected!r}"
+        )
+try:
+    device_resolver(2, None, 3, [])
+except ValueError as error:
+    if "num_gpus exceeds" not in str(error):
+        raise
+else:
+    raise AssertionError("Rust device selection silently shrank an oversized GPU request")
+
+# Exercise the public Python preparation boundary with the real Rust extension.
+# Python supplies only Torch/CayleyPy observations; making its fallback fail
+# proves the installed route consumed the Rust decision.
+import multigpubeamsearch.backend as device_backend
+import torch
+from types import SimpleNamespace
+
+_original_system = device_backend.platform.system
+_original_available = torch.cuda.is_available
+_original_count = torch.cuda.device_count
+_original_python_resolver = getattr(device_backend, "_resolve_runtime_devices_python", None)
+from multigpubeamsearch import rust_control as device_rust_control
+_original_rust_resolver = device_rust_control.resolve_runtime_devices
+_rank_environment = {
+    key: os.environ.pop(key, None)
+    for key in ("RANK", "LOCAL_RANK", "WORLD_SIZE", "TORCHELASTIC_RUN_ID")
+}
+device_backend.platform.system = lambda: "Linux"
+torch.cuda.is_available = lambda: True
+torch.cuda.device_count = lambda: 2
+device_backend._resolve_runtime_devices_python = lambda *args: (_ for _ in ()).throw(
+    AssertionError("public device selection used the Python policy")
+)
+try:
+    graph = SimpleNamespace(device_config=SimpleNamespace(devices=("cuda:1",)))
+    if device_backend.runtime_devices(graph, NativeOptions()) != (1,):
+        raise AssertionError("public preparation did not use the Rust-selected device")
+
+    # An older extension without the resolver retains the same public behavior.
+    device_rust_control.resolve_runtime_devices = lambda *args: None
+    device_backend._resolve_runtime_devices_python = _original_python_resolver
+    if device_backend.runtime_devices(graph, NativeOptions()) != (1,):
+        raise AssertionError("legacy wheel device-selection fallback changed behavior")
+finally:
+    device_backend.platform.system = _original_system
+    torch.cuda.is_available = _original_available
+    torch.cuda.device_count = _original_count
+    device_rust_control.resolve_runtime_devices = _original_rust_resolver
+    if _original_python_resolver is not None:
+        device_backend._resolve_runtime_devices_python = _original_python_resolver
+    for key, value in _rank_environment.items():
+        if value is not None:
+            os.environ[key] = value
+        else:
+            os.environ.pop(key, None)
+
 module = importlib.import_module("multigpubeamsearch._beam_runtime")
 module_path = assert_installed(module.__file__, "Rust extension")
 package_path = assert_installed(package.__file__, "multigpubeamsearch")
