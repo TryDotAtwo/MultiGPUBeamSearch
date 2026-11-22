@@ -183,6 +183,67 @@ def trace_boundary_worker(rank, rendezvous, output_dir, fail_rank):
         dist.destroy_process_group()
 
 
+
+def ranked_native_entry_worker(rank, rendezvous, output_dir):
+    torch.set_num_threads(1)
+    dist.init_process_group(
+        "gloo",
+        init_method=rendezvous,
+        rank=rank,
+        world_size=2,
+        timeout=timedelta(seconds=30),
+    )
+    try:
+        root = pack_rows(replay_cnot(3, (0, 1)))
+        identity = pack_rows(replay_cnot(3, ()))
+        input_matrix = RUNTIME.prepare_cnot_input(root, 6, 6, 3, "qhat")
+        admitted_rank = 1 if rank == 0 else rank
+        with World("cpu") as world:
+            try:
+                RUNTIME.run_cnot_native(
+                    world,
+                    root,
+                    identity,
+                    input_matrix,
+                    FlatScorer(),
+                    "qhat",
+                    False,
+                    6,
+                    6,
+                    6,
+                    3,
+                    None,
+                    admitted_rank,
+                    2,
+                )
+            except RuntimeError as error:
+                collective_error = str(error)
+            else:
+                raise AssertionError("mismatched admitted rank reached the CNOT search")
+
+            result = public_search()
+            if (
+                result.status != "solved"
+                or replay_cnot(3, result.gates) != replay_cnot(3, (0, 1))
+            ):
+                raise AssertionError(f"rank topology failure prevented recovery: {result!r}")
+
+        Path(output_dir, f"rank-{rank}.json").write_text(
+            json.dumps(
+                {
+                    "rank": rank,
+                    "collective_error": collective_error,
+                    "recovery": "passed",
+                    "status": result.status,
+                    "gates": list(result.gates),
+                },
+                sort_keys=True,
+            ),
+            encoding="utf-8",
+        )
+    finally:
+        dist.destroy_process_group()
+
 def main():
     with tempfile.TemporaryDirectory(prefix="mgbs-cnot-phases-") as temporary:
         root = Path(temporary)
@@ -256,6 +317,39 @@ def main():
                 for row in reports
             ):
                 raise AssertionError(f"trace boundary did not recover: {reports!r}")
+
+        binding_dir = root / "ranked-native-entry"
+        binding_dir.mkdir()
+        rendezvous = (binding_dir / "rendezvous").resolve().as_uri()
+        mp.spawn(
+            ranked_native_entry_worker,
+            args=(rendezvous, str(binding_dir)),
+            nprocs=2,
+            join=True,
+        )
+        binding_reports = [
+            json.loads((binding_dir / f"rank-{rank}.json").read_text())
+            for rank in range(2)
+        ]
+        if binding_reports[0]["collective_error"] != binding_reports[1]["collective_error"]:
+            raise AssertionError(
+                f"ranks disagreed on admitted CNOT rank topology: {binding_reports!r}"
+            )
+        expected = (
+            "bind admitted CNOT rank topology failed: rank 0: RuntimeError: "
+            "admitted CNOT rank topology"
+        )
+        if expected not in binding_reports[0]["collective_error"]:
+            raise AssertionError(
+                f"wrong admitted topology failure phase: {binding_reports!r}"
+            )
+        if any(
+            row["recovery"] != "passed"
+            or row["status"] != "solved"
+            or replay_cnot(3, tuple(row["gates"])) != replay_cnot(3, (0, 1))
+            for row in binding_reports
+        ):
+            raise AssertionError(f"rank topology vote did not recover: {binding_reports!r}")
 
     print("CNOT_GLOO_REAL_PHASE_AND_TRACE_BOUNDARIES_OK")
 
