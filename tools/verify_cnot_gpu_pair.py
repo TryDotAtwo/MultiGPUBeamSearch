@@ -448,8 +448,40 @@ def expected_panel_adapter_provenance():
     }
 
 
+def _validate_panel_scorer_metadata(report, preflight, panel_scorer_library_sha):
+    metadata_rows = report.get("scorer_metadata")
+    expected_dimensions = {root["dimension"] for root in preflight["root_pins"]}
+    require(
+        isinstance(metadata_rows, list)
+        and {row.get("dimension") for row in metadata_rows if isinstance(row, dict)} == expected_dimensions,
+        "panel result does not expose metadata from each loaded scorer dimension",
+    )
+    provenance = expected_panel_adapter_provenance()
+    for row in metadata_rows:
+        metadata = row.get("metadata")
+        require(isinstance(metadata, dict),
+                "panel result has no metadata from the loaded scorer library")
+        expected = {
+            "scorer_contract": "panel_search_v2",
+            "upstream_commit": provenance["native_adapter_source_commit"],
+            "panel": "test",
+            "panel_digest": preflight["panel_digest"],
+            "checkpoint_sha256": preflight["checkpoint_sha256"],
+            "search_manifest_sha256": preflight["search_manifest_sha256"],
+            "training_manifest_sha256": preflight["training_manifest_sha256"],
+            "training_result_sha256": preflight["training_result_sha256"],
+            "scorer_output_dtype": "float32",
+            "dimension": row["dimension"],
+        }
+        require(all(metadata.get(key) == value for key, value in expected.items()),
+                "loaded panel scorer metadata differs from its pinned panel-v2 contract")
+        require(isinstance(metadata.get("feature_registry_sha256"), str)
+                and SHA64.fullmatch(metadata["feature_registry_sha256"]),
+                "loaded panel scorer feature registry SHA-256 is missing or malformed")
+
+
 def validate_panel_gpu_pair(panel_result_dir, handoff_preflight_path, *,
-                            source_sha, wheel_sha, scorer_library_sha, run_id):
+                            source_sha, wheel_sha, panel_scorer_library_sha, run_id):
     """Bind 1/2-rank MGBS search results to the producer's locked test receipt."""
     preflight = load_json(handoff_preflight_path)
     require(isinstance(preflight, dict)
@@ -586,8 +618,9 @@ def validate_panel_gpu_pair(panel_result_dir, handoff_preflight_path, *,
             report.get("adapter") == expected_panel_adapter_provenance(),
             f"{path.name}: native adapter or endpoint source SHA differs from this consumer",
         )
+        _validate_panel_scorer_metadata(report, preflight, panel_scorer_library_sha)
         require(
-            report.get("scorer_library_sha256") == scorer_library_sha
+            report.get("scorer_library_sha256") == panel_scorer_library_sha
             and isinstance(acceptance, dict)
             and acceptance.get("schema") == "org.trydotatwo.multigpubeamsearch.cnot.acceptance"
             and acceptance.get("run_id") == run_id
@@ -616,6 +649,7 @@ def validate_panel_gpu_pair(panel_result_dir, handoff_preflight_path, *,
             and event_receipt.get("source_sha") == source_sha
             and event_receipt.get("wheel_sha256") == wheel_sha
             and event_receipt.get("world") == expected_world
+            and event_receipt.get("scorer_library_sha256") == panel_scorer_library_sha
             and event_receipt.get("report_sha256") == digest
             and acceptance.get("report_sha256") == digest
             and event_receipt.get("single_rank_transport") == (expected_world == 1),
@@ -678,6 +712,8 @@ def validate_panel_gpu_pair(panel_result_dir, handoff_preflight_path, *,
     return {
         "status": "accepted",
         "panel": "test",
+        "scorer_contract": "panel_search_v2",
+        "scorer_library_sha256": panel_scorer_library_sha,
         "locked_test_status": preflight["locked_test_status"],
         "locked_test_comparison_sha256": preflight["locked_test_comparison_sha256"],
         "checkpoint_sha256": preflight["checkpoint_sha256"],
@@ -696,7 +732,8 @@ def validate_panel_gpu_pair(panel_result_dir, handoff_preflight_path, *,
         "strict_backend_receipts": backend_event_receipts,
     }
 def validate(result_dir, source_sha, instance_id, manifest_sha, checkpoint_sha,
-             scorer_library_sha, wheel_sha, run_id, panel_result_dir, handoff_preflight_path):
+             scorer_library_sha, panel_scorer_library_sha, wheel_sha, run_id,
+             panel_result_dir, handoff_preflight_path):
     require(validate_instance_id(str(instance_id)) == str(instance_id),
             "receipt requires the explicitly selected new positive-decimal instance ID")
     root = Path(result_dir)
@@ -705,7 +742,7 @@ def validate(result_dir, source_sha, instance_id, manifest_sha, checkpoint_sha,
         handoff_preflight_path,
         source_sha=source_sha,
         wheel_sha=wheel_sha,
-        scorer_library_sha=scorer_library_sha,
+        panel_scorer_library_sha=panel_scorer_library_sha,
         run_id=run_id,
     )
     paired_names = (
@@ -840,6 +877,7 @@ def validate(result_dir, source_sha, instance_id, manifest_sha, checkpoint_sha,
         "checkpoint_sha256": checkpoint_sha,
         "manifest_sha256": manifest_sha,
         "scorer_library_sha256": scorer_library_sha,
+        "panel_scorer_library_sha256": panel_scorer_library_sha,
         "upstream_commit": left["model"].get("upstream_commit"),
         "paired_cnot_survivor_hashes_match": True,
         "paired_locked_test_panel": panel_verdict,
@@ -876,7 +914,10 @@ def main(argv=None):
     parser.add_argument("--instance-id", required=True)
     parser.add_argument("--manifest-sha256", required=True)
     parser.add_argument("--checkpoint-sha256", required=True)
-    parser.add_argument("--scorer-library-sha256", required=True)
+    parser.add_argument("--scorer-library-sha256", required=True,
+                        help="GL4 dev_v1 scorer library SHA-256")
+    parser.add_argument("--panel-scorer-library-sha256", required=True,
+                        help="panel-v2 scorer library SHA-256")
     parser.add_argument("--wheel-sha256", required=True)
     parser.add_argument("--run-id", required=True)
     parser.add_argument("--panel-result-dir", type=Path, required=True)
@@ -885,12 +926,14 @@ def main(argv=None):
     try:
         if not SHA40.fullmatch(args.source_sha):
             raise ValueError("source SHA must be a 40-character lowercase hexadecimal ID")
-        for name in ("manifest_sha256", "checkpoint_sha256", "scorer_library_sha256", "wheel_sha256"):
+        for name in ("manifest_sha256", "checkpoint_sha256", "scorer_library_sha256",
+                     "panel_scorer_library_sha256", "wheel_sha256"):
             if not SHA64.fullmatch(getattr(args, name)):
                 raise ValueError(f"{name} must be a 64-character lowercase SHA-256")
         receipt = validate(
             args.result_dir, args.source_sha, args.instance_id, args.manifest_sha256,
-            args.checkpoint_sha256, args.scorer_library_sha256, args.wheel_sha256,
+            args.checkpoint_sha256, args.scorer_library_sha256,
+            args.panel_scorer_library_sha256, args.wheel_sha256,
             args.run_id, args.panel_result_dir, args.handoff_preflight,
         )
     except (OSError, json.JSONDecodeError, ValueError) as error:

@@ -73,6 +73,7 @@ impl Scorer {
             .map(|spec| spec.id.to_string())
             .collect();
         let metadata = json!({
+            "scorer_contract": "dev_v1",
             "upstream_commit": "c5b3e3f93b45aa7e533fd2c06209c28ce516ffeb",
             "checkpoint_sha256": restored.receipt.sha256,
             "feature_registry_sha256": restored.field.registry.contract_sha256(),

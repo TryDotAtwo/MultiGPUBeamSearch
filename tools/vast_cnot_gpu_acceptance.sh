@@ -37,6 +37,19 @@ PY
 upstream=/private/TheQuantumProject
 manifest=/private/gl4/search-qhat.json
 expected_upstream=c5b3e3f93b45aa7e533fd2c06209c28ce516ffeb
+panel_source_commit="$("$python_bin" - "$source_dir/integrations/cnot_scorer/build.py" <<'PY'
+from pathlib import Path
+import re
+import sys
+match = re.search(r'^PANEL_SEARCH_V2_SOURCE_COMMIT = "([0-9a-f]{40})"$',
+                  Path(sys.argv[1]).read_text(encoding="utf-8"), flags=re.MULTILINE)
+if match is None:
+    raise SystemExit("panel-v2 scorer source pin is missing")
+print(match.group(1))
+PY
+)"
+[[ "$panel_source_commit" != "$expected_upstream" ]]
+git -C "$upstream" cat-file -e "${panel_source_commit}^{commit}"
 expected_checkpoint="$checkpoint_sha"
 [[ "$(git -C "$upstream" rev-parse HEAD)" == "$expected_upstream" ]]
 [[ -s "$manifest" ]]
@@ -177,18 +190,28 @@ print("INSTALLED_WHEEL_CUTLASS_OFFLINE_RECHECK=" + str(options.cutlass_dir))
 PY
 GITHUB_WORKSPACE="$source_dir" "$wheel_python" "$source_dir/integrations/cayleypy_native/tests/installed_wheel_smoke.py"
 
-scorer_build="${run_root}/private-cnot-scorer"
-"$python_bin" "$source_dir/integrations/cnot_scorer/build.py" --source "$upstream" --build-dir "$scorer_build"
-scorer_library="${scorer_build}/target/release/libcnot103_native.so"
+dev_scorer_build="${run_root}/private-cnot-scorer-dev-v1"
+"$python_bin" "$source_dir/integrations/cnot_scorer/build.py" --source "$upstream" --build-dir "$dev_scorer_build" --contract dev_v1
+scorer_library="${dev_scorer_build}/target/release/libcnot103_native.so"
 test -s "$scorer_library"
 scorer_sha256="$(sha256sum "$scorer_library" | awk '{print $1}')"
-python3 - "$result_dir/receipt.json" "$scorer_sha256" <<'PY'
+
+panel_scorer_build="${run_root}/private-cnot-scorer-panel-v2"
+"$python_bin" "$source_dir/integrations/cnot_scorer/build.py" --source "$upstream" --build-dir "$panel_scorer_build" --contract panel_search_v2
+panel_scorer_library="${panel_scorer_build}/target/release/libcnot103_native.so"
+test -s "$panel_scorer_library"
+panel_scorer_sha256="$(sha256sum "$panel_scorer_library" | awk '{print $1}')"
+[[ "$panel_scorer_sha256" != "$scorer_sha256" ]]
+
+python3 - "$result_dir/receipt.json" "$scorer_sha256" "$panel_scorer_sha256" <<'PY'
 import json, pathlib, sys
 receipt_path = pathlib.Path(sys.argv[1])
 receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
 receipt["scorer_library_sha256"] = sys.argv[2]
+receipt["panel_scorer_library_sha256"] = sys.argv[3]
 receipt_path.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 PY
+
 domain_build="${run_root}/cnot-owned-domain-build"
 cmake -S "$source_dir" -B "$domain_build" -DCMAKE_BUILD_TYPE=Release -DBEAM_CNOT_OWNED_DOMAIN_ONLY=ON -DBEAM_CUDA_ARCHITECTURES=86
 cmake --build "$domain_build" --target beam_cnot_owned_domain --parallel 2
@@ -213,8 +236,12 @@ run_trained_case() {
   local case_id="$1" visible_devices="$2" nproc="$3" gpu_uuid_list="$4"
   shift 4
   local case_log="${result_dir}/${case_id}.log"
-  if CUDA_VISIBLE_DEVICES="$visible_devices" \
-    MGBS_CNOT_STRICT_BACKEND=1 \
+  local -a scorer_environment=()
+  mapfile -d '' -t scorer_environment < <(
+    mgbs_vast_cnot_scorer_environment dev_v1 "$scorer_library" "$panel_scorer_library" "$scorer_sha256" "$panel_scorer_sha256"
+  )
+  if env CUDA_VISIBLE_DEVICES="$visible_devices" \
+    "${scorer_environment[@]}" \
     MGBS_CNOT_EXPECTED_CHECKPOINT_SHA256="$expected_checkpoint_sha" \
     MGBS_CNOT_EXPECTED_SEARCH_MANIFEST_SHA256="$manifest_sha" \
     MGBS_CNOT_ACCEPTANCE_RUN_ID="$acceptance_run_id" \
@@ -234,13 +261,17 @@ run_trained_case() {
 run_panel_case() {
   local case_id="$1" visible_devices="$2" nproc="$3" gpu_uuid_list="$4"
   local case_log="${panel_result_dir}/${case_id}.log"
-  local -a panel_args=()
+  local -a panel_args=() scorer_environment=()
+  mapfile -d '' -t scorer_environment < <(
+    mgbs_vast_cnot_scorer_environment panel_search_v2 "$scorer_library" "$panel_scorer_library" "$scorer_sha256" "$panel_scorer_sha256"
+  )
   mapfile -d '' -t panel_args < <(
     mgbs_vast_cnot_panel_cli_args "${handoff_run_root}" \
-      "${panel_result_dir}/${case_id}.json" "${scorer_library}" \
+      "${panel_result_dir}/${case_id}.json" "${panel_scorer_library}" \
       "${handoff_preflight}" "${handoff_preflight_sha}"
   )
-  if CUDA_VISIBLE_DEVICES="${visible_devices}" \
+  if env CUDA_VISIBLE_DEVICES="${visible_devices}" \
+    "${scorer_environment[@]}" \
     MGBS_TQP_MANIFEST="${panel_manifest}" \
     MGBS_CNOT_EXPECTED_CHECKPOINT_SHA256="${panel_checkpoint_sha}" \
     MGBS_CNOT_EXPECTED_SEARCH_MANIFEST_SHA256="${panel_manifest_sha}" \
@@ -291,12 +322,13 @@ for case_id in cnot-panel-test-qhat-1-gpu cnot-panel-test-qhat-2-gpu; do
     --expected-source-sha "$source_sha" --expected-wheel-sha256 "$wheel_sha256" \
     --expected-checkpoint-sha256 "$panel_checkpoint_sha" \
     --expected-manifest-sha256 "$panel_manifest_sha" \
-    --expected-scorer-library-sha256 "$scorer_sha256" \
+    --expected-scorer-library-sha256 "$panel_scorer_sha256" \
     > "${panel_result_dir}/backend-events/${case_id}.json"
 done
 "$python_bin" "$source_dir/tools/verify_cnot_gpu_pair.py" \
   --result-dir "$result_dir" --source-sha "$source_sha" --instance-id "$instance_id" \
   --manifest-sha256 "$manifest_sha" --checkpoint-sha256 "$expected_checkpoint" \
-  --scorer-library-sha256 "$scorer_sha256" --wheel-sha256 "$wheel_sha256" \
+  --scorer-library-sha256 "$scorer_sha256" \
+  --panel-scorer-library-sha256 "$panel_scorer_sha256" --wheel-sha256 "$wheel_sha256" \
   --run-id "$acceptance_run_id" \
   --panel-result-dir "$panel_result_dir" --handoff-preflight "$handoff_preflight"

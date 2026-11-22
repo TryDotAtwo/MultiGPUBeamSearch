@@ -1,3 +1,20 @@
+## CNOT scorer contract selection — 2026-11-22
+
+The acceptance launcher builds two separate Rust scorer libraries: the historical
+GL4 `dev_v1` adapter and the sealed panel `panel_search_v2` adapter from its
+own pinned upstream commit. The shared launcher helper selects the library and
+its SHA-256 by contract and enables strict Rust admission for both paths.
+
+For the panel, `verify_cnot.py` records metadata returned by the loaded scorer
+for every dimension. The report aggregator checks the panel contract, upstream
+adapter pin, checkpoint and manifest, training pins, dtype, feature registry,
+and the launcher-bound panel library digest. It also requires the strict event
+receipt to match that report. This proves the selected loaded scorer contract
+and binds the invocation to the built artifact digest; it does not constitute
+physical CUDA/NCCL acceptance. The installed-wheel workflow reuses one built wheel and records panel endpoint
+and inference-policy outcomes independently. Hosted checks for the implementation
+revision are pending; physical acceptance remains unverified.
+
 
 ## CNOT Gloo lifecycle receipts — 2026-11-22
 

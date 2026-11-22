@@ -235,6 +235,7 @@ class AcceptanceEventProtocolTest(unittest.TestCase):
                     expected_scorer_library_sha256=SCORER_SHA,
                 )
                 self.assertEqual(receipt["world"], world)
+                self.assertEqual(receipt["scorer_library_sha256"], SCORER_SHA)
                 self.assertEqual(receipt["single_rank_transport"], world == 1)
 
     def test_panel_report_binds_top_level_pins_without_a_smoke_model_object(self):

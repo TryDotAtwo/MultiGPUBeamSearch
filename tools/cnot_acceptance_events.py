@@ -373,6 +373,7 @@ def validate_case(trace_text: str, receipt_root, report: dict, *, expected_sourc
         "source_sha": expected_source_sha,
         "wheel_sha256": expected_wheel_sha256,
         "world": world,
+        "scorer_library_sha256": expected_scorer_library_sha256,
         "report_sha256": validated_report_sha256,
         "rank_devices": [
             {

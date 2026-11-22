@@ -357,7 +357,6 @@ def _write_panel_result(directory: Path, world: int):
                 "panel_digest": "b" * 64,
                 "checkpoint_sha256": CHECKPOINT_SHA,
                 "search_manifest_sha256": MANIFEST_SHA,
-                "scorer_library_sha256": PANEL_SCORER_SHA,
                 "feature_registry_sha256": "1" * 64,
                 "training_manifest_sha256": TRAINING_MANIFEST_SHA,
                 "training_result_sha256": TRAINING_RESULT_SHA,
@@ -424,6 +423,7 @@ def _write_panel_result(directory: Path, world: int):
         "source_sha": SOURCE_SHA,
         "wheel_sha256": WHEEL_SHA,
         "world": world,
+        "scorer_library_sha256": PANEL_SCORER_SHA,
         "report_sha256": report["acceptance"]["report_sha256"],
         "rank_devices": report["devices"],
         "single_rank_transport": world == 1,
@@ -458,6 +458,7 @@ def _validate(root: Path, instance_id="987654321"):
         MANIFEST_SHA,
         CHECKPOINT_SHA,
         SCORER_SHA,
+        PANEL_SCORER_SHA,
         WHEEL_SHA,
         RUN_ID,
         root / "panel",
@@ -494,7 +495,7 @@ class VerifyCnotGpuPairTests(unittest.TestCase):
                 if mutation == "contract":
                     metadata["scorer_contract"] = "dev_v1"
                 elif mutation == "library_hash":
-                    metadata["scorer_library_sha256"] = SCORER_SHA
+                    report["scorer_library_sha256"] = SCORER_SHA
                 else:
                     metadata["upstream_commit"] = "c" * 40
                 report["acceptance"]["report_sha256"] = protocol.report_sha256(report)

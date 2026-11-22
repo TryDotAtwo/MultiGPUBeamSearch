@@ -1,3 +1,10 @@
+## 2026-11-22 - Separate GL4 and panel-v2 scorer contracts
+
+- The Vast acceptance runner builds GL4 with the pinned `dev_v1` provider and the sealed panel with `panel_search_v2` from its separate pinned upstream revision. Each search receives its matching library, strict Rust admission, and launcher-bound library SHA-256.
+- The installed panel result reports metadata returned by the loaded Rust scorer (contract, upstream revision, panel and checkpoint/search pins, dtype and feature registry). The aggregator verifies that metadata against the sealed handoff and binds each report and backend receipt to the separately pinned panel library SHA.
+- The installed-wheel job builds and installs the wheel once, then runs the panel endpoint and inference-policy checks as separate outcomes so one endpoint failure does not suppress the other.
+- The hosted CPU source and installed-wheel checks are running on this source revision. The preceding RED on `03947b570391a86ada898540c5915802f8aae77b` reproduced the panel library-selection and scorer-SHA receipt failures. No physical or paid run was performed.
+
 ## 2026-11-22 - Reuse panel-v2 producer checks by exact inputs
 
 - The required producer-compatibility status runs on every PR update. It reuses the latest full check for the same adapter, fixture, producer pins and runner environment on this PR or its own branch. A fresh build runs the cheap CPU contracts before installing Torch and compiling the adapter.

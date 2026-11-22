@@ -622,7 +622,19 @@ def _panel_result_row(panel_root, result, wall_seconds):
 def _search_handoff_panel(args, resolved, device, world, *, scorer_factory):
     expansion_bound = resolved.expansion_upper_bound
     provenance = _adapter_provenance()
-    scorer_library_sha256 = hashlib.sha256(Path(args.library).read_bytes()).hexdigest()
+    def bind_scorer_library_identity():
+        expected_sha256 = os.environ.get("MGBS_CNOT_EXPECTED_TQP_LIBRARY_SHA256")
+        if expected_sha256 is not None:
+            if re.fullmatch(r"[0-9a-f]{64}", expected_sha256) is None:
+                raise ValueError("expected scorer library SHA-256 is malformed")
+            return expected_sha256
+        if os.environ.get("MGBS_CNOT_ACCEPTANCE_RUN_ID"):
+            raise ValueError("strict acceptance requires the launcher's pinned scorer library SHA-256")
+        return hashlib.sha256(Path(args.library).read_bytes()).hexdigest()
+
+    scorer_library_sha256 = world.checked(
+        "bind CNOT scorer library identity", bind_scorer_library_identity
+    )
     identity = {
         "producer_source_revision": resolved.producer_source_revision,
         "producer_emitter_sha256": resolved.producer_emitter_sha256,
@@ -647,7 +659,7 @@ def _search_handoff_panel(args, resolved, device, world, *, scorer_factory):
     world.require_engine_consensus(list(consensus))
 
     construct_scorer = TQPScorer if scorer_factory is None else scorer_factory
-    result_rows, scorers = [], {}
+    result_rows, scorers, scorer_metadata = [], {}, {}
     with ExitStack() as stack:
         for panel_root in resolved.panel_roots:
             n = panel_root["dimension"]
@@ -660,6 +672,40 @@ def _search_handoff_panel(args, resolved, device, world, *, scorer_factory):
                     ),
                 )
                 scorer = stack.enter_context(context)
+
+                def load_native_metadata():
+                    raw = getattr(scorer, "metadata", None)
+                    if raw is None:
+                        if args.require_rust_scorer and scorer_factory is None:
+                            raise RuntimeError("Rust panel scorer did not expose loaded library metadata")
+                        return None
+                    if not isinstance(raw, dict):
+                        raise TypeError("Rust panel scorer metadata must be a mapping")
+                    metadata = dict(raw)
+                    if args.require_rust_scorer and scorer_factory is None:
+                        expected = {
+                            "scorer_contract": "panel_search_v2",
+                            "upstream_commit": provenance["native_adapter_source_commit"],
+                            "panel": "test",
+                            "panel_digest": resolved.panel_digest,
+                            "checkpoint_sha256": resolved.checkpoint_sha256,
+                            "search_manifest_sha256": resolved.search_manifest_sha256,
+                            "training_manifest_sha256": resolved.training_manifest_sha256,
+                            "training_result_sha256": resolved.training_result_sha256,
+                            "scorer_output_dtype": "float32",
+                            "dimension": n,
+                        }
+                        for key, value in expected.items():
+                            require(metadata.get(key) == value,
+                                    f"loaded panel scorer metadata differs at {key}")
+                        require(re.fullmatch(
+                            r"[0-9a-f]{64}", str(metadata.get("feature_registry_sha256", ""))
+                        ) is not None, "loaded panel scorer feature registry SHA-256 is malformed")
+                    return metadata
+
+                scorer_metadata[n] = world.checked(
+                    "validate loaded CNOT panel scorer contract", load_native_metadata
+                )
                 if args.require_rust_scorer and scorer_factory is None:
                     def verify_native_type():
                         from multigpubeamsearch.cnot_scorer import _rust_tqp_scorer
@@ -717,6 +763,10 @@ def _search_handoff_panel(args, resolved, device, world, *, scorer_factory):
         "status": "completed",
         "engine": "rust",
         "scorer_library_sha256": scorer_library_sha256,
+        "scorer_metadata": [
+            {"dimension": dimension, "metadata": scorer_metadata[dimension]}
+            for dimension in sorted(scorer_metadata) if scorer_metadata[dimension] is not None
+        ],
         "locked_test_status": resolved.locked_test_status,
         "locked_test_comparison_sha256": resolved.locked_test_comparison_sha256,
         "rows": result_rows if world.rank == 0 else None,

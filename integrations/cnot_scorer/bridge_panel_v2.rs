@@ -101,6 +101,7 @@ impl Scorer {
             .map(|spec| spec.id.to_string())
             .collect();
         let metadata = json!({
+            "scorer_contract": "panel_search_v2",
             "upstream_commit": "e17953891a36e3e3ae8b038695bfac8548ab784f",
             "panel": spec.panel,
             "panel_digest": spec.panel_digest,

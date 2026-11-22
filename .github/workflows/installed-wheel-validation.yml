@@ -114,6 +114,7 @@ jobs:
           cd "$RUNNER_TEMP/mgbs-wheel-smoke"
           env -u PYTHONPATH python "$GITHUB_WORKSPACE/tools/test_vast_cnot_panel_cli_args.py" -v
       - uses: actions/checkout@v4
+        id: cnot_emitter_checkout
         with:
           repository: TryDotAtwo/cnot-neural-synth-frontier6
           ref: 42ed72f587ab70fc74a85cf0a25001efb29cb994
@@ -121,11 +122,13 @@ jobs:
           fetch-depth: 1
           persist-credentials: false
       - name: Count full dataset reads at the CNOT handoff boundary
+        if: always()
         id: cnot_handoff_snapshot_reads
         run: |
           set -euo pipefail
           python3 "$GITHUB_WORKSPACE/tools/test_cnot_panel_snapshot.py"
       - name: Verify receipt-driven CNOT panel endpoint with the installed CPU wheel
+        if: always() && steps.wheel_smoke.outcome == 'success' && steps.cnot_emitter_checkout.outcome == 'success' && steps.cnot_handoff_snapshot_reads.outcome == 'success'
         id: cnot_handoff_endpoint
         env:
           CNOT103_PRODUCER_CHECKOUT: ${{ github.workspace }}/cnot-emitter
@@ -142,6 +145,7 @@ jobs:
             exit "$status"
           fi
       - name: Verify inference backend policy in the installed wheel
+        if: always() && steps.wheel_smoke.outcome == 'success'
         id: inference_backend_policy
         run: |
           set -o pipefail
@@ -149,6 +153,7 @@ jobs:
           env -u PYTHONPATH python "$GITHUB_WORKSPACE/integrations/cayleypy_native/tests/installed_inference_backend_policy.py" \
             > "${RUNNER_TEMP}/mgbs-private-inference-backend-policy.log" 2>&1
       - name: Verify Rust inference backend policy
+        if: always()
         id: rust_inference_backend_runtime
         run: |
           set -o pipefail
