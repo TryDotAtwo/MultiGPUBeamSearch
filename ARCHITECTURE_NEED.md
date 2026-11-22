@@ -2,6 +2,12 @@
 
 The public CNOT entry point obtains its runtime route from typed `beam-runtime` policy. The capability snapshot is rank-agreed before selection. The policy selects the Rust controller, the Rust controller with compatibility stages, or the Python reference path; strict acceptance requires the complete Rust controller/stage/transport capability set and fails closed. Older extension builds retain their ordinary compatibility path. This does not yet move PyTorch's Gloo control-group object out of the Python adapter; that lifecycle remains an open migration boundary. Search order, score semantics and kernels are unchanged.
 
+## Typed CNOT request to runtime search options — 2026-11-22
+
+After the existing collective input-admission vote, the Rust controller keeps one validated `CnotRequest`. Its `search_options(rank, world)` conversion supplies the generic `beam-runtime::cnot_search::search` with the normalized global width, directed-gate alphabet, alphabet-capped shortlist and depth. The Rust compatibility-stage branch uses this conversion directly. The existing `run_cnot` PyO3 signature remains as a compatibility adapter. Search order, scoring, tensors, kernels and collective sequence are unchanged.
+
+The hosted RED fixture at `c383aa9` confirmed that the runtime conversion was absent. The exact green source SHA `c63937944b7752227982b388ee075be26e89c055` passed Rust CNOT CPU/Gloo [run 44976811410](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44976811410), installed wheel [run 44976811495](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44976811495), hosted harness [run 44976811467](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44976811467), and panel-v2 CPU compile/handoff [run 44976815210](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44976815210). Physical CUDA/NCCL execution remains unverified.
+
 # Конфиг
 
 ## Paired permutation acceptance receipt contract, 2026-11-22
