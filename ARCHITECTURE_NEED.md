@@ -1,3 +1,7 @@
+## Rust-owned permutation CUDA device admission — 2026-11-22
+
+The public permutation preparation path now sends the observed CUDA availability and normalized device request to one versioned `beam-runtime` plan. Rust rejects a missing CUDA runtime and resolves the same explicit, `num_gpus`, or graph-derived process-local indices; Python keeps the Linux/torchrun boundary checks, collects Torch facts, and retains the prior device selection for wheels without this API. No device binding, worker launch, search order, kernel, or numerical behavior changes.
+
 ## Current migration priority — 2026-11-22
 
 The active implementation phase prioritizes the public permutation beam-search path through Rust preparation and launch while preserving the existing CUDA/C++ kernels, multi-GPU execution, numerical policy, Python/Kaggle interfaces, CLI, torchrun and Slurm. CNOT implementation and compatibility remain in the branch; further CNOT changes, private checkpoint preparation and CNOT-specific physical acceptance are deferred at the user's request. Permutation CUDA/NCCL acceptance on one and two physical GPUs remains its own required gate.

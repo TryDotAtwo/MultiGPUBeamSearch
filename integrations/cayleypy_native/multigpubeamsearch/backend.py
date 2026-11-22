@@ -322,15 +322,25 @@ def runtime_devices(graph, options) -> tuple[int, ...]:
     if any(key in os.environ for key in ("RANK", "LOCAL_RANK", "WORLD_SIZE", "TORCHELASTIC_RUN_ID")):
         raise NativeUnavailable("native adapter cannot be invoked inside an existing torchrun rank")
     import torch
-    if not torch.cuda.is_available():
-        raise NativeUnavailable("native beam requires available CUDA devices")
-    visible_device_count = torch.cuda.device_count()
+    cuda_available = torch.cuda.is_available()
+    visible_device_count = torch.cuda.device_count() if cuda_available else 0
     graph_devices = (
         _graph_device_observations(graph, torch)
-        if options.devices is None and options.num_gpus is None
+        if cuda_available and options.devices is None and options.num_gpus is None
         else ()
     )
-    from .rust_control import resolve_runtime_devices
+    from .rust_control import resolve_runtime_device_plan, resolve_runtime_devices
+    selected = resolve_runtime_device_plan(
+        cuda_available,
+        visible_device_count,
+        options.devices,
+        options.num_gpus,
+        graph_devices,
+    )
+    if selected is not None:
+        return selected
+    if not cuda_available:
+        raise NativeUnavailable("native beam requires available CUDA devices")
     selected = resolve_runtime_devices(
         visible_device_count,
         options.devices,

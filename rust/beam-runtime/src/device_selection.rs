@@ -78,9 +78,30 @@ pub fn resolve(
     Ok(devices)
 }
 
+/// Check the runtime CUDA prerequisite and resolve the selected process-local devices.
+pub fn resolve_runtime_plan(
+    cuda_available: bool,
+    visible_device_count: u32,
+    explicit_devices: Option<Vec<i64>>,
+    num_gpus: Option<i64>,
+    graph_devices: Vec<DeviceObservation>,
+) -> Result<Vec<u32>> {
+    if !cuda_available {
+        return Err(Error::Message(
+            "native beam requires available CUDA devices".into(),
+        ));
+    }
+    resolve(
+        visible_device_count,
+        explicit_devices,
+        num_gpus,
+        graph_devices,
+    )
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{resolve, DeviceObservation};
+    use super::{resolve, resolve_runtime_plan, DeviceObservation};
 
     fn device(kind: &str, index: Option<i64>) -> DeviceObservation {
         DeviceObservation {
@@ -129,4 +150,16 @@ mod tests {
         let selected = resolve(129, None, Some(129), vec![]).unwrap_err();
         assert!(selected.to_string().contains("at most 128"));
     }
+    #[test]
+    fn runtime_plan_checks_cuda_before_device_selection() {
+        assert_eq!(
+            resolve_runtime_plan(true, 3, Some(vec![2, 0]), None, vec![]).unwrap(),
+            vec![2, 0]
+        );
+        let error = resolve_runtime_plan(false, 0, Some(vec![-1]), None, vec![])
+            .unwrap_err()
+            .to_string();
+        assert_eq!(error, "native beam requires available CUDA devices");
+    }
+
 }

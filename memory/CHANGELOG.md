@@ -1,3 +1,9 @@
+## 2026-11-22 - Resolve permutation CUDA availability and device selection in Rust
+
+- Added a versioned runtime plan that rejects unavailable CUDA before selecting process-local device indices, preserving existing explicit, `num_gpus`, graph-placement, and error rules.
+- Routed the public permutation preparation helper through that plan. Kept Linux/torchrun checks and old-wheel compatibility in place.
+- Added installed-wheel coverage for the real public Rust plan, compatibility fallback, and CUDA-unavailable short-circuit.
+
 ## 2026-11-22 - Test child CUDA mapping at its public boundary
 
 - Kept the installed-wheel CUDA visibility test focused on the direct mapping helper now that the public child launcher uses the combined Rust child-environment plan.

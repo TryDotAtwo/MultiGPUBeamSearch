@@ -386,3 +386,54 @@ def test_installed_rust_child_environment_controls_public_child_setup_and_fallba
         backend.child_environment((1,), Path("/invalid"), {
             "CUDA_VISIBLE_DEVICES": "GPU-a,-1",
         })
+
+
+def test_installed_rust_runtime_device_plan_controls_public_selection_and_fallback(monkeypatch):
+    from types import SimpleNamespace
+    import torch
+    from multigpubeamsearch import backend, rust_control
+
+    for name in ("RANK", "LOCAL_RANK", "WORLD_SIZE", "TORCHELASTIC_RUN_ID"):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setattr(backend.platform, "system", lambda: "Linux")
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
+    monkeypatch.setattr(torch.cuda, "device_count", lambda: 3)
+
+    native_resolver = rust_control.resolve_runtime_device_plan
+    observed = []
+
+    def observe(cuda_available, visible_count, explicit, num_gpus, graph_devices):
+        observed.append((cuda_available, visible_count, explicit, num_gpus, graph_devices))
+        return native_resolver(cuda_available, visible_count, explicit, num_gpus, graph_devices)
+
+    def forbidden(*_args, **_kwargs):
+        pytest.fail("public runtime device selection bypassed the Rust plan")
+
+    monkeypatch.setattr(rust_control, "resolve_runtime_device_plan", observe)
+    monkeypatch.setattr(rust_control, "resolve_runtime_devices", forbidden)
+    monkeypatch.setattr(backend, "_resolve_runtime_devices_python", forbidden)
+    options = SimpleNamespace(devices=(2, 0), num_gpus=None)
+    assert backend.runtime_devices(object(), options) == (2, 0)
+    assert observed == [(True, 3, (2, 0), None, ())]
+
+    monkeypatch.setattr(rust_control, "resolve_runtime_device_plan", lambda *_args: None)
+    monkeypatch.setattr(rust_control, "resolve_runtime_devices", lambda *_args: (1, 0))
+    assert backend.runtime_devices(object(), options) == (1, 0)
+
+
+def test_installed_rust_runtime_device_plan_rejects_missing_cuda_before_count(monkeypatch):
+    from types import SimpleNamespace
+    import torch
+    from multigpubeamsearch import backend
+
+    for name in ("RANK", "LOCAL_RANK", "WORLD_SIZE", "TORCHELASTIC_RUN_ID"):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setattr(backend.platform, "system", lambda: "Linux")
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
+
+    def forbidden_count():
+        pytest.fail("device count should not be queried when CUDA is unavailable")
+
+    monkeypatch.setattr(torch.cuda, "device_count", forbidden_count)
+    with pytest.raises(NativeUnavailable, match="native beam requires available CUDA devices"):
+        backend.runtime_devices(object(), SimpleNamespace(devices=(0,), num_gpus=None))
