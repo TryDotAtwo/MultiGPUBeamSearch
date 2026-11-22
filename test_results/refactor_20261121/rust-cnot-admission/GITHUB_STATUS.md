@@ -1,7 +1,7 @@
 # Rust + CUDA/C++ migration acceptance status
 
 Source branch: `codex/beam-3060-preflight-20261121`
-Latest tested code SHA: `c59d6294c11c411c9c1eaad54115b689b00a10a3`
+Latest tested code SHA: `25bc43abc1911d6a96c14d7c7d0c766a043f5f4d`
 Base main SHA: `e6c41b6dc6bb3a839f6338f3cfe9eaadf8608d5a`
 
 | Gate | Status | Evidence |
@@ -62,3 +62,16 @@ Tested code SHA: `c59d6294c11c411c9c1eaad54115b689b00a10a3`.
 - Hosted installed-wheel Gloo lifecycle and receipt validation: PASS, [run 44977925758](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44977925758). Receipt contract CPU fixture includes missing-phase, wrong-rank and missing-root-replay rejection.
 - Hosted acceptance harness: PASS, [run 44977925762](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44977925762). Rust CNOT CPU/Gloo: PASS, [run 44977925871](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44977925871). Panel-v2 CPU compile/handoff: PASS, [run 44977931023](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44977931023).
 - Physical CUDA/NCCL job: SKIPPED. No Vast instance was dispatched.
+
+## Typed rank-bound CNOT request — 2026-11-22
+
+Tested code SHA: `25bc43abc1911d6a96c14d7c7d0c766a043f5f4d`.
+
+- `CnotRequest` is bound to the active rank topology as `RankedCnotRequest` during collective admission. Invalid or oversized world geometry is rejected before native backend admission.
+- Rust CNOT CPU/Gloo: PASS, [run 44980014848](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44980014848).
+- Installed PEP 517 wheel: PASS, [run 44980014912](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44980014912), including the two-rank `verify_cnot.main` lifecycle and the corrected receipt contract: rank-local events for both ranks, distinct local engine inputs checked separately, and exactly three solved/bitwise-replayed rank-zero reports. Status artifact [14736474151](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44980014912/artifacts/14736474151).
+- Hosted acceptance harness: PASS, [run 44980014854](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44980014854). Panel-v2 CPU compile/handoff: PASS, [run 44980018575](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44980018575).
+- Physical CUDA/NCCL: SKIPPED. No physical GPU acceptance occurred.
+
+This is hosted CPU and installed-wheel evidence only. The CNOT controller still receives topology from Python `World`; native context ownership and physical 1/2-GPU parity remain open.
+
