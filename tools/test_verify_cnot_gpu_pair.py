@@ -22,6 +22,8 @@ WHEEL_SHA = "b" * 64
 CHECKPOINT_SHA = event_fixture.CHECKPOINT_SHA
 MANIFEST_SHA = event_fixture.MANIFEST_SHA
 SCORER_SHA = event_fixture.SCORER_SHA
+PANEL_SCORER_SHA = "f" * 64
+PANEL_SCORER_SOURCE_COMMIT = "e17953891a36e3e3ae8b038695bfac8548ab784f"
 RUN_ID = "hosted-attempt-17"
 MODEL = {
     "upstream_commit": "c" * 40,
@@ -345,7 +347,24 @@ def _write_panel_result(directory: Path, world: int):
         "producer_emitter_sha256": PRODUCER_EMITTER_SHA,
         "accepted_updates": 8,
         "checkpoint_sha256": CHECKPOINT_SHA,
-        "scorer_library_sha256": SCORER_SHA,
+        "scorer_library_sha256": PANEL_SCORER_SHA,
+        "scorer_metadata": [{
+            "dimension": 3,
+            "metadata": {
+                "scorer_contract": "panel_search_v2",
+                "upstream_commit": PANEL_SCORER_SOURCE_COMMIT,
+                "panel": "test",
+                "panel_digest": "b" * 64,
+                "checkpoint_sha256": CHECKPOINT_SHA,
+                "search_manifest_sha256": MANIFEST_SHA,
+                "scorer_library_sha256": PANEL_SCORER_SHA,
+                "feature_registry_sha256": "1" * 64,
+                "training_manifest_sha256": TRAINING_MANIFEST_SHA,
+                "training_result_sha256": TRAINING_RESULT_SHA,
+                "scorer_output_dtype": "float32",
+                "dimension": 3,
+            },
+        }],
         "dataset_sha256": DATASET_SHA,
         "search_manifest_sha256": MANIFEST_SHA,
         "baseline_search_manifest_sha256": BASELINE_MANIFEST_SHA,
@@ -454,13 +473,38 @@ class VerifyCnotGpuPairTests(unittest.TestCase):
             result = verify_cnot_gpu_pair.validate_panel_gpu_pair(
                 root / "panel", root / "handoff-preflight.json",
                 source_sha=SOURCE_SHA, wheel_sha=WHEEL_SHA,
-                scorer_library_sha=SCORER_SHA, run_id=RUN_ID,
+                panel_scorer_library_sha=PANEL_SCORER_SHA, run_id=RUN_ID,
             )
             self.assertTrue(result["ordered_results_match"])
             self.assertTrue(result["independent_replay"])
             self.assertEqual(result["locked_test_status"], "length_gain")
             self.assertEqual(result["world_sizes"], [1, 2])
             self.assertEqual(result["case_count"], 2)
+            self.assertEqual(result["scorer_library_sha256"], PANEL_SCORER_SHA)
+            self.assertEqual(result["scorer_contract"], "panel_search_v2")
+
+    def test_rejects_wrong_panel_scorer_contract_or_hash(self):
+        for mutation in ("contract", "library_hash", "upstream_commit"):
+            with self.subTest(mutation=mutation), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                _build_panel_campaign(root)
+                path = root / "panel" / "cnot-panel-test-qhat-1-gpu.json"
+                report = json.loads(path.read_text(encoding="utf-8"))
+                metadata = report["scorer_metadata"][0]["metadata"]
+                if mutation == "contract":
+                    metadata["scorer_contract"] = "dev_v1"
+                elif mutation == "library_hash":
+                    metadata["scorer_library_sha256"] = SCORER_SHA
+                else:
+                    metadata["upstream_commit"] = "c" * 40
+                report["acceptance"]["report_sha256"] = protocol.report_sha256(report)
+                path.write_text(json.dumps(report), encoding="utf-8")
+                with self.assertRaises(ValueError):
+                    verify_cnot_gpu_pair.validate_panel_gpu_pair(
+                        root / "panel", root / "handoff-preflight.json",
+                        source_sha=SOURCE_SHA, wheel_sha=WHEEL_SHA,
+                        panel_scorer_library_sha=PANEL_SCORER_SHA, run_id=RUN_ID,
+                    )
 
     def test_rejects_changed_candidate_aggregate(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -473,7 +517,7 @@ class VerifyCnotGpuPairTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 verify_cnot_gpu_pair.validate_panel_gpu_pair(
                     root / "panel", path, source_sha=SOURCE_SHA,
-                    wheel_sha=WHEEL_SHA, scorer_library_sha=SCORER_SHA, run_id=RUN_ID,
+                    wheel_sha=WHEEL_SHA, panel_scorer_library_sha=PANEL_SCORER_SHA, run_id=RUN_ID,
                 )
 
     def test_rejects_native_adapter_hash_or_endpoint_mismatch(self):
@@ -489,7 +533,7 @@ class VerifyCnotGpuPairTests(unittest.TestCase):
                 verify_cnot_gpu_pair.validate_panel_gpu_pair(
                     root / "panel", root / "handoff-preflight.json",
                     source_sha=SOURCE_SHA, wheel_sha=WHEEL_SHA,
-                    scorer_library_sha=SCORER_SHA, run_id=RUN_ID,
+                    panel_scorer_library_sha=PANEL_SCORER_SHA, run_id=RUN_ID,
                 )
 
     def test_rejects_locked_panel_root_replay_cost_and_comparison_mismatches(self):
@@ -509,7 +553,7 @@ class VerifyCnotGpuPairTests(unittest.TestCase):
                         verify_cnot_gpu_pair.validate_panel_gpu_pair(
                             root / "panel", root / "handoff-preflight.json",
                             source_sha=SOURCE_SHA, wheel_sha=WHEEL_SHA,
-                            scorer_library_sha=SCORER_SHA, run_id=RUN_ID,
+                            panel_scorer_library_sha=PANEL_SCORER_SHA, run_id=RUN_ID,
                         )
                     continue
                 if mutation == "root":
@@ -528,7 +572,7 @@ class VerifyCnotGpuPairTests(unittest.TestCase):
                     verify_cnot_gpu_pair.validate_panel_gpu_pair(
                         root / "panel", root / "handoff-preflight.json",
                         source_sha=SOURCE_SHA, wheel_sha=WHEEL_SHA,
-                        scorer_library_sha=SCORER_SHA, run_id=RUN_ID,
+                        panel_scorer_library_sha=PANEL_SCORER_SHA, run_id=RUN_ID,
                     )
 
     def test_serialized_per_case_receipts_join_to_one_campaign(self):
