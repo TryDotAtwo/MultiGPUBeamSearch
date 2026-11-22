@@ -103,3 +103,10 @@
 - The public `child_environment` path now uses the installed resolver; it preserves input order, duplicate indices, token trimming, exact invalid-token errors, and compatibility fallback for older wheels.
 - Added a hosted installed-wheel test through child environment construction and Rust runtime contract cases. Device selection, physical binding, CUDA kernels and NCCL setup are unchanged.
 - Rust CPU/Gloo, installed-wheel, and hosted source acceptance passed on `db3e1be`: [45055128201](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45055128201), [45055128252](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45055128252), [45055128570](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45055128570). Physical CUDA/NCCL was skipped.
+
+
+## 2026-11-22 - Build permutation worker child environment in Rust
+
+- Moved reserved-variable filtering, selected CUDA visibility, CUDA device-order preservation and NCCL ID path insertion into a versioned `beam-runtime` operation.
+- Routed the public permutation `backend.child_environment` through the installed PyO3 extension; retained the same output keys and Python fallback when the wheel lacks the operation.
+- Added installed-wheel and Rust contract coverage for environment isolation, selected device order, inherited device identifiers, invalid mapping and older-wheel fallback. Search, kernels, precision and transport are unchanged.

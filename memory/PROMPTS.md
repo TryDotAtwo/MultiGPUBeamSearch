@@ -171,3 +171,6 @@ Continue moving public permutation and CNOT search control to Rust + CUDA/C++ wh
 
 
 2026-11-22: Перенести mapping выбранных логических CUDA индексов через унаследованный CUDA_VISIBLE_DEVICES из Python в beam-runtime. Сохранить child_environment, порядок и дубликаты, trim токенов, фильтрацию переменных, ошибки и fallback старых wheel. Проверить через установленное расширение на hosted CPU; физическое device binding и NCCL не менять.
+
+
+2026-11-22: Перенести подготовку окружения публичного permutation worker целиком в beam-runtime: фильтрацию inherited rank/BEAM/torchrun/CUDA/NCCL/results ключей, CUDA_VISIBLE_DEVICES, CUDA_DEVICE_ORDER и BEAM_NCCL_ID_FILE. Сохранить child_environment output и fallback старых wheel; проверить установленное расширение и Rust contract. Не менять запуск процесса, поисковую семантику или транспорт.

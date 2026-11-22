@@ -333,3 +333,58 @@ def test_installed_rust_cuda_visibility_drives_child_environment_and_fallback(mo
         backend.child_environment((1,), Path("/invalid"), {
             "CUDA_VISIBLE_DEVICES": "GPU-a,-1",
         })
+
+
+def test_installed_rust_child_environment_controls_public_child_setup_and_fallback(monkeypatch):
+    from multigpubeamsearch import backend, rust_control
+
+    native_resolver = rust_control.resolve_child_environment
+    python_fallback = backend._child_environment_python
+    observed = []
+
+    def observe(environment, devices, nccl_id_file):
+        observed.append((dict(environment), tuple(devices), nccl_id_file))
+        return native_resolver(environment, devices, nccl_id_file)
+
+    def forbidden_fallback(*_args, **_kwargs):
+        pytest.fail("installed Rust child-environment path fell back to Python")
+
+    source = {
+        "PATH": "safe",
+        "CUDA_VISIBLE_DEVICES": " GPU-a, GPU-b ,GPU-c ",
+        "CUDA_DEVICE_ORDER": "PCI_BUS_ID",
+        "RANK": "3",
+        "ROLE_RANK": "2",
+        "MASTER_ADDR": "coordinator",
+        "NCCL_DEBUG": "TRACE",
+        "BEAM_WEIGHT_DIR": "wrong",
+        "STREAM4_BATCH_ALIGNMENT": "999",
+        "PUBLISH_RESULTS": "1",
+        "RESULTS_INGEST_TOKEN": "filtered",
+        "CUSTOM_VALUE": "kept",
+    }
+    monkeypatch.setattr(rust_control, "resolve_child_environment", observe)
+    monkeypatch.setattr(backend, "_child_environment_python", forbidden_fallback)
+    env = backend.child_environment((2, 0), Path("/rank"), source)
+    assert env == {
+        "PATH": "safe",
+        "CUSTOM_VALUE": "kept",
+        "CUDA_VISIBLE_DEVICES": "GPU-c,GPU-a",
+        "CUDA_DEVICE_ORDER": "PCI_BUS_ID",
+        "BEAM_NCCL_ID_FILE": "/rank/nccl-id.bin",
+    }
+    assert observed == [(source, (2, 0), "/rank/nccl-id.bin")]
+
+    monkeypatch.setattr(rust_control, "resolve_child_environment", lambda *_args: None)
+    monkeypatch.setattr(rust_control, "resolve_cuda_visibility", lambda *_args: None)
+    monkeypatch.setattr(backend, "_child_environment_python", python_fallback)
+    legacy = backend.child_environment((1, 1), Path("/legacy"), source)
+    assert legacy["CUDA_VISIBLE_DEVICES"] == "GPU-b,GPU-b"
+    assert legacy["BEAM_NCCL_ID_FILE"] == "/legacy/nccl-id.bin"
+    assert "RANK" not in legacy and "NCCL_DEBUG" not in legacy
+
+    monkeypatch.setattr(rust_control, "resolve_child_environment", native_resolver)
+    with pytest.raises(NativeUnavailable, match="cannot map selected devices"):
+        backend.child_environment((1,), Path("/invalid"), {
+            "CUDA_VISIBLE_DEVICES": "GPU-a,-1",
+        })

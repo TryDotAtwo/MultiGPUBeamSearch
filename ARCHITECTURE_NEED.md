@@ -3852,3 +3852,8 @@ The scheduler-to-CUDA ordinal transfer was validated on code SHA `935016b513a742
 
 
 The Rust-owned child CUDA visibility translation passed Rust CPU/Gloo in [run 45055128201](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45055128201), installed-wheel validation in [run 45055128252](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45055128252), and the hosted acceptance harness in [run 45055128570](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45055128570) on source SHA `db3e1beb0027b4c4ef42c80b87468fdf3630a07f`. The physical GPU and private producer jobs were skipped.
+
+
+## Rust-owned permutation child environment
+
+The public `backend.child_environment` now delegates reserved-variable filtering, CUDA visibility translation, retention of `CUDA_DEVICE_ORDER`, and the NCCL ID path to a versioned Rust runtime resolver. It returns the same child environment map and keeps the Python builder for older wheels. The resolver removes inherited rank, BEAM, torchrun, CUDA, NCCL, publish/results-ingest, shard and stream controls before adding the selected CUDA mask and run-local NCCL path. This covers the permutation worker's environment preparation; it does not start a child or change CUDA/NCCL algorithms.

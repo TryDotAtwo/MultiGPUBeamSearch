@@ -250,6 +250,47 @@ def resolve_runtime_devices(visible_device_count, explicit_devices, num_gpus, gr
     return tuple(selected)
 
 
+def resolve_child_environment(environment, devices, nccl_id_file):
+    """Build the filtered native child environment in beam-runtime when supported."""
+    if type(environment) is not dict or any(
+        type(name) is not str or type(value) is not str
+        for name, value in environment.items()
+    ):
+        return None
+    if type(devices) not in (tuple, list) or any(
+        type(device) is not int or not 0 <= device <= 0xFFFFFFFF
+        for device in devices
+    ):
+        return None
+    if type(nccl_id_file) is not str:
+        return None
+    try:
+        native = extension()
+    except (NativeUnavailable, ImportError):
+        return None
+    resolver = getattr(native, "resolve_child_environment", None)
+    if not callable(resolver):
+        return None
+    if getattr(native, "CLUSTER_CHILD_ENVIRONMENT_VERSION", None) != 1:
+        raise NativeUnavailable("Rust child environment API version is incompatible")
+    try:
+        encoded = resolver(environment, list(devices), nccl_id_file)
+    except (RuntimeError, ValueError, TypeError, OverflowError) as error:
+        raise NativeUnavailable(str(error)) from error
+    if not isinstance(encoded, str):
+        raise NativeUnavailable("Rust runtime returned an invalid child environment")
+    try:
+        result = json.loads(encoded)
+    except (TypeError, ValueError) as error:
+        raise NativeUnavailable("Rust runtime returned malformed child-environment JSON") from error
+    if not isinstance(result, dict) or any(
+        type(name) is not str or type(value) is not str
+        for name, value in result.items()
+    ):
+        raise NativeUnavailable("Rust runtime returned an invalid child environment")
+    return result
+
+
 def resolve_cuda_visibility(devices, inherited):
     """Map selected logical CUDA indices through the inherited visibility list."""
     if type(devices) not in (tuple, list) or any(

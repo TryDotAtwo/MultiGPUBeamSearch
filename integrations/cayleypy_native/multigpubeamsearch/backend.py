@@ -366,8 +366,8 @@ def cuda_visibility(devices: tuple[int, ...], environ: dict[str, str]) -> str:
     return _cuda_visibility_python(devices, environ)
 
 
-def child_environment(devices: tuple[int, ...], run_dir: Path, environ=None) -> dict[str, str]:
-    inherited = dict(os.environ if environ is None else environ)
+def _child_environment_python(inherited, devices, nccl_id_file):
+    """Compatibility implementation for extensions without Rust env planning."""
     env = {k: v for k, v in inherited.items() if not (
         k.startswith(("BEAM_", "TORCHELASTIC_", "TORCHRUN_", "CUDA_", "NCCL_", "PUBLISH_", "RESULTS_INGEST_")) or k in _RANK_KEYS
         or k.startswith(("SHARD_", "STREAM1_", "STREAM3_", "STREAM4_", "GLOBAL_"))
@@ -375,8 +375,19 @@ def child_environment(devices: tuple[int, ...], run_dir: Path, environ=None) -> 
     env["CUDA_VISIBLE_DEVICES"] = cuda_visibility(devices, inherited)
     if "CUDA_DEVICE_ORDER" in inherited:
         env["CUDA_DEVICE_ORDER"] = inherited["CUDA_DEVICE_ORDER"]
-    env["BEAM_NCCL_ID_FILE"] = str(run_dir / "nccl-id.bin")
+    env["BEAM_NCCL_ID_FILE"] = nccl_id_file
     return env
+
+
+def child_environment(devices: tuple[int, ...], run_dir: Path, environ=None) -> dict[str, str]:
+    inherited = dict(os.environ if environ is None else environ)
+    nccl_id_file = str(run_dir / "nccl-id.bin")
+    from .rust_control import resolve_child_environment
+
+    resolved = resolve_child_environment(inherited, devices, nccl_id_file)
+    if resolved is not None:
+        return resolved
+    return _child_environment_python(inherited, devices, nccl_id_file)
 
 
 def _resolve_microbatch_plan_python(contract, model, beam_width: int, world_size: int, *, row_limit=8192) -> dict:

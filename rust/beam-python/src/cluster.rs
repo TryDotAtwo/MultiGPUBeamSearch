@@ -38,6 +38,17 @@ fn resolve_scheduler_rank(environment: BTreeMap<String, String>) -> PyResult<Str
 }
 
 #[pyfunction]
+fn resolve_child_environment(
+    environment: BTreeMap<String, String>,
+    devices: Vec<u32>,
+    nccl_id_file: String,
+) -> PyResult<String> {
+    let resolved = beam_runtime::cluster::child_environment(&environment, &devices, &nccl_id_file)
+        .map_err(|error| PyValueError::new_err(error.to_string()))?;
+    serde_json::to_string(&resolved).map_err(|error| PyRuntimeError::new_err(error.to_string()))
+}
+
+#[pyfunction]
 fn resolve_cuda_visibility(devices: Vec<u32>, inherited: Option<String>) -> PyResult<String> {
     beam_runtime::cluster::cuda_visibility(&devices, inherited.as_deref())
         .map_err(|error| PyValueError::new_err(error.to_string()))
@@ -80,11 +91,13 @@ fn run_cluster_rank(
 pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add("CLUSTER_RANK_VERSION", 1)?;
     module.add("CLUSTER_DEVICE_BINDING_VERSION", 1)?;
+    module.add("CLUSTER_CHILD_ENVIRONMENT_VERSION", 1)?;
     module.add_function(wrap_pyfunction!(run_cluster_rank, module)?)?;
     module.add_function(wrap_pyfunction!(validate_cluster_rank, module)?)?;
     module.add_function(wrap_pyfunction!(resolve_scheduler_rank, module)?)?;
     module.add_function(wrap_pyfunction!(resolve_cuda_ordinal, module)?)?;
     module.add_function(wrap_pyfunction!(resolve_cuda_visibility, module)?)?;
+    module.add_function(wrap_pyfunction!(resolve_child_environment, module)?)?;
     module.add_function(wrap_pyfunction!(resolve_cluster_plan, module)?)?;
     Ok(())
 }

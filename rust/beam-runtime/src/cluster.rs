@@ -275,6 +275,67 @@ pub fn cuda_visibility(devices: &[u32], inherited: Option<&str>) -> Result<Strin
     Ok(mapped.join(","))
 }
 
+const CHILD_ENV_FILTER_PREFIXES: [&str; 12] = [
+    "BEAM_",
+    "TORCHELASTIC_",
+    "TORCHRUN_",
+    "CUDA_",
+    "NCCL_",
+    "PUBLISH_",
+    "RESULTS_INGEST_",
+    "SHARD_",
+    "STREAM1_",
+    "STREAM3_",
+    "STREAM4_",
+    "GLOBAL_",
+];
+
+const CHILD_ENV_FILTER_KEYS: [&str; 11] = [
+    "RANK",
+    "LOCAL_RANK",
+    "WORLD_SIZE",
+    "LOCAL_WORLD_SIZE",
+    "GROUP_RANK",
+    "ROLE_RANK",
+    "ROLE_WORLD_SIZE",
+    "MASTER_ADDR",
+    "MASTER_PORT",
+    "NODE_RANK",
+    "OMP_NUM_THREADS",
+];
+
+fn child_env_key_is_filtered(key: &str) -> bool {
+    CHILD_ENV_FILTER_KEYS.contains(&key)
+        || CHILD_ENV_FILTER_PREFIXES
+            .iter()
+            .any(|prefix| key.starts_with(prefix))
+}
+
+/// Build the same isolated child environment used by the Python adapter.
+pub fn child_environment(
+    inherited: &BTreeMap<String, String>,
+    devices: &[u32],
+    nccl_id_file: &str,
+) -> Result<BTreeMap<String, String>> {
+    let mut environment: BTreeMap<String, String> = inherited
+        .iter()
+        .filter(|(key, _)| !child_env_key_is_filtered(key))
+        .map(|(key, value)| (key.clone(), value.clone()))
+        .collect();
+    environment.insert(
+        "CUDA_VISIBLE_DEVICES".into(),
+        cuda_visibility(
+            devices,
+            inherited.get("CUDA_VISIBLE_DEVICES").map(String::as_str),
+        )?,
+    );
+    if let Some(order) = inherited.get("CUDA_DEVICE_ORDER") {
+        environment.insert("CUDA_DEVICE_ORDER".into(), order.clone());
+    }
+    environment.insert("BEAM_NCCL_ID_FILE".into(), nccl_id_file.into());
+    Ok(environment)
+}
+
 pub struct Request {
     pub command: Vec<String>,
     /// Executable lookup and Python pathlib resolution preserve existing Python semantics.
