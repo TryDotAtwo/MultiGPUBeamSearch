@@ -162,9 +162,10 @@ jobs:
           set -euo pipefail
           native="$RUNNER_TEMP/cnot-panel-v2-build/native"
           tree_sha="$(python3 tools/cnot_producer_compatibility.py --tree-digest "$native")"
-          recipe_sha="$(printf 'build.py=%s\nbridge_panel_v2.rs=%s\n' \
+          recipe_sha="$(printf 'build.py=%s\nbridge_panel_v2.rs=%s\npanel_v2_manifest.rs=%s\n' \
             "$(sha256sum integrations/cnot_scorer/build.py | awk '{print $1}')" \
             "$(sha256sum integrations/cnot_scorer/bridge_panel_v2.rs | awk '{print $1}')" \
+            "$(sha256sum integrations/cnot_scorer/panel_v2_manifest.rs | awk '{print $1}')" \
             | sha256sum | awk '{print $1}')"
           native_inputs_sha="$(printf 'tree=%s\nrecipe=%s\n' "$tree_sha" "$recipe_sha" \
             | sha256sum | awk '{print $1}')"
@@ -206,7 +207,7 @@ jobs:
           export LD_LIBRARY_PATH="$torch_lib"
           native="$RUNNER_TEMP/cnot-panel-v2-build/native"
           mkdir -p "$CARGO_TARGET_DIR"
-          if cargo test --locked --features torch --lib \
+          if cargo test --locked --features torch --lib panel_v2_manifest::tests \
               --manifest-path "$native/Cargo.toml" \
               > "$RUNNER_TEMP/producer-adapter-tests.log" 2>&1; then
             for test_name in \

@@ -27,6 +27,7 @@ HANDOFF_PATHS = {
 NATIVE_EXACT_PATHS = {
     "integrations/cnot_scorer/build.py",
     "integrations/cnot_scorer/bridge_panel_v2.rs",
+    "integrations/cnot_scorer/panel_v2_manifest.rs",
     "integrations/cnot_scorer/Cargo.toml",
     "integrations/cnot_scorer/Cargo.lock",
     ".github/cnot-panel-python-requirements.txt",

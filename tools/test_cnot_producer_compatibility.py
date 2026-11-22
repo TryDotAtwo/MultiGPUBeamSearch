@@ -49,6 +49,10 @@ class ProducerCompatibilityRoutingTests(unittest.TestCase):
             {"run_handoff": False, "run_native": True},
         )
         self.assertEqual(
+            classify_changed_paths(["integrations/cnot_scorer/panel_v2_manifest.rs"]),
+            {"run_handoff": False, "run_native": True},
+        )
+        self.assertEqual(
             classify_changed_paths(["integrations/cnot_scorer/src/bridge.rs"]),
             {"run_handoff": False, "run_native": True},
         )
@@ -161,7 +165,7 @@ class ProducerBuildCacheWorkflowTests(unittest.TestCase):
         cargo = workflow.split(
             "- name: Run the pinned panel-v2 adapter tests", 1
         )[1].split("\n      - name:", 1)[0]
-        self.assertNotIn("mgbs_scorer_panel_v2::tests", cargo)
+        self.assertIn("panel_v2_manifest::tests", cargo)
         for case in (
             "accepts_a_digest_bound_ordered_panel_manifest",
             "rejects_legacy_schema",
@@ -172,6 +176,13 @@ class ProducerBuildCacheWorkflowTests(unittest.TestCase):
                 self.assertIn(case, cargo)
         self.assertIn("PANEL_V2_CARGO_TESTS_PASS count=4", cargo)
         self.assertIn("PANEL_V2_CARGO_TESTS_FAILED missing_case=%s", cargo)
+
+    def test_native_manifest_helper_is_part_of_the_build_recipe(self):
+        workflow = WORKFLOW.read_text(encoding="utf-8")
+        self.assertIn("panel_v2_manifest.rs=%s", workflow)
+        helper = (ROOT / "integrations/cnot_scorer/build.py").read_text(encoding="utf-8")
+        self.assertIn('Path(__file__).with_name("panel_v2_manifest.rs")', helper)
+        self.assertIn('mod panel_v2_manifest;', helper)
 
     def test_emitter_route_has_no_torch_or_cargo_and_skips_native_steps(self):
         workflow = WORKFLOW.read_text(encoding="utf-8")

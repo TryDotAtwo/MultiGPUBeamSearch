@@ -89,6 +89,17 @@ pub(super) fn load_panel_checkpoint_on(""" + signature + """    device: Option<u
         module_name, bridge_name = "mgbs_scorer_panel_v2", "bridge_panel_v2.rs"
         module_declaration = "mod evaluation;\nmod mgbs_scorer_panel_v2;"
     replace_once(execution.with_suffix(".rs"), "mod evaluation;", module_declaration)
+    if contract == "panel_search_v2":
+        run_config = native / "src" / "run_config.rs"
+        replace_once(
+            run_config,
+            '#[cfg(feature = "torch")]\\nmod panel;',
+            '#[cfg(feature = "torch")]\\nmod panel;\\n#[cfg(feature = "torch")]\\nmod panel_v2_manifest;',
+        )
+        shutil.copyfile(
+            Path(__file__).with_name("panel_v2_manifest.rs"),
+            native / "src" / "run_config" / "panel_v2_manifest.rs",
+        )
     replace_once(native / "Cargo.toml", 'crate-type = ["rlib"]', 'crate-type = ["rlib", "cdylib"]')
     with (native / "cuda" / "CMakeLists.txt").open("a", encoding="utf-8", newline="\n") as cmake:
         cmake.write("\nset_property(TARGET cnot103_cuda PROPERTY POSITION_INDEPENDENT_CODE ON)\n")

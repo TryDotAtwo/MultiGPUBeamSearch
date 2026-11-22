@@ -1,3 +1,9 @@
+## 2026-11-22 - Run the panel-v2 identity tests in the CPU adapter gate
+
+- The bridge's typed panel-v2 manifest and identity validator now live in a shared Rust module compiled with the CPU Torch feature; the CUDA C ABI bridge imports the same implementation.
+- The hosted Rust gate selects the four named manifest tests from that CPU module and checks that each actually ran. This avoids the previous zero-test filter and avoids unrelated full-crate tests.
+- The panel manifest source is included in native preparation, cache fingerprints, and routing classification.
+
 ## 2026-11-22 - Require panel-v2 Rust unit tests to execute
 
 - Removed the over-specific Cargo test-name filter that returned success with zero tests (48 filtered out) on the pinned producer crate.
