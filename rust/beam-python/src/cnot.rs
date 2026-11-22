@@ -1,5 +1,7 @@
 //! Coarse Python adapter for the owned packed CNOT input contract.
-use beam_runtime::cnot_search::{self, Backend, CnotRequest, Edge, Goal, Options, RankedCnotRequest, Round};
+use beam_runtime::cnot_search::{
+    self, Backend, CnotRequest, Edge, Goal, Options, RankedCnotRequest, Round,
+};
 use beam_runtime::cnot_selection;
 use pyo3::{
     exceptions::{PyRuntimeError, PyValueError},

@@ -3,8 +3,8 @@
 //! Tensor storage remains owned by PyTorch/CUDA. Existing ATen operators and
 //! rank collectives are invoked on the caller's thread in their former order.
 use crate::{
-    cnot::PyCnotRankedRequest, cnot_native_batch,
-    cnot_native_checked::checked_v2 as checked, cnot_native_exchange, cnot_scorer_dispatch,
+    cnot::PyCnotRankedRequest, cnot_native_batch, cnot_native_checked::checked_v2 as checked,
+    cnot_native_exchange, cnot_scorer_dispatch,
 };
 use beam_runtime::cnot_search::{self, Backend, Edge, Goal, Options, RankedCnotRequest, Round};
 use pyo3::{
@@ -1579,7 +1579,9 @@ fn run_cnot_native<'py>(
     admitted_topology: Option<(u32, u32)>,
     ranked_request: Option<Py<PyCnotRankedRequest>>,
 ) -> PyResult<Py<PyAny>> {
-    let typed_request = ranked_request.as_ref().map(|request| request.borrow(py).inner);
+    let typed_request = ranked_request
+        .as_ref()
+        .map(|request| request.borrow(py).inner);
     let mut backend = None;
     let prepare_backend = (|| -> PyResult<Bound<'py, PyAny>> {
         backend = Some(NativeStages::new(
