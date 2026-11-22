@@ -18,11 +18,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          id=61937382
+          id=61941521
           endpoint=https://console.vast.ai/api/v0/instances
           authorization="Authorization: Bearer ${VAST_API_KEY}"
           row="$(curl --fail --silent --show-error --max-time 20 -H "$authorization" "$endpoint/" \
-            | jq -cer --argjson id "$id" '.instances[] | select(.id==$id and (.label | startswith("cube555-a100-61937382-")) and .actual_status=="running")')"
+            | jq -cer --argjson id "$id" '.instances[] | select(.id==$id and .label=="cube555-a100-fast-20261122" and .actual_status=="running")')"
           key="$RUNNER_TEMP/observe-key"
           ssh-keygen -q -t ed25519 -N "" -C "cube555-observe-$GITHUB_RUN_ID" -f "$key"
           request="$(jq -cn --arg ssh_key "$(cat "$key.pub")" '{ssh_key:$ssh_key}')"
@@ -39,6 +39,7 @@ jobs:
           set -e
           cd /root/cube555-egress 2>/dev/null || { echo "No test directory yet"; exit 0; }
           stat -c "%s %n" bundle.zip cube555-standalone-linux-x86_64-py311.tar 2>/dev/null || true
+          if [[ -f evidence/archive-checksums.txt ]]; then cat evidence/archive-checksums.txt; fi
           for file in evidence/*.log; do
             [[ -f "$file" ]] || continue
             echo "$file"
@@ -53,12 +54,12 @@ jobs:
               -exec grep -E "effective_beam|full_step_verified|capacity_scope|working_capacity_failure" {} \; | tail -n 20
           fi'
           for attempt in 1 2 3; do
-            if [[ "$proxy_host" =~ ^[a-zA-Z0-9.-]+$ && "$proxy_port" =~ ^[0-9]+$ ]] &&
-                ssh "${options[@]}" -p "$proxy_port" "root@$proxy_host" "$code"; then
-              exit 0
-            fi
             if [[ "$direct_host" =~ ^[0-9.]+$ && "$direct_port" =~ ^[0-9]+$ ]] &&
                 ssh "${options[@]}" -p "$direct_port" "root@$direct_host" "$code"; then
+              exit 0
+            fi
+            if [[ "$proxy_host" =~ ^[a-zA-Z0-9.-]+$ && "$proxy_port" =~ ^[0-9]+$ ]] &&
+                ssh "${options[@]}" -p "$proxy_port" "root@$proxy_host" "$code"; then
               exit 0
             fi
             sleep 12
