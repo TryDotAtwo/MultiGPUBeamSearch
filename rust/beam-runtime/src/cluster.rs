@@ -259,10 +259,11 @@ pub fn cuda_visibility(devices: &[u32], inherited: Option<&str>) -> Result<Strin
     let tokens: Vec<&str> = inherited.split(',').map(str::trim).collect();
     let mut mapped = Vec::with_capacity(devices.len());
     for &device in devices {
-        let index = usize::try_from(device)
-            .map_err(|_| ClusterError::Invalid(
+        let index = usize::try_from(device).map_err(|_| {
+            ClusterError::Invalid(
                 "cannot map selected devices through inherited CUDA_VISIBLE_DEVICES".into(),
-            ))?;
+            )
+        })?;
         let token = tokens.get(index).copied().unwrap_or("");
         if token.is_empty() || token == "-1" {
             return Err(ClusterError::Invalid(

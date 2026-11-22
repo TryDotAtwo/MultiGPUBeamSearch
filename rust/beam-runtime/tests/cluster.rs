@@ -205,7 +205,6 @@ fn scheduled_cuda_ordinal_rejects_missing_or_insufficient_visibility() {
     ));
 }
 
-
 #[test]
 fn cuda_visibility_preserves_inherited_token_order_and_whitespace_rules() {
     use beam_runtime::cluster::cuda_visibility;
@@ -215,7 +214,10 @@ fn cuda_visibility_preserves_inherited_token_order_and_whitespace_rules() {
         cuda_visibility(&[2, 0], Some(" GPU-a, GPU-b ,GPU-c ")).unwrap(),
         "GPU-c,GPU-a"
     );
-    assert_eq!(cuda_visibility(&[1, 1], Some("GPU-a,GPU-b")).unwrap(), "GPU-b,GPU-b");
+    assert_eq!(
+        cuda_visibility(&[1, 1], Some("GPU-a,GPU-b")).unwrap(),
+        "GPU-b,GPU-b"
+    );
     assert_eq!(cuda_visibility(&[], Some("")).unwrap(), "");
 }
 
