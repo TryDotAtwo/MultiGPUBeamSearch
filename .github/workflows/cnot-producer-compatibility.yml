@@ -8,6 +8,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
   compile-current-producer-adapter:
@@ -18,59 +19,34 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
-          fetch-depth: 0
           persist-credentials: false
       - uses: actions/setup-python@v5
+        id: python
         with:
           python-version: "3.11"
-      - name: Prepare the exact panel-v2 input fingerprint and changed paths
-        id: prepare
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p "$RUNNER_TEMP/cnot-panel-v2-state"
-          python3 tools/cnot_producer_compatibility.py prepare \
-            --event-name "$GITHUB_EVENT_NAME" \
-            --event-file "$GITHUB_EVENT_PATH" \
-            --workspace "$GITHUB_WORKSPACE" \
-            --output "$GITHUB_OUTPUT"
-      - name: Run cheap CPU panel-v2 contract checks
-        id: cheap_contracts
-        shell: bash
-        run: |
-          set -euo pipefail
-          python3 tools/test_cnot_producer_compatibility.py \
-            > "$RUNNER_TEMP/cnot-panel-v2-gate-tests.log" 2>&1
-          (cd integrations/cnot_scorer && python3 -m unittest -v test_handoff) \
-            > "$RUNNER_TEMP/cnot-panel-v2-handoff-tests.log" 2>&1
-      - name: Restore result for identical pinned inputs
+      - name: Find a completed build for these inputs
         id: previous
-        uses: actions/cache/restore@v4
-        continue-on-error: true
-        with:
-          path: ${{ runner.temp }}/cnot-panel-v2-state
-          key: ${{ runner.os }}-cnot-panel-v2-${{ steps.prepare.outputs.fingerprint }}-${{ github.run_id }}-${{ github.run_attempt }}
-          restore-keys: |
-            ${{ runner.os }}-cnot-panel-v2-${{ steps.prepare.outputs.fingerprint }}-
-      - name: Decide whether to reuse, carry failure, or build
-        id: decision
-        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PYTHON_VERSION_USED: ${{ steps.python.outputs.python-version }}
+          PANEL_INPUTS: >-
+            ${{ hashFiles('.github/workflows/cnot-producer-compatibility.yml',
+                         'integrations/cnot_scorer/build.py', 'integrations/cnot_scorer/bridge_panel_v2.rs',
+                         'integrations/cnot_scorer/handoff.py', 'integrations/cnot_scorer/test_handoff.py',
+                         'tools/cnot_producer_compatibility.py', 'tools/test_cnot_producer_compatibility.py') }}
+        run: python3 tools/cnot_producer_compatibility.py
+      - name: Carry the last failed build for identical inputs
+        if: steps.previous.outputs.verdict == 'failure'
         run: |
-          set -euo pipefail
-          python3 tools/cnot_producer_compatibility.py decide \
-            --state-file "$RUNNER_TEMP/cnot-panel-v2-state/state.json" \
-            --fingerprint "${{ steps.prepare.outputs.fingerprint }}" \
-            --changed-inputs "${{ steps.prepare.outputs.changed_inputs }}" \
-            --force-full "${{ steps.prepare.outputs.force_full }}" \
-            --output "$GITHUB_OUTPUT"
-      - name: Preserve a prior failure for identical inputs
-        if: steps.decision.outputs.action == 'carry_failure'
-        shell: bash
-        run: |
-          echo "The same pinned panel-v2 inputs have a recorded failed result; this PR status remains failed." >&2
+          echo "These inputs failed the last full build. Re-run this job to retry."
           exit 1
+      - name: Run cheap CPU panel-v2 contract checks before building
+        if: steps.previous.outputs.verdict == 'run'
+        run: |
+          python3 tools/test_cnot_producer_compatibility.py
+          (cd integrations/cnot_scorer && python3 -m unittest -v test_handoff)
       - uses: actions/checkout@v4
-        if: steps.decision.outputs.action == 'run_full'
+        if: steps.previous.outputs.verdict == 'run'
         with:
           repository: TryDotAtwo/cnot-neural-synth-frontier6
           ref: e17953891a36e3e3ae8b038695bfac8548ab784f
@@ -78,17 +54,15 @@ jobs:
           fetch-depth: 1
           persist-credentials: false
       - uses: actions/checkout@v4
-        if: steps.decision.outputs.action == 'run_full'
+        if: steps.previous.outputs.verdict == 'run'
         with:
           repository: TryDotAtwo/cnot-neural-synth-frontier6
           ref: 42ed72f587ab70fc74a85cf0a25001efb29cb994
           path: cnot-emitter
           fetch-depth: 1
           persist-credentials: false
-      - uses: dtolnay/rust-toolchain@stable
-        if: steps.decision.outputs.action == 'run_full'
       - name: Install pinned CPU PyTorch
-        if: steps.decision.outputs.action == 'run_full'
+        if: steps.previous.outputs.verdict == 'run'
         shell: bash
         run: |
           set -euo pipefail
@@ -96,9 +70,10 @@ jobs:
             > "$RUNNER_TEMP/producer-adapter-pip.log" 2>&1
       - name: Prepare and compile the pinned producer adapter
         id: cpu_compile
-        if: steps.decision.outputs.action == 'run_full'
+        if: steps.previous.outputs.verdict == 'run'
         shell: bash
         env:
+          RUSTUP_TOOLCHAIN: stable
           LIBTORCH_USE_PYTORCH: "1"
           CARGO_TARGET_DIR: ${{ runner.temp }}/cnot-panel-v2-target
         run: |
@@ -121,7 +96,7 @@ jobs:
             > "$RUNNER_TEMP/producer-adapter-tests.log" 2>&1
       - name: Run the pinned emitter through the consumer fixture
         id: handoff_tests
-        if: steps.decision.outputs.action == 'run_full'
+        if: steps.previous.outputs.verdict == 'run'
         shell: bash
         env:
           CNOT103_PRODUCER_CHECKOUT: ${{ github.workspace }}/cnot-emitter
@@ -130,61 +105,20 @@ jobs:
           set -euo pipefail
           (cd integrations/cnot_scorer && python3 -m unittest -v test_handoff) \
             > "$RUNNER_TEMP/producer-handoff-test.log" 2>&1
-      - name: Store the compatibility result for this input fingerprint
-        if: always()
-        id: finalize
-        shell: bash
-        env:
-          FINGERPRINT: ${{ steps.prepare.outputs.fingerprint }}
-          ACTION: ${{ steps.decision.outputs.action }}
-          CHEAP_OUTCOME: ${{ steps.cheap_contracts.outcome }}
-          COMPILE_OUTCOME: ${{ steps.cpu_compile.outcome }}
-          HANDOFF_OUTCOME: ${{ steps.handoff_tests.outcome }}
-        run: |
-          set -euo pipefail
-          action="$ACTION"
-          if [[ -z "$action" ]]; then action=run_full; fi
-          python3 tools/cnot_producer_compatibility.py finish \
-            --state-file "$RUNNER_TEMP/cnot-panel-v2-state/state.json" \
-            --fingerprint "$FINGERPRINT" \
-            --action "$action" \
-            --cheap-outcome "$CHEAP_OUTCOME" \
-            --compile-outcome "$COMPILE_OUTCOME" \
-            --handoff-outcome "$HANDOFF_OUTCOME" \
-            --summary-file "$GITHUB_STEP_SUMMARY"
-      - name: Enforce the stored compatibility result
-        if: always()
-        shell: bash
-        run: |
-          python3 tools/cnot_producer_compatibility.py verify-result \
-            --state-file "$RUNNER_TEMP/cnot-panel-v2-state/state.json"
-      - name: Save same-input outcome for later docs-only updates
-        if: always() && steps.prepare.outputs.fingerprint != ''
+      # Only a full build creates an entry. The existing workflow file is a small cache payload.
+      - name: Remember the full build outcome
+        if: ${{ !cancelled() && steps.previous.outputs.verdict == 'run' }}
         uses: actions/cache/save@v4
         continue-on-error: true
         with:
-          path: ${{ runner.temp }}/cnot-panel-v2-state
-          key: ${{ runner.os }}-cnot-panel-v2-${{ steps.prepare.outputs.fingerprint }}-${{ github.run_id }}-${{ github.run_attempt }}
-      - name: Upload redacted panel-v2 gate result
-        if: always()
+          key: ${{ steps.previous.outputs.prefix }}${{ github.run_id }}-${{ github.run_attempt }}-${{ job.status }}
+          path: .github/workflows/cnot-producer-compatibility.yml
+      - name: Upload native diagnostics on failure
+        if: ${{ failure() && steps.previous.outputs.verdict == 'run' }}
         uses: actions/upload-artifact@v4
-        with:
-          name: cnot-panel-v2-compatibility-result
-          path: ${{ runner.temp }}/cnot-panel-v2-state/state.json
-          if-no-files-found: ignore
-          retention-days: 14
-      - name: Upload panel-v2 CPU check logs
-        if: always()
-        uses: actions/upload-artifact@v4
+        continue-on-error: true
         with:
           name: cnot-panel-v2-compatibility-logs
-          path: |
-            ${{ runner.temp }}/cnot-panel-v2-gate-tests.log
-            ${{ runner.temp }}/cnot-panel-v2-handoff-tests.log
-            ${{ runner.temp }}/producer-adapter-pip.log
-            ${{ runner.temp }}/producer-adapter-prepare.log
-            ${{ runner.temp }}/producer-adapter-cargo.log
-            ${{ runner.temp }}/producer-adapter-tests.log
-            ${{ runner.temp }}/producer-handoff-test.log
+          path: ${{ runner.temp }}/producer-*.log
           if-no-files-found: ignore
           retention-days: 14
