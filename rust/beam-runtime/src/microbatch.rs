@@ -42,19 +42,29 @@ fn as_u64(value: u128) -> Result<u64> {
 /// Preserve the Python planner's exact integer choices and metadata fields.
 pub fn resolve(request: &Request) -> Result<Plan> {
     if request.beam_width == 0 {
-        return Err(invalid("beam_width must be positive for microbatch planning"));
+        return Err(invalid(
+            "beam_width must be positive for microbatch planning",
+        ));
     }
     if request.world_size == 0 {
-        return Err(invalid("world_size must be positive for microbatch planning"));
+        return Err(invalid(
+            "world_size must be positive for microbatch planning",
+        ));
     }
     if request.move_count == 0 {
-        return Err(invalid("move_count must be positive for microbatch planning"));
+        return Err(invalid(
+            "move_count must be positive for microbatch planning",
+        ));
     }
     if request.output_dim == 0 {
-        return Err(invalid("output_dim must be positive for microbatch planning"));
+        return Err(invalid(
+            "output_dim must be positive for microbatch planning",
+        ));
     }
     if request.row_limit == 0 {
-        return Err(invalid("inference row limit must be positive for microbatch planning"));
+        return Err(invalid(
+            "inference row limit must be positive for microbatch planning",
+        ));
     }
 
     let divisor = u128::from(request.world_size) * INITIAL_SORT_SLOTS * ALIGNMENT;
@@ -92,8 +102,14 @@ pub fn resolve(request: &Request) -> Result<Plan> {
 mod tests {
     use super::{resolve, Plan, Request};
 
-    fn request(beam_width: u64, world_size: u32, move_count: u32, output_dim: u32,
-               model_backend: &str, row_limit: u64) -> Request {
+    fn request(
+        beam_width: u64,
+        world_size: u32,
+        move_count: u32,
+        output_dim: u32,
+        model_backend: &str,
+        row_limit: u64,
+    ) -> Request {
         Request {
             beam_width,
             world_size,
