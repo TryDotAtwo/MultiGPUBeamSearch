@@ -5,7 +5,11 @@ import hashlib
 import json
 import subprocess
 import tempfile
+from dataclasses import replace
 from pathlib import Path
+
+
+FIRST_PROFILE_WIDTH = 65_536
 
 
 def beam_width(value):
@@ -64,7 +68,7 @@ def profile_grid_path(cache_dir, torch, inputs, cutlass_dir, blend, bfs_radius):
         hardware = None
     devices = [torch.cuda.get_device_properties(i) for i in range(2)]
     identity = {
-        "schema": 1,
+        "schema": 2,
         "runtime": sorted(runtime),
         "files": [hashlib.sha256(path.read_bytes()).hexdigest() for path in inputs],
         "devices": [[str(getattr(device, "uuid", "")), str(device)] for device in devices],
@@ -89,30 +93,74 @@ def load_grid(index):
     return None
 
 
-def prepare_profile_grid(graph, result, search, index, saved):
-    record = profile_record(result)
-    if saved is None:
-        saved = {"max": record, "profiles": {}}
+def profile_widths(ceiling):
+    return [1 << exponent for exponent in range(FIRST_PROFILE_WIDTH.bit_length() - 1,
+                                                ceiling.bit_length())
+            if 1 << exponent < ceiling] + [ceiling]
+
+
+def discover_maximum(graph, search, options, index):
+    from multigpubeamsearch import NativeBackendError
+    from multigpubeamsearch.beam_capacity import CapacityRejected
+
+    # A fixed-width call can ask the native planner to find the capacity limit
+    # without requiring the full-frontier throughput benchmark of native "max".
+    seed = graph.beam_search(
+        **search, beam_width=FIRST_PROFILE_WIDTH,
+        native_options=replace(options, calibration_discover_capacity=True),
+    )
+    admission = seed.native_metadata["profile"]["maximum_beam"]
+    ceiling = max(admission["effective_beam"], FIRST_PROFILE_WIDTH)
+    print(f"Native memory admission found {admission['effective_beam']:,} parents. "
+          "Checking execution.", flush=True)
+
+    # Try the admitted limit first, then a few nearby candidates before the
+    # coarser grid. Continue only when the native planner rejected capacity.
+    nearby = [ceiling - ceiling // divisor for divisor in (64, 32, 16, 8)]
+    candidates = set(profile_widths(ceiling))
+    candidates.update(width for width in nearby if width > FIRST_PROFILE_WIDTH)
+    rejected = []
+    for width in sorted(candidates, reverse=True):
+        try:
+            result = seed if width == FIRST_PROFILE_WIDTH else graph.beam_search(
+                **search, beam_width=width,
+            )
+        except NativeBackendError as error:
+            if (not isinstance(error.__cause__, CapacityRejected) and
+                    str(error) != "no measured inference batch admits the requested frontier"):
+                raise
+            print(f"Native execution plan rejected beam {width:,}: {error}", flush=True)
+            rejected.append(width)
+            continue
+        selected = profile_record(result)
+        if selected["effective_beam"] != width:
+            raise RuntimeError(f"Native search did not preserve beam {width:,}")
+        saved = {
+            "max": selected,
+            "capacity": {"admitted_beam": admission["effective_beam"],
+                         "search_complete": admission["search_complete"],
+                         "execution_rejected_beams": rejected},
+            "profiles": {str(FIRST_PROFILE_WIDTH): profile_record(seed), str(width): selected},
+        }
         save_grid(index, saved)
-    else:
-        saved["profiles"][str(record["effective_beam"])] = record
-    effective_max = saved["max"]["effective_beam"]
-    widths = [1 << exponent for exponent in range(16, effective_max.bit_length())
-              if 1 << exponent < effective_max] + [effective_max]
+        print(f"Selected maximum beam {width:,}", flush=True)
+        return saved, result
+    raise RuntimeError("No executable beam width was found")
+
+
+def prepare_profile_grid(graph, result, search, index, saved, cold):
+    record = profile_record(result)
+    widths = profile_widths(saved["max"]["effective_beam"])
     profiles = saved["profiles"]
-    reused = all(str(width) in profiles for width in widths)
+    reused = not cold and all(str(width) in profiles for width in widths)
+    profiles[str(record["effective_beam"])] = record
     saved.update(grid_reused=reused, last_search=record)
     # Write each completed point so an interrupted calibration can resume.
     for width in widths:
         if str(width) in profiles:
             continue
         print(f"Calibrating beam {width:,}", flush=True)
-        probe = graph.beam_search(
-            **search,
-            beam_width=width,
-            max_steps=search["bfs_radius"] + 2,
-            solution_mode="first",
-        )
+        probe = graph.beam_search(**search, beam_width=width)
         profiles[str(width)] = profile_record(probe)
         save_grid(index, saved)
     save_grid(index, saved)
@@ -196,39 +244,44 @@ def main(argv=None):
 
     work_dir = args.work_dir.resolve()
     cache_dir = work_dir / "cache"
-    enable_native(NativeOptions(num_gpus=2, cutlass_dir=cutlass_dir,
-                                cache_dir=cache_dir, autotune=True,
-                                calibration_pipeline_seconds=3600))
+    options = NativeOptions(num_gpus=2, cutlass_dir=cutlass_dir, cache_dir=cache_dir, autotune=True)
+    enable_native(options)
     search = dict(
         start_state=start, predictor=predictor, backend="native",
         use_child_scores=True, return_path=True,
         bfs_radius=min(args.bfs_radius, args.max_steps - 1),
         bfs_max_entries=30_000_000,
     )
-    requested_width = args.beam_width
-    index = saved = None
+    search.update(max_steps=args.max_steps, solution_mode="collect" if args.collect else "first")
+    width = args.beam_width
+    index = saved = result = None
+    cold = False
     if args.beam_width == "max":
         inputs = (puzzle_file, transformer_dir / "manifest.json", mlp_dir / "manifest.json")
         index = profile_grid_path(cache_dir, torch, inputs, cutlass_dir, [w, 1 - w],
                                   search["bfs_radius"])
+        probe = dict(search, start_state=starts["1020"], max_steps=search["bfs_radius"] + 2,
+                     solution_mode="first")
         saved = load_grid(index)
-        if saved is not None:
-            requested_width = saved["max"]["effective_beam"]
-            print(f"Using cached maximum beam {requested_width:,}", flush=True)
+        cold = saved is None
+        if cold:
+            saved, calibrated = discover_maximum(graph, probe, options, index)
+            if probe == search:
+                result = calibrated
+        width = saved["max"]["effective_beam"]
+        if not cold:
+            print(f"Using cached maximum beam {width:,}", flush=True)
 
-    result = graph.beam_search(
-        **search, beam_width=requested_width, max_steps=args.max_steps,
-        solution_mode="collect" if args.collect else "first",
-    )
+    if result is None:
+        result = graph.beam_search(**search, beam_width=width)
     result_path = save_result(result, graph, start, work_dir / "results",
                               metadata={"puzzle_id": args.puzzle_id, "blend": [w, 1 - w],
                                         "beam_width": args.beam_width,
-                                        "maximum_reused": saved is not None})
+                                        "maximum_reused": saved is not None and not cold})
     print(f"Puzzle {args.puzzle_id}  found={result.path_found}  length={result.path_length}")
     print(f"Result and profile: {result_path}")
     if index is not None and result.native_metadata.get("effective_beam_width"):
-        # Calibration depends on graph/model, not on the chosen start.
-        prepare_profile_grid(graph, result, dict(search, start_state=starts["1020"]), index, saved)
+        prepare_profile_grid(graph, result, probe, index, saved, cold)
 
 
 if __name__ == "__main__":

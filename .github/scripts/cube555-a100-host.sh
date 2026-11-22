@@ -56,12 +56,19 @@ from pathlib import Path
 evidence = Path(sys.argv[1])
 cold = json.loads((evidence / "cold-grid.json").read_text())
 warm = json.loads((evidence / "warm-grid.json").read_text())
-assert cold["max"]["requested_beam"] == warm["max"]["requested_beam"] == "max"
+assert cold["max"]["effective_beam"] == warm["max"]["effective_beam"]
+assert cold["capacity"] == warm["capacity"]
+assert cold["capacity"]["search_complete"] is True
+assert cold["max"]["effective_beam"] <= cold["capacity"]["admitted_beam"]
 assert cold["grid_reused"] is False and warm["grid_reused"] is True
 assert set(cold["profiles"]) == set(warm["profiles"])
+assert all(value["measurement_scope"] == "exact_admitted_component_capacities"
+           for value in cold["profiles"].values())
 assert warm["last_search"]["requested_beam"] == cold["max"]["effective_beam"]
 assert warm["last_search"]["effective_beam"] == cold["max"]["effective_beam"]
 assert warm["last_search"]["inference_cache_hit"] and warm["last_search"]["pipeline_cache_hit"]
+print(f"Native memory admission: {cold['capacity']['admitted_beam']:,}; "
+      f"rejected execution widths: {cold['capacity']['execution_rejected_beams']}")
 for stage, grid in (("cold", cold), ("warm", warm)):
     print(f"{stage}: beam {grid['max']['effective_beam']:,}; "
           f"inference cache {grid['last_search']['inference_cache_hit']}; "
