@@ -85,6 +85,7 @@ jobs:
               rust/beam-runtime/src/search_session.rs \
               rust/beam-runtime/src/cluster.rs \
               rust/beam-runtime/src/search_inputs.rs \
+              rust/beam-runtime/src/shared_profiles.rs \
               rust/beam-core/src/permutation.rs \
               rust/beam-core/src/search.rs \
               rust/beam-python/src/configuration.rs \
@@ -106,6 +107,7 @@ jobs:
               rust/beam-runtime/tests/session_preparation_identity.rs\
               rust/beam-runtime/tests/search_inputs.rs \
               rust/beam-runtime/tests/cluster.rs \
+              rust/beam-runtime/tests/shared_profiles.rs \
               rust/beam-runtime/tests/cnot_exchange.rs
             rustfmt --check --edition 2021 rust/beam-core/src/inference.rs rust/beam-core/src/cnot.rs rust/beam-core/tests/cnot.rs
             rustfmt --check --edition 2021 rust/beam-python/src/planning.rs
@@ -118,6 +120,7 @@ jobs:
             cargo test --locked -p beam-runtime --test session_preparation_identity
             cargo test --locked -p beam-runtime --test search_inputs
             cargo test --locked -p beam-runtime --test cluster
+            cargo test --locked -p beam-runtime --test shared_profiles
             cargo test --locked -p beam-native-sys cnot_tqp_scorer
             cargo check --locked -p beam-python
           } 2>&1 | tee test_results/refactor_20261120/cnot-rust-domain-fallback/cnot-rust-cpu.log

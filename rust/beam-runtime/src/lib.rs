@@ -28,6 +28,7 @@ pub mod profile_cache;
 mod resident;
 pub mod search_inputs;
 pub mod search_session;
+pub mod shared_profiles;
 pub mod telemetry;
 mod worker;
 pub mod working_capacity;

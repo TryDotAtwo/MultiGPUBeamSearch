@@ -251,9 +251,21 @@ with tempfile.TemporaryDirectory(prefix="beam-shared-profile-") as temporary:
     if find_profile(source_root, dict(profile_identity, beam=2_000_000)) is not None:
         raise AssertionError("Rust profile lookup accepted a mismatched workload")
 
+    from unittest.mock import patch
+    from multigpubeamsearch import rust_control
+
+    class OlderRustRuntime:
+        pass
+
+    with patch.object(rust_control, "extension", return_value=OlderRustRuntime()):
+        if find_profile(source_root, profile_identity) != parsed_rust_record:
+            raise AssertionError("the old-wheel Python profile fallback changed")
+
     (records / f"{profile_sha}.json").write_text("{}", encoding="utf-8")
     if native_profile_reader(str(profiles), json.dumps(profile_identity, sort_keys=True)) is not None:
         raise AssertionError("Rust profile lookup accepted a record with the wrong SHA")
+    if find_profile(source_root, profile_identity) is not None:
+        raise AssertionError("the Python adapter bypassed the Rust digest rejection")
 print("INSTALLED_RUST_SHARED_PROFILE_LOOKUP_PASS", flush=True)
 
 summary = {

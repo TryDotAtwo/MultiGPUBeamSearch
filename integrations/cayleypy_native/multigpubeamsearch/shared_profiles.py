@@ -7,6 +7,7 @@ from __future__ import annotations
 import hashlib
 import json
 from pathlib import Path
+from .errors import NativeUnavailable
 
 SCHEMA = 1
 MAX_BYTES = 2 << 20
@@ -42,9 +43,8 @@ def _json(path):
     return json.loads(path.read_text(encoding='utf-8'))
 
 
-def find_profile(source_dir, identity):
-    """Fail closed on malformed, mismatched or unhashed registry entries."""
-    if source_dir is None:return None
+def _find_profile_python(source_dir, identity):
+    """Compatibility reader for wheels without the Rust registry method."""
     root=(Path(source_dir)/'profiles').resolve()
     try:
         index=_json(root/'index.json')
@@ -71,10 +71,37 @@ def find_profile(source_dir, identity):
     return None
 
 
+def find_profile(source_dir, identity):
+    """Use the Rust registry reader, with an old-wheel Python fallback."""
+    if source_dir is None:
+        return None
+    try:
+        from .rust_control import extension
+        native = extension()
+    except (ImportError, NativeUnavailable):
+        native = None
+    reader = getattr(native, 'find_shared_profile', None)
+    if callable(reader):
+        try:
+            encoded = reader(
+                str(Path(source_dir) / 'profiles'),
+                json.dumps(identity, sort_keys=True, allow_nan=False),
+            )
+            if encoded is None:
+                return None
+            if not isinstance(encoded, str):
+                return None
+            value = json.loads(encoded)
+            return value if isinstance(value, dict) else None
+        except (OSError, RuntimeError, TypeError, ValueError, OverflowError):
+            return None
+    return _find_profile_python(source_dir, identity)
+
+
 def lookup(contract, model, runtime, options, devices, beam):
     """An absent/old source bundle cannot disable normal local calibration."""
     source = getattr(options, 'source_dir', None)
-    if source is None or not (Path(source)/'profiles/index.json').is_file():
+    if source is None:
         return None
     try:
         return find_profile(source, compatibility(contract, model, runtime, devices, beam))
