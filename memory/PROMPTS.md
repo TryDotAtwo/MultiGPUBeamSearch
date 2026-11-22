@@ -1,3 +1,5 @@
+2026-11-22: Ivan requested a standalone Linux Cube555 Transformer/MLP blend through CayleyPy for a closed two-GPU cluster. The first `--beam-width max` should discover and tune a local grid, then reuse the matching profiles across invocations. Validate the archive checksum, `bash run.sh --check`, and cold/warm `bash run.sh --beam-width max --max-steps 2 --bfs-radius 0` on one Vast node with two A100s. Total Vast spend authorized: $30. Download from GitHub on the compute host.
+
 2026-11-19: Ivan authorized installing the repository Actions secret `VAST_API_KEY`. The current hosted Actions environment has already authenticated with this secret; the existing value must not be exposed in code, command arguments, or logs.
 
 2026-11-19: Ivan asked to continue the Rust + CUDA/C++ rewrite, including CNOT, without optimization; preserve multi-GPU architecture and Python compatibility, and synchronize verified changes with GitHub.

@@ -1,3 +1,10 @@
+## 2026-11-22 - Standalone Cube555 blend through CayleyPy
+
+- Added a Linux x86-64 bundle with the Cube555 graph, exported Transformer/MLP weights, CUTLASS and an offline Python 3.11 wheelhouse. The CLI registers the native CayleyPy backend and calls `graph.beam_search`. The default blend is 0.8 Transformer and 0.2 MLP.
+- On the first `--beam-width max`, the native planner estimates the inference reserve and admits a frontier on all ranks. The standalone searches at that width and uses exact-capacity component calibration for each point in the grid. Repeat runs use the saved width and validated native profiles. The grid identity excludes documentation checksums and binds to the compute inputs.
+- [Offline package and public registry test](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45006414821) passed at `4689df7624feb6010183991f12329f9d7dfb0a57`. [Runtime and model archive](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45006414821/artifacts/14748053274).
+- [Two-A100 validation](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45006623185) and [receipts](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45006623185/artifacts/14748483631). Both 40 GiB PCIe A100s passed the two-step search at width 119,287,808. Cold startup and the 12-point grid took 883 seconds. Warm startup took 15 seconds with inference and pipeline cache hits. The test measured components at their admitted capacities and exercised two search steps with BFS radius zero. The host downloaded the archive directly from GitHub. All rentals for this task were removed.
+
 ## 2026-11-21 - Make CNOT runtime acceptance select Rust explicitly
 
 - `tools/verify_cnot.py` accepts `--engine`, reports the selected engine and scorer runtime type, and `--require-rust-scorer` requires both the Rust controller and the PyO3 Rust-owned TQP scorer for trained checkpoint cases. The search algorithm and scorer numerics are unchanged.
