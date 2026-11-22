@@ -12,7 +12,7 @@ permissions:
   actions: read
 
 concurrency:
-  group: cube555-standalone-vast-a100
+  group: cube555-standalone-vast-61937382
   cancel-in-progress: false
 
 jobs:
@@ -21,6 +21,8 @@ jobs:
     timeout-minutes: 250
     env:
       CUBE555_BUNDLE_RUN: '45001314619'
+      CUBE555_LEASE_LABEL: cube555-a100-61937382-proxy
+      CUBE555_EXISTING_INSTANCE_ID: '61937382'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -36,14 +38,11 @@ jobs:
           run-id: ${{ env.CUBE555_BUNDLE_RUN }}
           name: cube555-standalone-max-linux-x86_64-py311
           path: ${{ runner.temp }}/cube555-bundle
-      - name: Check archive and prepare the Vast CLI
+      - name: Check the test harness
         run: |
           bash -n .github/scripts/cube555-vast.sh
           bash -n .github/scripts/cube555-a100-host.sh
-          cd "$RUNNER_TEMP/cube555-bundle"
-          sha256sum -c cube555-standalone-linux-x86_64-py311.tar.sha256
-          python -m pip install 'vastai==1.10.0'
-      - name: Rent two A100s and test cold and warm startup
+      - name: Test cold and warm startup on the existing A100 lease
         timeout-minutes: 215
         env:
           VAST_API_KEY: ${{ secrets.VAST_API_KEY }}
