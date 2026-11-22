@@ -3658,3 +3658,24 @@ logic, but only physical runs confirm the selected 3060 devices.
 The native Rust CNOT controller now creates one `beam_runtime::cnot_search::CnotRequest` during the existing collective admission phase. It owns the wire count, global width, effective shortlist, depth, mode, validation policy and requested engine as typed values. Shortlists are capped to the existing directed-gate alphabet, and the same validated values are used for native stage execution.
 
 Python still supplies the compatible tensor/model adapter and initialized distributed world. The request changes no row-XOR semantics, scoring, precision, kernel, stage order or collective. Hosted Rust/PyO3 and installed-wheel checks are the acceptance boundary for this control transfer; CUDA/NCCL hardware remains separately unverified.
+
+
+## Rank-consistent CNOT dispatch selection (2026-11-22)
+
+CNOT route selection consumes one snapshot of callable native bindings per rank.
+The existing control-group vote intersects those snapshots before the executor
+starts a search. A rank-local missing stage therefore cannot cause one rank to
+enter a Gloo vote while another enters a different phase. Strict acceptance
+rejects an incomplete required native set before the data plane. Public
+`auto` selects one shared route, preferring Rust compatibility stages when
+available; explicit `rust` returns a shared error if no Rust route is common.
+The selected route is passed to execution instead of being independently
+resolved again from the user's original engine string.
+
+The installed-wheel test covers missing native callables on either rank,
+strict failure before transport, common-route selection, explicit Rust failure,
+and a healthy auto retry in the same two-rank Gloo group. The same SHA also
+passed wide cutoff parity and separate topology/deduplication/tie fixtures.
+These are CPU/Gloo and installed-wheel checks; physical CUDA/NCCL acceptance
+remains pending.
+
