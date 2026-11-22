@@ -20,7 +20,38 @@ def valid_checks():
     }
 
 
+def top_level_job_body(workflow: str, name: str) -> str:
+    lines = workflow.splitlines()
+    marker = f"  {name}:"
+    start = next((index for index, line in enumerate(lines) if line == marker), None)
+    if start is None:
+        raise AssertionError(f"missing top-level job: {name}")
+    end = next(
+        (
+            index
+            for index in range(start + 1, len(lines))
+            if lines[index].startswith("  ")
+            and not lines[index].startswith("    ")
+            and lines[index].rstrip().endswith(":")
+        ),
+        len(lines),
+    )
+    return "\n".join(lines[start + 1 : end])
+
+
 class ProducerSourceGateTests(unittest.TestCase):
+    def test_top_level_job_parser_keeps_nested_needs_and_condition(self):
+        sample = (
+            "jobs:\n"
+            "  first:\n"
+            "    if: dispatch\n"
+            "    needs: [validate, gate]\n"
+            "  next:\n"
+            "    if: false\n"
+        )
+        body = top_level_job_body(sample, "first")
+        self.assertIn("needs: [validate, gate]", body)
+        self.assertNotIn("if: false", body)
     def test_three_successes_for_the_exact_producer_revision_pass(self):
         self.assertEqual(("passed", "none"), evaluate_source_gate(PRODUCER_SOURCE_SHA, valid_checks()))
 
@@ -60,7 +91,8 @@ class ProducerSourceGateTests(unittest.TestCase):
         self.assertIn("needs: [producer_manifest, producer_cpu_runtime, producer_cuda_build]", gate)
         for name in REQUIRED_CHECKS:
             self.assertIn(f"needs.producer_{name}", gate)
-        gpu = workflow.split("gpu-acceptance:", 1)[1].split("\n  ", 1)[0]
+        gpu = top_level_job_body(workflow, "gpu-acceptance")
+        self.assertTrue(gpu.strip())
         self.assertIn("needs: [validate-source, producer_source_gate]", gpu)
         self.assertIn("needs.producer_source_gate.outputs.status == 'passed'", gpu)
         self.assertIn("github.event_name == 'workflow_dispatch'", gpu)
