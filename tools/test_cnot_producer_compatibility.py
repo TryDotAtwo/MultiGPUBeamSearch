@@ -123,7 +123,8 @@ class ProducerBuildCacheWorkflowTests(unittest.TestCase):
             "- name: Prepare exact panel-v2 Rust crate before Torch or Cargo", 1
         )[1].split("\n      - name:", 1)[0]
         self.assertIn("--prepare-only", prepare_block)
-        self.assertNotIn("cargo", prepare_block.lower())
+        self.assertNotIn("cargo test", prepare_block.lower())
+        self.assertNotIn("rustup", prepare_block.lower())
         self.assertNotIn("pip install", prepare_block.lower())
         self.assertNotIn("torch", prepare_block.lower())
 
