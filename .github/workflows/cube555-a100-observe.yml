@@ -50,8 +50,8 @@ jobs:
           if [[ -d cube555-standalone/beam_run ]]; then
             find cube555-standalone/beam_run -name verification-budget.json -exec cat {} \;
             find cube555-standalone/beam_run -name cmake-build.log -exec tail -n 3 {} \;
-            find cube555-standalone/beam_run -path '*/profile-grids/*.json' -printf "%p\n"
-  find cube555-standalone/beam_run -name maximum-beam.json \
+            find cube555-standalone/beam_run -path "*/profile-grids/*.json" -print
+            find cube555-standalone/beam_run -name maximum-beam.json \
               -exec grep -E "effective_beam|full_step_verified|capacity_scope|working_capacity_failure" {} \; | tail -n 20
           fi'
           for attempt in 1 2 3; do
