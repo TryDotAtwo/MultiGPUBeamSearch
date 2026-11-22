@@ -11,6 +11,7 @@ use pyo3::{
 pub(crate) fn deduplicate_score<'py>(
     py: Python<'py>,
     stages: &Bound<'py, PyAny>,
+    strict_backend: bool,
 ) -> PyResult<Bound<'py, PyAny>> {
     let world = stages.getattr("world")?;
     let incoming = stages.getattr("incoming")?;
@@ -40,6 +41,7 @@ pub(crate) fn deduplicate_score<'py>(
             n.extract()?,
             words.extract()?,
             &scorer,
+            strict_backend,
             None,
         );
     }
@@ -57,7 +59,9 @@ pub(crate) fn deduplicate_score<'py>(
     let meta = distinct.get_item(1)?;
     let child_count = children.len()?;
     let values = if child_count != 0 {
-        let raw = scorer.call_method1("child_values", (&children,))?;
+        let raw = crate::cnot_scorer_dispatch::child_values(
+            py, &world, &scorer, &children, strict_backend,
+        )?;
         let expected = [i64::try_from(child_count).map_err(|_| {
             pyo3::exceptions::PyOverflowError::new_err("CNOT distinct count exceeds int64")
         })?];

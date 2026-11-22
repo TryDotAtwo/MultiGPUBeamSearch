@@ -347,7 +347,7 @@ def test_rust_top_level_controller_preserves_compatibility_stage_fallback(monkey
 
     def native_stages():
         events.append(("native-runner",))
-        return object()
+        return None
 
     class Stages:
         def root_is_goal(self):

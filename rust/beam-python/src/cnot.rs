@@ -376,6 +376,7 @@ impl PyCnotSearchInput {
 struct PyStages<'py> {
     py: Python<'py>,
     stages: Bound<'py, PyAny>,
+    strict_backend: bool,
 }
 
 impl Backend for PyStages<'_> {
@@ -502,7 +503,9 @@ impl Backend for PyStages<'_> {
                         self.py,
                         &world,
                         "rank parent actions and expand",
-                        crate::cnot_native_expand::expand(self.py, &self.stages, begin, k),
+                        crate::cnot_native_expand::expand(
+                            self.py, &self.stages, begin, k, self.strict_backend,
+                        ),
                     )?;
                     let expansion = expansion.downcast::<PyTuple>()?;
                     if expansion.len() != 2 {
@@ -563,7 +566,9 @@ impl Backend for PyStages<'_> {
                         self.py,
                         &world,
                         "deduplicate and evaluate distinct children",
-                        crate::cnot_native_dedup_score::deduplicate_score(self.py, &self.stages),
+                        crate::cnot_native_dedup_score::deduplicate_score(
+                            self.py, &self.stages, self.strict_backend,
+                        ),
                     )?;
                     let result = result.downcast::<PyTuple>()?;
                     if result.len() != 3 {
@@ -996,7 +1001,9 @@ fn run_cnot_native_search<'py>(
             "build CNOT compatibility stages",
             compatibility_stages,
         )?;
-        return Ok(run_cnot_with_options(py, stages, request.search_options())?.into_bound(py));
+        return Ok(run_cnot_with_options(
+            py, stages, request.search_options(), admitted_strict,
+        )?.into_bound(py));
     }
 
     let admitted_root = input_matrix.getattr("root")?;
@@ -1039,6 +1046,10 @@ fn run_cnot<'py>(
     alphabet: u32,
     max_depth: u64,
 ) -> PyResult<Py<PyAny>> {
+    let strict_backend = matches!(
+        std::env::var("MGBS_CNOT_STRICT_BACKEND").as_deref(),
+        Ok("1")
+    );
     run_cnot_with_options(
         py,
         stages,
@@ -1050,6 +1061,7 @@ fn run_cnot<'py>(
             alphabet,
             max_depth,
         },
+        strict_backend,
     )
 }
 
@@ -1057,8 +1069,9 @@ fn run_cnot_with_options<'py>(
     py: Python<'py>,
     stages: Bound<'py, PyAny>,
     options: Options,
+    strict_backend: bool,
 ) -> PyResult<Py<PyAny>> {
-    let mut backend = PyStages { py, stages };
+    let mut backend = PyStages { py, stages, strict_backend };
     let outcome = cnot_search::search(&mut backend, options)?;
     outcome_to_python(py, outcome)
 }
