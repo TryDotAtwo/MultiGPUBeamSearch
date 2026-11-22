@@ -342,13 +342,20 @@ class NativeSession:
             device_order=tuple(devices)
             visible_devices=os.environ.get('CUDA_VISIBLE_DEVICES')
             cuda_device_order=os.environ.get('CUDA_DEVICE_ORDER')
-            options_repr=repr(options)
             runtime_build=runtime.build_metadata if runtime is not None else None
-            runtime_build_key=json.dumps(runtime_build,sort_keys=True) if runtime is not None else None
-            identity=(contract.graph_hash,geometry,graph_content,model.artifact_hash,artifact_sizes,
-                model.backend,device_order,binding_scope,
-                beam_width,max_steps,options_repr,visible_devices,cuda_device_order,
-                runtime_build_key)
+            identity = None
+
+            def legacy_identity():
+                # Older extensions and Python-owned sessions retain the historical
+                # comparison key. A typed Rust owner compares its PreparationIdentity
+                # directly and must not depend on Python repr/options formatting.
+                options_repr = repr(options)
+                runtime_build_key = (json.dumps(runtime_build, sort_keys=True)
+                                     if runtime_build is not None else None)
+                return (contract.graph_hash, geometry, graph_content, model.artifact_hash, artifact_sizes,
+                        model.backend, device_order, binding_scope, beam_width, max_steps,
+                        options_repr, visible_devices, cuda_device_order, runtime_build_key)
+
             rust_preparation_identity_supported = False
             identity_key = None
             if self._engine == 'rust':
@@ -382,27 +389,6 @@ class NativeSession:
                         runtime_build=runtime_build,
                     )
                     rust_preparation_identity_supported = identity_key is not None
-            if identity_key is None:
-                preparation_identity = {
-                    'graph_hash': contract.graph_hash,
-                    'geometry': [None if value is None else int(value) for value in geometry],
-                    'center': None if center is None else [int(value) for value in center],
-                    'generators': None if generators is None else [
-                        [int(value) for value in move] for move in generators],
-                    'model_artifact_hash': model.artifact_hash,
-                    'artifact_sizes': None if artifact_sizes is None else [
-                        int(size) for size in artifact_sizes],
-                    'model_backend': model.backend,
-                    'devices': [int(device) for device in device_order],
-                    'binding_scope': bool(binding_scope),
-                    'beam_width': beam_width if type(beam_width) is str and beam_width == 'max' else int(beam_width),
-                    'max_steps': int(max_steps),
-                    'options_repr': options_repr,
-                    'cuda_visible_devices': visible_devices,
-                    'cuda_device_order': cuda_device_order,
-                    'runtime_build': runtime_build,
-                }
-                identity_key = json.dumps(preparation_identity, sort_keys=True)
             if (self.model_snapshot_cache is None
                     or not self.model_snapshot_cache.verify_for_launch(model, contract)):
                 verify_prepared_model(model,contract)
@@ -416,8 +402,15 @@ class NativeSession:
                     matcher = getattr(self._workers, 'preparation_matches', None)
                     if callable(matcher):
                         rust_identity_match = matcher(identity_key)
-            identity_changed = (identity != self._identity if rust_identity_match is None
-                                else not rust_identity_match)
+            if rust_identity_match is not None:
+                identity_changed = not rust_identity_match
+            elif self._workers is None:
+                # A new worker group has no prior preparation identity to compare.
+                identity_changed = True
+            else:
+                # Compatibility for old Rust worker extensions and Python owners.
+                identity = legacy_identity()
+                identity_changed = identity != self._identity
             preserve_rust_owner = (identity_changed and self._engine == 'rust'
                 and self._workers is not None
                 and callable(getattr(self._workers, 'configure', None)))
@@ -511,6 +504,8 @@ class NativeSession:
                     rust_preparation_identity_supported
                     and self._engine == 'rust' and callable(recorder)
                     and recorder(identity_key))
+                if not rust_owns_identity and identity is None:
+                    identity = legacy_identity()
                 self._identity = None if rust_owns_identity else identity
                 self._metadata = (None if rust_owns_metadata
                                   else deepcopy(outcome.metadata))
