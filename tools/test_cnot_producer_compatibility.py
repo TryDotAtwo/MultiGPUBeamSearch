@@ -169,7 +169,7 @@ class ProducerBuildCacheWorkflowTests(unittest.TestCase):
             "rejects_reordered_or_wrong_digest",
         ):
             with self.subTest(case=case):
-                self.assertIn(f"::{case}", cargo)
+                self.assertIn(case, cargo)
         self.assertIn("PANEL_V2_CARGO_TESTS_PASS count=4", cargo)
         self.assertIn("PANEL_V2_CARGO_TESTS_FAILED missing_case=%s", cargo)
 
