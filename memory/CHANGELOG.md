@@ -1,3 +1,9 @@
+## 2026-11-22 - Bind CNOT requests to rank geometry
+
+- Added `RankedCnotRequest` in `beam-runtime`. The validated request is bound to the active `rank/world` during the existing collective input-admission phase; invalid topology (`world=0`, `rank >= world`, or `world > 65536`) is rejected before native backend admission. Private fields and accessors preserve the validated contract.
+- The Rust CNOT adapter now uses the bound request for normalized search controls. Public Python signatures, tensors, stage ordering, collectives, scoring, kernels, precision and search semantics are unchanged.
+- On source SHA `25bc43abc1911d6a96c14d7c7d0c766a043f5f4d`, Rust CNOT CPU/Gloo passed in [run 44980014848](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44980014848), the installed PEP 517 wheel passed in [run 44980014912](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44980014912), hosted acceptance passed in [run 44980014854](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44980014854), and the panel-v2 CPU compile/handoff passed in [run 44980018575](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44980018575). The physical CUDA/NCCL job was skipped.
+
 
 ## 2026-11-22 - Validate CNOT lifecycle receipts by rank and phase
 
