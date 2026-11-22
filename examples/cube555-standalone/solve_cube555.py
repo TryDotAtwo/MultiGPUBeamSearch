@@ -185,6 +185,8 @@ def main(argv=None):
     parser.add_argument("--max-steps", type=int, default=140)
     parser.add_argument("--transformer-weight", type=float, default=0.8)
     parser.add_argument("--bfs-radius", type=int, default=5)
+    parser.add_argument("--calibration-seconds", type=int, default=90,
+                        help="Stream 1 calibration time limit per beam width (default: %(default)s s)")
     parser.add_argument("--collect", action="store_true", help="Collect replayable alternatives")
     parser.add_argument("--work-dir", type=Path, default=Path("beam_run"))
     parser.add_argument("--assets", type=Path, default=Path(__file__).resolve().parent / "assets")
@@ -196,6 +198,8 @@ def main(argv=None):
         parser.error("--transformer-weight must be between 0 and 1")
     if not 0 <= args.bfs_radius <= 5:
         parser.error("--bfs-radius must be between 0 and 5")
+    if args.calibration_seconds < 1:
+        parser.error("--calibration-seconds must be positive")
 
     assets = args.assets.resolve()
     puzzle_file = assets / "puzzle_info.json"
@@ -244,7 +248,8 @@ def main(argv=None):
 
     work_dir = args.work_dir.resolve()
     cache_dir = work_dir / "cache"
-    options = NativeOptions(num_gpus=2, cutlass_dir=cutlass_dir, cache_dir=cache_dir, autotune=True)
+    options = NativeOptions(num_gpus=2, cutlass_dir=cutlass_dir, cache_dir=cache_dir, autotune=True,
+                            calibration_seconds=args.calibration_seconds)
     enable_native(options)
     search = dict(
         start_state=start, predictor=predictor, backend="native",

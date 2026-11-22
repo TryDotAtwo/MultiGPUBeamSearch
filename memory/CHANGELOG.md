@@ -1,3 +1,8 @@
+## 2026-11-22 - Configurable Cube555 inference calibration deadline
+
+- Exposed the existing per-width Stream 1 calibration deadline as `--calibration-seconds` in the standalone CLI. The default remains 90 seconds. This option reuses compatible cached profiles.
+- Exercised interrupted grid recovery on CPU by injecting a timeout after a completed point. The retry passed 180 seconds to `NativeOptions`, reused the previously saved points, and finished the missing width in the fixture. GPU behavior after the reported cluster timeout remains unverified.
+
 ## 2026-11-22 - Standalone Cube555 blend through CayleyPy
 
 - Added a Linux x86-64 bundle with the Cube555 graph, exported Transformer/MLP weights, CUTLASS and an offline Python 3.11 wheelhouse. The CLI registers the native CayleyPy backend and calls `graph.beam_search`. The default blend is 0.8 Transformer and 0.2 MLP.
