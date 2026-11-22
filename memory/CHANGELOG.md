@@ -3,6 +3,7 @@
 - Kept the installed-wheel CUDA visibility test focused on the direct mapping helper now that the public child launcher uses the combined Rust child-environment plan.
 - The end-to-end child environment test continues to verify the installed Rust resolver, filtering, selected CUDA mask, NCCL path, legacy fallback and error behavior.
 - The current migration phase prioritizes permutation search; CNOT code and compatibility remain preserved while CNOT-specific development and acceptance are deferred.
+- Installed-wheel validation passed on source SHA `1e8b88cf6f188171bbe583875a400fca9095c5f8` in [run 45056737762](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45056737762), including direct CUDA mapping, the public combined child-environment resolver, and saturated permutation CPU cases.
 
 ## 2026-11-22 - Move public cluster planning into beam-runtime
 
