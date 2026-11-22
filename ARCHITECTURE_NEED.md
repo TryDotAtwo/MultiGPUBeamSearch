@@ -1,3 +1,9 @@
+## Rust-owned public cluster planning — 2026-11-22
+
+The public `plan_cluster` adapter now sends the validated per-node GPU counts, global beam width, shard count and batch alignment to `beam-runtime`. Rust returns the same ordered global/node/local rank mapping, exact global beam, per-rank frontier capacity and alignment. Python preserves the public dataclasses and validation errors, and uses the existing calculation only when an older extension does not export the resolver.
+
+This moves multi-node geometry policy without changing the requested/effective width, rank ordering, shard layout, transport, CUDA execution or hardware-verification status. Hosted CPU and installed-wheel verification is pending; physical CUDA/NCCL acceptance remains separate.
+
 ## Rust-owned permutation microbatch plan — 2026-11-22
 
 The existing integer plan for Stream 3's initial inference rows is resolved in beam-runtime, including the scalar-head row-to-parent mapping, four initial sort slots, 1024-row alignment, capacity scale and metadata fields. The Python adapter supplies typed request values and turns the plan into the same BEAM_B_MICRO environment value consumed by the existing runner. Older wheels retain the Python implementation. This transfers the current policy without changing candidate, search, model, kernel or precision behavior.

@@ -31,6 +31,16 @@ class ClusterPlan:
     hardware_verified: bool = False
 
 
+def _resolve_cluster_plan_python(counts, beam_width, shard_count, batch_alignment,
+                                alignment, capacity):
+    """Compatibility policy for installed extensions without the Rust planner."""
+    ranks = []
+    for node, count in enumerate(counts):
+        for local in range(count):
+            ranks.append(RankPlacement(len(ranks), node, local))
+    return ClusterPlan(tuple(ranks), beam_width, beam_width, alignment, capacity, shard_count)
+
+
 def plan_cluster(gpus_per_node, beam_width, *, shard_count=16, batch_alignment=1024):
     """Plan a block layout and the native exact top-k before memory admission."""
     counts = tuple(gpus_per_node)
@@ -47,11 +57,30 @@ def plan_cluster(gpus_per_node, beam_width, *, shard_count=16, batch_alignment=1
     capacity = (beam_width + world - 1) // world
     if alignment >= 2**64 or capacity >= 2**32:
         raise ValueError("native alignment or rank-local frontier index overflows")
-    ranks = []
-    for node, count in enumerate(counts):
-        for local in range(count):
-            ranks.append(RankPlacement(len(ranks), node, local))
-    return ClusterPlan(tuple(ranks), beam_width, beam_width, alignment, capacity, shard_count)
+
+    from .rust_control import resolve_cluster_plan
+
+    request = {
+        "gpus_per_node": list(counts),
+        "beam_width": beam_width,
+        "shard_count": shard_count,
+        "batch_alignment": batch_alignment,
+    }
+    plan = resolve_cluster_plan(request)
+    if plan is None:
+        return _resolve_cluster_plan_python(
+            counts, beam_width, shard_count, batch_alignment, alignment, capacity
+        )
+    ranks = tuple(RankPlacement(**rank) for rank in plan["ranks"])
+    return ClusterPlan(
+        ranks,
+        plan["requested_beam"],
+        plan["effective_beam"],
+        plan["alignment"],
+        plan["local_frontier_capacity"],
+        plan["shard_count"],
+        plan["hardware_verified"],
+    )
 
 
 @dataclass(frozen=True)

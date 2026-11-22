@@ -12,6 +12,98 @@ use std::{
 
 const MAX_WORLD_SIZE: u64 = 128;
 
+#[derive(Clone, Debug, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PlanRequest {
+    pub gpus_per_node: Vec<u32>,
+    pub beam_width: u64,
+    pub shard_count: u32,
+    pub batch_alignment: u32,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize)]
+pub struct PlannedRank {
+    pub global_rank: u64,
+    pub node_rank: u64,
+    pub local_rank: u64,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize)]
+pub struct ClusterPlan {
+    pub ranks: Vec<PlannedRank>,
+    pub requested_beam: u64,
+    pub effective_beam: u64,
+    pub alignment: u64,
+    pub local_frontier_capacity: u64,
+    pub shard_count: u32,
+    pub hardware_verified: bool,
+}
+
+/// Preserve the public cluster planner's existing integer rules in beam-runtime.
+pub fn plan_cluster(request: &PlanRequest) -> Result<ClusterPlan> {
+    if request.gpus_per_node.is_empty() || request.gpus_per_node.contains(&0) {
+        return Err(ClusterError::Invalid(
+            "each node must have a positive GPU count".into(),
+        ));
+    }
+    let world = request
+        .gpus_per_node
+        .iter()
+        .try_fold(0u64, |total, &count| total.checked_add(u64::from(count)))
+        .ok_or_else(|| ClusterError::Invalid("native cluster world size overflows".into()))?;
+    if world > MAX_WORLD_SIZE {
+        return Err(ClusterError::Invalid(format!(
+            "native final exchange supports at most {MAX_WORLD_SIZE} ranks"
+        )));
+    }
+    if request.beam_width == 0 {
+        return Err(ClusterError::Invalid(
+            "beam_width must be a positive uint64".into(),
+        ));
+    }
+    if request.shard_count == 0 {
+        return Err(ClusterError::Invalid(
+            "shard_count must be a positive uint32".into(),
+        ));
+    }
+    if request.batch_alignment == 0 {
+        return Err(ClusterError::Invalid(
+            "batch_alignment must be a positive uint32".into(),
+        ));
+    }
+    let alignment = u128::from(world)
+        * u128::from(request.shard_count)
+        * u128::from(request.batch_alignment);
+    let beam = u128::from(request.beam_width);
+    let capacity = (beam + u128::from(world) - 1) / u128::from(world);
+    if alignment >= (1u128 << 64) || capacity >= (1u128 << 32) {
+        return Err(ClusterError::Invalid(
+            "native alignment or rank-local frontier index overflows".into(),
+        ));
+    }
+
+    let mut ranks = Vec::with_capacity(world as usize);
+    for (node_rank, &count) in request.gpus_per_node.iter().enumerate() {
+        for local_rank in 0..u64::from(count) {
+            ranks.push(PlannedRank {
+                global_rank: ranks.len() as u64,
+                node_rank: node_rank as u64,
+                local_rank,
+            });
+        }
+    }
+
+    Ok(ClusterPlan {
+        ranks,
+        requested_beam: request.beam_width,
+        effective_beam: request.beam_width,
+        alignment: alignment as u64,
+        local_frontier_capacity: capacity as u64,
+        shard_count: request.shard_count,
+        hardware_verified: false,
+    })
+}
+
 #[derive(Debug, thiserror::Error)]
 pub enum ClusterError {
     #[error("{0}")]

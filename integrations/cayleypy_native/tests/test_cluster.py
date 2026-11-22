@@ -61,3 +61,40 @@ def test_slurm_global_rank_accepts_valid_node_local_mapping():
     assert (rank.global_rank, rank.node_rank, rank.local_rank, rank.world_size, rank.local_world_size) == (
         12, 1, 4, 14, 6
     )
+
+def test_public_cluster_plan_uses_rust_and_keeps_old_wheel_fallback(monkeypatch):
+    from multigpubeamsearch import cluster as cluster_module
+    from multigpubeamsearch import rust_control
+
+    request = {
+        "gpus_per_node": [2, 4, 1],
+        "beam_width": 1_000_003,
+        "shard_count": 16,
+        "batch_alignment": 1024,
+    }
+    observed = []
+    native_resolver = rust_control.resolve_cluster_plan
+
+    def observe(value):
+        observed.append(value)
+        return native_resolver(value)
+
+    monkeypatch.setattr(rust_control, "resolve_cluster_plan", observe)
+    fallback = cluster_module._resolve_cluster_plan_python
+
+    def forbidden_fallback(*args, **kwargs):
+        pytest.fail("installed Rust cluster planner fell back to Python")
+
+    monkeypatch.setattr(cluster_module, "_resolve_cluster_plan_python", forbidden_fallback)
+    plan = cluster_module.plan_cluster((2, 4, 1), 1_000_003)
+    assert observed == [request]
+    assert plan.ranks[0].global_rank == 0
+    assert plan.ranks[1].node_rank == 0 and plan.ranks[1].local_rank == 1
+    assert plan.ranks[2].node_rank == 1 and plan.ranks[2].local_rank == 0
+    assert (plan.alignment, plan.local_frontier_capacity) == (114_688, 142_858)
+    assert plan.effective_beam == plan.requested_beam == 1_000_003
+    assert not plan.hardware_verified
+
+    monkeypatch.setattr(rust_control, "resolve_cluster_plan", lambda _: None)
+    monkeypatch.setattr(cluster_module, "_resolve_cluster_plan_python", fallback)
+    assert cluster_module.plan_cluster((2, 4, 1), 1_000_003) == plan

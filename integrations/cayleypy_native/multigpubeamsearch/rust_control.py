@@ -250,6 +250,89 @@ def resolve_runtime_devices(visible_device_count, explicit_devices, num_gpus, gr
     return tuple(selected)
 
 
+def resolve_cluster_plan(request):
+    """Resolve the public multi-node rank layout in beam-runtime when available."""
+    fields = {"gpus_per_node", "beam_width", "shard_count", "batch_alignment"}
+    if type(request) is not dict or set(request) != fields:
+        raise NativeUnavailable("cluster plan request must contain the exact planning fields")
+    counts = request["gpus_per_node"]
+    if (
+        type(counts) not in (tuple, list)
+        or not counts
+        or any(type(count) is not int or not 0 < count <= (1 << 32) - 1 for count in counts)
+    ):
+        raise NativeUnavailable("cluster plan gpus_per_node must be positive uint32 values")
+    limits = {
+        "beam_width": (1, (1 << 64) - 1),
+        "shard_count": (1, (1 << 32) - 1),
+        "batch_alignment": (1, (1 << 32) - 1),
+    }
+    for name, (lower, upper) in limits.items():
+        value = request[name]
+        if type(value) is not int or not lower <= value <= upper:
+            raise NativeUnavailable(f"cluster plan {name} must be in [{lower}, {upper}]")
+    payload = dict(request, gpus_per_node=list(counts))
+    try:
+        encoded_request = json.dumps(payload, sort_keys=True, allow_nan=False)
+    except (TypeError, ValueError, OverflowError) as error:
+        raise NativeUnavailable("cluster plan request is not JSON-compatible") from error
+    try:
+        native = extension()
+    except (NativeUnavailable, ImportError):
+        return None
+    resolver = getattr(native, "resolve_cluster_plan", None)
+    if not callable(resolver):
+        return None
+    try:
+        encoded = resolver(encoded_request)
+    except (RuntimeError, ValueError, TypeError, OverflowError) as error:
+        raise NativeUnavailable(str(error)) from error
+    if not isinstance(encoded, str):
+        raise NativeUnavailable("Rust runtime returned an invalid cluster plan")
+    try:
+        plan = json.loads(encoded)
+    except (TypeError, ValueError) as error:
+        raise NativeUnavailable("Rust runtime returned malformed cluster-plan JSON") from error
+    expected = {
+        "ranks", "requested_beam", "effective_beam", "alignment",
+        "local_frontier_capacity", "shard_count", "hardware_verified",
+    }
+    if not isinstance(plan, dict) or set(plan) != expected:
+        raise NativeUnavailable("Rust runtime returned an invalid cluster plan")
+    ranks = plan["ranks"]
+    expected_rank_count = sum(counts)
+    rank_fields = {"global_rank", "node_rank", "local_rank"}
+    if not isinstance(ranks, list) or len(ranks) != expected_rank_count:
+        raise NativeUnavailable("Rust runtime returned an invalid cluster rank layout")
+    offset = 0
+    for node, count in enumerate(counts):
+        for local in range(count):
+            rank = ranks[offset]
+            if (
+                not isinstance(rank, dict)
+                or set(rank) != rank_fields
+                or any(type(rank[name]) is not int for name in rank_fields)
+                or rank != {"global_rank": offset, "node_rank": node, "local_rank": local}
+            ):
+                raise NativeUnavailable("Rust runtime returned an invalid cluster rank layout")
+            offset += 1
+    for name in (
+        "requested_beam", "effective_beam", "alignment",
+        "local_frontier_capacity", "shard_count",
+    ):
+        if type(plan[name]) is not int or not 0 < plan[name] < (1 << 64):
+            raise NativeUnavailable("Rust runtime returned an invalid cluster plan")
+    if (
+        plan["requested_beam"] != request["beam_width"]
+        or plan["effective_beam"] != request["beam_width"]
+        or plan["shard_count"] != request["shard_count"]
+        or plan["hardware_verified"] is not False
+        or plan["local_frontier_capacity"] >= (1 << 32)
+    ):
+        raise NativeUnavailable("Rust runtime returned an inconsistent cluster plan")
+    return plan
+
+
 def resolve_microbatch_plan(request):
     """Resolve the established inference-row plan in beam-runtime when available."""
     fields = {

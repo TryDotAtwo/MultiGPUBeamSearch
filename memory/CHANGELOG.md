@@ -1,3 +1,9 @@
+## 2026-11-22 - Move public cluster planning into beam-runtime
+
+- The public multi-node `plan_cluster` adapter now delegates block rank placement, exact beam capacity and aligned shard geometry to a typed Rust plan.
+- Kept the same Python API, validation limits and result dataclasses. Wheels without the Rust planning function keep the existing Python formula.
+- Added installed-wheel assertions for the real public helper and legacy fallback, plus exact Rust CPU checks for uneven node sizes and overflow rejection.
+
 ## 2026-11-22 - Move permutation microbatch planning into beam-runtime
 
 - Added a typed Rust request and plan for the existing integer microbatch formula; kept all alignment, capacity, row-limit, scalar-head, ensemble and environment semantics unchanged.
