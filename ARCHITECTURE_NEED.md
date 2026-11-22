@@ -1,3 +1,22 @@
+
+## CNOT Gloo lifecycle receipts — 2026-11-22
+
+The installed-wheel lifecycle check records each phase independently on both
+Gloo ranks. For engine mismatch, it validates each rank's requested engine
+(`auto` on rank 0 and `python` on rank 1) separately, while both receipts
+must record the same consensus rejection. Rank-local scorer failures and their
+healthy retries also require matching phase receipts from both ranks.
+
+`verify_cnot.py` owns the global result report on rank 0 only. The aggregate
+therefore requires exactly the three rank-0 retry reports
+`healthy-after-engine-mismatch-0.json`, `healthy-after-0-0.json`, and
+`healthy-after-1-0.json`, each solved with bitwise replay. It does not require
+or infer a report from rank 1. The CPU receipt fixture rejects missing phases,
+wrong rank identity and missing root replay evidence.
+
+At code SHA `c59d6294c11c411c9c1eaad54115b689b00a10a3`, the installed-wheel
+Gloo lifecycle passed in [run 44977925758](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44977925758); the physical GPU job was skipped.
+
 ## CNOT public dispatch ownership — 2026-11-22
 
 The public CNOT entry point obtains its runtime route from typed `beam-runtime` policy. The capability snapshot is rank-agreed before selection. The policy selects the Rust controller, the Rust controller with compatibility stages, or the Python reference path; strict acceptance requires the complete Rust controller/stage/transport capability set and fails closed. Older extension builds retain their ordinary compatibility path. This does not yet move PyTorch's Gloo control-group object out of the Python adapter; that lifecycle remains an open migration boundary. Search order, score semantics and kernels are unchanged.
