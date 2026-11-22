@@ -26,7 +26,13 @@ _MODEL = {
     "feature_schema": "runtime_packet_layout_v25",
     "input_slots": 102,
 }
-_LOCKED_STATUSES = {"length_gain", "coverage_gain", "tie", "no_practical_gain"}
+_SEARCH_CONFIG = {
+    "global_width": 36,
+    "shortlist": 4,
+    "max_depth": 8,
+    "max_expansions": 201,
+}
+_LOCKED_STATUSES = {"length_gain", "coverage_gain", "combined_gain", "tie", "no_practical_gain"}
 
 
 class HandoffError(ValueError):
@@ -155,6 +161,24 @@ def _comparison_digest(comparison: dict[str, Any]) -> str:
 
 
 _ORIENTATION = "row_target_xor_row_control"
+
+
+def validate_search_contract(search: object) -> int:
+    """Validate the pinned v13 B/K/D/E preset and its frontier expansion bound."""
+    if not isinstance(search, dict) or search != _SEARCH_CONFIG:
+        raise HandoffError("search configuration differs from the supported CNOT preset")
+    if any(type(search.get(name)) is not int for name in _SEARCH_CONFIG):
+        raise HandoffError("search configuration fields must be exact integers")
+    width = search["global_width"]
+    shortlist = search["shortlist"]
+    depth = search["max_depth"]
+    capacities = [1]
+    for _ in range(1, depth):
+        capacities.append(min(width, shortlist * capacities[-1]))
+    upper_bound = sum(capacities)
+    if upper_bound != search["max_expansions"]:
+        raise HandoffError("max_expansions differs from the v13 whole-frontier upper bound")
+    return upper_bound
 
 
 def _sealed_panel_roots(
@@ -364,7 +388,6 @@ def resolve_panel_v2_handoff(
         root, handoff.get("search_manifest"), "panel search manifest"
     )
 
-    training_manifest_value = _json_object(train_manifest_path, "training manifest")
     if (
         receipt.get("dataset_sha256") != dataset_sha
         or receipt.get("search") != search
@@ -424,6 +447,7 @@ def resolve_panel_v2_handoff(
     ):
         raise HandoffError("panel, search configuration or scorer differs from the handoff")
 
+    validate_search_contract(search)
     _manifest_pin(
         root,
         search_path,
