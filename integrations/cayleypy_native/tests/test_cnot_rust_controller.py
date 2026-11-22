@@ -127,7 +127,7 @@ def test_rust_top_level_controller_owns_cnot_admission_and_stage_dispatch():
         ("native-runner",),
         ("all-ranks-support", True),
         ("native-stages", world, admitted_root, identity, input_matrix, scorer,
-         "qhat", True, 5, 6, 6, 4, {"admitted_topology": (0, 1)}),
+         "qhat", True, 5, 6, 6, 4, None, {"admitted_topology": (0, 1)}),
     ]
 
 
