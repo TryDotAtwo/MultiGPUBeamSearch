@@ -6,7 +6,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from handoff import HandoffError, resolve_panel_v2_handoff
+from handoff import HandoffError, resolve_panel_v2_handoff, validate_search_contract
 
 
 def digest_bytes(data):
@@ -224,6 +224,32 @@ class PanelV2HandoffTests(unittest.TestCase):
         self.assertEqual(resolved.panel_ids, tuple(self.case_ids))
         self.assertEqual(resolved.panel_digest, self.panel_digest)
         self.assertEqual(resolved.locked_test_status, "length_gain")
+        self.assertEqual(resolved.dataset_path, self.dataset_path.resolve())
+        self.assertEqual(resolved.orientation, "row_target_xor_row_control")
+        self.assertEqual(resolved.artifact_path_policy, "same_run_root_mount")
+        self.assertEqual(
+            [(root["panel_index"], root["case_id"], root["dimension"], root["orientation"])
+             for root in resolved.panel_roots],
+            [(3, "locked-case-a", 2, "row_target_xor_row_control"),
+             (9, "locked-case-b", 2, "row_target_xor_row_control")],
+        )
+
+    def test_supported_search_geometry_has_exact_v13_frontier_bound(self):
+        self.assertEqual(validate_search_contract(self.search), 201)
+
+    def test_rejects_altered_or_boolean_search_budget_fields(self):
+        for name, value in (
+            ("global_width", 35),
+            ("shortlist", 3),
+            ("max_depth", 7),
+            ("max_expansions", 200),
+            ("max_expansions", True),
+        ):
+            with self.subTest(name=name, value=value):
+                changed = copy.deepcopy(self.search)
+                changed[name] = value
+                with self.assertRaises(HandoffError):
+                    validate_search_contract(changed)
 
     def test_rejects_a_changed_training_result_even_when_json_still_parses(self):
         self.training_result.write_text('{"schema":"changed"}', encoding="utf-8")
