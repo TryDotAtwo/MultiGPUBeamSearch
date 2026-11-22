@@ -2,6 +2,7 @@
 from datetime import timedelta
 import json
 import os
+import re
 from pathlib import Path
 import tempfile
 
@@ -17,6 +18,14 @@ from multigpubeamsearch.rust_control import extension
 
 RUNTIME = extension()
 _diagnostic_case = "startup"
+_diagnostic_detail = None
+
+
+def _safe_error_detail(error):
+    text = " ".join(str(error).split())
+    text = re.sub(r"[0-9a-fA-F]{32,}", "<digest>", text)
+    text = re.sub(r"(?:[A-Za-z]:)?[\\/][^\s:]+", "<path>", text)
+    return text[:160]
 
 
 class FlatScorer:
@@ -188,6 +197,19 @@ def admitted_backend_mode_worker(rank, rendezvous, output_dir):
                 ),
                 encoding="utf-8",
             )
+    except Exception as error:
+        Path(output_dir, f"rank-{rank}.failure.json").write_text(
+            json.dumps(
+                {
+                    "rank": rank,
+                    "type": type(error).__name__,
+                    "detail": _safe_error_detail(error),
+                },
+                sort_keys=True,
+            ),
+            encoding="utf-8",
+        )
+        raise
     finally:
         World.gather_fixed = original_gather_fixed
         if old_value is None:
@@ -348,12 +370,24 @@ def main():
         mode_dir = root / "admitted-backend-mode"
         mode_dir.mkdir()
         mode_rendezvous = (mode_dir / "rendezvous").resolve().as_uri()
-        mp.spawn(
-            admitted_backend_mode_worker,
-            args=(mode_rendezvous, str(mode_dir)),
-            nprocs=2,
-            join=True,
-        )
+        try:
+            mp.spawn(
+                admitted_backend_mode_worker,
+                args=(mode_rendezvous, str(mode_dir)),
+                nprocs=2,
+                join=True,
+            )
+        except Exception:
+            global _diagnostic_detail
+            for rank in (0, 1):
+                failure_path = mode_dir / f"rank-{rank}.failure.json"
+                if failure_path.is_file():
+                    failure = json.loads(failure_path.read_text(encoding="utf-8"))
+                    _diagnostic_detail = (
+                        failure["rank"], failure["type"], failure["detail"]
+                    )
+                    break
+            raise
         mode_reports = [
             json.loads((mode_dir / f"rank-{rank}.json").read_text())
             for rank in range(2)
@@ -441,8 +475,16 @@ if __name__ == "__main__":
     except Exception as error:
         # Publish only a bounded case label and exception type; full traces stay
         # in the runner's private temporary log.
+        detail = ""
+        if _diagnostic_detail is not None:
+            rank, worker_type, worker_detail = _diagnostic_detail
+            detail = (
+                f" rank={rank} worker_type={worker_type}"
+                f" worker_detail={json.dumps(worker_detail, ensure_ascii=True)}"
+            )
         print(
-            f"CNOT_PHASE_FAILURE case={_diagnostic_case} type={type(error).__name__}",
+            f"CNOT_PHASE_FAILURE case={_diagnostic_case} type={type(error).__name__}"
+            f"{detail}",
             flush=True,
         )
         raise
