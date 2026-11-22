@@ -111,6 +111,7 @@ while not (directory/'stop').exists():
         cuda_visible_devices: None,
         cuda_device_order: None,
         runtime_build: Some(identity.runtime_build.clone()),
+        resolved_inference_plan: None,
     };
     for (index, start) in [vec![1, 0, 2, 3], vec![0, 1, 3, 2], vec![1, 0, 3, 2]]
         .iter()
@@ -211,6 +212,7 @@ while not (directory/'stop').exists():
         cuda_visible_devices: None,
         cuda_device_order: None,
         runtime_build: Some(identity.runtime_build.clone()),
+        resolved_inference_plan: None,
     };
     session.remember_preparation(&preparation).unwrap();
     assert!(session.begin_preparation(&preparation).unwrap());

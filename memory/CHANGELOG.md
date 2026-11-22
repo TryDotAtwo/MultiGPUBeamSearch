@@ -1,5 +1,6 @@
 ## 2026-11-22 - Include the resolved inference plan in Rust session identity
 
+- The installed-wheel identity test requires the schema-v3 native extension and passes its canonical JSON identity through the real PyO3 `SearchSession` API; the session test checks same-plan reuse and invalidation after plan or model changes.
 - Extended typed permutation preparation identity with the resolved backend, policy and row limit from the Rust inference resolver. A repeated `NativeSession` call can reuse its resident rank owner only when the plan and other preparation inputs match; a changed plan invalidates preparation.
 - Kept schema-v2 extension compatibility by carrying the plan inside its existing structured options object.
 - The installed-wheel inference-policy check calls the actual installed Rust extension through `prepare_runtime` and verifies the runner selection and resulting profile.

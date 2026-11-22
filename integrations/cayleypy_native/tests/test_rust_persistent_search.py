@@ -76,9 +76,14 @@ def test_compiled_rust_preparation_identity_uses_structured_options():
 
     try:
         runtime = rust_control.extension()
-    except NativeUnavailable:
+    except NativeUnavailable as error:
+        if os.environ.get("REQUIRE_RUST_PREPARATION_IDENTITY") == "1":
+            raise AssertionError(
+                "installed-wheel gate requires the compiled Rust preparation API"
+            ) from error
         pytest.skip("Rust extension is not built in this CPU-only job")
 
+    assert getattr(runtime, "PREPARATION_IDENTITY_SCHEMA_VERSION", 0) >= 3
     build = getattr(runtime, "build_preparation_identity", None)
     assert callable(build), "Rust preparation identity builder is missing"
     plan = {
@@ -92,7 +97,7 @@ def test_compiled_rust_preparation_identity_uses_structured_options():
         "source_dir": "/remote/project",
         "resolved_inference_plan": plan,
     }
-    identity = json.loads(build(
+    identity_json = build(
         "a" * 64,
         [4, 4, 2],
         [0, 1],
@@ -108,7 +113,8 @@ def test_compiled_rust_preparation_identity_uses_structured_options():
         "0",
         "PCI_BUS_ID",
         json.dumps({"binary_sha256": "c" * 64}),
-    ))
+    )
+    identity = json.loads(identity_json)
     assert identity["options"] == {
         "inference_backend": "cutlass",
         "calibration_frontier_max_states": 1234,
@@ -118,9 +124,9 @@ def test_compiled_rust_preparation_identity_uses_structured_options():
     assert "options_repr" not in identity
 
     session = runtime.SearchSession()
-    assert session.begin_preparation(identity) is False
-    session.remember_preparation(identity)
-    assert session.begin_preparation(identity) is True
+    assert session.begin_preparation(identity_json) is False
+    session.remember_preparation(identity_json)
+    assert session.begin_preparation(identity_json) is True
     changed_plan = dict(plan, inference_row_limit=4096)
     options["resolved_inference_plan"] = changed_plan
     changed_identity = build(
@@ -428,13 +434,14 @@ def test_rust_session_reuses_and_releases_rank_owner(tmp_path, monkeypatch, worl
         assert len(owners) == 1 and not owners[0].closed
         assert len(owners[0].requests) == 4
         assert owners[0].preparation_checks == []
-        assert len(owners[0].preparation_begins) == 2
+        assert len(owners[0].preparation_begins) == 3
         assert owners[0].preparation_resets == 2
         assert owners[0].preparation_records == []
         assert len(owners[0].preparation_results) == 3
         assert owners[0].preparation_begins[0] == owners[0].preparation_results[0][0]
         assert owners[0].preparation_begins[1] != owners[0].preparation_results[0][0]
         assert owners[0].preparation_begins[1] == owners[0].preparation_results[1][0]
+        assert owners[0].preparation_begins[2] != owners[0].preparation_results[1][0]
         assert owners[0].preparation_begins[2] == owners[0].preparation_results[2][0]
         assert json.loads(owners[0].preparation_results[0][0])["resolved_inference_plan"] == {
             "backend": "cutlass",
