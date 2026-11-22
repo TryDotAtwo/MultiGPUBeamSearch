@@ -1,7 +1,7 @@
 # Rust + CUDA/C++ migration acceptance status
 
 Source branch: `codex/beam-3060-preflight-20261121`
-Latest tested code SHA: `87e1726e9aad31bae211e7ee07c3ee077729dfc6`
+Latest tested code SHA: `57bf4f0deb90e1b0009b1a458968e5ca4096fe23`
 Base main SHA: `e6c41b6dc6bb3a839f6338f3cfe9eaadf8608d5a`
 
 | Gate | Status | Evidence |
@@ -85,3 +85,12 @@ Tested code SHA: `25bc43abc1911d6a96c14d7c7d0c766a043f5f4d`.
 
 This is hosted CPU and installed-wheel evidence only. The CNOT controller still receives topology from Python `World`; native context ownership and physical 1/2-GPU parity remain open.
 
+
+
+## Latest verified source gate — 2026-11-22
+
+Tested code SHA: `57bf4f0deb90e1b0009b1a458968e5ca4096fe23`.
+
+- Installed PEP 517 wheel outside the checkout: PASS, all 27 steps in [run 44983817156](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44983817156). This includes rank-local two-rank Gloo event receipts, separate engine-input validation, rank-zero-only solved/bitwise replay reports, CNOT cutoff and topology fixtures, and the panel-v2 byte-binding regression.
+- Pinned panel-v2 producer CPU compile and synthetic handoff: PASS, [runs 44983817105](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44983817105) and [44983819836](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44983819836).
+- Physical CUDA/NCCL: SKIPPED; no instance was dispatched. Installed-wheel/Gloo and panel CPU results do not establish GPU execution, checkpoint scorer parity on hardware, or 1/2-GPU parity.
