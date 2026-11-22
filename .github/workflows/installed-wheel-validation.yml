@@ -99,6 +99,17 @@ jobs:
           mkdir -p "$RUNNER_TEMP/mgbs-wheel-smoke"
           cd "$RUNNER_TEMP/mgbs-wheel-smoke"
           env -u PYTHONPATH python "$GITHUB_WORKSPACE/integrations/cayleypy_native/tests/installed_wheel_smoke.py" > "${RUNNER_TEMP}/mgbs-private-smoke.log" 2>&1
+      - name: Verify rank-consistent CNOT dispatch on installed wheel
+        id: cnot_dispatch_consensus
+        env:
+          PYTHONWARNINGS: error::DeprecationWarning
+        run: |
+          set -o pipefail
+          cd "$RUNNER_TEMP/mgbs-wheel-smoke"
+          timeout --signal=TERM --kill-after=15s 180s \
+            env -u PYTHONPATH python -m torch.distributed.run --standalone --nproc_per_node=2 \
+            "$GITHUB_WORKSPACE/integrations/cayleypy_native/tests/installed_cnot_dispatch_consensus.py" \
+            > "${RUNNER_TEMP}/mgbs-private-cnot-dispatch-consensus.log" 2>&1
       - name: Verify receipt-driven CNOT panel endpoint with the installed CPU wheel
         id: cnot_handoff_endpoint
         run: |
@@ -183,17 +194,6 @@ jobs:
           print("INSTALLED_GPU_IDENTITY_HELPER=" + identity.__file__)
           PY
           python "$GITHUB_WORKSPACE/tools/test_cnot_gpu_identity.py" -v
-      - name: Verify rank-consistent CNOT dispatch on installed wheel
-        id: cnot_dispatch_consensus
-        env:
-          PYTHONWARNINGS: error::DeprecationWarning
-        run: |
-          set -o pipefail
-          cd "$RUNNER_TEMP/mgbs-wheel-smoke"
-          timeout --signal=TERM --kill-after=15s 180s \
-            env -u PYTHONPATH python -m torch.distributed.run --standalone --nproc_per_node=2 \
-            "$GITHUB_WORKSPACE/integrations/cayleypy_native/tests/installed_cnot_dispatch_consensus.py" \
-            > "${RUNNER_TEMP}/mgbs-private-cnot-dispatch-consensus.log" 2>&1
       - name: Verify CNOT Gloo receipt contract on hosted CPU
         id: gloo_receipt_contract
         run: |
