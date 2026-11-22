@@ -17,7 +17,7 @@ from typing import Any
 _SHA1 = re.compile(r"[0-9a-f]{40}\Z")
 _SHA256 = re.compile(r"[0-9a-f]{64}\Z")
 _HANDOFF_SCHEMA = "cnot103_multigpu_beam_handoff_v3"
-EXPECTED_PRODUCER_SOURCE_REVISION = "01eb7c8f85b89ec6814f7f326c3612c64d5d96d9"
+EXPECTED_PRODUCER_SOURCE_REVISION = "7310b1eb5ec07c76c131ba8c60b105ff4aad7a9c"
 EXPECTED_PRODUCER_EMITTER_SHA256 = "2a6f579be0b1426a451aadf06709fa027b17eb7170f7b694d945acf81e070bf1"
 _RECEIPT_SCHEMA = "cnot103_learning_curve_campaign_v1"
 _SEARCH_SCHEMA = "cnot103_panel_search_v2"
