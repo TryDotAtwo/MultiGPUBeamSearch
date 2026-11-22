@@ -3841,3 +3841,6 @@ The public `cluster.scheduler_rank` path uses the typed `beam-runtime` resolver 
 ## Rust-owned scheduler-to-CUDA ordinal mapping
 
 `ScheduledRank.cuda_ordinal` now delegates its existing single-visible-device and local-rank rules to `beam-runtime` through a versioned PyO3 function. The public method, error text, and old-wheel compatibility fallback remain unchanged. This only maps an already assigned scheduler rank into the process-local CUDA namespace; it does not bind devices, alter `CUDA_VISIBLE_DEVICES`, launch ranks, or initialize NCCL. The extension's ordinary rank resolver and CUDA ordinal API use separate version constants.
+
+
+The scheduler-to-CUDA ordinal transfer was validated on code SHA `935016b513a742067f3be11315b7013a322dbefc`: Rust CPU/Gloo passed in [run 45054019605](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45054019605), the installed PEP 517 wheel passed in [run 45054019597](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45054019597), and hosted acceptance passed in [run 45054020205](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45054020205). The physical GPU job was skipped.

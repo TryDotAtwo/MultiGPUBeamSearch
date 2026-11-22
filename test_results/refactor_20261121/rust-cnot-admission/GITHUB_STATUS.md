@@ -1,28 +1,36 @@
 # Rust + CUDA/C++ migration acceptance status
 
 Source branch: `codex/beam-3060-preflight-20261121`
-Latest tested code SHA: `a96be795a011174d7f244c06f1593a62b16e6c27`
+Latest tested code SHA: `935016b513a742067f3be11315b7013a322dbefc`
 Base main SHA: `e6c41b6dc6bb3a839f6338f3cfe9eaadf8608d5a`
 
 | Gate | Status | Evidence |
 |---|---|---|
-| Rust CNOT CPU/Gloo suite | PASS | [run 45052314834](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45052314834) passed on `a96be79`. |
-| Installed PEP 517 wheel outside checkout | PASS | [run 45052314835](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45052314835) passed, including the Rust scheduler-rank resolver and public torchrun/Slurm helper. |
-| Panel-v2 producer compatibility | PASS | The current producer emitter at `eafc0f82f088603a525f428a8fa3d00e9e702fa8` serialized a handoff accepted by the consumer in [run 45051759583](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45051759583) on `8565e8b`; the handoff inputs were unchanged in `a96be79`. |
-| Hosted acceptance harness | PASS | [run 45052315268](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45052315268) passed on hosted CPU; the physical GPU job was skipped. |
+| Rust CNOT CPU/Gloo suite | PASS | [run 45054019605](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45054019605) passed on `935016b`, including Rust cluster rank and CUDA ordinal contracts. |
+| Installed PEP 517 wheel outside checkout | PASS | [run 45054019597](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45054019597) passed with the real installed extension and public `ScheduledRank.cuda_ordinal` path. |
+| Panel-v2 producer compatibility | PASS | The actual producer emitter at `eafc0f82f088603a525f428a8fa3d00e9e702fa8` was accepted by the consumer in [run 45051759583](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45051759583); producer/handoff inputs are unchanged. |
+| Hosted acceptance harness | PASS | [run 45054020205](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45054020205) passed on hosted CPU; physical and private producer jobs were skipped. |
 | Permutation CPU acceptance | PASS on CPU | Installed-wheel replay/reuse and saturated LRX(5), B=3 oracle cases remain covered. No physical permutation parity is claimed. |
 | CUDA/NCCL permutation and trained CNOT on physical 1/2 GPUs | PENDING | No physical CUDA/NCCL execution, trained checkpoint replay, physical rank participation, exact hardware replay, or 1-/2-GPU parity has been run. |
 | Vast campaign staging and total storage cost | BLOCKED | Trusted private GL4 manifest/checkpoint staging and complete storage-cost disposition remain unresolved. No paid instance was started. |
-| Full Rust ownership migration | IN PROGRESS | Rust owns permutation device selection, inference profile/microbatch planning, cluster geometry and scheduler-rank parsing, and typed session identity. Python still prepares some model/world inputs; PR #10 remains draft. |
+| Full Rust ownership migration | IN PROGRESS | Rust owns permutation device selection, inference profile/microbatch planning, cluster geometry and scheduler parsing, typed session identity, and CUDA ordinal policy. Python still prepares some model/world inputs; PR #10 remains draft. |
 
 Hosted CPU and installed-wheel evidence does not establish physical CUDA/NCCL execution or complete the Rust migration.
 
+## Rust-owned scheduler-to-CUDA ordinal mapping — 2026-11-22
+
+- `ScheduledRank.cuda_ordinal` delegates to a separately versioned Rust runtime API. Single-visible-device mapping, local ordinal mapping, error text and old-wheel fallback remain compatible.
+- Rust CPU/Gloo validation passed on tested SHA `935016b513a742067f3be11315b7013a322dbefc`: [run 45054019605](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45054019605). It ran the runtime cluster contract tests and Rust formatting checks.
+- Installed PEP 517 wheel validation passed outside the checkout: [run 45054019597](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45054019597). Tests called the actual installed extension through the public method, checked single/multi-visible-device behavior, invalid inputs, propagated errors, and the legacy fallback.
+- Hosted acceptance passed: [run 45054020205](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45054020205). The physical GPU job was skipped. Intermediate test-fixture and formatting failures were corrected before this tested SHA.
+
 ## Rust-owned torchrun/Slurm scheduler rank resolution — 2026-11-22
 
-- The public `cluster.scheduler_rank` helper now delegates torchrun and Slurm environment parsing to `beam-runtime`; Python keeps the same `ScheduledRank`, error contract, and fallback for older wheels.
+- The public `cluster.scheduler_rank` helper delegates torchrun and Slurm environment parsing to `beam-runtime`; Python keeps the same `ScheduledRank`, error contract, and fallback for older wheels.
 - Test-only RED commit `8565e8b` failed because the installed extension and adapter did not expose `resolve_scheduler_rank`.
 - On implementation SHA `a96be795a011174d7f244c06f1593a62b16e6c27`, Rust CNOT CPU/Gloo passed in [run 45052314834](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45052314834), installed-wheel validation passed in [run 45052314835](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45052314835), and the hosted acceptance harness passed in [run 45052315268](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45052315268).
-- Installed-wheel checks exercised real Rust-extension resolution for torchrun and Slurm inputs, malformed-rank rejection, public helper routing with Python parsing disabled, and legacy-extension fallback. These are hosted CPU checks; physical CUDA/NCCL was skipped.
+- The latest installed-wheel run `45054019597` also exercises torchrun and Slurm resolution on the updated runtime, with Python parsing disabled for the installed path and compatibility fallback checked separately.
+- These are hosted CPU checks; physical CUDA/NCCL remains unverified.
 
 ## Rust-owned public cluster planning — 2026-11-22
 
