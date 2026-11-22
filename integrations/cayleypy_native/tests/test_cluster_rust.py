@@ -267,6 +267,7 @@ def test_public_cuda_ordinal_uses_rust_and_preserves_legacy_fallback(monkeypatch
 
     observed = []
     native_resolver = rust_control.resolve_cuda_ordinal
+    python_fallback = cluster._cuda_ordinal_python
 
     def observe(local_rank, visible_devices):
         observed.append((local_rank, visible_devices))
@@ -281,9 +282,8 @@ def test_public_cuda_ordinal_uses_rust_and_preserves_legacy_fallback(monkeypatch
     assert cluster.ScheduledRank(0, 0, 9, 9, 1).cuda_ordinal(1) == 0
     assert observed == [(3, 4), (9, 1)]
 
-    fallback = cluster._cuda_ordinal_python
     monkeypatch.setattr(rust_control, "resolve_cuda_ordinal", lambda *_args: None)
-    monkeypatch.setattr(cluster, "_cuda_ordinal_python", fallback)
+    monkeypatch.setattr(cluster, "_cuda_ordinal_python", python_fallback)
     assert cluster.ScheduledRank(1, 0, 1, 2, 2).cuda_ordinal(2) == 1
 
     monkeypatch.setattr(

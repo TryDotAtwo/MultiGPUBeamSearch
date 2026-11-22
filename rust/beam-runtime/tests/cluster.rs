@@ -185,7 +185,6 @@ fn typed_cluster_plan_rejects_world_and_frontier_overflow() {
     .is_err());
 }
 
-
 #[test]
 fn scheduled_cuda_ordinal_preserves_visible_namespace_mapping() {
     assert_eq!(cuda_ordinal(7, 1).unwrap(), 0);
