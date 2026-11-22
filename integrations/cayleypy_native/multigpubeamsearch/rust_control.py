@@ -360,6 +360,49 @@ def resolve_search_environment(
 
 
 
+def resolve_search_model_environment(request):
+    """Resolve model-family worker variables through the installed Rust runtime."""
+    if type(request) is not dict:
+        return None
+    try:
+        payload = json.dumps(request, sort_keys=True, allow_nan=False)
+    except (TypeError, ValueError, OverflowError):
+        return None
+    try:
+        native = extension()
+    except (NativeUnavailable, ImportError):
+        return None
+    resolver = getattr(native, "resolve_model_search_environment", None)
+    if not callable(resolver):
+        return None
+    if getattr(native, "CLUSTER_MODEL_SEARCH_ENVIRONMENT_VERSION", None) != 1:
+        raise NativeUnavailable("Rust model search environment API version is incompatible")
+    try:
+        encoded = resolver(payload)
+    except (RuntimeError, ValueError, TypeError, OverflowError) as error:
+        raise NativeUnavailable(str(error)) from error
+    if type(encoded) is not str:
+        raise NativeUnavailable("Rust runtime returned an invalid model search environment")
+    try:
+        result = json.loads(encoded)
+    except (TypeError, ValueError) as error:
+        raise NativeUnavailable("Rust runtime returned malformed model environment JSON") from error
+    allowed = {
+        "BEAM_BLEND_DIR",
+        "BEAM_WEIGHT_DIR",
+        "BEAM_ENSEMBLE_BACKEND",
+        "BEAM_STREAM1_EXECUTOR",
+        "BEAM_MLP_GRAPH_HASH",
+        "BEAM_MLP_ARTIFACT_HASH",
+    }
+    if not isinstance(result, dict) or any(
+        type(name) is not str or type(value) is not str or name not in allowed
+        for name, value in result.items()
+    ):
+        raise NativeUnavailable("Rust runtime returned an invalid model search environment")
+    return result
+
+
 def resolve_child_environment(environment, devices, nccl_id_file):
     """Build the filtered native child environment in beam-runtime when supported."""
     if type(environment) is not dict or any(

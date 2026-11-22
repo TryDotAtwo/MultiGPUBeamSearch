@@ -58,6 +58,16 @@ fn resolve_search_environment(
     serde_json::to_string(&environment).map_err(|error| PyRuntimeError::new_err(error.to_string()))
 }
 
+
+#[pyfunction]
+fn resolve_model_search_environment(payload: String) -> PyResult<String> {
+    let request: beam_runtime::cluster::SearchModelEnvironmentRequest =
+        serde_json::from_str(&payload).map_err(|error| PyValueError::new_err(error.to_string()))?;
+    let environment = beam_runtime::cluster::search_model_environment(&request)
+        .map_err(|error| PyValueError::new_err(error.to_string()))?;
+    serde_json::to_string(&environment).map_err(|error| PyRuntimeError::new_err(error.to_string()))
+}
+
 #[pyfunction]
 fn resolve_child_environment(
     environment: BTreeMap<String, String>,
@@ -111,6 +121,7 @@ fn run_cluster_rank(
 
 pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add("CLUSTER_SEARCH_ENVIRONMENT_VERSION", 1)?;
+    module.add("CLUSTER_MODEL_SEARCH_ENVIRONMENT_VERSION", 1)?;
     module.add("CLUSTER_RANK_VERSION", 1)?;
     module.add("CLUSTER_DEVICE_BINDING_VERSION", 1)?;
     module.add("CLUSTER_CHILD_ENVIRONMENT_VERSION", 1)?;
@@ -121,6 +132,7 @@ pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(resolve_cuda_visibility, module)?)?;
     module.add_function(wrap_pyfunction!(resolve_child_environment, module)?)?;
     module.add_function(wrap_pyfunction!(resolve_search_environment, module)?)?;
+    module.add_function(wrap_pyfunction!(resolve_model_search_environment, module)?)?;
     module.add_function(wrap_pyfunction!(resolve_cluster_plan, module)?)?;
     Ok(())
 }

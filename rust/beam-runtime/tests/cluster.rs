@@ -238,6 +238,99 @@ fn cuda_visibility_rejects_missing_indices_empty_tokens_and_disabled_devices() {
 }
 
 #[test]
+fn model_search_environment_preserves_ensemble_and_executor_settings() {
+    use beam_runtime::cluster::{search_model_environment, SearchModelEnvironmentRequest};
+
+    let environment = search_model_environment(&SearchModelEnvironmentRequest {
+        model_backend: "ensemble".into(),
+        ensemble_blend_dir: Some("/models/blend".into()),
+        ensemble_first_weights_dir: Some("/models/blend/head-a".into()),
+        inference_backend: Some("cutlass".into()),
+        mlp_host_binding: None,
+    })
+    .unwrap();
+    assert_eq!(environment.get("BEAM_BLEND_DIR").map(String::as_str), Some("/models/blend"));
+    assert_eq!(
+        environment.get("BEAM_WEIGHT_DIR").map(String::as_str),
+        Some("/models/blend/head-a")
+    );
+    assert_eq!(
+        environment.get("BEAM_ENSEMBLE_BACKEND").map(String::as_str),
+        Some("cutlass")
+    );
+    assert_eq!(
+        environment.get("BEAM_STREAM1_EXECUTOR").map(String::as_str),
+        Some("libtorch_eager")
+    );
+
+    let transformer = search_model_environment(&SearchModelEnvironmentRequest {
+        model_backend: "piece_transformer".into(),
+        ensemble_blend_dir: None,
+        ensemble_first_weights_dir: None,
+        inference_backend: Some("libtorch".into()),
+        mlp_host_binding: None,
+    })
+    .unwrap();
+    assert_eq!(
+        transformer.get("BEAM_STREAM1_EXECUTOR").map(String::as_str),
+        Some("libtorch_eager")
+    );
+    assert!(!transformer.contains_key("BEAM_BLEND_DIR"));
+    assert!(!transformer.contains_key("BEAM_WEIGHT_DIR"));
+}
+
+#[test]
+fn model_search_environment_preserves_optional_mlp_host_binding() {
+    use beam_runtime::cluster::{
+        search_model_environment, MlpHostBindingIdentity, SearchModelEnvironmentRequest,
+    };
+
+    let environment = search_model_environment(&SearchModelEnvironmentRequest {
+        model_backend: "mlp".into(),
+        ensemble_blend_dir: None,
+        ensemble_first_weights_dir: None,
+        inference_backend: Some("cutlass".into()),
+        mlp_host_binding: Some(MlpHostBindingIdentity {
+            graph_hash: "a".repeat(64),
+            artifact_hash: "b".repeat(64),
+        }),
+    })
+    .unwrap();
+    assert_eq!(
+        environment.get("BEAM_MLP_GRAPH_HASH").map(String::as_str),
+        Some("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+    );
+    assert_eq!(
+        environment.get("BEAM_MLP_ARTIFACT_HASH").map(String::as_str),
+        Some("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb")
+    );
+    assert_eq!(environment.len(), 2);
+}
+
+#[test]
+fn model_search_environment_rejects_invalid_family_routes() {
+    use beam_runtime::cluster::{search_model_environment, SearchModelEnvironmentRequest};
+
+    let invalid_ensemble = SearchModelEnvironmentRequest {
+        model_backend: "ensemble".into(),
+        ensemble_blend_dir: Some("/models/blend".into()),
+        ensemble_first_weights_dir: None,
+        inference_backend: Some("cutlass".into()),
+        mlp_host_binding: None,
+    };
+    assert!(search_model_environment(&invalid_ensemble).is_err());
+
+    let invalid_route = SearchModelEnvironmentRequest {
+        model_backend: "mlp".into(),
+        ensemble_blend_dir: None,
+        ensemble_first_weights_dir: None,
+        inference_backend: Some("unknown".into()),
+        mlp_host_binding: None,
+    };
+    assert!(search_model_environment(&invalid_route).is_err());
+}
+
+#[test]
 fn child_environment_filters_rank_controls_and_maps_cuda_visibility() {
     use beam_runtime::cluster::child_environment;
 

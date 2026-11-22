@@ -436,6 +436,56 @@ def runtime_search_environment(puzzle_info, test_csv, weight_dir, run_dir,
     )
 
 
+
+def _search_model_environment_python(request):
+    """Compatibility environment builder for older runtime wheels."""
+    environment = {}
+    if request["model_backend"] == "ensemble":
+        environment["BEAM_BLEND_DIR"] = request["ensemble_blend_dir"]
+        environment["BEAM_WEIGHT_DIR"] = request["ensemble_first_weights_dir"]
+        if request["inference_backend"]:
+            environment["BEAM_ENSEMBLE_BACKEND"] = request["inference_backend"]
+    if (request["inference_backend"] == "libtorch"
+            or request["model_backend"] in ("piece_transformer", "ensemble")):
+        environment["BEAM_STREAM1_EXECUTOR"] = "libtorch_eager"
+    binding = request["mlp_host_binding"]
+    if binding is not None:
+        environment["BEAM_MLP_GRAPH_HASH"] = binding["graph_hash"]
+        environment["BEAM_MLP_ARTIFACT_HASH"] = binding["artifact_hash"]
+    return environment
+
+
+def search_model_environment(model, runtime, *, graph_hash, mlp_host_binding):
+    """Build the prepared model-family environment through the versioned Rust API."""
+    backend_name = model.backend
+    ensemble_blend_dir = None
+    ensemble_first_weights_dir = None
+    if backend_name == "ensemble":
+        ensemble_blend_dir = str(model.weights_dir)
+        first = model.manifest["ensemble"]["models"][0]
+        ensemble_first_weights_dir = str(model.weights_dir / first["weights_dir"])
+    binding = None
+    if mlp_host_binding:
+        binding = {
+            "graph_hash": graph_hash,
+            "artifact_hash": model.artifact_hash,
+        }
+    request = {
+        "model_backend": backend_name,
+        "ensemble_blend_dir": ensemble_blend_dir,
+        "ensemble_first_weights_dir": ensemble_first_weights_dir,
+        "inference_backend": runtime.build_metadata.get("inference_backend"),
+        "mlp_host_binding": binding,
+    }
+    from .rust_control import resolve_search_model_environment
+
+    native = resolve_search_model_environment(request)
+    if native is not None:
+        return native
+    return _search_model_environment_python(request)
+
+
+
 def _resolve_microbatch_plan_python(contract, model, beam_width: int, world_size: int, *, row_limit=8192) -> dict:
     """Compatibility implementation for extensions without the Rust planner."""
     default_rows, alignment, initial_sort_slots = row_limit, 1024, 4
@@ -806,15 +856,10 @@ def _run_native_once(contract, model, options, beam_width, max_steps, run_dir, d
     resident_session = current_session()
     snapshot_cache = getattr(resident_session, 'model_snapshot_cache', None)
     mlp_host_binding = requires_mlp_host_binding(snapshot_cache, model, contract, build_metadata)
-    if mlp_host_binding:
-        env.update(BEAM_MLP_GRAPH_HASH=contract.graph_hash,
-                   BEAM_MLP_ARTIFACT_HASH=model.artifact_hash)
-    if model.backend == "ensemble":
-        env["BEAM_BLEND_DIR"] = str(model.weights_dir)
-        if runtime.build_metadata.get('inference_backend'):
-            env["BEAM_ENSEMBLE_BACKEND"] = runtime.build_metadata['inference_backend']
-        first = model.manifest["ensemble"]["models"][0]
-        env["BEAM_WEIGHT_DIR"] = str(model.weights_dir / first["weights_dir"])
+    env.update(search_model_environment(
+        model, runtime, graph_hash=contract.graph_hash,
+        mlp_host_binding=mlp_host_binding,
+    ))
     microbatch_env, microbatch_metadata = microbatch_environment(contract, model, beam_width, len(devices),
         row_limit=runtime.profile.get("inference_row_limit", 8192))
     env.update(microbatch_env)
@@ -850,8 +895,6 @@ def _run_native_once(contract, model, options, beam_width, max_steps, run_dir, d
     inherited_ld = env.get("LD_LIBRARY_PATH", "")
     nccl_dir = str(nccl_library.parent)
     env["LD_LIBRARY_PATH"] = nccl_dir + (os.pathsep + inherited_ld if inherited_ld else "")
-    if runtime.build_metadata.get("inference_backend") == "libtorch" or model.backend in ("piece_transformer", "ensemble"):
-        env["BEAM_STREAM1_EXECUTOR"] = "libtorch_eager"
     # Legacy production_runner writes its solution/no-solution logs here.
     legacy_results = run_dir / "test_results"
     legacy_results.mkdir(exist_ok=True)

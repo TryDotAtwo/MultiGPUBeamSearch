@@ -378,6 +378,102 @@ pub fn search_environment(request: &SearchEnvironmentRequest) -> BTreeMap<String
     .collect()
 }
 
+
+#[derive(Clone, Debug, PartialEq, Eq, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct MlpHostBindingIdentity {
+    pub graph_hash: String,
+    pub artifact_hash: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SearchModelEnvironmentRequest {
+    pub model_backend: String,
+    pub ensemble_blend_dir: Option<String>,
+    pub ensemble_first_weights_dir: Option<String>,
+    pub inference_backend: Option<String>,
+    pub mlp_host_binding: Option<MlpHostBindingIdentity>,
+}
+
+/// Build fixed model-family variables for the permutation runner.
+/// Python still owns framework objects and model preparation; the Rust runtime
+/// receives only the prepared paths, route, and optional binding identity.
+pub fn search_model_environment(
+    request: &SearchModelEnvironmentRequest,
+) -> Result<BTreeMap<String, String>> {
+    if request.model_backend.is_empty() {
+        return Err(ClusterError::Invalid(
+            "model backend must be a nonempty string".into(),
+        ));
+    }
+    if request
+        .inference_backend
+        .as_deref()
+        .is_some_and(|backend| !matches!(backend, "libtorch" | "cutlass"))
+    {
+        return Err(ClusterError::Invalid(
+            "unsupported model inference backend".into(),
+        ));
+    }
+
+    let ensemble = request.model_backend == "ensemble";
+    let mut environment = BTreeMap::new();
+    match (
+        ensemble,
+        request.ensemble_blend_dir.as_deref(),
+        request.ensemble_first_weights_dir.as_deref(),
+    ) {
+        (true, Some(blend_dir), Some(first_weights_dir))
+            if !blend_dir.is_empty() && !first_weights_dir.is_empty() =>
+        {
+            environment.insert("BEAM_BLEND_DIR".into(), blend_dir.into());
+            environment.insert("BEAM_WEIGHT_DIR".into(), first_weights_dir.into());
+            if let Some(backend) = request.inference_backend.as_deref() {
+                environment.insert("BEAM_ENSEMBLE_BACKEND".into(), backend.into());
+            }
+        }
+        (false, None, None) => {}
+        _ => {
+            return Err(ClusterError::Invalid(
+                "ensemble environment paths do not match the model family".into(),
+            ))
+        }
+    }
+
+    if request.inference_backend.as_deref() == Some("libtorch")
+        || matches!(request.model_backend.as_str(), "piece_transformer" | "ensemble")
+    {
+        environment.insert("BEAM_STREAM1_EXECUTOR".into(), "libtorch_eager".into());
+    }
+
+    if let Some(binding) = &request.mlp_host_binding {
+        let valid_hash = |value: &str| {
+            value.len() == 64
+                && value
+                    .bytes()
+                    .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+        };
+        if request.model_backend != "mlp"
+            || !valid_hash(&binding.graph_hash)
+            || !valid_hash(&binding.artifact_hash)
+        {
+            return Err(ClusterError::Invalid(
+                "MLP host binding requires an MLP model and SHA256 identities".into(),
+            ));
+        }
+        environment.insert(
+            "BEAM_MLP_GRAPH_HASH".into(),
+            binding.graph_hash.clone(),
+        );
+        environment.insert(
+            "BEAM_MLP_ARTIFACT_HASH".into(),
+            binding.artifact_hash.clone(),
+        );
+    }
+    Ok(environment)
+}
+
 pub struct Request {
     pub command: Vec<String>,
     /// Executable lookup and Python pathlib resolution preserve existing Python semantics.

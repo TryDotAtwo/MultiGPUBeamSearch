@@ -479,3 +479,82 @@ def test_installed_rust_search_environment_controls_public_permutation_launch(mo
     monkeypatch.setattr(rust_control, "resolve_search_environment", lambda *_args: None)
     monkeypatch.setattr(backend, "_runtime_search_environment_python", python_fallback)
     assert backend.runtime_search_environment(*values) == expected
+
+
+def test_installed_rust_model_environment_controls_public_permutation_launch_and_fallback(monkeypatch):
+    from types import SimpleNamespace
+    from pathlib import Path
+    from multigpubeamsearch import backend, rust_control
+
+    native_resolver = rust_control.resolve_search_model_environment
+    python_fallback = backend._search_model_environment_python
+    observed = []
+
+    ensemble = SimpleNamespace(
+        backend="ensemble",
+        weights_dir=Path("/models/blend"),
+        manifest={"ensemble": {"models": [{"weights_dir": "head-a"}]}},
+        artifact_hash="a" * 64,
+    )
+    runtime = SimpleNamespace(build_metadata={"inference_backend": "cutlass"})
+
+    def observe(request):
+        observed.append(dict(request))
+        return native_resolver(request)
+
+    def forbidden(*_args, **_kwargs):
+        pytest.fail("installed Rust model environment path fell back to Python")
+
+    monkeypatch.setattr(rust_control, "resolve_search_model_environment", observe)
+    monkeypatch.setattr(backend, "_search_model_environment_python", forbidden)
+    assert backend.search_model_environment(
+        ensemble, runtime, graph_hash="b" * 64, mlp_host_binding=False
+    ) == {
+        "BEAM_BLEND_DIR": "/models/blend",
+        "BEAM_WEIGHT_DIR": "/models/blend/head-a",
+        "BEAM_ENSEMBLE_BACKEND": "cutlass",
+        "BEAM_STREAM1_EXECUTOR": "libtorch_eager",
+    }
+    assert observed == [{
+        "model_backend": "ensemble",
+        "ensemble_blend_dir": "/models/blend",
+        "ensemble_first_weights_dir": "/models/blend/head-a",
+        "inference_backend": "cutlass",
+        "mlp_host_binding": None,
+    }]
+
+    mlp = SimpleNamespace(
+        backend="mlp",
+        weights_dir=Path("/models/mlp"),
+        manifest={},
+        artifact_hash="c" * 64,
+    )
+    mlp_env = backend.search_model_environment(
+        mlp, runtime, graph_hash="d" * 64, mlp_host_binding=True
+    )
+    assert mlp_env == {
+        "BEAM_MLP_GRAPH_HASH": "d" * 64,
+        "BEAM_MLP_ARTIFACT_HASH": "c" * 64,
+    }
+
+    monkeypatch.setattr(rust_control, "resolve_search_model_environment", lambda _request: None)
+    monkeypatch.setattr(backend, "_search_model_environment_python", python_fallback)
+    assert backend.search_model_environment(
+        ensemble, runtime, graph_hash="b" * 64, mlp_host_binding=False
+    ) == {
+        "BEAM_BLEND_DIR": "/models/blend",
+        "BEAM_WEIGHT_DIR": "/models/blend/head-a",
+        "BEAM_ENSEMBLE_BACKEND": "cutlass",
+        "BEAM_STREAM1_EXECUTOR": "libtorch_eager",
+    }
+
+    from multigpubeamsearch.errors import NativeUnavailable
+
+    def rejected(_request):
+        raise NativeUnavailable("incompatible Rust model environment")
+
+    monkeypatch.setattr(rust_control, "resolve_search_model_environment", rejected)
+    with pytest.raises(NativeUnavailable, match="incompatible Rust model environment"):
+        backend.search_model_environment(
+            ensemble, runtime, graph_hash="b" * 64, mlp_host_binding=False
+        )
