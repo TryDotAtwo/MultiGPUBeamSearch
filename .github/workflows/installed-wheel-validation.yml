@@ -106,21 +106,11 @@ jobs:
         env:
           REQUIRE_RUST_CLUSTER: "1"
         run: |
-          set -o pipefail
-          mkdir -p "$GITHUB_WORKSPACE/test_results/refactor_20261122/cluster-worker"
+          set -euo pipefail
           cd "$RUNNER_TEMP/mgbs-wheel-smoke"
-          env -u PYTHONPATH REQUIRE_RUST_CLUSTER=1 python -m pytest -vv \
+          env -u PYTHONPATH REQUIRE_RUST_CLUSTER=1 python -m pytest -q \
             "$GITHUB_WORKSPACE/integrations/cayleypy_native/tests/test_cluster_worker.py" \
-            "$GITHUB_WORKSPACE/integrations/cayleypy_native/tests/test_cluster_rust.py" \
-            2>&1 | tee "$GITHUB_WORKSPACE/test_results/refactor_20261122/cluster-worker/installed-wheel.log"
-      - name: Upload installed scheduler worker validation log
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: cluster-worker-installed-wheel-${{ github.run_id }}
-          path: test_results/refactor_20261122/cluster-worker/installed-wheel.log
-          if-no-files-found: error
-          retention-days: 7
+            "$GITHUB_WORKSPACE/integrations/cayleypy_native/tests/test_cluster_rust.py"
       - name: Verify rank-consistent CNOT dispatch on installed wheel
         id: cnot_dispatch_consensus
         env:
