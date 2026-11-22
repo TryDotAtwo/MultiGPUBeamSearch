@@ -40,7 +40,6 @@ pub fn select_engine(
     }
 }
 
-
 /// Capabilities agreed by all ranks before choosing the public controller path.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct DispatchCapabilities {
