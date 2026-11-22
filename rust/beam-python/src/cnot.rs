@@ -837,7 +837,7 @@ fn run_cnot_native_search<'py>(
         let mode_text: String = mode.extract()?;
         let validation_text: String = validation.extract()?;
         let engine_text: String = engine.extract()?;
-        let request_value = CnotRequest::new(
+        let task = CnotRequest::new(
             input_matrix.getattr("n")?.extract()?,
             width.extract()?,
             shortlist.extract()?,
@@ -848,6 +848,11 @@ fn run_cnot_native_search<'py>(
             &engine_text,
         )
         .map_err(|error| PyValueError::new_err(error.to_string()))?;
+        let rank: u32 = world.getattr("rank")?.extract()?;
+        let world_size: u32 = world.getattr("size")?.extract()?;
+        let request_value = task
+            .bind_rank(rank, world_size)
+            .map_err(|error| PyValueError::new_err(error.to_string()))?;
         let selected_engine = selected_engine_name(request_value.selected_engine())?;
         let digest = cnot_admission_digest(
             py,
@@ -909,7 +914,7 @@ fn run_cnot_native_search<'py>(
         )?;
     }
 
-    let wires = request.wires;
+    let wires = request.task.wires;
     let identity_args = PyDict::new(py);
     identity_args.set_item("device", world.getattr("device")?)?;
     let identity_result = identity_builder.call((wires,), Some(&identity_args));
@@ -938,12 +943,10 @@ fn run_cnot_native_search<'py>(
                 "strict CNOT acceptance requires the Rust native stage runner on every rank",
             ));
         }
-        let rank: u32 = world.getattr("rank")?.extract()?;
-        let world_size: u32 = world.getattr("size")?.extract()?;
-        let width = request.width;
-        let shortlist_value = request.shortlist;
-        let depth = request.max_depth;
-        let mode = PyString::new(py, request.mode.as_str()).into_any();
+        let width = request.task.width;
+        let shortlist_value = request.task.shortlist;
+        let depth = request.task.max_depth;
+        let mode = PyString::new(py, request.task.mode.as_str()).into_any();
 
         if supports_native {
             let native_root = input_matrix.getattr("root")?;
@@ -994,7 +997,7 @@ fn run_cnot_native_search<'py>(
             compatibility_stages,
         )?;
         return Ok(
-            run_cnot_with_options(py, stages, request.search_options(rank, world_size))?
+            run_cnot_with_options(py, stages, request.search_options())?
                 .into_bound(py),
         );
     }
