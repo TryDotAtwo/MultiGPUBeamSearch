@@ -939,8 +939,7 @@ fn run_cnot_native_search<'py>(
             world.clone(),
             !native_stages.is_none(),
         )?;
-        if admitted_strict && !supports_native
-        {
+        if admitted_strict && !supports_native {
             return Err(PyRuntimeError::new_err(
                 "strict CNOT acceptance requires the Rust native stage runner on every rank",
             ));
