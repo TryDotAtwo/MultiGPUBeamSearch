@@ -1,3 +1,9 @@
+## Rust-owned CNOT dispatch fingerprint — 2026-11-22
+
+The public CNOT path now asks `beam-runtime` for the versioned request fingerprint used by rank consensus. The PyO3 adapter converts the public engine and depth inputs once at this boundary; the Rust runtime hashes engine, u64-depth fit, and strict-mode bits using the established byte contract. The Python adapter uses this API when present and retains the identical legacy digest for older wheels. Gloo phase ordering, capability voting, route selection, search stages, scorer, and CUDA/NCCL behavior are unchanged.
+
+The installed-wheel regression compares the Rust digest against the prior Python formula for every engine, the u64 depth boundary, strict/compatibility mode, and invalid engine; it also asserts that the public search calls the installed Rust API. Physical CUDA/NCCL execution remains a separate gate.
+
 ## Accept the current panel-v2 producer receipt — 2026-11-22
 
 The consumer accepts producer source revision `eafc0f82f088603a525f428a8fa3d00e9e702fa8` with the exact existing `build_multigpu_beam_handoff` emitter SHA-256. The receipt source revision is distinct from the emitter ABI: the producer function is unchanged from its parent `42ed72f587ab70fc74a85cf0a25001efb29cb994`, whose receipts remain supported, along with the historical `7310b1eb5ec07c76c131ba8c60b105ff4aad7a9c` pin. The hosted no-Torch compatibility fixture checks out the current producer revision, calls its real serializer, and sends the serialized receipt through the consumer resolver. This is CPU-only handoff validation; trained scorer/GPU acceptance remains separate.

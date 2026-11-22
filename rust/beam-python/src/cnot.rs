@@ -133,6 +133,31 @@ fn prepare_cnot_input<'py>(
     })
 }
 
+#[pyfunction(name = "_cnot_public_dispatch_digest")]
+fn cnot_public_dispatch_digest<'py>(
+    py: Python<'py>,
+    engine: Bound<'py, PyAny>,
+    max_depth: Bound<'py, PyAny>,
+    strict_backend: bool,
+) -> PyResult<Bound<'py, PyBytes>> {
+    let builtins = py.import("builtins")?;
+    let engine_type = builtins.getattr("type")?.call1((&engine,))?;
+    if !engine_type.is(&builtins.getattr("str")?) {
+        return Err(PyValueError::new_err(
+            "CNOT engine must be auto, python, or rust",
+        ));
+    }
+    let engine_text: String = engine.extract()?;
+    let depth_fits_u64 = !max_depth.call_method1("__gt__", (u64::MAX,))?.is_truthy()?;
+    let digest = beam_runtime::cnot_search::public_dispatch_digest(
+        &engine_text,
+        depth_fits_u64,
+        strict_backend,
+    )
+    .map_err(|error| PyValueError::new_err(error.to_string()))?;
+    Ok(PyBytes::new(py, &digest))
+}
+
 #[pyfunction]
 fn run_cnot_native_require_consensus(world: Bound<'_, PyAny>, digest: Vec<u8>) -> PyResult<()> {
     let values: Vec<i64> = digest.into_iter().map(i64::from).collect();
@@ -1082,6 +1107,7 @@ pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<PyCnotSearchInput>()?;
     module.add_function(wrap_pyfunction!(prepare_cnot_input, module)?)?;
     module.add_function(wrap_pyfunction!(validate_cnot_search_controls, module)?)?;
+    module.add_function(wrap_pyfunction!(cnot_public_dispatch_digest, module)?)?;
     module.add_function(wrap_pyfunction!(run_cnot_native_require_consensus, module)?)?;
     module.add_function(wrap_pyfunction!(select_cnot_dispatch, module)?)?;
     module.add_function(wrap_pyfunction!(run_cnot_native_search, module)?)?;

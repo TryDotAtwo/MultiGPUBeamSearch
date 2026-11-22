@@ -4,6 +4,8 @@
 //! never receives a device pointer; each call represents a complete batch or
 //! collective, and the caller keeps the backend on its original rank thread.
 
+use sha2::{Digest, Sha256};
+
 /// Public preference for the CNOT search controller.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RequestedEngine {
@@ -226,6 +228,30 @@ pub fn select_engine(
         RequestedEngine::Rust if depth_fits_u64 => Ok(SelectedEngine::Rust),
         RequestedEngine::Rust => Err(EngineSelectionError::RustDepthExceedsU64),
     }
+}
+
+/// Compute the stable fingerprint used to agree public route inputs across ranks.
+///
+/// Keep this byte contract aligned with the legacy Python adapter so mixed-age
+/// wheels fail or agree at the existing consensus phase, never at a later
+/// transport collective.
+pub fn public_dispatch_digest(
+    engine: &str,
+    depth_fits_u64: bool,
+    strict_backend: bool,
+) -> Result<[u8; 32], CnotRequestError> {
+    if !matches!(engine, "auto" | "python" | "rust") {
+        return Err(CnotRequestError::Engine);
+    }
+    let mut engine_hash = Sha256::new();
+    engine_hash.update(b"cnot-requested-engine-v1:");
+    engine_hash.update(engine.as_bytes());
+
+    let mut request_hash = Sha256::new();
+    request_hash.update(b"cnot-public-dispatch-v1:");
+    request_hash.update([u8::from(strict_backend), u8::from(depth_fits_u64)]);
+    request_hash.update(engine_hash.finalize());
+    Ok(request_hash.finalize().into())
 }
 
 /// Capabilities agreed by all ranks before choosing the public controller path.
@@ -512,6 +538,18 @@ pub fn search<B: Backend>(
 mod tests {
     use super::*;
     use std::collections::VecDeque;
+
+    #[test]
+    fn public_dispatch_digest_validates_engine_and_tracks_route_inputs() {
+        let base = public_dispatch_digest("auto", true, false).unwrap();
+        assert_ne!(base, public_dispatch_digest("rust", true, false).unwrap());
+        assert_ne!(base, public_dispatch_digest("auto", false, false).unwrap());
+        assert_ne!(base, public_dispatch_digest("auto", true, true).unwrap());
+        assert_eq!(
+            public_dispatch_digest("invalid", true, false),
+            Err(CnotRequestError::Engine)
+        );
+    }
 
     #[test]
     fn typed_cnot_request_preserves_controls_and_caps_shortlist_to_alphabet() {

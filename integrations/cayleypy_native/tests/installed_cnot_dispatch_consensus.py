@@ -1,5 +1,6 @@
 """Installed-wheel regression for rank-consistent CNOT route admission."""
 from datetime import timedelta
+import hashlib
 import os
 
 import torch.distributed as dist
@@ -17,10 +18,11 @@ def _all_ranks_equal(label, value):
     return gathered[0]
 
 
-def _attempt(*, hidden_rank=None, hidden_names=(), engine="auto", strict=False):
+def _attempt(*, hidden_rank=None, hidden_names=(), engine="auto", strict=False, legacy_digest=False):
     rank = dist.get_rank()
     hidden_names = set(hidden_names)
     events = []
+    digest_events = []
     original_native_method = World.native_method
     original_runner = cnot._native_search_runner
     original_start_transport = World.start_transport
@@ -28,6 +30,11 @@ def _attempt(*, hidden_rank=None, hidden_names=(), engine="auto", strict=False):
 
     def native_method(self, name):
         binding = original_native_method(self, name)
+        if name == "_cnot_public_dispatch_digest":
+            if legacy_digest:
+                return None
+            if callable(binding):
+                digest_events.append(name)
         if self.rank == hidden_rank and name in hidden_names:
             return None
         return binding
@@ -66,6 +73,7 @@ def _attempt(*, hidden_rank=None, hidden_names=(), engine="auto", strict=False):
                 "status": None,
                 "gates": None,
                 "transport_preferences": list(events),
+                "native_dispatch_digest_calls": len(digest_events),
             }
         else:
             record = {
@@ -73,6 +81,7 @@ def _attempt(*, hidden_rank=None, hidden_names=(), engine="auto", strict=False):
                 "status": result.status,
                 "gates": list(result.gates) if result.gates is not None else None,
                 "transport_preferences": list(events),
+                "native_dispatch_digest_calls": len(digest_events),
             }
     finally:
         World.native_method = original_native_method
@@ -85,9 +94,14 @@ def _attempt(*, hidden_rank=None, hidden_names=(), engine="auto", strict=False):
     return _all_ranks_equal("CNOT dispatch outcome", record)
 
 
-def _expect_solved(label, record, expected_transport):
+def _expect_solved(label, record, expected_transport, *, digest_calls=1):
     if record["error"] is not None or record["status"] != "solved" or record["gates"] != []:
         raise AssertionError(f"{label} did not complete the identity search: {record}")
+    if record["native_dispatch_digest_calls"] != digest_calls:
+        raise AssertionError(
+            f"{label} used {record['native_dispatch_digest_calls']} Rust digest calls; "
+            f"expected {digest_calls}: {record}"
+        )
     if record["transport_preferences"] != expected_transport:
         raise AssertionError(
             f"{label} ignored the rank-agreed dispatch path: "
@@ -100,6 +114,48 @@ def _expect_coordinated_failure(label, record):
         raise AssertionError(f"{label} unexpectedly selected a route: {record}")
     if record["transport_preferences"]:
         raise AssertionError(f"{label} entered transport before admission failed: {record}")
+
+
+def _assert_rust_dispatch_digest_matches_compatibility():
+    from multigpubeamsearch.rust_control import extension
+
+    digest_builder = getattr(extension(), "_cnot_public_dispatch_digest", None)
+    if not callable(digest_builder):
+        raise AssertionError("installed Rust extension lacks the CNOT dispatch digest")
+    for engine in ("auto", "python", "rust"):
+        engine_digest = hashlib.sha256(
+            b"cnot-requested-engine-v1:" + engine.encode("utf-8")
+        ).digest()
+        for max_depth in (0, (1 << 64) - 1, 1 << 64):
+            depth_fits = max_depth <= (1 << 64) - 1
+            for strict in (False, True):
+                expected = hashlib.sha256(
+                    b"cnot-public-dispatch-v1:"
+                    + bytes((int(strict), int(depth_fits)))
+                    + engine_digest
+                ).digest()
+                actual = digest_builder(engine, max_depth, strict)
+                if type(actual) is not bytes or actual != expected:
+                    raise AssertionError(
+                        f"Rust dispatch digest changed the compatibility contract: "
+                        f"engine={engine}, depth={max_depth}, strict={strict}"
+                    )
+                legacy = cnot._public_dispatch_digest(
+                    engine, max_depth, strict, native_digest=None
+                )
+                if legacy != expected:
+                    raise AssertionError(
+                        f"legacy wheel fallback changed the digest contract: "
+                        f"engine={engine}, depth={max_depth}, strict={strict}"
+                    )
+    try:
+        digest_builder("invalid", 1, False)
+    except ValueError as error:
+        if "CNOT engine must be auto, python, or rust" not in str(error):
+            raise AssertionError(f"wrong invalid-engine error: {error}") from error
+    else:
+        raise AssertionError("Rust dispatch digest accepted an invalid engine")
+    print("CNOT_RUST_PUBLIC_DISPATCH_DIGEST_PASS", flush=True)
 
 
 def _assert_rust_selector_reads_depth_once():
@@ -135,6 +191,7 @@ def _assert_rust_selector_reads_depth_once():
     print("CNOT_RUST_SELECTOR_SINGLE_PARSE_PASS", flush=True)
 
 def main():
+    _assert_rust_dispatch_digest_matches_compatibility()
     _assert_rust_selector_reads_depth_once()
     dist.init_process_group("gloo", timeout=timedelta(seconds=90))
     try:
@@ -175,6 +232,16 @@ def main():
             engine="rust",
         )
         _expect_coordinated_failure("explicit Rust without a common route", record)
+
+        # An older wheel has no Rust digest export. Its Python fallback must
+        # produce the same rank-consensus bytes and still finish the search.
+        record = _attempt(engine="auto", legacy_digest=True)
+        _expect_solved(
+            "legacy wheel digest fallback",
+            record,
+            [True],
+            digest_calls=0,
+        )
 
         # The live default process group must remain usable after all failures.
         record = _attempt(engine="auto")

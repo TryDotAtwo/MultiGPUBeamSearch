@@ -297,8 +297,13 @@ def _native_search_runner():
         return None
 
 
-def _public_dispatch_digest(engine, max_depth, strict_backend):
-    """Fingerprint every input that can change rank-local route selection."""
+def _public_dispatch_digest(engine, max_depth, strict_backend, *, native_digest=None):
+    """Fingerprint route inputs with Rust, preserving the older-wheel contract."""
+    if callable(native_digest):
+        digest = native_digest(engine, max_depth, strict_backend)
+        if type(digest) is not bytes or len(digest) != 32:
+            raise RuntimeError("Rust CNOT dispatch digest must be exactly 32 bytes")
+        return digest
     engine_digest = _requested_engine_digest(engine)
     depth_fits_u64 = not (max_depth > 2**64 - 1)
     flags = bytes((int(strict_backend), int(depth_fits_u64)))
@@ -450,7 +455,12 @@ def search_cnot(root, scorer, *, width, shortlist, max_depth, mode="qhat", audit
         strict_backend = os.environ.get("MGBS_CNOT_STRICT_BACKEND") == "1"
         dispatch_digest = world.checked(
             "validate CNOT runtime dispatch request",
-            lambda: _public_dispatch_digest(engine, max_depth, strict_backend),
+            lambda: _public_dispatch_digest(
+                engine,
+                max_depth,
+                strict_backend,
+                native_digest=world.native_method("_cnot_public_dispatch_digest"),
+            ),
         )
         world.require_engine_consensus(dispatch_digest)
 
