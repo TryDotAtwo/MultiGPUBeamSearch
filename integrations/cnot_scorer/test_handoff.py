@@ -1,8 +1,12 @@
 """Synthetic tests for resolving the producer's private panel-v2 handoff."""
 import copy
 import hashlib
+import importlib.util
 import json
+import os
 from pathlib import Path
+import subprocess
+import sys
 import tempfile
 import unittest
 
@@ -35,6 +39,7 @@ class PanelV2HandoffTests(unittest.TestCase):
 
         self.accepted_updates = 64
         self.checkpoint_sha = "c" * 64
+        self.producer_emitter_sha256 = "d" * 64
         self.indices = [3, 9]
         self.case_ids = ["locked-case-a", "locked-case-b"]
         self.panel_digest = canonical_digest({
@@ -92,9 +97,10 @@ class PanelV2HandoffTests(unittest.TestCase):
             "paired_cost_delta": -1,
         }
         self.handoff = {
-            "schema": "cnot103_multigpu_beam_handoff_v1",
+            "schema": "cnot103_multigpu_beam_handoff_v2",
             "consumer": "MultiGPUBeamSearch",
             "producer_source_revision": "e" * 40,
+            "producer_emitter_sha256": self.producer_emitter_sha256,
             "accepted_updates": self.accepted_updates,
             "checkpoint_sha256": self.checkpoint_sha,
             "model": {
@@ -175,6 +181,7 @@ class PanelV2HandoffTests(unittest.TestCase):
         metrics = {
             "case_count": len(self.indices),
             "panel_indices": list(self.indices),
+            "panel_ids": list(self.case_ids),
             "panel_digest": self.panel_digest,
         }
         return {
@@ -197,6 +204,7 @@ class PanelV2HandoffTests(unittest.TestCase):
             {
                 "schema": "cnot103_learning_curve_campaign_v1",
                 "source_revision": self.receipt_source_revision,
+                "producer_emitter_sha256": self.producer_emitter_sha256,
                 "dataset_sha256": self.dataset_sha,
                 "search": dict(self.search),
                 "locked_test_panel_digest": self.panel_digest,
@@ -224,6 +232,7 @@ class PanelV2HandoffTests(unittest.TestCase):
         self.assertEqual(resolved.checkpoint_sha256, self.checkpoint_sha)
         self.assertEqual(resolved.dataset_sha256, self.dataset_sha)
         self.assertEqual(resolved.accepted_updates, self.accepted_updates)
+        self.assertEqual(resolved.producer_emitter_sha256, self.producer_emitter_sha256)
         self.assertEqual(resolved.panel_indices, tuple(self.indices))
         self.assertEqual(resolved.panel_ids, tuple(self.case_ids))
         self.assertEqual(resolved.panel_digest, self.panel_digest)
@@ -330,6 +339,8 @@ class PanelV2HandoffTests(unittest.TestCase):
             lambda value: value.update(panel="dev"),
             lambda value: value.update(panel_digest="f" * 64),
             lambda value: value["baseline_metrics"].update(panel_indices=list(reversed(self.indices))),
+            lambda value: value["baseline_metrics"].update(panel_ids=list(reversed(self.case_ids))),
+            lambda value: value["candidate_metrics"].update(panel_ids=list(reversed(self.case_ids))),
             lambda value: value["candidate_metrics"].update(panel_digest="f" * 64),
             lambda value: value.update(candidate_head="proposal"),
             lambda value: value["candidate_metrics"]["receipt_pins"].update(checkpoint_sha256="f" * 64),
@@ -349,6 +360,82 @@ class PanelV2HandoffTests(unittest.TestCase):
                 self.write_receipt()
                 with self.assertRaises(HandoffError):
                     resolve_panel_v2_handoff(self.root, self.receipt)
+
+    def test_rejects_a_campaign_emitter_pin_mismatch(self):
+        value = json.loads(self.receipt.read_text(encoding="utf-8"))
+        value["producer_emitter_sha256"] = "f" * 64
+        write_json(self.receipt, value)
+        with self.assertRaisesRegex(HandoffError, "emitter pin"):
+            resolve_panel_v2_handoff(self.root, self.receipt)
+
+    def test_rejects_feature_schema_abi_mismatch(self):
+        self.handoff["model"]["feature_schema"] = "runtime_packet_layout_v24"
+        self.write_receipt()
+        with self.assertRaises(HandoffError):
+            resolve_panel_v2_handoff(self.root, self.receipt)
+
+    @unittest.skipUnless(
+        os.environ.get("CNOT103_PRODUCER_CHECKOUT")
+        and os.environ.get("CNOT103_PRODUCER_SOURCE_SHA"),
+        "current producer cross-compatibility runs in hosted CI",
+    )
+    def test_current_producer_emitter_builds_a_consumer_accepted_handoff(self):
+        producer_root = Path(os.environ["CNOT103_PRODUCER_CHECKOUT"]).resolve()
+        expected_sha = os.environ["CNOT103_PRODUCER_SOURCE_SHA"]
+        observed_sha = subprocess.run(
+            ["git", "-C", str(producer_root), "rev-parse", "HEAD"],
+            check=True, capture_output=True, text=True,
+        ).stdout.strip()
+        self.assertEqual(observed_sha, expected_sha)
+        scripts = producer_root / ".github" / "scripts"
+        sys.path.insert(0, str(scripts))
+        try:
+            source_path = scripts / "run_full_training.py"
+            spec = importlib.util.spec_from_file_location(
+                "cnot103_pinned_producer_run_full_training", source_path
+            )
+            self.assertIsNotNone(spec)
+            self.assertIsNotNone(spec.loader)
+            producer = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(producer)
+        finally:
+            sys.path.remove(str(scripts))
+
+        comparison = copy.deepcopy(self.comparison)
+        comparison["baseline_metrics"]["receipt_pins"]["source_revision"] = expected_sha
+        emitted = producer.build_multigpu_beam_handoff(
+            root=self.root,
+            source_revision=expected_sha,
+            accepted_updates=self.accepted_updates,
+            checkpoint_sha256=self.checkpoint_sha,
+            training_manifest_path=self.training_manifest,
+            training_result_path=self.training_result,
+            search_manifest_path=self.search_manifest,
+            expected_panel="test",
+            expected_panel_indices=list(self.indices),
+            expected_panel_ids=list(self.case_ids),
+            expected_panel_digest=self.panel_digest,
+            expected_search=dict(self.search),
+            locked_test_comparison=comparison,
+        )
+        self.assertEqual(emitted["schema"], "cnot103_multigpu_beam_handoff_v2")
+        self.assertEqual(
+            emitted["producer_emitter_sha256"],
+            producer.multigpu_handoff_emitter_sha256(),
+        )
+        self.handoff = emitted
+        self.comparison = comparison
+        self.receipt_source_revision = expected_sha
+        self.producer_emitter_sha256 = emitted["producer_emitter_sha256"]
+        self.top_level_comparison = copy.deepcopy(comparison)
+        self.write_receipt()
+        resolved = resolve_panel_v2_handoff(self.root, self.receipt)
+        self.assertEqual(resolved.producer_source_revision, expected_sha)
+        self.assertEqual(
+            resolved.producer_emitter_sha256,
+            producer.multigpu_handoff_emitter_sha256(),
+        )
+        self.assertEqual(resolved.panel_ids, tuple(self.case_ids))
 
     def test_absolute_search_manifest_pins_require_the_same_run_root_mount(self):
         import shutil

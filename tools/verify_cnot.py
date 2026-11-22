@@ -545,6 +545,7 @@ def _search_handoff_panel(args, resolved, device, world, *, scorer_factory):
     provenance = _adapter_provenance()
     identity = {
         "producer_source_revision": resolved.producer_source_revision,
+        "producer_emitter_sha256": resolved.producer_emitter_sha256,
         "accepted_updates": resolved.accepted_updates,
         "checkpoint_sha256": resolved.checkpoint_sha256,
         "dataset_sha256": resolved.dataset_sha256,
@@ -601,6 +602,7 @@ def _search_handoff_panel(args, resolved, device, world, *, scorer_factory):
     return {
         "schema": "cnot103_mgbs_panel_search_result_v1",
         "producer_source_revision": resolved.producer_source_revision,
+        "producer_emitter_sha256": resolved.producer_emitter_sha256,
         "accepted_updates": resolved.accepted_updates,
         "checkpoint_sha256": resolved.checkpoint_sha256,
         "dataset_sha256": resolved.dataset_sha256,

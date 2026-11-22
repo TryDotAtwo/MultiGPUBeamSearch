@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import copy
+import hashlib
 import importlib.util
 import json
 from pathlib import Path
@@ -104,6 +105,10 @@ class InstalledHandoffEndpointTests(unittest.TestCase):
         report_path = self.fixture.reports / "consumer-panel.private.json"
         report = json.loads(report_path.read_text(encoding="utf-8"))
         self.assertEqual(report["schema"], "cnot103_mgbs_panel_search_result_v1")
+        self.assertEqual(report["producer_emitter_sha256"], self.fixture.producer_emitter_sha256)
+        self.assertEqual(report["adapter"]["native_adapter_source_commit"], "e17953891a36e3e3ae8b038695bfac8548ab784f")
+        bridge = ROOT / "integrations" / "cnot_scorer" / "bridge_panel_v2.rs"
+        self.assertEqual(report["adapter"]["adapter_source_sha256"], hashlib.sha256(bridge.read_bytes()).hexdigest())
         self.assertEqual(report["panel"], "test")
         self.assertEqual(report["panel_indices"], [3, 9])
         self.assertEqual(report["panel_ids"], ["locked-case-a", "locked-case-b"])

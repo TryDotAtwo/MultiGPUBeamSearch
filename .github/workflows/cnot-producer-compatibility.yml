@@ -38,6 +38,13 @@ jobs:
           path: cnot-producer
           fetch-depth: 1
           persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: TryDotAtwo/cnot-neural-synth-frontier6
+          ref: 3a067abc608444dd1dfcf6522d523acf41968798
+          path: cnot-emitter
+          fetch-depth: 1
+          persist-credentials: false
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
@@ -81,6 +88,9 @@ jobs:
       - name: Run synthetic panel-v2 handoff tests
         id: handoff_tests
         shell: bash
+        env:
+          CNOT103_PRODUCER_CHECKOUT: ${{ github.workspace }}/cnot-emitter
+          CNOT103_PRODUCER_SOURCE_SHA: 3a067abc608444dd1dfcf6522d523acf41968798
         run: |
           set -euo pipefail
           python3 - <<'PY'

@@ -16,7 +16,7 @@ from typing import Any
 
 _SHA1 = re.compile(r"[0-9a-f]{40}\Z")
 _SHA256 = re.compile(r"[0-9a-f]{64}\Z")
-_HANDOFF_SCHEMA = "cnot103_multigpu_beam_handoff_v1"
+_HANDOFF_SCHEMA = "cnot103_multigpu_beam_handoff_v2"
 _RECEIPT_SCHEMA = "cnot103_learning_curve_campaign_v1"
 _SEARCH_SCHEMA = "cnot103_panel_search_v2"
 _RESULT_SCHEMA = "cnot103_training_result_v1"
@@ -48,6 +48,7 @@ class ResolvedPanelV2Handoff:
     training_manifest_sha256: str
     training_result_sha256: str
     producer_source_revision: str
+    producer_emitter_sha256: str
     accepted_updates: int
     checkpoint_sha256: str
     dataset_sha256: str
@@ -272,6 +273,7 @@ def _validate_locked_comparison(
     *,
     status: object,
     panel_indices: list[int],
+    panel_ids: list[str],
     panel_digest: str,
     dataset_sha: str,
     source_revision: str,
@@ -293,6 +295,7 @@ def _validate_locked_comparison(
         if (
             not isinstance(metrics, dict)
             or metrics.get("panel_indices") != panel_indices
+            or metrics.get("panel_ids") != panel_ids
             or metrics.get("panel_digest") != panel_digest
             or metrics.get("case_count") != len(panel_indices)
         ):
@@ -358,6 +361,7 @@ def resolve_panel_v2_handoff(
         raise HandoffError("locked-test evaluation was not completed")
 
     source_revision = handoff.get("producer_source_revision")
+    producer_emitter_sha256 = handoff.get("producer_emitter_sha256")
     accepted_updates = handoff.get("accepted_updates")
     checkpoint_sha = handoff.get("checkpoint_sha256")
     dataset_sha = handoff.get("dataset_sha256")
@@ -365,11 +369,15 @@ def resolve_panel_v2_handoff(
     model = handoff.get("model")
     if receipt.get("source_revision") != source_revision:
         raise HandoffError("learning-curve receipt source revision differs from the handoff")
+    if receipt.get("producer_emitter_sha256") != producer_emitter_sha256:
+        raise HandoffError("learning-curve receipt producer emitter pin differs from the handoff")
     if (
         handoff.get("schema") != _HANDOFF_SCHEMA
         or handoff.get("consumer") != "MultiGPUBeamSearch"
         or not isinstance(source_revision, str)
         or _SHA1.fullmatch(source_revision) is None
+        or not isinstance(producer_emitter_sha256, str)
+        or _SHA256.fullmatch(producer_emitter_sha256) is None
         or type(accepted_updates) is not int
         or accepted_updates < 1
         or not isinstance(checkpoint_sha, str)
@@ -494,6 +502,7 @@ def resolve_panel_v2_handoff(
         comparison,
         status=status,
         panel_indices=indices,
+        panel_ids=ids,
         panel_digest=panel_digest,
         dataset_sha=dataset_sha,
         source_revision=source_revision,
@@ -511,6 +520,7 @@ def resolve_panel_v2_handoff(
         training_manifest_sha256=train_manifest_sha,
         training_result_sha256=train_result_sha,
         producer_source_revision=source_revision,
+        producer_emitter_sha256=producer_emitter_sha256,
         accepted_updates=accepted_updates,
         checkpoint_sha256=checkpoint_sha,
         dataset_sha256=dataset_sha,
