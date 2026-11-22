@@ -1,3 +1,9 @@
+## 2026-11-22 - Build runtime options from the typed CNOT request
+
+- Added `CnotRequest::search_options` in `beam-runtime`. It carries the validated width, alphabet-capped shortlist, derived directed-gate alphabet and depth into the generic Rust CNOT search controller.
+- The compatibility-stage branch now converts the admitted request directly to runtime options. The existing `run_cnot` PyO3 call signature remains available through a thin adapter. Search ordering, scorer calls, tensors, kernels and collective sequence are unchanged.
+- Hosted RED at `c383aa9` failed on the new missing `search_options` method as expected. On source SHA `c63937944b7752227982b388ee075be26e89c055`, Rust CNOT CPU/Gloo passed in [run 44976811410](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44976811410), installed wheel in [run 44976811495](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44976811495), hosted source harness in [run 44976811467](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44976811467), and panel-v2 CPU compile/handoff in [run 44976815210](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44976815210). The physical GPU job was skipped.
+
 ## 2026-11-22 - Move public CNOT route selection into Rust runtime
 
 - Added a typed capability matrix and dispatch decision in `beam-runtime` for the Rust controller, compatibility Rust controller and Python reference path.
