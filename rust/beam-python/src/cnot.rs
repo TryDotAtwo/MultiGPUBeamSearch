@@ -504,7 +504,11 @@ impl Backend for PyStages<'_> {
                         &world,
                         "rank parent actions and expand",
                         crate::cnot_native_expand::expand(
-                            self.py, &self.stages, begin, k, self.strict_backend,
+                            self.py,
+                            &self.stages,
+                            begin,
+                            k,
+                            self.strict_backend,
                         ),
                     )?;
                     let expansion = expansion.downcast::<PyTuple>()?;
@@ -567,7 +571,9 @@ impl Backend for PyStages<'_> {
                         &world,
                         "deduplicate and evaluate distinct children",
                         crate::cnot_native_dedup_score::deduplicate_score(
-                            self.py, &self.stages, self.strict_backend,
+                            self.py,
+                            &self.stages,
+                            self.strict_backend,
                         ),
                     )?;
                     let result = result.downcast::<PyTuple>()?;
@@ -1001,9 +1007,10 @@ fn run_cnot_native_search<'py>(
             "build CNOT compatibility stages",
             compatibility_stages,
         )?;
-        return Ok(run_cnot_with_options(
-            py, stages, request.search_options(), admitted_strict,
-        )?.into_bound(py));
+        return Ok(
+            run_cnot_with_options(py, stages, request.search_options(), admitted_strict)?
+                .into_bound(py),
+        );
     }
 
     let admitted_root = input_matrix.getattr("root")?;
@@ -1071,7 +1078,11 @@ fn run_cnot_with_options<'py>(
     options: Options,
     strict_backend: bool,
 ) -> PyResult<Py<PyAny>> {
-    let mut backend = PyStages { py, stages, strict_backend };
+    let mut backend = PyStages {
+        py,
+        stages,
+        strict_backend,
+    };
     let outcome = cnot_search::search(&mut backend, options)?;
     outcome_to_python(py, outcome)
 }

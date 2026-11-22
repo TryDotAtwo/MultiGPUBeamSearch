@@ -60,7 +60,11 @@ pub(crate) fn deduplicate_score<'py>(
     let child_count = children.len()?;
     let values = if child_count != 0 {
         let raw = crate::cnot_scorer_dispatch::child_values(
-            py, &world, &scorer, &children, strict_backend,
+            py,
+            &world,
+            &scorer,
+            &children,
+            strict_backend,
         )?;
         let expected = [i64::try_from(child_count).map_err(|_| {
             pyo3::exceptions::PyOverflowError::new_err("CNOT distinct count exceeds int64")
