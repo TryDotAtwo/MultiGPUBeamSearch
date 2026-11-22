@@ -44,7 +44,8 @@ def test_engine_resolution_is_explicit_and_old_extensions_fail_closed(monkeypatc
         cnot._search_engine("rust", 2**64)
 
 
-def test_rust_top_level_controller_owns_cnot_admission_and_stage_dispatch():
+def test_rust_top_level_controller_owns_cnot_admission_and_stage_dispatch(monkeypatch):
+    monkeypatch.delenv("MGBS_CNOT_STRICT_BACKEND", raising=False)
     require_controller()
     controller = getattr(rust_control.extension(), "run_cnot_native_search", None)
     assert callable(controller), "matching Rust CNOT top-level controller is required"
@@ -119,16 +120,21 @@ def test_rust_top_level_controller_owns_cnot_admission_and_stage_dispatch():
     expected_digest = hashlib.sha256(raw)
     expected_digest.update(json.dumps(config).encode())
     digest_values = list(expected_digest.digest())
-    assert events == [
+    assert events[:-1] == [
         ("prepare-input", caller_root, 5, 9, 4, "qhat", "python"),
         ("longs", digest_values),
         ("gather-fixed", digest_values),
         ("identity", 3, "cpu"),
         ("native-runner",),
         ("all-ranks-support", True),
-        ("native-stages", world, admitted_root, identity, input_matrix, scorer,
-         "qhat", True, 5, 6, 6, 4, None, {"admitted_topology": (0, 1)}),
     ]
+    stage_event = events[-1]
+    assert stage_event[:12] == (
+        "native-stages", world, admitted_root, identity, input_matrix, scorer,
+        "qhat", True, 5, 6, 6, 4,
+    )
+    assert stage_event[-2].strict is False
+    assert stage_event[-1] == {"admitted_topology": (0, 1)}
 
 
 def test_rust_controller_prepares_typed_input_without_python_builder(monkeypatch):

@@ -17,11 +17,20 @@ use std::{fs, path::PathBuf};
 
 #[pyclass(name = "_CnotBackendAdmission", unsendable)]
 pub(crate) struct PyCnotBackendAdmission {
+    pub(crate) strict: bool,
     device_domain: Option<beam_native_sys::cnot_device_bridge::DeviceDomain>,
     device_domain_sha256: Option<String>,
     gpu_observation: Option<crate::cnot_acceptance::GpuObservation>,
     stream5_library_sha256: Option<String>,
     stream5_transport: Option<Py<PyAny>>,
+}
+
+#[pymethods]
+impl PyCnotBackendAdmission {
+    #[getter]
+    fn strict(&self) -> bool {
+        self.strict
+    }
 }
 
 fn strict_backend_enabled() -> bool {
@@ -245,10 +254,20 @@ pub(crate) fn preflight_strict_backend<'py>(
     root: &Bound<'py, PyAny>,
     scorer: &Bound<'py, PyAny>,
     use_rust_controller: bool,
-) -> PyResult<Option<Py<PyCnotBackendAdmission>>> {
+) -> PyResult<Py<PyCnotBackendAdmission>> {
     let strict = strict_backend_mode(world)?;
     if !strict {
-        return Ok(None);
+        return Ok(Py::new(
+            py,
+            PyCnotBackendAdmission {
+                strict: false,
+                device_domain: None,
+                device_domain_sha256: None,
+                gpu_observation: None,
+                stream5_library_sha256: None,
+                stream5_transport: None,
+            },
+        )?);
     }
     let (device_domain, domain_sha256) = prepare_device_domain_checked(
         py,
@@ -369,6 +388,7 @@ pub(crate) fn preflight_strict_backend<'py>(
         admitted_backend = Some(Py::new(
             py,
             PyCnotBackendAdmission {
+                strict: true,
                 device_domain: Some(device_domain),
                 device_domain_sha256: Some(domain_sha256),
                 gpu_observation: gpu_observation.clone(),
@@ -455,18 +475,18 @@ pub(crate) fn preflight_strict_backend<'py>(
         Ok(py.None().into_bound(py))
     })();
     checked(py, world, "write CNOT admission receipts", receipt_write)?;
-    Ok(Some(admitted))
+    Ok(admitted)
 }
 
 pub(crate) fn bind_stream5_admission<'py>(
     py: Python<'py>,
-    admission: Option<&Py<PyCnotBackendAdmission>>,
+    admission: &Py<PyCnotBackendAdmission>,
     world: &Bound<'py, PyAny>,
     library_sha256: Option<String>,
 ) -> PyResult<()> {
-    let Some(admission) = admission else {
+    if !admission.borrow(py).strict {
         return Ok(());
-    };
+    }
     let size: usize = world.getattr("size")?.extract()?;
     if size <= 1 {
         return Ok(());
@@ -567,8 +587,8 @@ impl<'py> NativeStages<'py> {
         }
         let n = root.call_method1("size", (1,))?.extract()?;
         let words = root.call_method1("size", (2,))?.extract()?;
-        let strict_backend = strict_backend_enabled();
         let (
+            strict_backend,
             device_domain,
             device_domain_sha256,
             gpu_observation,
@@ -577,6 +597,7 @@ impl<'py> NativeStages<'py> {
         ) = if let Some(admission) = admission {
             let mut admission = admission.borrow_mut(py);
             (
+                admission.strict,
                 admission.device_domain.take(),
                 admission.device_domain_sha256.take(),
                 admission.gpu_observation.take(),
@@ -584,7 +605,7 @@ impl<'py> NativeStages<'py> {
                 admission.stream5_transport.take(),
             )
         } else {
-            (None, None, None, None, None)
+            (strict_backend_enabled(), None, None, None, None, None)
         };
         if strict_backend && device_domain.is_none() {
             return Err(PyRuntimeError::new_err(

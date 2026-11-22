@@ -241,12 +241,17 @@ impl<'py> Backend for TensorExchange<'_, 'py> {
 }
 
 #[pyfunction]
+#[pyo3(signature=(world, prefer_rust, admitted_strict=None))]
 pub(crate) fn run_cnot_native_start_transport<'py>(
     py: Python<'py>,
     world: Bound<'py, PyAny>,
     prefer_rust: bool,
+    admitted_strict: Option<bool>,
 ) -> PyResult<Option<String>> {
-    let strict = super::cnot_native_stages::strict_backend_mode(&world)?;
+    let strict = match admitted_strict {
+        Some(strict) => strict,
+        None => super::cnot_native_stages::strict_backend_mode(&world)?,
+    };
     if world.getattr("size")?.extract::<usize>()? == 1 {
         return Ok(None);
     }

@@ -3406,3 +3406,9 @@ Main commit `148b2a826a369b7601e904ea409e0cc5301c75c9` also passed the 260-test 
 - Search order, tensors, scoring, stage/collective sequence, kernels and precision are unchanged. Python `World` still owns Gloo operations; this is an incremental control handoff, not full context ownership.
 - The installed PEP 517 wheel passed all 31 steps for implementation SHA `d9814462b05938f3419aa5c71332f9c3ce6619cd` in [run 44988105808](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44988105808). This includes the two-rank Gloo topology mismatch/recovery path. At test-only follow-up SHA `519897eef927d7c60603260c2464f53addf8ea6b`, Rust/Python CNOT CPU/Gloo passed in [run 44988942783](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44988942783), and panel-v2 CPU compatibility passed in [run 44988946712](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44988946712).
 - Hosted acceptance passed at the implementation SHA in [run 44988105821](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44988105821); its physical GPU job was skipped. CUDA/NCCL and physical 1/2-GPU behavior remain unverified.
+
+## 2026-11-22 - Pin CNOT backend mode after collective admission
+
+- The Rust CNOT controller now retains the collectively admitted strict/compatibility mode in its per-search backend admission object.
+- Stream 5 startup, native-stage admission, and the native stage constructor consume that same mode instead of rereading the mutable environment during the search. Legacy direct extension calls without an admission object retain their compatibility fallback.
+- Added installed-wheel coverage for changing the process environment after admission and for the compatibility admission object passed to native stage dispatch. Search order, collectives, scoring, kernels and precision are unchanged.

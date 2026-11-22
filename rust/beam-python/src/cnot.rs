@@ -892,15 +892,20 @@ fn run_cnot_native_search<'py>(
         &scorer,
         use_rust,
     )?;
+    let admitted_strict = admitted_backends.borrow(py).strict;
 
     run_cnot_native_require_consensus(world.clone(), digest)?;
-    let stream5_fingerprint =
-        crate::cnot_stream5::run_cnot_native_start_transport(py, world.clone(), use_rust)?;
-    if let Some(admission) = admitted_backends.as_ref() {
+    let stream5_fingerprint = crate::cnot_stream5::run_cnot_native_start_transport(
+        py,
+        world.clone(),
+        use_rust,
+        Some(admitted_strict),
+    )?;
+    if admitted_strict {
         let bind_result = (|| -> PyResult<Bound<'_, PyAny>> {
             crate::cnot_native_stages::bind_stream5_admission(
                 py,
-                Some(admission),
+                &admitted_backends,
                 &world,
                 stream5_fingerprint,
             )?;
@@ -934,10 +939,7 @@ fn run_cnot_native_search<'py>(
             world.clone(),
             !native_stages.is_none(),
         )?;
-        if matches!(
-            std::env::var("MGBS_CNOT_STRICT_BACKEND").as_deref(),
-            Ok("1")
-        ) && !supports_native
+        if admitted_strict && !supports_native
         {
             return Err(PyRuntimeError::new_err(
                 "strict CNOT acceptance requires the Rust native stage runner on every rank",
@@ -961,42 +963,23 @@ fn run_cnot_native_search<'py>(
                 })(),
             )?;
             let topology_kwargs = topology_kwargs.downcast::<PyDict>()?;
-            return match admitted_backends {
-                Some(admission) => native_stages.call(
-                    (
-                        world,
-                        native_root,
-                        identity,
-                        input_matrix,
-                        scorer,
-                        mode,
-                        audit,
-                        width,
-                        shortlist_value,
-                        alphabet,
-                        depth,
-                        admission,
-                    ),
-                    Some(&topology_kwargs),
+            return native_stages.call(
+                (
+                    world,
+                    native_root,
+                    identity,
+                    input_matrix,
+                    scorer,
+                    mode,
+                    audit,
+                    width,
+                    shortlist_value,
+                    alphabet,
+                    depth,
+                    admitted_backends,
                 ),
-                None => native_stages.call(
-                    (
-                        world,
-                        native_root,
-                        identity,
-                        input_matrix,
-                        scorer,
-                        mode,
-                        audit,
-                        width,
-                        shortlist_value,
-                        alphabet,
-                        depth,
-                        py.None(),
-                    ),
-                    Some(&topology_kwargs),
-                ),
-            };
+                Some(&topology_kwargs),
+            );
         }
 
         let compatibility_stages = compatibility_stages_builder.call1((

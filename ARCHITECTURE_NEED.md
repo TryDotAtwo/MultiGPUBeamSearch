@@ -3690,3 +3690,7 @@ remains pending.
 ## Panel-v2 handoff byte binding — 2026-11-22
 
 The resolver retains each verified JSON artifact's bytes, hashes those bytes, and parses the same byte sequence. It does not reread a manifest or result after digest verification. This applies to the training manifest and result, selected-panel search manifest, and baseline Hamming search manifest. A read-count regression was RED before the change and passed on tested code SHA `57bf4f0deb90e1b0009b1a458968e5ca4096fe23` in the installed-wheel endpoint suite ([run 44983817156](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44983817156)); the pinned producer compile/handoff CPU gates also passed ([44983817105](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44983817105), [44983819836](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44983819836)). This is CPU handoff evidence, not a trained GPU replay.
+
+## Per-search CNOT backend-mode snapshot (2026-11-22)
+
+The controller votes the strict or compatibility mode during backend admission and stores that decision in a Rust-owned per-search admission object. Stream 5 startup and native-stage construction consume the stored decision. Production execution does not reread the process environment after admission, so a rank-local environment change cannot change the backend requirements partway through a search. Legacy direct extension calls that omit an admission object retain the environment-based compatibility fallback.
