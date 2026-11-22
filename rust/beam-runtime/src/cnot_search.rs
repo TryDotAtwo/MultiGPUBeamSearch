@@ -259,8 +259,9 @@ pub enum DispatchError {
 }
 
 /// Resolve the CNOT control path once from typed options and the rank-wide
-/// capability vote. Strict acceptance requires the complete Rust data path;
-/// ordinary auto mode retains the Python reference fallback.
+/// capability vote. The Rust controller requires a common native stage runner;
+/// otherwise a common compatibility controller is preferred. Strict acceptance
+/// requires the complete Rust data path; ordinary auto mode can use Python.
 pub fn select_dispatch(
     requested: RequestedEngine,
     depth_fits_u64: bool,
@@ -290,7 +291,11 @@ pub fn select_dispatch(
 
     match selected {
         SelectedEngine::Python => Ok(DispatchPath::PythonReference),
-        SelectedEngine::Rust if capabilities.native_controller && capabilities.checked_control => {
+        SelectedEngine::Rust
+            if capabilities.native_controller
+                && capabilities.checked_control
+                && capabilities.native_stages =>
+        {
             Ok(DispatchPath::RustController)
         }
         SelectedEngine::Rust if capabilities.compatibility_controller => {
