@@ -1,3 +1,10 @@
+
+## 2026-11-22 - Validate CNOT lifecycle receipts by rank and phase
+
+- The installed-wheel lifecycle contract uses one event receipt from each rank for every phase. Engine mismatch receipts retain each rank's different requested engine and validate that value separately while requiring the same rejection phase and outcome.
+- `verify_cnot.py` writes its global replay report only on rank 0, so validation now consumes exactly three rank-0 reports: `healthy-after-engine-mismatch-0.json`, `healthy-after-0-0.json`, and `healthy-after-1-0.json`. Rank 1 is not expected to emit a result report.
+- The earlier `9a49382` check incorrectly expected a report from each rank. At tested code SHA `c59d6294c11c411c9c1eaad54115b689b00a10a3`, the hosted harness passed [run 44977925762](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44977925762), the installed wheel and two-rank Gloo lifecycle passed [run 44977925758](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44977925758), the Rust CNOT CPU/Gloo suite passed [run 44977925871](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44977925871), and the panel-v2 CPU handoff passed [run 44977931023](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44977931023). The physical GPU job was skipped.
+
 ## 2026-11-22 - Build runtime options from the typed CNOT request
 
 - Added `CnotRequest::search_options` in `beam-runtime`. It carries the validated width, alphabet-capped shortlist, derived directed-gate alphabet and depth into the generic Rust CNOT search controller.
