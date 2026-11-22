@@ -18,7 +18,7 @@ fn resolve_cluster_plan(payload: String) -> PyResult<String> {
         beam_runtime::cluster::ClusterError::Io(error) => PyErr::from(error),
         beam_runtime::cluster::ClusterError::Json(error) => {
             PyValueError::new_err(error.to_string())
-        },
+        }
     })?;
     serde_json::to_string(&plan).map_err(|error| PyRuntimeError::new_err(error.to_string()))
 }
