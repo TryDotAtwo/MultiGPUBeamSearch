@@ -119,6 +119,7 @@ class PanelV2HandoffTests(unittest.TestCase):
                 "sha256": digest_bytes(self.training_result.read_bytes()),
             },
             "search_manifest": {},
+            "baseline_search_manifest": {},
             "panel": "test",
             "panel_indices": list(self.indices),
             "panel_ids": list(self.case_ids),
@@ -152,6 +153,37 @@ class PanelV2HandoffTests(unittest.TestCase):
             "path": "manifests/locked-test-search.json",
             "sha256": digest_bytes(self.search_manifest.read_bytes()),
         }
+        self.baseline_search_manifest = self.manifests / "baseline-test-hamming.json"
+        dataset_value = json.loads(self.dataset_path.read_text(encoding="utf-8"))
+        baseline_roots = []
+        for index, case_id in zip(self.indices, self.case_ids):
+            state = dataset_value["panels"]["test"][index]["state"]
+            baseline_roots.append({
+                "panel_index": index,
+                "case_id": case_id,
+                "dimension": state["n"],
+                "alphabet_id": state["alphabet_id"],
+                "start_packed_rows": list(state["packed_rows"]),
+            })
+        write_json(
+            self.baseline_search_manifest,
+            {
+                "schema": "cnot103_hamming_search_v1",
+                "source_revision": self.handoff["producer_source_revision"],
+                "dataset": {"path": str(self.dataset_path), "sha256": self.dataset_sha},
+                "panel": "test",
+                "panel_indices": list(self.indices),
+                "panel_ids": list(self.case_ids),
+                "panel_roots": baseline_roots,
+                "panel_digest": self.panel_digest,
+                "runtime_contract": "native_device_search_v13",
+                "search": dict(self.search),
+            },
+        )
+        self.handoff["baseline_search_manifest"] = {
+            "path": "manifests/baseline-test-hamming.json",
+            "sha256": digest_bytes(self.baseline_search_manifest.read_bytes()),
+        }
         self.comparison = self._comparison_fixture()
         self.handoff["locked_test_status"] = self.comparison["status"]
         self.handoff["locked_test_comparison_sha256"] = canonical_digest(self.comparison)
@@ -163,7 +195,7 @@ class PanelV2HandoffTests(unittest.TestCase):
 
     def _comparison_fixture(self):
         baseline_pins = {
-            "search_manifest_sha256": "a" * 64,
+            "search_manifest_sha256": self.handoff["baseline_search_manifest"]["sha256"],
             "dataset_sha256": self.dataset_sha,
             "source_revision": self.handoff["producer_source_revision"],
             "runtime_contract": "native_device_search_v13",
@@ -300,6 +332,19 @@ class PanelV2HandoffTests(unittest.TestCase):
         self.handoff["search_manifest"]["sha256"] = digest_bytes(
             self.search_manifest.read_bytes()
         )
+        self.write_receipt()
+        with self.assertRaises(HandoffError):
+            resolve_panel_v2_handoff(self.root, self.receipt)
+
+    def test_rejects_baseline_manifest_panel_swap_after_receipt_repin(self):
+        manifest = json.loads(self.baseline_search_manifest.read_text(encoding="utf-8"))
+        manifest["panel_ids"] = list(reversed(self.case_ids))
+        write_json(self.baseline_search_manifest, manifest)
+        digest = digest_bytes(self.baseline_search_manifest.read_bytes())
+        self.handoff["baseline_search_manifest"]["sha256"] = digest
+        self.comparison["baseline_metrics"]["receipt_pins"]["search_manifest_sha256"] = digest
+        self.handoff["locked_test_comparison_sha256"] = canonical_digest(self.comparison)
+        self.top_level_comparison = copy.deepcopy(self.comparison)
         self.write_receipt()
         with self.assertRaises(HandoffError):
             resolve_panel_v2_handoff(self.root, self.receipt)
