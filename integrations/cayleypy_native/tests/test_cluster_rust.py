@@ -126,6 +126,22 @@ def test_slurm_step_rank_cli(tmp_path, engine):
     assert json.loads(log.read_text()) == ["12", "1", "4", "6", "GPU-four"]
 
 
+@pytest.mark.parametrize("engine", ["python", "rust"])
+@pytest.mark.parametrize("local_rank_flag", ["--local-rank", "--local_rank"])
+def test_torchrun_local_rank_flag_aliases_preserve_scheduler_assignment(tmp_path, engine, local_rank_flag):
+    env = torch_env(1)
+    probe = "import json,os;print(json.dumps([os.environ['RANK'],os.environ['LOCAL_RANK'],os.environ['WORLD_SIZE']]))"
+    worker = subprocess.run(
+        [sys.executable, "-m", "multigpubeamsearch.cluster_worker",
+         "--shared-dir", str(tmp_path), local_rank_flag, "1",
+         "--engine", engine, "--", sys.executable, "-c", probe],
+        env=env, capture_output=True, text=True, timeout=20,
+    )
+    assert worker.returncode == 0, worker.stderr
+    log = tmp_path / "cluster-test/attempt-0/rank-1/native.log"
+    assert json.loads(log.read_text()) == ["1", "1", "2"]
+
+
 @pytest.mark.skipif(os.name != "posix", reason="POSIX SIGTERM semantics")
 @pytest.mark.parametrize("engine", ["python", "rust"])
 def test_worker_sigterm_publishes_failure_and_reaps_child(tmp_path, engine):
