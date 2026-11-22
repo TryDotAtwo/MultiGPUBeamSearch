@@ -158,6 +158,108 @@ class InstalledHandoffEndpointTests(unittest.TestCase):
         self.assertEqual(self.search_calls, [])
         self.assertFalse((self.fixture.reports / "consumer-panel.private.json").exists())
 
+    def test_invalid_pinned_panel_metadata_stops_before_scorer_or_search(self):
+        receipt_path = self.fixture.receipt
+        original_files = {
+            path.relative_to(self.fixture.root): path.read_bytes()
+            for path in self.fixture.root.rglob("*")
+            if path.is_file()
+        }
+
+        def restore_files():
+            for path in self.fixture.root.rglob("*"):
+                if path.is_file() and path.relative_to(self.fixture.root) not in original_files:
+                    path.unlink()
+            for relative, data in original_files.items():
+                path = self.fixture.root / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(data)
+            self.scorer_creations.clear()
+            self.search_calls.clear()
+
+        def receipt_value():
+            return json.loads(receipt_path.read_text(encoding="utf-8"))
+
+        def write_receipt(value):
+            receipt_path.write_text(json.dumps(value, sort_keys=True), encoding="utf-8")
+
+        def handoffs(value):
+            return (
+                value["multi_gpu_beam_handoff"],
+                value["locked_test"]["consumer_handoff"],
+            )
+
+        def change_source():
+            value = receipt_value()
+            value["source_revision"] = "f" * 40
+            write_receipt(value)
+
+        def change_model_abi():
+            value = receipt_value()
+            for handoff in handoffs(value):
+                handoff["model"]["feature_schema"] = "runtime_packet_layout_v24"
+            write_receipt(value)
+
+        def change_checkpoint():
+            value = receipt_value()
+            value["selected"]["checkpoint_sha256"] = "f" * 64
+            write_receipt(value)
+
+        def permute_panel_ids():
+            value = receipt_value()
+            for handoff in handoffs(value):
+                handoff["panel_ids"] = list(reversed(handoff["panel_ids"]))
+            write_receipt(value)
+
+        def change_budget_semantics():
+            value = receipt_value()
+            value["search"]["max_expansions"] = 200
+            for handoff in handoffs(value):
+                handoff["search"]["max_expansions"] = 200
+            write_receipt(value)
+
+        def mix_locked_comparison():
+            value = receipt_value()
+            comparison = copy.deepcopy(value["locked_test"]["comparison"])
+            comparison["candidate_head"] = "proposal"
+            value["locked_test"]["comparison"] = comparison
+            value["locked_test_comparison"] = copy.deepcopy(comparison)
+            digest = hashlib.sha256(
+                json.dumps(comparison, sort_keys=True, separators=(",", ":")).encode("utf-8")
+            ).hexdigest()
+            for handoff in handoffs(value):
+                handoff["locked_test_comparison_sha256"] = digest
+            write_receipt(value)
+
+        def change_pinned_root():
+            dataset = json.loads(self.fixture.dataset_path.read_text(encoding="utf-8"))
+            dataset["panels"]["test"][3]["state"]["packed_rows"] = [1, 2]
+            self.fixture.dataset_path.write_text(
+                json.dumps(dataset, sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
+
+        cases = (
+            ("source", change_source),
+            ("model_abi", change_model_abi),
+            ("checkpoint", change_checkpoint),
+            ("panel_order", permute_panel_ids),
+            ("search_budget", change_budget_semantics),
+            ("mixed_comparison", mix_locked_comparison),
+            ("pinned_root", change_pinned_root),
+        )
+        for name, mutate in cases:
+            with self.subTest(name=name):
+                restore_files()
+                mutate()
+                output_name = f"rejected-{name}.private.json"
+                with self.assertRaises(SystemExit):
+                    self.invoke(output_name=output_name)
+                self.assertEqual(self.scorer_creations, [])
+                self.assertEqual(self.search_calls, [])
+                self.assertFalse((self.fixture.reports / output_name).exists())
+        restore_files()
+
     def test_missing_handoff_receipt_fails_before_scorer_or_search(self):
         missing = self.fixture.root / "reports" / "missing.json"
         with self.assertRaises(SystemExit):

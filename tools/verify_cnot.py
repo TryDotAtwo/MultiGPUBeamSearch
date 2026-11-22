@@ -102,6 +102,8 @@ def verify_layers(root, scorer, mode, width, k, layers, device):
             batch = torch.cat([pack_rows(rows, device=device) for rows, word in parents])
             head = scorer.parent_scores(batch, mode).tolist()
         eligible = {}
+        raw_legal_candidates = 0
+        duplicate_children = 0
         for i, (rows, word) in enumerate(parents):
             actions = range(len(pairs))
             if k < len(pairs):
@@ -109,7 +111,11 @@ def verify_layers(root, scorer, mode, width, k, layers, device):
             for action in actions:
                 child = apply(rows, pairs[action])
                 if child not in closed:
-                    eligible.setdefault(child, (i, word + (action,)))
+                    raw_legal_candidates += 1
+                    if child in eligible:
+                        duplicate_children += 1
+                    else:
+                        eligible[child] = (i, word + (action,))
         measured = {}
         for bits, parent, _lex, _generation, route, *lanes in layer["candidates"]:
             child = rows_of(lanes, n)
@@ -140,6 +146,7 @@ def verify_layers(root, scorer, mode, width, k, layers, device):
         ).hexdigest()
         reports.append(dict(
             depth=layer["depth"], distinct=len(eligible), retained=len(winners),
+            raw_legal_candidates=raw_legal_candidates, duplicate_children=duplicate_children,
             winners_sha256=digest, by_rank=layer["by_rank"],
             selection_oracle="reported_scores",
             reference_order_status=reference_status,
