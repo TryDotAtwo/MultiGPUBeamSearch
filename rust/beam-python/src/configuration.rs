@@ -27,7 +27,6 @@ fn resolve_runtime_devices(
     .map_err(|error| PyValueError::new_err(error.to_string()))
 }
 
-
 #[pyfunction]
 fn resolve_runtime_device_plan(
     cuda_available: bool,

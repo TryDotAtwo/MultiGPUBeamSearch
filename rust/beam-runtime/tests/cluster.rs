@@ -237,7 +237,6 @@ fn cuda_visibility_rejects_missing_indices_empty_tokens_and_disabled_devices() {
     }
 }
 
-
 #[test]
 fn child_environment_filters_rank_controls_and_maps_cuda_visibility() {
     use beam_runtime::cluster::child_environment;
@@ -259,12 +258,27 @@ fn child_environment_filters_rank_controls_and_maps_cuda_visibility() {
     let result = child_environment(&inherited, &[2, 0], "/rank/nccl-id.bin").unwrap();
     assert_eq!(result.get("PATH").map(String::as_str), Some("safe"));
     assert_eq!(result.get("CUSTOM_VALUE").map(String::as_str), Some("kept"));
-    assert_eq!(result.get("CUDA_VISIBLE_DEVICES").map(String::as_str), Some("GPU-c,GPU-a"));
-    assert_eq!(result.get("CUDA_DEVICE_ORDER").map(String::as_str), Some("PCI_BUS_ID"));
-    assert_eq!(result.get("BEAM_NCCL_ID_FILE").map(String::as_str), Some("/rank/nccl-id.bin"));
+    assert_eq!(
+        result.get("CUDA_VISIBLE_DEVICES").map(String::as_str),
+        Some("GPU-c,GPU-a")
+    );
+    assert_eq!(
+        result.get("CUDA_DEVICE_ORDER").map(String::as_str),
+        Some("PCI_BUS_ID")
+    );
+    assert_eq!(
+        result.get("BEAM_NCCL_ID_FILE").map(String::as_str),
+        Some("/rank/nccl-id.bin")
+    );
     for removed in [
-        "RANK", "ROLE_RANK", "MASTER_ADDR", "NCCL_DEBUG", "BEAM_WEIGHT_DIR",
-        "STREAM4_BATCH_ALIGNMENT", "PUBLISH_RESULTS", "RESULTS_INGEST_TOKEN",
+        "RANK",
+        "ROLE_RANK",
+        "MASTER_ADDR",
+        "NCCL_DEBUG",
+        "BEAM_WEIGHT_DIR",
+        "STREAM4_BATCH_ALIGNMENT",
+        "PUBLISH_RESULTS",
+        "RESULTS_INGEST_TOKEN",
     ] {
         assert!(!result.contains_key(removed), "kept reserved key {removed}");
     }
