@@ -996,10 +996,7 @@ fn run_cnot_native_search<'py>(
             "build CNOT compatibility stages",
             compatibility_stages,
         )?;
-        return Ok(
-            run_cnot_with_options(py, stages, request.search_options())?
-                .into_bound(py),
-        );
+        return Ok(run_cnot_with_options(py, stages, request.search_options())?.into_bound(py));
     }
 
     let admitted_root = input_matrix.getattr("root")?;
