@@ -46,6 +46,12 @@ installed wheel, hosted acceptance and panel-v2 CPU checks passed in runs
 [44980018575](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44980018575).
 The physical CUDA/NCCL job was skipped.
 
+## Admitted CNOT topology at native-stage binding — 2026-11-22
+
+The public Rust CNOT controller forwards the `rank/world` values from the admitted `RankedCnotRequest` into native-stage construction. The adapter checks that pair against the Python `World` and places construction inside the existing common Gloo phase before search. Existing direct PyO3 callers may omit the optional argument and retain their compatibility behavior.
+
+This narrows the topology handoff for stage setup; Python `World` still owns the control group and tensor collectives. No search, scoring, ordering, kernel, precision, or data-plane behavior changed. The installed wheel passed on implementation SHA `d9814462b05938f3419aa5c71332f9c3ce6619cd`; physical CUDA/NCCL remains unverified.
+
 # Конфиг
 
 ## Paired permutation acceptance receipt contract, 2026-11-22

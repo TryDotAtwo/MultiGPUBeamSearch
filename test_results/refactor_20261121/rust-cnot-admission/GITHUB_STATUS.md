@@ -1,7 +1,8 @@
 # Rust + CUDA/C++ migration acceptance status
 
 Source branch: `codex/beam-3060-preflight-20261121`
-Latest tested code SHA: `57bf4f0deb90e1b0009b1a458968e5ca4096fe23`
+Latest installed-wheel code SHA: `d9814462b05938f3419aa5c71332f9c3ce6619cd`
+Latest hosted CPU test SHA: `519897eef927d7c60603260c2464f53addf8ea6b`
 Base main SHA: `e6c41b6dc6bb3a839f6338f3cfe9eaadf8608d5a`
 
 | Gate | Status | Evidence |
@@ -104,3 +105,12 @@ Tested source SHA: `3241de1df83c101abe3cca906fa9d1de801f611a`.
 - Hosted acceptance/source harness: PASS, [run 44986148934](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44986148934). Panel-v2 CPU compile and handoff: PASS, [run 44986152290](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44986152290).
 - The first source harness attempt at run 44985950759 caught an added raw log upload that violated the workflow's redacted-status-only contract. The log artifact and `tee` were removed; the subsequent source harness passed.
 - Physical CUDA/NCCL job: SKIPPED. No paid instance was created; physical 1/2-GPU parity and trained checkpoint execution remain pending.
+
+## Admitted CNOT topology at native-stage binding
+
+Implementation SHA: `d9814462b05938f3419aa5c71332f9c3ce6619cd`; latest hosted test SHA: `519897eef927d7c60603260c2464f53addf8ea6b`.
+
+- Installed PEP 517 wheel outside checkout: PASS, 31 steps, [run 44988105808](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44988105808). The topology failure/recovery fixture passed on two Gloo ranks.
+- Rust CNOT CPU/Gloo: PASS after correcting a test expectation for the optional empty admission argument, [run 44988942783](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44988942783).
+- Panel-v2 CPU compatibility: PASS, [run 44988946712](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44988946712). Hosted source acceptance passed at implementation SHA [run 44988105821](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44988105821).
+- Physical CUDA/NCCL: SKIPPED. No 1/2-GPU behavior is claimed. Python `World` remains the Gloo/tensor-collective owner; full Rust context ownership remains open.
