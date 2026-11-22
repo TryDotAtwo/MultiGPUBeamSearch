@@ -1,7 +1,7 @@
 # Rust + CUDA/C++ migration acceptance status
 
 Source branch: `codex/beam-3060-preflight-20261121`
-Latest tested code SHA: `c63937944b7752227982b388ee075be26e89c055`
+Latest tested code SHA: `c59d6294c11c411c9c1eaad54115b689b00a10a3`
 Base main SHA: `e6c41b6dc6bb3a839f6338f3cfe9eaadf8608d5a`
 
 | Gate | Status | Evidence |
@@ -51,3 +51,14 @@ Tested code SHA: `c63937944b7752227982b388ee075be26e89c055`.
 - Physical CUDA/NCCL job: SKIPPED; no GPU was dispatched.
 
 The request now supplies normalized controls to the generic Rust compatibility-stage controller; the public PyO3 `run_cnot` signature and search semantics remain unchanged. This is hosted CPU evidence, not hardware acceptance.
+
+
+## CNOT verify_cnot Gloo receipts, 2026-11-22
+
+Tested code SHA: `c59d6294c11c411c9c1eaad54115b689b00a10a3`.
+
+- The two-rank test records each phase in rank-local event receipts. The engine-mismatch case allows the expected local inputs to differ (`auto` and `python`) while checking the common rejection outcome.
+- The verifier checks exactly three rank-0 result reports, all `solved` with `bitwise_replay=true`: `healthy-after-engine-mismatch-0.json`, `healthy-after-0-0.json`, and `healthy-after-1-0.json`. It does not expect result JSON from rank 1.
+- Hosted installed-wheel Gloo lifecycle and receipt validation: PASS, [run 44977925758](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44977925758). Receipt contract CPU fixture includes missing-phase, wrong-rank and missing-root-replay rejection.
+- Hosted acceptance harness: PASS, [run 44977925762](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44977925762). Rust CNOT CPU/Gloo: PASS, [run 44977925871](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44977925871). Panel-v2 CPU compile/handoff: PASS, [run 44977931023](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44977931023).
+- Physical CUDA/NCCL job: SKIPPED. No Vast instance was dispatched.
