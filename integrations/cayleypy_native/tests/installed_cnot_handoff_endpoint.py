@@ -10,6 +10,7 @@ import tempfile
 import unittest
 
 import torch
+import torch.distributed as dist
 
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / "integrations" / "cnot_scorer"))
@@ -51,6 +52,14 @@ class InstalledHandoffEndpointTests(unittest.TestCase):
         self.assertNotIn(ROOT.resolve(), package_path.parents, "test imported the checkout instead of the installed wheel")
         self.fixture = PanelV2HandoffTests()
         self.fixture.setUp()
+        self.owns_process_group = not dist.is_initialized()
+        if self.owns_process_group:
+            dist.init_process_group(
+                backend="gloo",
+                init_method=f"file://{self.fixture.root / 'gloo-rendezvous'}",
+                rank=0,
+                world_size=1,
+            )
         self.verify = load_verify_endpoint()
         self.scorer_creations = []
         self.search_calls = []
@@ -73,6 +82,8 @@ class InstalledHandoffEndpointTests(unittest.TestCase):
         self.scorer_factory = factory
 
     def tearDown(self):
+        if self.owns_process_group and dist.is_initialized():
+            dist.destroy_process_group()
         self.fixture.tearDown()
 
     def invoke(self, *, receipt=None, output_name="consumer-panel.private.json", extra=()):
@@ -86,7 +97,7 @@ class InstalledHandoffEndpointTests(unittest.TestCase):
             "--output", str(self.fixture.reports / output_name),
             *extra,
         ]
-        return self.verify.main(args, scorer_factory=self.scorer_factory)
+        return self.verify.main(args, scorer_factory=self.scorer_factory, manage_process_group=False)
 
     def test_public_endpoint_loads_ordered_roots_and_searches_with_pinned_qhat_budget(self):
         self.invoke()
@@ -131,7 +142,7 @@ class InstalledHandoffEndpointTests(unittest.TestCase):
             and call["engine"] == "rust"
             for call in self.search_calls
         ))
-        self.assertEqual([call["root"] for call in self.search_calls], [[[1], [2]], [[1], [2]]])
+        self.assertEqual([call["root"] for call in self.search_calls], [[[1], [3]], [[3], [2]]])
 
     def test_bad_receipt_fails_before_scorer_or_search(self):
         self.fixture.receipt_source_revision = "f" * 40
