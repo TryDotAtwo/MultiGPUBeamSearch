@@ -17,6 +17,7 @@ import torch.multiprocessing as mp
 
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / "integrations" / "cnot_scorer"))
+from handoff import CURRENT_PRODUCER_SOURCE_REVISION  # noqa: E402
 from test_handoff import PanelV2HandoffTests  # noqa: E402
 
 import multigpubeamsearch  # noqa: E402
@@ -105,13 +106,37 @@ class InstalledHandoffEndpointTests(unittest.TestCase):
                 world_size=1,
             )
         self.verify = load_verify_endpoint()
+        self.resolver_loads = 0
+        self.mutate_receipt_after_resolve = False
+        self.real_resolver_loader = self.verify._load_handoff_resolver
+
+        def load_resolver_once_per_public_request():
+            self.resolver_loads += 1
+            module = self.real_resolver_loader()
+            resolve = module.resolve_panel_v2_handoff
+
+            def resolve_and_optionally_mutate(*args, **kwargs):
+                snapshot = resolve(*args, **kwargs)
+                if self.mutate_receipt_after_resolve:
+                    Path(args[1] if len(args) > 1 else kwargs["learning_curve_receipt"]).write_bytes(
+                        b"changed after the consumer bound the handoff"
+                    )
+                return snapshot
+
+            module.resolve_panel_v2_handoff = resolve_and_optionally_mutate
+            return module
+
+        self.verify._load_handoff_resolver = load_resolver_once_per_public_request
         self.scorer_creations = []
         self.search_calls = []
         self.scorer = SyntheticScorer()
         self.real_search = self.verify.search_cnot
 
         def factory(library, manifest, *, n, device, inference_batch=4):
-            self.scorer_creations.append((library, Path(manifest).resolve(), n, str(device), inference_batch))
+            self.scorer_creations.append((
+                library, Path(manifest).resolve(), n, str(device), inference_batch,
+                os.environ.get("MGBS_CNOT_EXPECTED_SEARCH_MANIFEST_SHA256"),
+            ))
             return self.scorer
 
         def search(root, scorer, **kwargs):
@@ -135,15 +160,19 @@ class InstalledHandoffEndpointTests(unittest.TestCase):
                 os.environ[key] = value
         self.fixture.tearDown()
 
-    def invoke(self, *, receipt=None, output_name="consumer-panel.private.json", extra=()):
+    def invoke(self, *, fixture=None, receipt=None, output_name="consumer-panel.private.json", extra=()):
+        target = self.fixture if fixture is None else fixture
+        library = target.root / "synthetic-scorer.so"
+        if not library.exists():
+            library.write_bytes(b"synthetic CNOT scorer library fixture")
         args = [
             "--case", "panel",
             "--backend", "gloo",
             "--engine", "rust",
-            "--library", str(self.scorer_library),
-            "--run-root", str(self.fixture.root),
-            "--handoff-receipt", str(receipt or self.fixture.receipt),
-            "--output", str(self.fixture.reports / output_name),
+            "--library", str(library),
+            "--run-root", str(target.root),
+            "--handoff-receipt", str(receipt or target.receipt),
+            "--output", str(target.reports / output_name),
             *extra,
         ]
         return self.verify.main(args, scorer_factory=self.scorer_factory, manage_process_group=False)
@@ -168,12 +197,23 @@ class InstalledHandoffEndpointTests(unittest.TestCase):
         self.assertEqual(row["word"]["physical_cost"], 0)
         self.assertTrue(row["word"]["replayed"])
 
-    def test_public_endpoint_loads_ordered_roots_and_searches_with_pinned_qhat_budget(self):
+    def test_public_endpoint_binds_two_distinct_panels_once_and_forwards_roots_and_budget(self):
+        if os.environ.get("CNOT103_PRODUCER_CHECKOUT") and os.environ.get("CNOT103_PRODUCER_SOURCE_SHA"):
+            self.fixture.emit_current_producer_handoff()
+        first_resolver_load = self.resolver_loads
+        self.mutate_receipt_after_resolve = True
         self.invoke()
+        self.mutate_receipt_after_resolve = False
+        self.assertEqual(
+            self.fixture.receipt.read_bytes(),
+            b"changed after the consumer bound the handoff",
+        )
+        self.assertEqual(self.resolver_loads - first_resolver_load, 1)
         report_path = self.fixture.reports / "consumer-panel.private.json"
         report = json.loads(report_path.read_text(encoding="utf-8"))
         self.assertEqual(report["schema"], "cnot103_mgbs_panel_search_result_v1")
         self.assertEqual(report["producer_emitter_sha256"], self.fixture.producer_emitter_sha256)
+        self.assertEqual(report["producer_source_revision"], self.fixture.handoff["producer_source_revision"])
         self.assertEqual(report["adapter"]["native_adapter_source_commit"], "e17953891a36e3e3ae8b038695bfac8548ab784f")
         bridge = ROOT / "integrations" / "cnot_scorer" / "bridge_panel_v2.rs"
         self.assertEqual(report["adapter"]["adapter_source_sha256"], hashlib.sha256(bridge.read_bytes()).hexdigest())
@@ -225,6 +265,7 @@ class InstalledHandoffEndpointTests(unittest.TestCase):
                 2,
                 "cpu",
                 4,
+                self.fixture.handoff["search_manifest"]["sha256"],
             ),
         )
         self.assertEqual(len(self.search_calls), 2)
@@ -238,6 +279,42 @@ class InstalledHandoffEndpointTests(unittest.TestCase):
             for call in self.search_calls
         ))
         self.assertEqual([call["root"] for call in self.search_calls], [[[[1], [3]]], [[[3], [2]]]])
+
+        alternate = PanelV2HandoffTests()
+        alternate.variant = "alternate"
+        alternate.setUp()
+        alternate.pin_producer_revision(CURRENT_PRODUCER_SOURCE_REVISION)
+        self.addCleanup(alternate.tearDown)
+        alternate_resolver_load = self.resolver_loads
+        os.environ.pop("MGBS_CNOT_EXPECTED_SEARCH_MANIFEST_SHA256", None)
+        self.invoke(fixture=alternate, output_name="consumer-panel-alternate.private.json")
+        self.assertEqual(self.resolver_loads - alternate_resolver_load, 1)
+        alternate_report = json.loads(
+            (alternate.reports / "consumer-panel-alternate.private.json").read_text(encoding="utf-8")
+        )
+        self.assertNotEqual(alternate_report["panel_digest"], report["panel_digest"])
+        self.assertEqual(alternate_report["panel_ids"], ["alternate-case-a", "alternate-case-b"])
+        self.assertEqual(alternate_report["producer_source_revision"], CURRENT_PRODUCER_SOURCE_REVISION)
+        self.assertEqual([row["case_id"] for row in alternate_report["rows"]], alternate.case_ids)
+        self.assertTrue(all(row["word"]["replayed"] for row in alternate_report["rows"]))
+        self.assertEqual(
+            [call["root"] for call in self.search_calls[2:]],
+            [[[[2], [1]]], [[[1], [3]]]],
+        )
+        self.assertEqual(self.scorer_creations[-1], (
+            str(alternate.root / "synthetic-scorer.so"),
+            alternate.search_manifest.resolve(),
+            2,
+            "cpu",
+            4,
+            alternate.handoff["search_manifest"]["sha256"],
+        ))
+        self.assertTrue(all(
+            call["width"] == alternate.search["global_width"]
+            and call["shortlist"] == alternate.search["shortlist"]
+            and call["max_depth"] == alternate.search["max_depth"]
+            for call in self.search_calls[2:]
+        ))
 
     def test_installed_public_panel_endpoint_matches_one_and_two_gloo_ranks(self):
         one_path = self.fixture.reports / "consumer-panel-one-rank.private.json"

@@ -126,3 +126,9 @@ Keep an active goal until the migration and required verification are complete.
 
 
 2026-11-22 lifecycle receipt clarification: Validate one event receipt from each rank for every Gloo phase, allowing rank-local requested-engine values to differ while checking them independently. Require only the three rank-0 retry reports (healthy-after-engine-mismatch-0.json, healthy-after-0-0.json, and healthy-after-1-0.json) with solved status and bitwise replay; do not require result files from rank 1.
+
+
+2026-11-22 one-off consumer/CI request: Keep the CNOT panel-v2 producer check as a required PR status while avoiding pinned Torch installation and adapter compilation for documentation, logs and unrelated changes. Reuse a prior result only for an identical adapter/fixture/pin fingerprint; preserve a prior failure and run fully when the result is missing or inputs change; manual dispatch remains full. Bind the consumer to the resolved panel once, remove only duplicate checks that add no independent evidence, and test two distinguishable panels through the public installed-wheel verifier, observing roots and B/K/D at search and scorer inputs. Keep independent replay and rank agreement. No GPU dispatch for this one-off.
+
+
+2026-11-22 producer compatibility follow-up: Support the exact producer source revision 42ed72f587ab70fc74a85cf0a25001efb29cb994 while retaining legacy receipts from 7310b1eb5ec07c76c131ba8c60b105ff4aad7a9c. Bind each supported source revision to its emitter ABI hash; reject unsupported revisions and mismatched ABI. Test the new actual emitter through the normal resolver and public installed-wheel verifier without changing producer code or running training/paid compute.

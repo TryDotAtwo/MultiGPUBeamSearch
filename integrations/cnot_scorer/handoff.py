@@ -18,7 +18,12 @@ _SHA1 = re.compile(r"[0-9a-f]{40}\Z")
 _SHA256 = re.compile(r"[0-9a-f]{64}\Z")
 _HANDOFF_SCHEMA = "cnot103_multigpu_beam_handoff_v3"
 EXPECTED_PRODUCER_SOURCE_REVISION = "7310b1eb5ec07c76c131ba8c60b105ff4aad7a9c"
+CURRENT_PRODUCER_SOURCE_REVISION = "42ed72f587ab70fc74a85cf0a25001efb29cb994"
 EXPECTED_PRODUCER_EMITTER_SHA256 = "2a6f579be0b1426a451aadf06709fa027b17eb7170f7b694d945acf81e070bf1"
+SUPPORTED_PRODUCER_EMITTER_ABI = {
+    EXPECTED_PRODUCER_SOURCE_REVISION: EXPECTED_PRODUCER_EMITTER_SHA256,
+    CURRENT_PRODUCER_SOURCE_REVISION: EXPECTED_PRODUCER_EMITTER_SHA256,
+}
 _RECEIPT_SCHEMA = "cnot103_learning_curve_campaign_v1"
 _SEARCH_SCHEMA = "cnot103_panel_search_v2"
 _RESULT_SCHEMA = "cnot103_training_result_v1"
@@ -60,6 +65,7 @@ class ResolvedPanelV2Handoff:
     panel_ids: tuple[str, ...]
     panel_digest: str
     search: dict[str, Any]
+    expansion_upper_bound: int
     locked_test_status: str
     locked_test_comparison_sha256: str
     locked_test_comparison: dict[str, Any]
@@ -386,10 +392,10 @@ def resolve_panel_v2_handoff(
         raise HandoffError("learning-curve receipt source revision differs from the handoff")
     if receipt.get("producer_emitter_sha256") != producer_emitter_sha256:
         raise HandoffError("learning-curve receipt producer emitter pin differs from the handoff")
-    if source_revision != EXPECTED_PRODUCER_SOURCE_REVISION:
-        raise HandoffError("producer source revision differs from the consumer pin")
-    if producer_emitter_sha256 != EXPECTED_PRODUCER_EMITTER_SHA256:
-        raise HandoffError("producer emitter differs from the consumer pin")
+    if not isinstance(source_revision, str) or source_revision not in SUPPORTED_PRODUCER_EMITTER_ABI:
+        raise HandoffError("producer source revision is unsupported by the consumer")
+    if producer_emitter_sha256 != SUPPORTED_PRODUCER_EMITTER_ABI[source_revision]:
+        raise HandoffError("producer emitter ABI hash differs from the source pin")
     if (
         handoff.get("schema") != _HANDOFF_SCHEMA
         or handoff.get("consumer") != "MultiGPUBeamSearch"
@@ -478,7 +484,7 @@ def resolve_panel_v2_handoff(
     ):
         raise HandoffError("panel, search configuration or scorer differs from the handoff")
 
-    validate_search_contract(search)
+    expansion_upper_bound = validate_search_contract(search)
     _manifest_pin(
         root,
         search_path,
@@ -588,6 +594,7 @@ def resolve_panel_v2_handoff(
         panel_ids=tuple(ids),
         panel_digest=panel_digest,
         search=dict(search),
+        expansion_upper_bound=expansion_upper_bound,
         locked_test_status=status,
         locked_test_comparison_sha256=comparison_sha,
         locked_test_comparison=comparison,

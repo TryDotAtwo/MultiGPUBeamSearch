@@ -562,8 +562,7 @@ def _panel_result_row(panel_root, result, wall_seconds):
 
 
 def _search_handoff_panel(args, resolved, device, world, *, scorer_factory):
-    resolver = _load_handoff_resolver()
-    expansion_bound = resolver.validate_search_contract(resolved.search)
+    expansion_bound = resolved.expansion_upper_bound
     provenance = _adapter_provenance()
     scorer_library_sha256 = hashlib.sha256(Path(args.library).read_bytes()).hexdigest()
     identity = {

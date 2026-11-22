@@ -12,6 +12,7 @@ import unittest
 from unittest.mock import patch
 
 from handoff import (
+    CURRENT_PRODUCER_SOURCE_REVISION,
     EXPECTED_PRODUCER_EMITTER_SHA256,
     EXPECTED_PRODUCER_SOURCE_REVISION,
     HandoffError,
@@ -47,8 +48,15 @@ class PanelV2HandoffTests(unittest.TestCase):
         self.accepted_updates = 64
         self.checkpoint_sha = "c" * 64
         self.producer_emitter_sha256 = EXPECTED_PRODUCER_EMITTER_SHA256
-        self.indices = [3, 9]
-        self.case_ids = ["locked-case-a", "locked-case-b"]
+        variant = getattr(self, "variant", "primary")
+        if variant == "primary":
+            self.indices = [3, 9]
+            self.case_ids = ["locked-case-a", "locked-case-b"]
+            self.root_rows = [[1, 3], [3, 2]]
+        else:
+            self.indices = [2, 7]
+            self.case_ids = [f"{variant}-case-a", f"{variant}-case-b"]
+            self.root_rows = [[2, 1], [1, 3]]
         self.panel_digest = canonical_digest({
             "panel": "test",
             "indices": self.indices,
@@ -60,17 +68,22 @@ class PanelV2HandoffTests(unittest.TestCase):
             "max_depth": 8,
             "max_expansions": 201,
         }
-        records = [
-            {
-                "lineage_id": "locked-case-a" if index == 3 else "locked-case-b" if index == 9 else f"other-{index}",
+        selected_roots = {
+            index: (case_id, packed_rows)
+            for index, case_id, packed_rows in zip(self.indices, self.case_ids, self.root_rows)
+        }
+        records = []
+        for index in range(10):
+            selected = selected_roots.get(index)
+            case_id, packed_rows = selected if selected is not None else (f"other-{index}", [1, 2])
+            records.append({
+                "lineage_id": case_id,
                 "state": {
                     "n": 2,
                     "alphabet_id": "all_to_all_unit_cnot:2",
-                    "packed_rows": [1, 3] if index == 3 else [3, 2] if index == 9 else [1, 2],
+                    "packed_rows": list(packed_rows),
                 },
-            }
-            for index in range(10)
-        ]
+            })
         dataset_value = {"schema": "synthetic-sealed-dataset", "panels": {"test": records}}
         dataset_bytes = (json.dumps(dataset_value, sort_keys=True) + "\n").encode("utf-8")
         self.dataset_path = self.root / "data" / "frozen.json"
@@ -234,6 +247,15 @@ class PanelV2HandoffTests(unittest.TestCase):
             "candidate_metrics": {**metrics, "receipt_pins": candidate_pins},
         }
 
+    def pin_producer_revision(self, revision):
+        self.handoff["producer_source_revision"] = revision
+        self.receipt_source_revision = revision
+        self.comparison = self._comparison_fixture()
+        self.handoff["locked_test_status"] = self.comparison["status"]
+        self.handoff["locked_test_comparison_sha256"] = canonical_digest(self.comparison)
+        self.top_level_comparison = copy.deepcopy(self.comparison)
+        self.write_receipt()
+
     def tearDown(self):
         self.temp.cleanup()
 
@@ -280,6 +302,7 @@ class PanelV2HandoffTests(unittest.TestCase):
         self.assertEqual(resolved.panel_indices, tuple(self.indices))
         self.assertEqual(resolved.panel_ids, tuple(self.case_ids))
         self.assertEqual(resolved.panel_digest, self.panel_digest)
+        self.assertEqual(resolved.expansion_upper_bound, 201)
         self.assertEqual(resolved.locked_test_status, "length_gain")
         self.assertEqual(resolved.locked_test_comparison_sha256, canonical_digest(self.comparison))
         self.assertEqual(resolved.locked_test_comparison, self.comparison)
@@ -461,12 +484,7 @@ class PanelV2HandoffTests(unittest.TestCase):
         with self.assertRaises(HandoffError):
             resolve_panel_v2_handoff(self.root, self.receipt)
 
-    @unittest.skipUnless(
-        os.environ.get("CNOT103_PRODUCER_CHECKOUT")
-        and os.environ.get("CNOT103_PRODUCER_SOURCE_SHA"),
-        "current producer cross-compatibility runs in hosted CI",
-    )
-    def test_current_producer_emitter_builds_a_consumer_accepted_handoff(self):
+    def emit_current_producer_handoff(self):
         producer_root = Path(os.environ["CNOT103_PRODUCER_CHECKOUT"]).resolve()
         expected_sha = os.environ["CNOT103_PRODUCER_SOURCE_SHA"]
         observed_sha = subprocess.run(
@@ -524,6 +542,28 @@ class PanelV2HandoffTests(unittest.TestCase):
             producer.multigpu_handoff_emitter_sha256(),
         )
         self.assertEqual(resolved.panel_ids, tuple(self.case_ids))
+        return resolved
+
+    @unittest.skipUnless(
+        os.environ.get("CNOT103_PRODUCER_CHECKOUT")
+        and os.environ.get("CNOT103_PRODUCER_SOURCE_SHA"),
+        "current producer cross-compatibility runs in hosted CI",
+    )
+    def test_current_producer_emitter_builds_a_consumer_accepted_handoff(self):
+        self.emit_current_producer_handoff()
+
+    def test_resolves_current_pinned_producer_revision(self):
+        self.pin_producer_revision(CURRENT_PRODUCER_SOURCE_REVISION)
+        resolved = resolve_panel_v2_handoff(self.root, self.receipt)
+        self.assertEqual(resolved.producer_source_revision, CURRENT_PRODUCER_SOURCE_REVISION)
+        self.assertEqual(resolved.producer_emitter_sha256, EXPECTED_PRODUCER_EMITTER_SHA256)
+
+    def test_rejects_an_emitter_abi_not_pinned_for_the_source_revision(self):
+        self.producer_emitter_sha256 = "f" * 64
+        self.handoff["producer_emitter_sha256"] = self.producer_emitter_sha256
+        self.write_receipt()
+        with self.assertRaisesRegex(HandoffError, "producer emitter ABI"):
+            resolve_panel_v2_handoff(self.root, self.receipt)
 
     def test_absolute_search_manifest_pins_require_the_same_run_root_mount(self):
         import shutil

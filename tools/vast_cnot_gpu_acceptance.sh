@@ -95,7 +95,6 @@ PY
 panel_checkpoint_sha="${panel_pins[0]}"
 panel_manifest_sha="${panel_pins[1]}"
 panel_manifest="${panel_pins[2]}"
-[[ "$(sha256sum "$panel_manifest" | awk '{print $1}')" == "$panel_manifest_sha" ]]
 cd "$source_dir/integrations/cayleypy_native"
 cutlass_cache="/private/cache/cayleypy-native"
 cutlass_dir="$("$python_bin" - "$source_dir" "$cutlass_cache" <<'PY'

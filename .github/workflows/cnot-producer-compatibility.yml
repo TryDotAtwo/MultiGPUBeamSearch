@@ -4,17 +4,6 @@ on:
   pull_request:
     branches:
       - main
-    paths:
-      - .github/workflows/cnot-producer-compatibility.yml
-      - integrations/cnot_scorer/**
-      - integrations/cayleypy_native/multigpubeamsearch/build.py
-  push:
-    branches:
-      - "codex/beam-*"
-    paths:
-      - .github/workflows/cnot-producer-compatibility.yml
-      - integrations/cnot_scorer/**
-      - integrations/cayleypy_native/multigpubeamsearch/build.py
   workflow_dispatch:
 
 permissions:
@@ -28,10 +17,60 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.sha }}
-          fetch-depth: 1
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
           persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Prepare the exact panel-v2 input fingerprint and changed paths
+        id: prepare
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/cnot-panel-v2-state"
+          python3 tools/cnot_producer_compatibility.py prepare \
+            --event-name "$GITHUB_EVENT_NAME" \
+            --event-file "$GITHUB_EVENT_PATH" \
+            --workspace "$GITHUB_WORKSPACE" \
+            --output "$GITHUB_OUTPUT"
+      - name: Run cheap CPU panel-v2 contract checks
+        id: cheap_contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/test_cnot_producer_compatibility.py \
+            > "$RUNNER_TEMP/cnot-panel-v2-gate-tests.log" 2>&1
+          (cd integrations/cnot_scorer && python3 -m unittest -v test_handoff) \
+            > "$RUNNER_TEMP/cnot-panel-v2-handoff-tests.log" 2>&1
+      - name: Restore result for identical pinned inputs
+        id: previous
+        uses: actions/cache/restore@v4
+        continue-on-error: true
+        with:
+          path: ${{ runner.temp }}/cnot-panel-v2-state
+          key: ${{ runner.os }}-cnot-panel-v2-${{ steps.prepare.outputs.fingerprint }}-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: |
+            ${{ runner.os }}-cnot-panel-v2-${{ steps.prepare.outputs.fingerprint }}-
+      - name: Decide whether to reuse, carry failure, or build
+        id: decision
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/cnot_producer_compatibility.py decide \
+            --state-file "$RUNNER_TEMP/cnot-panel-v2-state/state.json" \
+            --fingerprint "${{ steps.prepare.outputs.fingerprint }}" \
+            --changed-inputs "${{ steps.prepare.outputs.changed_inputs }}" \
+            --force-full "${{ steps.prepare.outputs.force_full }}" \
+            --output "$GITHUB_OUTPUT"
+      - name: Preserve a prior failure for identical inputs
+        if: steps.decision.outputs.action == 'carry_failure'
+        shell: bash
+        run: |
+          echo "The same pinned panel-v2 inputs have a recorded failed result; this PR status remains failed." >&2
+          exit 1
       - uses: actions/checkout@v4
+        if: steps.decision.outputs.action == 'run_full'
         with:
           repository: TryDotAtwo/cnot-neural-synth-frontier6
           ref: e17953891a36e3e3ae8b038695bfac8548ab784f
@@ -39,107 +78,113 @@ jobs:
           fetch-depth: 1
           persist-credentials: false
       - uses: actions/checkout@v4
+        if: steps.decision.outputs.action == 'run_full'
         with:
           repository: TryDotAtwo/cnot-neural-synth-frontier6
-          ref: 7310b1eb5ec07c76c131ba8c60b105ff4aad7a9c
+          ref: 42ed72f587ab70fc74a85cf0a25001efb29cb994
           path: cnot-emitter
           fetch-depth: 1
           persist-credentials: false
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
       - uses: dtolnay/rust-toolchain@stable
+        if: steps.decision.outputs.action == 'run_full'
       - name: Install pinned CPU PyTorch
-        id: pytorch
+        if: steps.decision.outputs.action == 'run_full'
         shell: bash
         run: |
           set -euo pipefail
-          python -m pip install torch==2.9.0 --index-url https://download.pytorch.org/whl/cpu > "${RUNNER_TEMP}/producer-adapter-pip.log" 2>&1
-      - name: Prepare the pinned producer source and compile the injected bridge
+          python -m pip install torch==2.9.0 --index-url https://download.pytorch.org/whl/cpu \
+            > "$RUNNER_TEMP/producer-adapter-pip.log" 2>&1
+      - name: Prepare and compile the pinned producer adapter
         id: cpu_compile
+        if: steps.decision.outputs.action == 'run_full'
         shell: bash
         env:
           LIBTORCH_USE_PYTORCH: "1"
           CARGO_TARGET_DIR: ${{ runner.temp }}/cnot-panel-v2-target
         run: |
           set -euo pipefail
-          build_dir="${RUNNER_TEMP}/cnot-panel-v2-build"
+          build_dir="$RUNNER_TEMP/cnot-panel-v2-build"
           if ! python integrations/cnot_scorer/build.py --contract panel_search_v2 \
-              --source "${GITHUB_WORKSPACE}/cnot-producer" \
-              --build-dir "$build_dir" --prepare-only > "${RUNNER_TEMP}/producer-adapter-prepare.log" 2>&1; then
-            echo "source_adapter=failed" >> "$GITHUB_OUTPUT"
+              --source "$GITHUB_WORKSPACE/cnot-producer" \
+              --build-dir "$build_dir" --prepare-only > "$RUNNER_TEMP/producer-adapter-prepare.log" 2>&1; then
             exit 1
           fi
           native="$build_dir/native"
           torch_lib="$(python -c 'import pathlib, torch; print(pathlib.Path(torch.__file__).parent / "lib")')"
           export LD_LIBRARY_PATH="$torch_lib:${LD_LIBRARY_PATH:-}"
           if ! cargo check --locked --features torch --lib --manifest-path "$native/Cargo.toml" \
-              > "${RUNNER_TEMP}/producer-adapter-cargo.log" 2>&1; then
-            echo "source_adapter=failed" >> "$GITHUB_OUTPUT"
+              > "$RUNNER_TEMP/producer-adapter-cargo.log" 2>&1; then
             exit 1
           fi
-          if ! cargo test --locked --features torch --lib mgbs_scorer_panel_v2::tests \
-              --manifest-path "$native/Cargo.toml" \
-              > "${RUNNER_TEMP}/producer-adapter-tests.log" 2>&1; then
-            echo "source_adapter=failed" >> "$GITHUB_OUTPUT"
-            exit 1
-          fi
-          echo "source_adapter=passed" >> "$GITHUB_OUTPUT"
-      - name: Run synthetic panel-v2 handoff tests
+          cargo test --locked --features torch --lib mgbs_scorer_panel_v2::tests \
+            --manifest-path "$native/Cargo.toml" \
+            > "$RUNNER_TEMP/producer-adapter-tests.log" 2>&1
+      - name: Run the pinned emitter through the consumer fixture
         id: handoff_tests
+        if: steps.decision.outputs.action == 'run_full'
         shell: bash
         env:
           CNOT103_PRODUCER_CHECKOUT: ${{ github.workspace }}/cnot-emitter
-          CNOT103_PRODUCER_SOURCE_SHA: 7310b1eb5ec07c76c131ba8c60b105ff4aad7a9c
+          CNOT103_PRODUCER_SOURCE_SHA: 42ed72f587ab70fc74a85cf0a25001efb29cb994
         run: |
           set -euo pipefail
-          python3 - <<'PY'
-          import os
-          import sys
-          import unittest
-
-          suite = unittest.defaultTestLoader.discover(
-              "integrations/cnot_scorer", pattern="test_handoff.py"
-          )
-
-          def flatten(value):
-              for item in value:
-                  if isinstance(item, unittest.TestSuite):
-                      yield from flatten(item)
-                  else:
-                      yield item
-
-          ordered = sorted(flatten(suite), key=lambda test: test.id())
-          numbers = {test.id(): index + 1 for index, test in enumerate(ordered)}
-          log_path = os.path.join(os.environ["RUNNER_TEMP"], "producer-handoff-test.log")
-          with open(log_path, "w", encoding="utf-8") as stream:
-              result = unittest.TextTestRunner(stream=stream, verbosity=2).run(suite)
-          failed = [test for test, _ in result.failures + result.errors]
-          if result.wasSuccessful():
-              status = "passed"
-          else:
-              case = numbers.get(failed[0].id()) if failed else None
-              status = f"failed_case_{case:02d}" if case is not None else "failed_unknown"
-          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
-              output.write(f"handoff_tests={status}\\n")
-          print(f"handoff_tests={status}")
-          sys.exit(0 if result.wasSuccessful() else 1)
-          PY
-      - name: Publish redacted source status
+          (cd integrations/cnot_scorer && python3 -m unittest -v test_handoff) \
+            > "$RUNNER_TEMP/producer-handoff-test.log" 2>&1
+      - name: Store the compatibility result for this input fingerprint
         if: always()
+        id: finalize
+        shell: bash
         env:
-          OUTCOME: ${{ steps.cpu_compile.outcome }}
-          HANDOFF_OUTCOME: ${{ steps.handoff_tests.outputs.handoff_tests }}
+          FINGERPRINT: ${{ steps.prepare.outputs.fingerprint }}
+          ACTION: ${{ steps.decision.outputs.action }}
+          CHEAP_OUTCOME: ${{ steps.cheap_contracts.outcome }}
+          COMPILE_OUTCOME: ${{ steps.cpu_compile.outcome }}
+          HANDOFF_OUTCOME: ${{ steps.handoff_tests.outcome }}
+        run: |
+          set -euo pipefail
+          action="$ACTION"
+          if [[ -z "$action" ]]; then action=run_full; fi
+          python3 tools/cnot_producer_compatibility.py finish \
+            --state-file "$RUNNER_TEMP/cnot-panel-v2-state/state.json" \
+            --fingerprint "$FINGERPRINT" \
+            --action "$action" \
+            --cheap-outcome "$CHEAP_OUTCOME" \
+            --compile-outcome "$COMPILE_OUTCOME" \
+            --handoff-outcome "$HANDOFF_OUTCOME" \
+            --summary-file "$GITHUB_STEP_SUMMARY"
+      - name: Enforce the stored compatibility result
+        if: always()
         shell: bash
         run: |
-          if [[ "$OUTCOME" != "success" ]]; then
-            echo "CNOT producer adapter: failed (CPU source compile or panel-manifest tests; GPU runtime not run)." >> "$GITHUB_STEP_SUMMARY"
-          elif [[ "$HANDOFF_OUTCOME" == "passed" ]]; then
-            echo "CNOT producer adapter: passed (CPU source compile, panel-manifest and synthetic handoff tests; GPU runtime not run)." >> "$GITHUB_STEP_SUMMARY"
-          else
-            case "$HANDOFF_OUTCOME" in
-              failed_case_[0-9][0-9]|failed_unknown) result="$HANDOFF_OUTCOME" ;;
-              *) result="failed_unknown" ;;
-            esac
-            echo "CNOT producer adapter: failed ($result; CPU source compile passed; GPU runtime not run)." >> "$GITHUB_STEP_SUMMARY"
-          fi
+          python3 tools/cnot_producer_compatibility.py verify-result \
+            --state-file "$RUNNER_TEMP/cnot-panel-v2-state/state.json"
+      - name: Save same-input outcome for later docs-only updates
+        if: always() && steps.prepare.outputs.fingerprint != ''
+        uses: actions/cache/save@v4
+        continue-on-error: true
+        with:
+          path: ${{ runner.temp }}/cnot-panel-v2-state
+          key: ${{ runner.os }}-cnot-panel-v2-${{ steps.prepare.outputs.fingerprint }}-${{ github.run_id }}-${{ github.run_attempt }}
+      - name: Upload redacted panel-v2 gate result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cnot-panel-v2-compatibility-result
+          path: ${{ runner.temp }}/cnot-panel-v2-state/state.json
+          if-no-files-found: ignore
+          retention-days: 14
+      - name: Upload panel-v2 CPU check logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cnot-panel-v2-compatibility-logs
+          path: |
+            ${{ runner.temp }}/cnot-panel-v2-gate-tests.log
+            ${{ runner.temp }}/cnot-panel-v2-handoff-tests.log
+            ${{ runner.temp }}/producer-adapter-pip.log
+            ${{ runner.temp }}/producer-adapter-prepare.log
+            ${{ runner.temp }}/producer-adapter-cargo.log
+            ${{ runner.temp }}/producer-adapter-tests.log
+            ${{ runner.temp }}/producer-handoff-test.log
+          if-no-files-found: ignore
+          retention-days: 14
