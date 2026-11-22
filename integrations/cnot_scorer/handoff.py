@@ -82,17 +82,25 @@ def _inside_root(path: Path, root: Path, name: str) -> Path:
     return resolved
 
 
-def _json_object(path: Path, name: str) -> dict[str, Any]:
+def _json_object_bytes(raw: bytes, name: str) -> dict[str, Any]:
     try:
-        value = json.loads(path.read_bytes())
-    except (OSError, json.JSONDecodeError, UnicodeDecodeError):
+        value = json.loads(raw)
+    except (json.JSONDecodeError, UnicodeDecodeError):
         raise HandoffError(f"{name} JSON is unreadable") from None
     if not isinstance(value, dict):
         raise HandoffError(f"{name} JSON is malformed")
     return value
 
 
-def _artifact(root: Path, reference: object, name: str) -> tuple[Path, str]:
+def _json_object(path: Path, name: str) -> dict[str, Any]:
+    try:
+        raw = path.read_bytes()
+    except OSError:
+        raise HandoffError(f"{name} JSON is unreadable") from None
+    return _json_object_bytes(raw, name)
+
+
+def _artifact(root: Path, reference: object, name: str) -> tuple[Path, str, bytes]:
     if not isinstance(reference, dict):
         raise HandoffError(f"{name} reference is malformed")
     relative = reference.get("path")
@@ -117,12 +125,13 @@ def _artifact(root: Path, reference: object, name: str) -> tuple[Path, str]:
         raise HandoffError(f"{name} path is not a safe run-relative path")
     path = _inside_root(root.joinpath(*posix.parts), root, name)
     try:
-        actual_sha = _sha256(path.read_bytes())
+        raw = path.read_bytes()
     except OSError:
         raise HandoffError(f"{name} cannot be read") from None
+    actual_sha = _sha256(raw)
     if actual_sha != expected_sha:
         raise HandoffError(f"{name} SHA-256 differs from the handoff")
-    return path, actual_sha
+    return path, actual_sha, raw
 
 
 def _manifest_pin(root: Path, manifest_path: Path, value: object, expected_path: Path,
@@ -189,13 +198,13 @@ def validate_search_contract(search: object) -> int:
 def _sealed_panel_roots(
     root: Path,
     training_manifest_path: Path,
+    training_manifest: dict[str, Any],
     expected_dataset_sha: str,
     panel: str,
     indices: list[int],
     ids: list[str],
     expected_digest: str,
 ) -> tuple[Path, tuple[dict[str, Any], ...]]:
-    training_manifest = _json_object(training_manifest_path, "training manifest")
     if training_manifest.get("schema") != "cnot103_training_run_v1":
         raise HandoffError("training manifest schema is unsupported")
     dataset_pin = training_manifest.get("dataset")
@@ -396,18 +405,19 @@ def resolve_panel_v2_handoff(
     ):
         raise HandoffError("handoff source, model or training identity is invalid")
 
-    train_manifest_path, train_manifest_sha = _artifact(
+    train_manifest_path, train_manifest_sha, train_manifest_bytes = _artifact(
         root, handoff.get("training_manifest"), "training manifest"
     )
-    train_result_path, train_result_sha = _artifact(
+    train_result_path, train_result_sha, train_result_bytes = _artifact(
         root, handoff.get("training_result"), "training result"
     )
-    search_path, search_sha = _artifact(
+    search_path, search_sha, search_manifest_bytes = _artifact(
         root, handoff.get("search_manifest"), "panel search manifest"
     )
-    baseline_search_path, baseline_search_sha = _artifact(
+    baseline_search_path, baseline_search_sha, baseline_search_bytes = _artifact(
         root, handoff.get("baseline_search_manifest"), "baseline Hamming search manifest"
     )
+    training_manifest = _json_object_bytes(train_manifest_bytes, "training manifest")
 
     if (
         receipt.get("dataset_sha256") != dataset_sha
@@ -420,7 +430,7 @@ def resolve_panel_v2_handoff(
     if selected.get("checkpoint_sha256") != checkpoint_sha:
         raise HandoffError("selected checkpoint differs from the handoff")
 
-    result = _json_object(train_result_path, "training result")
+    result = _json_object_bytes(train_result_bytes, "training result")
     progress = result.get("end_progress")
     checkpoint = result.get("checkpoint")
     if (
@@ -436,7 +446,7 @@ def resolve_panel_v2_handoff(
     ):
         raise HandoffError("training result differs from the selected handoff")
 
-    search_manifest = _json_object(search_path, "panel search manifest")
+    search_manifest = _json_object_bytes(search_manifest_bytes, "panel search manifest")
     panel = handoff.get("panel")
     indices = handoff.get("panel_indices")
     ids = handoff.get("panel_ids")
@@ -489,14 +499,15 @@ def resolve_panel_v2_handoff(
     dataset_path, panel_roots = _sealed_panel_roots(
         root,
         train_manifest_path,
+        training_manifest,
         dataset_sha,
         panel,
         indices,
         ids,
         panel_digest,
     )
-    baseline_manifest = _json_object(
-        baseline_search_path, "baseline Hamming search manifest"
+    baseline_manifest = _json_object_bytes(
+        baseline_search_bytes, "baseline Hamming search manifest"
     )
     baseline_dataset = baseline_manifest.get("dataset")
     baseline_dataset_path = None
