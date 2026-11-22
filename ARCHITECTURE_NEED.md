@@ -2,7 +2,7 @@
 
 The existing integer plan for Stream 3's initial inference rows is resolved in beam-runtime, including the scalar-head row-to-parent mapping, four initial sort slots, 1024-row alignment, capacity scale and metadata fields. The Python adapter supplies typed request values and turns the plan into the same BEAM_B_MICRO environment value consumed by the existing runner. Older wheels retain the Python implementation. This transfers the current policy without changing candidate, search, model, kernel or precision behavior.
 
-The installed-wheel smoke compares exact scalar-head, ensemble/nondefault-row-limit and unadjusted plans, then exercises the real helper with the Python fallback forced to fail and checks legacy-extension behavior. CPU verification is pending; physical CUDA/NCCL verification remains separate.
+The installed-wheel smoke compares exact scalar-head, ensemble/nondefault-row-limit and unadjusted plans, then exercises the real helper with the Python fallback forced to fail and checks legacy-extension behavior. Hosted installed-wheel validation passed on code SHA `5cfff58de62f454fe6b63d8ea61514718e4ed578` ([run 45048372751](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45048372751)), exercising the public helper against the scalar-head, ensemble/nondefault-row-limit, unadjusted, installed-Rust, and legacy-fallback cases. The Rust CPU/CNOT suite passed on the same SHA ([run 45048372758](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45048372758)). Physical CUDA/NCCL verification remains separate.
 
 ## Rust-owned permutation device selection — 2026-11-22
 

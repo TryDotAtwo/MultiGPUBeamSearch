@@ -1,21 +1,29 @@
 # Rust + CUDA/C++ migration acceptance status
 
 Source branch: `codex/beam-3060-preflight-20261121`
-Latest tested code SHA: `74c3c33f3de796af00485b0f0d770d485135efd4`
+Latest tested code SHA: `5cfff58de62f454fe6b63d8ea61514718e4ed578`
 Base main SHA: `e6c41b6dc6bb3a839f6338f3cfe9eaadf8608d5a`
 
 | Gate | Status | Evidence |
 |---|---|---|
-| Rust CNOT CPU/Gloo suite | PASS | 323 passed, 2 hardware-only skipped on `74c3c33`, [run 45044225075](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45044225075). |
-| Installed PEP 517 wheel outside checkout | PASS | Installed-wheel run [45044225072](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45044225072) passed. Its two-rank Gloo phase test injects CNOT identity initialization failures on rank 0 and rank 1, requires the same phase/error on both, verifies transport has not started, then completes a public search retry on the same process group. |
-| Panel-v2 producer compatibility | PASS | Pinned emitter/consumer adapter workflow passed on [run 45044229550](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45044229550); the matching Rust adapter build artifact was reused. |
-| Hosted acceptance harness | PASS | Source-only checks passed on [run 45044225521](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45044225521). Physical GPU jobs were skipped by the push trigger. |
+| Rust CNOT CPU/Gloo suite | PASS | [run 45048372758](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45048372758) passed on `5cfff58`. |
+| Installed PEP 517 wheel outside checkout | PASS | [run 45048372751](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45048372751) passed, including the Rust-owned microbatch plan through the public helper, old-wheel fallback, inference policy, session reuse, and CNOT Gloo acceptance. |
+| Panel-v2 producer compatibility | PASS | [run 45048377696](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45048377696) passed. The real pinned producer serializer to consumer resolver also passed on the unchanged producer/handoff inputs at [run 45047895962](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45047895962). |
+| Hosted acceptance harness | PASS | [run 45048373196](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45048373196) passed; its physical GPU job was skipped on push. |
 | Permutation CPU acceptance | PASS on CPU | Installed-wheel CPU replay/reuse and saturated LRX(5), B=3 oracle cases remain covered. No physical permutation parity is claimed. |
-| CUDA/NCCL permutation and trained CNOT on physical 1/2 GPUs | PENDING | No physical CUDA/NCCL execution, trained checkpoint replay, physical rank participation, or physical rank recovery has been run. |
+| CUDA/NCCL permutation and trained CNOT on physical 1/2 GPUs | PENDING | No physical CUDA/NCCL execution, trained checkpoint replay, physical rank participation, exact hardware replay, or 1-/2-GPU parity has been run. |
 | Vast campaign staging and total storage cost | BLOCKED | Trusted private GL4 manifest/checkpoint staging and complete storage-cost disposition remain unresolved for the authorized new 2x desktop RTX 3060 campaign. No paid instance was started. |
-| Full Rust ownership migration | IN PROGRESS | CNOT compatibility identity setup now has a rank-wide checked phase. Python `World`/Torch ownership and permutation model/profile/scheduler preparation remain; PR #10 is draft. |
+| Full Rust ownership migration | IN PROGRESS | Rust now owns the permutation microbatch plan as well as inference route, device selection, and session identity. Python still prepares some model/world inputs; PR #10 is draft. |
 
 Hosted CPU and installed-wheel evidence does not establish physical CUDA/NCCL execution or complete the Rust migration.
+
+## Rust-owned permutation microbatch plan — 2026-11-22
+
+- `beam-runtime` now returns the typed plan for the existing inference row/capacity formula. The Python adapter applies the same environment variable and preserves the old formula only for installed extensions without this API.
+- Installed-wheel PASS on code SHA `5cfff58de62f454fe6b63d8ea61514718e4ed578`: [run 45048372751](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45048372751). The public helper was exercised with three distinguishable plans, including scalar-head mapping, ensemble with a nondefault row limit, and an unadjusted capacity plan. The installed Rust path was checked with Python fallback disabled; the legacy-extension fallback was checked separately.
+- Rust CNOT CPU/Gloo: PASS, [run 45048372758](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45048372758). Hosted acceptance harness: PASS, [run 45048373196](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45048373196). Panel-v2 compatibility: PASS, [run 45048377696](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45048377696).
+- Physical CUDA/NCCL job was skipped; no hardware result is claimed.
+
 
 ## Compatibility-route CNOT identity initialization — 2026-11-22
 
