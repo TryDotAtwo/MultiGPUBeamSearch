@@ -1,3 +1,10 @@
+## 2026-11-22 - Split panel-v2 producer feedback and build caches
+
+- The required PR workflow routes emitter and producer-manifest changes to a stdlib-only handoff check. That route uses a fresh Python environment without PyTorch and skips Cargo even when the native cache is cold. Producer/native adapter changes route to the CPU Rust test.
+- The native crate is prepared before installing Rust or PyTorch. A preparation failure therefore exits before either toolchain setup.
+- The PyTorch environment cache is keyed by runner platform, Python version and dependency file. The Rust target cache is separate and keyed by the prepared native tree bytes, build recipe, adapter ABI, Rust toolchain, Python/PyTorch ABI and runner image; emitter and manifest pins are not inputs to this key.
+- Only a successful native test saves the Cargo target. Restored targets still run the Rust tests. Python and `PYO3_PYTHON` point to the same validated cached or freshly created Python 3.11 environment.
+
 ## 2026-11-22 - Reuse successful panel-v2 adapter build artifacts
 
 - Replaced the custom prior-verdict cache with GitHub Actions caching of the pinned panel-v2 Python environment, prepared native crate and Cargo target. The key includes the native adapter source digests, producer/emitter pins, CPU PyTorch version, Rust toolchain and runner image.
