@@ -115,8 +115,11 @@ jobs:
         run: |
           set -o pipefail
           cd "$RUNNER_TEMP/mgbs-wheel-smoke"
-          env -u PYTHONPATH python "$GITHUB_WORKSPACE/integrations/cayleypy_native/tests/installed_cnot_handoff_endpoint.py" \
-            > "${RUNNER_TEMP}/mgbs-private-cnot-handoff-endpoint.log" 2>&1
+          if ! env -u PYTHONPATH python "$GITHUB_WORKSPACE/integrations/cayleypy_native/tests/installed_cnot_handoff_endpoint.py" \
+              > "${RUNNER_TEMP}/mgbs-private-cnot-handoff-endpoint.log" 2>&1; then
+            cat "${RUNNER_TEMP}/mgbs-private-cnot-handoff-endpoint.log"
+            exit 1
+          fi
       - name: Verify vendored source headers invalidate the installed native fingerprint
         id: vendor_source_fingerprint
         run: |

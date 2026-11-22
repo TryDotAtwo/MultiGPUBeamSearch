@@ -84,6 +84,7 @@ jobs:
         run: |
           set -euo pipefail
           if ! python -m unittest discover -s integrations/cnot_scorer -p 'test_handoff.py' -v > "${RUNNER_TEMP}/producer-handoff-test.log" 2>&1; then
+            cat "${RUNNER_TEMP}/producer-handoff-test.log"
             echo "handoff_tests=failed" >> "$GITHUB_OUTPUT"
             exit 1
           fi
