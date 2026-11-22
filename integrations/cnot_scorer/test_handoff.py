@@ -237,6 +237,13 @@ class PanelV2HandoffTests(unittest.TestCase):
     def test_supported_search_geometry_has_exact_v13_frontier_bound(self):
         self.assertEqual(validate_search_contract(self.search), 201)
 
+    def test_rejects_top_level_search_mismatch_before_loading_artifacts(self):
+        value = json.loads(self.receipt.read_text(encoding="utf-8"))
+        value["search"]["global_width"] = 35
+        write_json(self.receipt, value)
+        with self.assertRaisesRegex(HandoffError, "top-level receipt"):
+            resolve_panel_v2_handoff(self.root, self.receipt)
+
     def test_rejects_altered_or_boolean_search_budget_fields(self):
         for name, value in (
             ("global_width", 35),
