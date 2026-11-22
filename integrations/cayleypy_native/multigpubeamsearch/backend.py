@@ -278,6 +278,44 @@ def prepare_runtime(contract, model, options, run_dir, devices, *,
     return PreparedRuntime(runner, metadata, architectures, profile)
 
 
+def _graph_device_observations(graph, torch):
+    config = getattr(graph, "device_config", None)
+    if config is None:
+        # CayleyPy 0.1 exposes graph.device instead of device_config.
+        device = getattr(graph, "device", None)
+        configured = () if device is None else (device,)
+    else:
+        configured = tuple(getattr(config, "devices", ()))
+    return tuple(
+        (device.type, device.index)
+        for device in (torch.device(value) for value in configured)
+    )
+
+
+def _resolve_runtime_devices_python(visible_device_count, explicit_devices,
+                                    num_gpus, graph_devices):
+    """Compatibility policy for wheels without the Rust device resolver."""
+    if explicit_devices is not None:
+        devices = explicit_devices
+    elif num_gpus is not None:
+        if num_gpus > visible_device_count:
+            raise NativeUnavailable("num_gpus exceeds the number of visible CUDA devices")
+        devices = tuple(range(num_gpus))
+    elif not graph_devices or all(kind == "cpu" for kind, _ in graph_devices):
+        # A CPU graph describes the puzzle; native search uses visible GPUs.
+        devices = tuple(range(visible_device_count))
+    elif any(kind != "cuda" for kind, _ in graph_devices):
+        raise NativeUnavailable("graph mixes CPU and CUDA devices; set explicit native devices")
+    else:
+        devices = tuple(0 if index is None else index for _, index in graph_devices)
+    if not devices or len(set(devices)) != len(devices) or len(devices) > 128 or any(
+        type(device) is not int or device < 0 or device >= visible_device_count
+        for device in devices
+    ):
+        raise NativeUnavailable("native devices must be distinct available CUDA indices (at most 128)")
+    return tuple(devices)
+
+
 def runtime_devices(graph, options) -> tuple[int, ...]:
     if platform.system() != "Linux":
         raise NativeUnavailable("native beam currently requires Linux/CUDA/NCCL")
@@ -286,34 +324,27 @@ def runtime_devices(graph, options) -> tuple[int, ...]:
     import torch
     if not torch.cuda.is_available():
         raise NativeUnavailable("native beam requires available CUDA devices")
-    if options.devices is not None:
-        devices = options.devices
-    elif options.num_gpus is not None:
-        if options.num_gpus > torch.cuda.device_count():
-            raise NativeUnavailable("num_gpus exceeds the number of visible CUDA devices")
-        devices = tuple(range(options.num_gpus))
-    else:
-        config = getattr(graph, "device_config", None)
-        if config is None:
-            # CayleyPy 0.1 exposes graph.device instead of device_config.
-            device = getattr(graph, "device", None)
-            configured = () if device is None else (device,)
-        else:
-            configured = getattr(config, "devices", ())
-        if not configured or all(torch.device(d).type == "cpu" for d in configured):
-            # A CPU graph describes the puzzle; native search uses visible GPUs.
-            devices = tuple(range(torch.cuda.device_count()))
-        elif any(torch.device(d).type != "cuda" for d in configured):
-            raise NativeUnavailable("graph mixes CPU and CUDA devices; set explicit native devices")
-        else:
-            devices = tuple(0 if torch.device(d).index is None else torch.device(d).index for d in configured)
-    if not devices or len(set(devices)) != len(devices) or len(devices) > 128 or any(
-        type(d) is not int or d < 0 or d >= torch.cuda.device_count() for d in devices
-    ):
-        raise NativeUnavailable("native devices must be distinct available CUDA indices (at most 128)")
-    return tuple(devices)
-
-
+    visible_device_count = torch.cuda.device_count()
+    graph_devices = (
+        _graph_device_observations(graph, torch)
+        if options.devices is None and options.num_gpus is None
+        else ()
+    )
+    from .rust_control import resolve_runtime_devices
+    selected = resolve_runtime_devices(
+        visible_device_count,
+        options.devices,
+        options.num_gpus,
+        graph_devices,
+    )
+    if selected is not None:
+        return selected
+    return _resolve_runtime_devices_python(
+        visible_device_count,
+        options.devices,
+        options.num_gpus,
+        graph_devices,
+    )
 def cuda_visibility(devices: tuple[int, ...], environ: dict[str, str]) -> str:
     inherited = environ.get("CUDA_VISIBLE_DEVICES")
     if inherited is None:

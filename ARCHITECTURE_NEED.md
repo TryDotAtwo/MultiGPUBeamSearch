@@ -1,3 +1,9 @@
+## Rust-owned permutation device selection — 2026-11-22
+
+The public native preparation path now sends the visible CUDA count, explicit device request, requested GPU count, and normalized graph-device kind/index observations to `beam-runtime`. Rust applies the existing selection rules and returns the concrete device ordinals used by preparation. Python continues to query Torch and translate CayleyPy device objects; it uses the prior Python resolver only when an older extension does not expose this API. CUDA_VISIBLE_DEVICES mapping remains a separate launch-environment step.
+
+The installed-wheel smoke checks the Rust selection table and calls the public preparation helper with the Python fallback forced to fail. It separately checks the old-wheel compatibility path. CPU/GPU search, model export, inference profile selection, kernels and precision are unchanged.
+
 ## Keep CNOT history edges typed across checked stages — 2026-11-22
 
 The Rust checked-stage helper now carries generic Rust results through the existing rank-wide vote and diagnostic path. CNOT history decodes the fixed signed wire row directly into the runtime `Edge` inside that checked phase; it does not convert the values back through a Python tuple. Error stage names, error text, vote ordering, history layout and replay checks remain unchanged.
@@ -3808,4 +3814,4 @@ The producer compatibility fixture now changes the baseline Hamming manifest's s
 
 ## Rust-owned inference profile resolution (2026-11-22)
 
-The installed-wheel acceptance check exposed that the Rust extension exported backend selection but not the typed profile plan consumed by the preparation path. Rust now returns the selected backend together with the existing profile name and inference row limit. The Python adapter uses that single plan for runner construction and the prepared profile. Older extensions retain the existing backend-selection fallback and the same fixed profile mapping. No inference kernel, numerical policy, or beam-search behavior changes. CPU/PyO3 verification is pending; physical CUDA/NCCL verification remains pending.
+The installed-wheel acceptance check exposed that the Rust extension exported backend selection but not the typed profile plan consumed by the preparation path. Rust now returns the selected backend together with the existing profile name and inference row limit. The Python adapter uses that single plan for runner construction and the prepared profile. Older extensions retain the existing backend-selection fallback and the same fixed profile mapping. No inference kernel, numerical policy, or beam-search behavior changes. CPU/PyO3 verification passed through the installed-wheel policy and preparation path on tested SHA a0f406238515ffab5d0c45b9ae4b0d5dc5011931 (run 45040185404). Physical CUDA/NCCL verification remains pending.

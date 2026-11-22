@@ -200,6 +200,56 @@ def _native_options_supported(options):
     return True
 
 
+def resolve_runtime_devices(visible_device_count, explicit_devices, num_gpus, graph_devices):
+    """Resolve process-local device indices in beam-runtime when supported."""
+    if type(visible_device_count) is not int or visible_device_count < 0:
+        raise NativeUnavailable("visible CUDA device count must be a nonnegative integer")
+    if explicit_devices is not None:
+        if type(explicit_devices) not in (tuple, list) or any(
+            type(device) is not int for device in explicit_devices
+        ):
+            raise NativeUnavailable("explicit CUDA devices must be an integer sequence")
+        explicit = list(explicit_devices)
+    else:
+        explicit = None
+    if num_gpus is not None and type(num_gpus) is not int:
+        raise NativeUnavailable("num_gpus must be an integer")
+    observations = []
+    try:
+        for observation in graph_devices:
+            if (
+                type(observation) not in (tuple, list)
+                or len(observation) != 2
+                or type(observation[0]) is not str
+                or (observation[1] is not None and type(observation[1]) is not int)
+            ):
+                raise ValueError("invalid normalized graph device observation")
+            observations.append((observation[0], observation[1]))
+    except TypeError as error:
+        raise NativeUnavailable("graph devices must be a sequence of observations") from error
+    try:
+        native = extension()
+    except (NativeUnavailable, ImportError):
+        return None
+    resolver = getattr(native, "resolve_runtime_devices", None)
+    if not callable(resolver):
+        return None
+    try:
+        selected = resolver(visible_device_count, explicit, num_gpus, observations)
+    except (RuntimeError, ValueError, TypeError, OverflowError) as error:
+        raise NativeUnavailable(str(error)) from error
+    if (
+        type(selected) is not list
+        or not selected
+        or len(selected) > 128
+        or any(type(device) is not int or not 0 <= device < visible_device_count
+               for device in selected)
+        or len(set(selected)) != len(selected)
+    ):
+        raise NativeUnavailable("Rust runtime returned an invalid device selection")
+    return tuple(selected)
+
+
 def resolve_inference_backend(request):
     """Resolve the prepared permutation runner in Rust when the wheel supports it.
 

@@ -9,6 +9,7 @@ pub mod cnot_selection;
 pub mod component_probe;
 pub mod component_tuning;
 pub mod depth_control;
+pub mod device_selection;
 mod downstream_full;
 pub mod downstream_job;
 pub mod frontier_job;

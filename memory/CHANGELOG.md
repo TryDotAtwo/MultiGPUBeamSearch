@@ -56,3 +56,9 @@
 - Moved CNOT identity construction in the admitted Rust compatibility route into a rank-wide checked Gloo phase before transport startup. A rank-local allocation/initialization error now returns the same phase and cause on every rank.
 - The installed-wheel Gloo test hides the newer controller ABI, injects the identity failure independently on rank 0 and rank 1, confirms transport does not start for the failed request, and retries a public search on the same process group.
 - Search rules, packed state representation, scorer, CUDA kernels, precision, and collective transport are unchanged.
+
+## 2026-11-22 - Resolve permutation device selection in beam-runtime
+
+- Moved device-list policy from the Python backend into a typed Rust runtime function. The adapter supplies the visible CUDA count, explicit `devices` or `num_gpus`, and normalized CayleyPy/Torch graph-device observations.
+- Preserved explicit selection, exact requested GPU counts, all-visible-GPU selection for absent/CPU graph devices, configured CUDA order, `cuda` mapping to ordinal zero, the 128-device limit, and existing rejection cases.
+- Wheels without the new PyO3 function keep the Python policy. Runtime kernels, precision, scoring, graph search, and launch visibility mapping are unchanged.
