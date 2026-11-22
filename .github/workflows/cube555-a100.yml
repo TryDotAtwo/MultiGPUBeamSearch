@@ -9,10 +9,10 @@ on:
 
 permissions:
   contents: read
-  actions: read
+  actions: write
 
 concurrency:
-  group: cube555-standalone-vast-61937382
+  group: cube555-standalone-vast-egress-61937382
   cancel-in-progress: false
 
 jobs:
@@ -20,24 +20,15 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 250
     env:
-      CUBE555_BUNDLE_RUN: '45001314619'
-      CUBE555_LEASE_LABEL: cube555-a100-61937382-proxy
+      CUBE555_BUNDLE_ARTIFACT: '14745697843'
+      CUBE555_LEASE_LABEL: cube555-a100-61937382-egress
       CUBE555_EXISTING_INSTANCE_ID: '61937382'
+      CUBE555_STALLED_RUN: '45002634635'
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
           sparse-checkout: .github/scripts
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-      - name: Download the verified standalone archive
-        uses: actions/download-artifact@v4
-        with:
-          github-token: ${{ github.token }}
-          run-id: ${{ env.CUBE555_BUNDLE_RUN }}
-          name: cube555-standalone-max-linux-x86_64-py311
-          path: ${{ runner.temp }}/cube555-bundle
       - name: Check the test harness
         run: |
           bash -n .github/scripts/cube555-vast.sh
@@ -46,6 +37,7 @@ jobs:
         timeout-minutes: 215
         env:
           VAST_API_KEY: ${{ secrets.VAST_API_KEY }}
+          GH_TOKEN: ${{ github.token }}
         run: bash .github/scripts/cube555-vast.sh
       - name: Verify that the rental has been removed
         if: always()

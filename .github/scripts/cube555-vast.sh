@@ -80,6 +80,20 @@ printf 'Vast lease %s (%s)\n' "$id" "$label"
 jq -n --argjson id "$id" --arg label "$label" '{instance_id:$id,label:$label}' \
     > "$evidence/lease.json"
 
+if [[ -n "${CUBE555_STALLED_RUN:-}" ]]; then
+    gh_run="repos/$GITHUB_REPOSITORY/actions/runs/$CUBE555_STALLED_RUN"
+    status="$(gh api "$gh_run" --jq .status)"
+    if [[ "$status" != completed ]]; then
+        gh api --method POST "$gh_run/cancel" >/dev/null || true
+        for attempt in {1..15}; do
+            status="$(gh api "$gh_run" --jq .status)"
+            [[ "$status" == completed ]] && break
+            sleep 8
+        done
+    fi
+    [[ "$status" == completed ]] || { echo 'Previous transfer is still running.' >&2; exit 1; }
+fi
+
 request="$(jq -cn --arg ssh_key "$(cat "$key.pub")" '{ssh_key:$ssh_key}')"
 curl --fail --silent --show-error --max-time 25 --retry 3 --retry-all-errors \
     --retry-delay 5 -X POST -H "Authorization: Bearer ${VAST_API_KEY}" \
@@ -123,11 +137,25 @@ remote nvidia-smi --query-gpu=index,name,memory.total,driver_version --format=cs
     | tee "$evidence/gpus.csv"
 remote nvidia-smi topo -m | tee "$evidence/topology.txt"
 
-remote_dir=/root/cube555-test
-remote "mkdir -p $remote_dir"
-echo "Staging the checked offline archive"
-timeout 22m tar -C "$temp/cube555-bundle" -cf - "$archive" "$archive.sha256" \
-    | timeout 22m ssh "${ssh_opts[@]}" "root@$host" "tar -xf - -C $remote_dir"
+remote_dir=/root/cube555-egress
+remote "mkdir -p $remote_dir; if ! command -v unzip >/dev/null || ! command -v curl >/dev/null; then
+    apt-get -qq update && apt-get -qq install -y --no-install-recommends unzip curl ca-certificates; fi"
+echo "Downloading the checked offline archive on the GPU node"
+location="$(curl --fail --silent --show-error --max-time 25 --dump-header - --output /dev/null \
+    -H "Authorization: Bearer ${GH_TOKEN:?}" -H 'Accept: application/vnd.github+json' \
+    "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/artifacts/$CUBE555_BUNDLE_ARTIFACT/zip" \
+    | awk 'tolower($1) == "location:" { sub(/\r$/, "", $2); print $2; exit }')"
+[[ "$location" == https://* && "$location" != *'"'* && "$location" != *\\* ]] || {
+    echo 'GitHub did not issue an HTTPS download URL.' >&2
+    exit 1
+}
+printf 'url = "%s"\n' "$location" \
+    | timeout 23m ssh "${ssh_opts[@]}" "root@$host" \
+        "cd $remote_dir && curl --config - --proto '=https' --fail --silent --show-error \
+        --max-time 1300 --write-out 'Downloaded %{size_download} bytes in %{time_total}s\n' \
+        --output bundle.zip && unzip -oq bundle.zip '$archive' '$archive.sha256' && rm -- bundle.zip" \
+    | tee "$evidence/transfer.txt"
+unset location
 date -u +%FT%TZ > "$evidence/test-started-utc.txt"
 
 test_status=0
