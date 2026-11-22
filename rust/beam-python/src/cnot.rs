@@ -957,15 +957,10 @@ fn run_cnot_native_search<'py>(
             "build CNOT compatibility stages",
             compatibility_stages,
         )?;
-        return Ok(run_cnot(
+        return Ok(run_cnot_with_options(
             py,
             stages,
-            rank,
-            world_size,
-            width,
-            shortlist_value,
-            alphabet,
-            depth,
+            request.search_options(rank, world_size),
         )?
         .into_bound(py));
     }
@@ -1010,9 +1005,9 @@ fn run_cnot<'py>(
     alphabet: u32,
     max_depth: u64,
 ) -> PyResult<Py<PyAny>> {
-    let mut backend = PyStages { py, stages };
-    let outcome = cnot_search::search(
-        &mut backend,
+    run_cnot_with_options(
+        py,
+        stages,
         Options {
             rank,
             world,
@@ -1021,7 +1016,16 @@ fn run_cnot<'py>(
             alphabet,
             max_depth,
         },
-    )?;
+    )
+}
+
+fn run_cnot_with_options<'py>(
+    py: Python<'py>,
+    stages: Bound<'py, PyAny>,
+    options: Options,
+) -> PyResult<Py<PyAny>> {
+    let mut backend = PyStages { py, stages };
+    let outcome = cnot_search::search(&mut backend, options)?;
     outcome_to_python(py, outcome)
 }
 
