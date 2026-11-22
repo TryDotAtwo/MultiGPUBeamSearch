@@ -97,6 +97,28 @@ def inject_history_edge_failure(rank, fail_rank):
     return original_longs, state
 
 
+def inject_history_row_decode_failure(rank, fail_rank):
+    original_broadcast = World.broadcast
+    state = {"fired": False}
+
+    def injected_broadcast(world, tensor, source):
+        result = original_broadcast(world, tensor, source)
+        if (
+            rank == fail_rank
+            and not state["fired"]
+            and tuple(result.shape) == (3,)
+        ):
+            # Corrupt one rank's local view only after the broadcast has
+            # completed, so peers enter the same checked validation phase.
+            result = result.clone()
+            result[1] = -1
+            state["fired"] = True
+        return result
+
+    World.broadcast = injected_broadcast
+    return original_broadcast, state
+
+
 def worker(rank, rendezvous, output_dir, phase, fail_rank):
     torch.set_num_threads(1)
     dist.init_process_group(
@@ -106,11 +128,12 @@ def worker(rank, rendezvous, output_dir, phase, fail_rank):
         world_size=2,
         timeout=timedelta(seconds=30),
     )
-    original, injection = (
-        inject_winner_packet_failure(rank, fail_rank)
-        if phase == "winner packet"
-        else inject_history_edge_failure(rank, fail_rank)
-    )
+    if phase == "winner packet":
+        original, injection = inject_winner_packet_failure(rank, fail_rank)
+    elif phase == "history row decode":
+        original, injection = inject_history_row_decode_failure(rank, fail_rank)
+    else:
+        original, injection = inject_history_edge_failure(rank, fail_rank)
     try:
         with World("cpu"):
             compatibility = phase.startswith("compatibility ")
@@ -148,6 +171,8 @@ def worker(rank, rendezvous, output_dir, phase, fail_rank):
     finally:
         if phase == "winner packet":
             torch.cat = original
+        elif phase == "history row decode":
+            World.broadcast = original
         else:
             World.longs = original
         dist.destroy_process_group()
@@ -330,6 +355,8 @@ def main():
             ("winner packet", 1),
             ("history edge", 0),
             ("history edge", 1),
+            ("history row decode", 0),
+            ("history row decode", 1),
             ("compatibility history edge typed input", 0),
             ("compatibility history edge typed input", 1),
             ("compatibility history edge python input", 0),
@@ -351,11 +378,21 @@ def main():
             ]
             if reports[0]["collective_error"] != reports[1]["collective_error"]:
                 raise AssertionError(f"ranks disagreed on {phase} failure: {reports!r}")
-            expected = (
-                f"prepare CNOT winner packet failed: rank {fail_rank}: RuntimeError: injected winner packet"
-                if phase == "winner packet"
-                else f"prepare CNOT history edge failed: rank {fail_rank}: RuntimeError: injected history edge"
-            )
+            if phase == "winner packet":
+                expected = (
+                    f"prepare CNOT winner packet failed: rank {fail_rank}: "
+                    "RuntimeError: injected winner packet"
+                )
+            elif phase == "history row decode":
+                expected = (
+                    f"validate CNOT history edge failed: rank {fail_rank}: "
+                    "ValueError: invalid CNOT history route"
+                )
+            else:
+                expected = (
+                    f"prepare CNOT history edge failed: rank {fail_rank}: "
+                    "RuntimeError: injected history edge"
+                )
             if expected not in reports[0]["collective_error"]:
                 raise AssertionError(f"wrong error phase or owner: {reports!r}")
             if any(not row["injection_fired"] and row["rank"] == fail_rank for row in reports):
