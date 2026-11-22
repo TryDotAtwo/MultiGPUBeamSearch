@@ -31,6 +31,8 @@ on:
       - tools/vast_campaign_watchdog.py
       - tools/test_vast_campaign_watchdog.py
       - tools/test_vast_campaign_workflow.py
+      - tools/cnot_producer_source_gate.py
+      - tools/test_cnot_producer_source_gate.py
       - tools/vast_public_status.py
       - tools/test_vast_public_status.py
       - .github/workflows/vast-campaign-watchdog.yml
@@ -74,7 +76,11 @@ jobs:
           python-version: "3.11"
       - name: Compile source-only acceptance helpers
         id: compile_source
-        run: python -m py_compile tools/verify_permutation_cuda.py tools/permutation_acceptance.py tools/test_permutation_acceptance.py tools/verify_cnot.py tools/cnot_acceptance_events.py tools/test_cnot_acceptance_events.py tools/test_cnot_gpu_identity.py tools/verify_cnot_gpu_pair.py tools/test_verify_cnot_gpu_pair.py tools/test_vast_result_transport.py tools/vast_public_status.py tools/test_vast_public_status.py tools/test_vast_source_archive.py tools/create_vast_source_archive.py tools/vast_instance_contract.py tools/test_vast_instance_contract.py tools/vast_budget_deadline.py tools/test_vast_budget_deadline.py tools/vast_campaign_guard.py tools/test_vast_campaign_guard.py tools/vast_campaign_watchdog.py tools/test_vast_campaign_watchdog.py tools/test_vast_campaign_workflow.py tools/vast_private_preflight.py tools/test_vast_private_preflight.py integrations/cayleypy_native/tests/installed_verify_cnot_gloo_lifecycle.py integrations/cayleypy_native/multigpubeamsearch/gpu_identity.py
+        run: python -m py_compile tools/verify_permutation_cuda.py tools/permutation_acceptance.py tools/test_permutation_acceptance.py tools/verify_cnot.py tools/cnot_acceptance_events.py tools/test_cnot_acceptance_events.py tools/test_cnot_gpu_identity.py tools/verify_cnot_gpu_pair.py tools/test_verify_cnot_gpu_pair.py tools/test_vast_result_transport.py tools/vast_public_status.py tools/test_vast_public_status.py tools/test_vast_source_archive.py tools/create_vast_source_archive.py tools/vast_instance_contract.py tools/test_vast_instance_contract.py tools/vast_budget_deadline.py tools/test_vast_budget_deadline.py tools/vast_campaign_guard.py tools/test_vast_campaign_guard.py tools/vast_campaign_watchdog.py tools/test_vast_campaign_watchdog.py tools/test_vast_campaign_workflow.py tools/cnot_producer_source_gate.py tools/test_cnot_producer_source_gate.py tools/vast_private_preflight.py tools/test_vast_private_preflight.py integrations/cayleypy_native/tests/installed_verify_cnot_gloo_lifecycle.py integrations/cayleypy_native/multigpubeamsearch/gpu_identity.py
+      - name: Test exact producer-source gate
+        if: always()
+        id: producer_source_gate_test
+        run: python tools/test_cnot_producer_source_gate.py -v
       - name: Test private result transport boundary
         if: always()
         id: private_transport
@@ -287,9 +293,64 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-  gpu-acceptance:
+
+  producer_manifest:
     if: github.event_name == 'workflow_dispatch'
-    needs: validate-source
+    name: Exact producer source manifest and supervisor checks
+    uses: TryDotAtwo/cnot-neural-synth-frontier6/.github/workflows/check-full-training-manifest.yml@7310b1eb5ec07c76c131ba8c60b105ff4aad7a9c
+    with:
+      source_sha: 7310b1eb5ec07c76c131ba8c60b105ff4aad7a9c
+
+  producer_cpu_runtime:
+    if: github.event_name == 'workflow_dispatch'
+    name: Exact producer CPU runtime, resume and profile checks
+    uses: TryDotAtwo/cnot-neural-synth-frontier6/.github/workflows/check-full-training-cpu-runtime.yml@7310b1eb5ec07c76c131ba8c60b105ff4aad7a9c
+    with:
+      source_sha: 7310b1eb5ec07c76c131ba8c60b105ff4aad7a9c
+
+  producer_cuda_build:
+    if: github.event_name == 'workflow_dispatch'
+    name: Exact producer CUDA build and link
+    uses: TryDotAtwo/cnot-neural-synth-frontier6/.github/workflows/check-full-training-cuda-build.yml@7310b1eb5ec07c76c131ba8c60b105ff4aad7a9c
+    with:
+      source_sha: 7310b1eb5ec07c76c131ba8c60b105ff4aad7a9c
+
+  producer_source_gate:
+    if: ${{ github.event_name == 'workflow_dispatch' && always() }}
+    name: Require all exact producer checks
+    needs: [producer_manifest, producer_cpu_runtime, producer_cuda_build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    outputs:
+      status: ${{ steps.gate.outputs.status }}
+    steps:
+      - name: Check out this consumer revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Fail closed unless every producer result matches its pin
+        id: gate
+        env:
+          EXPECTED_SHA: 7310b1eb5ec07c76c131ba8c60b105ff4aad7a9c
+          MANIFEST_RESULT: ${{ needs.producer_manifest.result }}
+          MANIFEST_SHA: ${{ needs.producer_manifest.outputs.checked_sha }}
+          CPU_RUNTIME_RESULT: ${{ needs.producer_cpu_runtime.result }}
+          CPU_RUNTIME_SHA: ${{ needs.producer_cpu_runtime.outputs.checked_sha }}
+          CUDA_BUILD_RESULT: ${{ needs.producer_cuda_build.result }}
+          CUDA_BUILD_SHA: ${{ needs.producer_cuda_build.outputs.checked_sha }}
+        run: |
+          set -euo pipefail
+          python3 tools/cnot_producer_source_gate.py \
+            --expected-sha "$EXPECTED_SHA" \
+            --manifest-result "$MANIFEST_RESULT" --manifest-sha "$MANIFEST_SHA" \
+            --cpu-runtime-result "$CPU_RUNTIME_RESULT" --cpu-runtime-sha "$CPU_RUNTIME_SHA" \
+            --cuda-build-result "$CUDA_BUILD_RESULT" --cuda-build-sha "$CUDA_BUILD_SHA" \
+            --output "$GITHUB_OUTPUT"
+
+  gpu-acceptance:
+    if: ${{ github.event_name == 'workflow_dispatch' && needs.producer_source_gate.outputs.status == 'passed' }}
+    needs: [validate-source, producer_source_gate]
     name: Build installed wheel and run Rust permutation plus CNOT acceptance
     runs-on: ubuntu-latest
     timeout-minutes: 135
