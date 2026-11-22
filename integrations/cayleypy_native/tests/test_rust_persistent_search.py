@@ -315,6 +315,9 @@ def test_rust_session_reuses_and_releases_rank_owner(tmp_path, monkeypatch, worl
     runtime = SimpleNamespace(runner=tmp_path / "runner", architectures=(86,),
                               build_metadata={"binary_sha256": "c" * 64})
     options = NativeOptions(cache_dir=tmp_path)
+    def reject_python_repr(self):
+        raise AssertionError("Rust-owned preparation identity must not use Python repr(options)")
+    monkeypatch.setattr(NativeOptions, "__repr__", reject_python_repr)
     monkeypatch.setenv("CUDA_VISIBLE_DEVICES", "0,1")
     monkeypatch.setenv("CUDA_DEVICE_ORDER", "PCI_BUS_ID")
     session = NativeSession(engine="rust")
