@@ -245,7 +245,7 @@ fn select_cnot_dispatch(
         caps,
     )
     .map_err(|error| match error {
-        beam_runtime::cnot_search::DispatchError::Engine(
+        beam_runtime::cnot_search::DispatchError::EngineSelection(
             beam_runtime::cnot_search::EngineSelectionError::RustDepthExceedsU64,
         ) => PyValueError::new_err("CNOT Rust engine depth exceeds u64"),
         beam_runtime::cnot_search::DispatchError::StrictRequiresRustController => {
