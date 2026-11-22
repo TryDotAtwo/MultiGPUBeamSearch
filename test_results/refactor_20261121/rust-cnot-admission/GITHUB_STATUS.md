@@ -1,18 +1,18 @@
 # Rust + CUDA/C++ migration acceptance status
 
 Source branch: `codex/beam-3060-preflight-20261121`
-Latest installed-wheel code SHA: `bcdb5ae82f10b3b0e8ad6b7b357f255cb638efef`
-Latest hosted CPU test SHA: `948ffe320e32fb54500c669e35920f9e41a99194`
+Latest installed-wheel code SHA: `9ce5954b6b1d6bd014a2af086dec71ff7686a255`
+Latest hosted CPU test SHA: `9ce5954b6b1d6bd014a2af086dec71ff7686a255`
 Base main SHA: `e6c41b6dc6bb3a839f6338f3cfe9eaadf8608d5a`
 
 | Gate | Status | Evidence |
 |---|---|---|
-| Hosted source harness and new-host acceptance workflow checks | PASS | [run 44994732760](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44994732760): hosted CPU acceptance passed; redacted artifact [14743547032](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44994732760/artifacts/14743547032). Physical GPU job skipped. |
-| Rust CNOT CPU compatibility suite | PASS | 323 passed, 2 skipped on current test SHA `948ffe320e32fb54500c669e35920f9e41a99194`, [run 44994974016](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44994974016). |
-| Installed PEP 517 wheel outside checkout | PASS | [run 44994732751](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44994732751) on code SHA `bcdb5ae82f10b3b0e8ad6b7b357f255cb638efef`; the two-rank Gloo phase-failure/reuse test, receipt validator, and real `verify_cnot` lifecycle passed. Redacted status artifact [14743162189](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44994732751/artifacts/14743162189). |
-| Panel-v2 CPU producer compatibility | PASS | [run 44994978882](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44994978882) on test SHA `948ffe320e32fb54500c669e35920f9e41a99194`; this is compile/handoff CPU evidence only, not trained GPU replay. |
+| Hosted source harness and new-host acceptance workflow checks | PASS | [run 44996962394](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44996962394): all hosted CPU checks passed. Physical GPU job skipped. |
+| Rust CNOT CPU compatibility suite | PASS | 323 passed, 2 hardware tests skipped on SHA `9ce5954b6b1d6bd014a2af086dec71ff7686a255`, [run 44996962379](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44996962379). |
+| Installed PEP 517 wheel outside checkout | PASS | Full installed-wheel workflow passed on code SHA `9ce5954b6b1d6bd014a2af086dec71ff7686a255`, [run 44996962384](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44996962384). Rank-consistent dispatch, lifecycle failures/retries, parity, and receipt checks passed. |
+| Panel-v2 CPU producer compatibility | PASS | [run 44996966326](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44996966326): source compile and synthetic handoff passed; this is CPU evidence, not trained GPU replay. |
 | Default CNOT Rust controller dispatch | PASS on 2-rank Gloo | Rank 0 and rank 1 each had the native runner hidden in turn. Strict rejected before transport; `auto` used one common compatibility route; explicit Rust returned the same no-common-route error; a healthy `auto` retry then completed on the same process group. [run 44981755387](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44981755387). |
-| Runtime engine policy | PASS | `beam-runtime::cnot_search::select_dispatch` now requires a rank-common native-stage set before selecting the Rust controller; its unit regression and installed-wheel Gloo path pass. |
+| Runtime engine policy | PASS | `beam-runtime::cnot_search::select_dispatch` is now the sole Rust route-selection policy after PyO3 input conversion; rank-common native-stage requirements and installed-wheel Gloo cases pass. |
 | Vendored source manifest and native fingerprint | PASS | Installed-wheel tests checked required source-bundle headers and that changing vendored headers changes the native fingerprint. |
 | CNOT independent scorer-reference cutoff | PASS | Exact full path tie-break, separated boundary and ambiguous-within-tolerance fixtures pass. Search order and precision are unchanged. |
 | Permutation acceptance | PASS on CPU only | LRX(4), B=64 smoke and saturated LRX(5), B=3 oracle contracts pass for full Hash128 dedup, duplicate routing, exact cutoff, rank work, replay and session reuse. No physical GPU ran. |
@@ -115,3 +115,14 @@ Implementation SHA: `d9814462b05938f3419aa5c71332f9c3ce6619cd`; latest hosted te
 - Rust CNOT CPU/Gloo: PASS after correcting a test expectation for the optional empty admission argument, [run 44988942783](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44988942783).
 - Panel-v2 CPU compatibility: PASS, [run 44988946712](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44988946712). Hosted source acceptance passed at implementation SHA [run 44988105821](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44988105821).
 - Physical CUDA/NCCL: SKIPPED. No 1/2-GPU behavior is claimed. Python `World` remains the Gloo/tensor-collective owner; full Rust context ownership remains open.
+
+
+## Single-pass Rust CNOT dispatch — 2026-11-22
+
+Tested source SHA: `9ce5954b6b1d6bd014a2af086dec71ff7686a255`.
+
+- A new installed-wheel regression failed on test-only SHA `edcafd46a1585deb81c4f6007db877015a699fae` at the rank-consistent dispatch step, exposing the redundant depth-selection call in the PyO3 wrapper.
+- The wrapper now converts the engine token and depth-fit value once and passes them to the sole route policy, `beam_runtime::cnot_search::select_dispatch`. The exact installed PEP 517 wheel outside-checkout gate passed, including the new selector regression, two-rank dispatch consensus, phase failures and retry, CNOT one/two-rank Gloo parity, and permutation CPU acceptance: [run 44996962384](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44996962384). Redacted status artifact: [14743928675](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44996962384/artifacts/14743928675).
+- Rust CNOT CPU/Gloo: 323 passed, 2 hardware-only skipped, [run 44996962379](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44996962379).
+- Hosted acceptance: PASS, physical job SKIPPED, [run 44996962394](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44996962394). Panel-v2 CPU compile/handoff: PASS, [run 44996966326](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44996966326).
+- No physical CUDA/NCCL or trained-checkpoint GPU execution is claimed.

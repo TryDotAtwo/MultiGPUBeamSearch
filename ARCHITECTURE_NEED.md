@@ -3694,3 +3694,21 @@ The resolver retains each verified JSON artifact's bytes, hashes those bytes, an
 ## Per-search CNOT backend-mode snapshot (2026-11-22)
 
 The controller votes the strict or compatibility mode during backend admission and stores that decision in a Rust-owned per-search admission object. Stream 5 startup, native-stage construction and Rust scorer dispatch consume the stored decision. Production execution does not reread the process environment after admission, so a rank-local environment change cannot change the backend requirements partway through a search. Legacy direct extension calls that omit an admission object retain the environment-based compatibility fallback.
+
+
+## Single CNOT dispatch decision (2026-11-22)
+
+After the existing rank-wide callable-capability vote, the PyO3 adapter converts
+the public engine token and depth-range fact into the typed runtime input. It
+calls `beam_runtime::cnot_search::select_dispatch` once; the discarded
+preliminary engine selection has been removed. The typed route remains the
+value passed to the executor. The Python `World` still owns process-group
+creation and supplies Gloo/Torch adapters, so this change does not transfer
+world or CUDA-handle ownership.
+
+An installed-wheel regression checks the selector boundary and the existing
+two-rank Gloo route/failure/retry cases. The test failed on
+`edcafd46a1585deb81c4f6007db877015a699fae` and passed on
+`9ce5954b6b1d6bd014a2af086dec71ff7686a255` ([run
+44996962384](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44996962384)).
+CUDA/NCCL behavior remains pending.

@@ -3418,3 +3418,12 @@ Main commit `148b2a826a369b7601e904ea409e0cc5301c75c9` also passed the 260-test 
 - The Rust CNOT controller now retains the collectively admitted strict/compatibility mode in its per-search backend admission object.
 - Stream 5 startup, native-stage admission and construction, and Rust scorer dispatch consume that same mode instead of rereading the mutable environment during the search. Legacy direct extension calls without an admission object retain their compatibility fallback.
 - Added installed-wheel coverage for changing the process environment after admission and for the compatibility admission object passed to native stage dispatch. Search order, collectives, scoring, kernels and precision are unchanged.
+
+
+## 2026-11-22 - Resolve public CNOT dispatch once in Rust
+
+- Added an installed-wheel regression proving that the PyO3 CNOT selector does not compare the requested depth twice while building the typed route.
+- PyO3 now converts the validated engine token and depth-fit flag; `beam_runtime::cnot_search::select_dispatch` is the only route-selection policy. Invalid engine values keep the public CNOT error. Search order, Gloo/NCCL transport, stage bindings, scoring, kernels and precision are unchanged.
+- RED: installed-wheel dispatch step failed at test SHA `edcafd46a1585deb81c4f6007db877015a699fae`, [run 44996678906](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44996678906). GREEN: full installed-wheel validation passed at implementation SHA `9ce5954b6b1d6bd014a2af086dec71ff7686a255`, [run 44996962384](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44996962384).
+- Rust CNOT CPU/Gloo passed with 323 passed and 2 hardware tests skipped in [run 44996962379](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44996962379). Hosted acceptance passed in [run 44996962394](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44996962394), and the panel-v2 CPU compile/handoff gate passed in [run 44996966326](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44996966326).
+- Physical CUDA/NCCL remains unverified; the GPU job was skipped.
