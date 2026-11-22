@@ -9,6 +9,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from handoff import (
     EXPECTED_PRODUCER_EMITTER_SHA256,
@@ -293,6 +294,27 @@ class PanelV2HandoffTests(unittest.TestCase):
             [root["start_packed_rows"] for root in resolved.panel_roots],
             [[1, 3], [3, 2]],
         )
+
+    def test_resolver_parses_the_same_artifact_bytes_it_hashes(self):
+        artifact_paths = {
+            self.training_manifest.resolve(),
+            self.training_result.resolve(),
+            self.search_manifest.resolve(),
+            self.baseline_search_manifest.resolve(),
+        }
+        reads = {}
+        original_read_bytes = Path.read_bytes
+
+        def counted_read_bytes(path):
+            resolved = path.resolve()
+            if resolved in artifact_paths:
+                reads[resolved] = reads.get(resolved, 0) + 1
+            return original_read_bytes(path)
+
+        with patch.object(Path, "read_bytes", counted_read_bytes):
+            resolve_panel_v2_handoff(self.root, self.receipt)
+
+        self.assertEqual(reads, {path: 1 for path in artifact_paths})
 
     def test_supported_search_geometry_has_exact_v13_frontier_bound(self):
         self.assertEqual(validate_search_contract(self.search), 201)
