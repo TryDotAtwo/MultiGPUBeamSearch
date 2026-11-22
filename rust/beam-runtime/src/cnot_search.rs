@@ -321,6 +321,39 @@ mod tests {
     use std::collections::VecDeque;
 
     #[test]
+    fn typed_cnot_request_preserves_controls_and_caps_shortlist_to_alphabet() {
+        let request = CnotRequest::new(
+            4,
+            9,
+            99,
+            7,
+            "proposal",
+            true,
+            "auto",
+            "auto",
+        )
+        .unwrap();
+
+        assert_eq!(request.wires, 4);
+        assert_eq!(request.width, 9);
+        assert_eq!(request.shortlist, 12);
+        assert_eq!(request.max_depth, 7);
+        assert_eq!(request.mode, CnotMode::Proposal);
+        assert!(request.audit);
+        assert_eq!(request.validation, CnotValidation::Auto);
+        assert_eq!(request.requested_engine, RequestedEngine::Auto);
+        assert_eq!(request.selected_engine(), Ok(SelectedEngine::Rust));
+    }
+
+    #[test]
+    fn typed_cnot_request_rejects_invalid_public_controls() {
+        assert!(CnotRequest::new(4, 0, 1, 7, "qhat", false, "auto", "auto").is_err());
+        assert!(CnotRequest::new(4, 9, 1, 7, "unknown", false, "auto", "auto").is_err());
+        assert!(CnotRequest::new(4, 9, 1, 7, "qhat", false, "auto", "unknown").is_err());
+        assert!(CnotRequest::new(4, 9, 1, 7, "qhat", false, "unknown", "auto").is_err());
+    }
+
+    #[test]
     fn engine_selection_preserves_auto_reference_and_explicit_rust_depth_rules() {
         assert_eq!(
             select_engine(RequestedEngine::Auto, true),
