@@ -1,24 +1,20 @@
 # Rust + CUDA/C++ migration acceptance status
 
 Source branch: `codex/beam-3060-preflight-20261121`
-Latest installed-wheel code SHA: `9ce5954b6b1d6bd014a2af086dec71ff7686a255`
-Latest hosted CPU test SHA: `9ce5954b6b1d6bd014a2af086dec71ff7686a255`
+Latest installed-wheel SHA: `a0f406238515ffab5d0c45b9ae4b0d5dc5011931`
+Latest Rust CNOT CPU suite SHA: `3e8e321c18e4c382985b158ab571ffac017229a2`
 Base main SHA: `e6c41b6dc6bb3a839f6338f3cfe9eaadf8608d5a`
 
 | Gate | Status | Evidence |
 |---|---|---|
-| Hosted source harness and new-host acceptance workflow checks | PASS | [run 44996962394](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44996962394): all hosted CPU checks passed. Physical GPU job skipped. |
-| Rust CNOT CPU compatibility suite | PASS | 323 passed, 2 hardware tests skipped on SHA `9ce5954b6b1d6bd014a2af086dec71ff7686a255`, [run 44996962379](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44996962379). |
-| Installed PEP 517 wheel outside checkout | PASS | Full installed-wheel workflow passed on code SHA `9ce5954b6b1d6bd014a2af086dec71ff7686a255`, [run 44996962384](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44996962384). Rank-consistent dispatch, lifecycle failures/retries, parity, and receipt checks passed. |
-| Panel-v2 CPU producer compatibility | PASS | [run 44996966326](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44996966326): source compile and synthetic handoff passed; this is CPU evidence, not trained GPU replay. |
-| Default CNOT Rust controller dispatch | PASS on 2-rank Gloo | Rank 0 and rank 1 each had the native runner hidden in turn. Strict rejected before transport; `auto` used one common compatibility route; explicit Rust returned the same no-common-route error; a healthy `auto` retry then completed on the same process group. [run 44981755387](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44981755387). |
-| Runtime engine policy | PASS | `beam-runtime::cnot_search::select_dispatch` is now the sole Rust route-selection policy after PyO3 input conversion; rank-common native-stage requirements and installed-wheel Gloo cases pass. |
-| Vendored source manifest and native fingerprint | PASS | Installed-wheel tests checked required source-bundle headers and that changing vendored headers changes the native fingerprint. |
-| CNOT independent scorer-reference cutoff | PASS | Exact full path tie-break, separated boundary and ambiguous-within-tolerance fixtures pass. Search order and precision are unchanged. |
-| Permutation acceptance | PASS on CPU only | LRX(4), B=64 smoke and saturated LRX(5), B=3 oracle contracts pass for full Hash128 dedup, duplicate routing, exact cutoff, rank work, replay and session reuse. No physical GPU ran. |
-| CUDA/NCCL permutation and trained CNOT on physical 1/2 GPUs | PENDING; GPU job skipped | Physical device identity, trained checkpoint scoring, NCCL participation/parity and physical recovery remain unverified. |
-| Vast campaign cost, trusted private-input staging and storage disposition | BLOCKED | A trusted GL4 manifest/checkpoint staging receipt and complete storage-cost disposition are still required before the authorized new 2x desktop RTX 3060 campaign under the remaining $10 cap. The old instance is outside scope. |
-| Full Rust ownership migration | IN PROGRESS | Rust controls CNOT stage order/history and engine policy, but the native stage adapter retains Python `World`/Torch objects. Permutation model/profile preparation and scheduler compatibility also retain Python control. |
+| Rust CNOT CPU/Gloo suite | PASS | 323 passed, 2 skipped on `3e8e321`; the new `Edge::from_i64_row` signed/width/length cases passed in [run 45039189653](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45039189653). |
+| Installed PEP 517 wheel outside checkout | PASS | Wheel built and exercised from outside the checkout on `a0f4062`. The Gloo phase test injected malformed history rows after broadcast on rank 0 and rank 1 separately, checked common phase/error, then completed a healthy retry in the same group. [Run 45040185404](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45040185404). |
+| Panel-v2 producer compatibility | PASS | Hosted producer/consumer adapter validation passed on `a0f4062`, [run 45040191347](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45040191347). |
+| Hosted acceptance harness | PASS | Source checks passed on `3e8e321`, [run 45039190060](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45039190060). Its CUDA/physical jobs were skipped. |
+| Permutation CPU acceptance | PASS on CPU | Existing LRX(4) replay/reuse and saturated LRX(5), B=3 oracle tests are covered by the installed-wheel run. Physical GPU parity remains unverified. |
+| CUDA/NCCL permutation and trained CNOT on physical 1/2 GPUs | PENDING | No physical CUDA/NCCL execution, trained checkpoint replay, or physical rank recovery was claimed in these hosted runs. |
+| Vast campaign staging and total storage cost | BLOCKED | Trusted private GL4 manifest/checkpoint staging and complete cost disposition are still outstanding for the authorized new 2x desktop RTX 3060 campaign. No paid instance was started. |
+| Full Rust ownership migration | IN PROGRESS | Rust owns CNOT request policy, stage order, typed history edge validation and rank-wide checked outcomes. Native stages still retain Python `World`/Torch objects; permutation model/profile and scheduler preparation also retain Python control. PR #10 remains draft. |
 
 Hosted CPU and installed-wheel evidence does not establish physical CUDA/NCCL execution or complete the Rust migration.
 
