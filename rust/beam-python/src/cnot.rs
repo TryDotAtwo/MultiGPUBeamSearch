@@ -668,22 +668,58 @@ impl Backend for PyStages<'_> {
             if input.is_instance_of::<PyCnotSearchInput>() && self.stages.hasattr("world")? {
                 let world = self.stages.getattr("world")?;
                 let rank: u32 = world.getattr("rank")?.extract()?;
-                let edge = world.call_method1("longs", (vec![0_i64, 0, 0],))?;
-                if target == rank {
-                    edge.call_method1("copy_", (records.bind(self.py).get_item(local_index)?,))?;
-                }
-                world.call_method1("broadcast", (&edge, target))?;
-                let row: Vec<i64> = edge.call_method0("tolist")?.extract()?;
-                if row.len() != 3 {
-                    return Err(PyValueError::new_err("invalid CNOT history edge"));
-                }
+                let prepared = (|| -> PyResult<Bound<'_, PyAny>> {
+                    let edge = world.call_method1("longs", (vec![0_i64, 0, 0],))?;
+                    if target == rank {
+                        let record = records.bind(self.py).get_item(local_index)?;
+                        edge.call_method1("copy_", (record,))?;
+                    }
+                    Ok(edge)
+                })();
+                let edge = crate::cnot_native_checked::checked_compat(
+                    self.py,
+                    &world,
+                    "prepare CNOT history edge",
+                    prepared,
+                )?;
+                let broadcast = world.call_method1("broadcast", (&edge, target));
+                let edge = crate::cnot_native_checked::checked_compat(
+                    self.py,
+                    &world,
+                    "broadcast CNOT history edge",
+                    broadcast,
+                )?;
+                let parsed = crate::cnot_native_checked::checked_compat(
+                    self.py,
+                    &world,
+                    "validate CNOT history edge",
+                    (|| -> PyResult<Bound<'_, PyAny>> {
+                        let row: Vec<i64> = edge.call_method0("tolist")?.extract()?;
+                        if row.len() != 3 {
+                            return Err(PyValueError::new_err("invalid CNOT history edge"));
+                        }
+                        let parent = u64::try_from(row[0])
+                            .map_err(|_| PyValueError::new_err("invalid CNOT history parent"))?;
+                        let route = u32::try_from(row[1])
+                            .map_err(|_| PyValueError::new_err("invalid CNOT history route"))?;
+                        let owner = u32::try_from(row[2])
+                            .map_err(|_| PyValueError::new_err("invalid CNOT history owner"))?;
+                        let int = self.py.import("builtins")?.getattr("int")?;
+                        Ok(PyTuple::new(
+                            self.py,
+                            [
+                                int.call1((parent,))?,
+                                int.call1((route,))?,
+                                int.call1((owner,))?,
+                            ],
+                        )?
+                        .into_any())
+                    })(),
+                )?;
                 return Ok(Edge {
-                    parent: u64::try_from(row[0])
-                        .map_err(|_| PyValueError::new_err("invalid CNOT history parent"))?,
-                    route: u32::try_from(row[1])
-                        .map_err(|_| PyValueError::new_err("invalid CNOT history route"))?,
-                    owner: u32::try_from(row[2])
-                        .map_err(|_| PyValueError::new_err("invalid CNOT history owner"))?,
+                    parent: parsed.get_item(0)?.extract()?,
+                    route: parsed.get_item(1)?.extract()?,
+                    owner: parsed.get_item(2)?.extract()?,
                 });
             }
         }
