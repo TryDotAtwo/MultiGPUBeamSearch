@@ -16,6 +16,7 @@ from multigpubeamsearch.rust_control import extension
 
 
 RUNTIME = extension()
+_diagnostic_case = "startup"
 
 
 class FlatScorer:
@@ -297,6 +298,7 @@ def ranked_native_entry_worker(rank, rendezvous, output_dir, fail_rank):
         dist.destroy_process_group()
 
 def main():
+    global _diagnostic_case
     with tempfile.TemporaryDirectory(prefix="mgbs-cnot-phases-") as temporary:
         root = Path(temporary)
         for phase, fail_rank in (
@@ -309,6 +311,7 @@ def main():
             ("compatibility history edge python input", 0),
             ("compatibility history edge python input", 1),
         ):
+            _diagnostic_case = f"{phase.replace(' ', '-')}-rank-{fail_rank}"
             phase_dir = root / f"{phase.replace(' ', '-')}-rank-{fail_rank}"
             phase_dir.mkdir()
             rendezvous = (phase_dir / "rendezvous").resolve().as_uri()
@@ -341,6 +344,7 @@ def main():
             ):
                 raise AssertionError(f"the live process group did not recover: {reports!r}")
 
+        _diagnostic_case = "admitted-backend-mode"
         mode_dir = root / "admitted-backend-mode"
         mode_dir.mkdir()
         mode_rendezvous = (mode_dir / "rendezvous").resolve().as_uri()
@@ -364,6 +368,7 @@ def main():
             )
 
         for fail_rank in (0, 1):
+            _diagnostic_case = f"trace-stage-rank-{fail_rank}"
             trace_dir = root / f"trace-stage-rank-{fail_rank}"
             trace_dir.mkdir()
             rendezvous = (trace_dir / "rendezvous").resolve().as_uri()
@@ -393,6 +398,7 @@ def main():
                 raise AssertionError(f"trace boundary did not recover: {reports!r}")
 
         for fail_rank in (0, 1):
+            _diagnostic_case = f"ranked-native-entry-fail-{fail_rank}"
             binding_dir = root / f"ranked-native-entry-fail-{fail_rank}"
             binding_dir.mkdir()
             rendezvous = (binding_dir / "rendezvous").resolve().as_uri()
@@ -430,4 +436,13 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as error:
+        # Publish only a bounded case label and exception type; full traces stay
+        # in the runner's private temporary log.
+        print(
+            f"CNOT_PHASE_FAILURE case={_diagnostic_case} type={type(error).__name__}",
+            flush=True,
+        )
+        raise

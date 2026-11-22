@@ -205,9 +205,21 @@ jobs:
         run: |
           set -o pipefail
           cd "$RUNNER_TEMP/mgbs-wheel-smoke"
-          timeout --signal=TERM --kill-after=15s 180s \
+          if timeout --signal=TERM --kill-after=15s 180s \
             env -u PYTHONPATH python "$GITHUB_WORKSPACE/integrations/cayleypy_native/tests/installed_cnot_phase_boundaries.py" \
-            > "${RUNNER_TEMP}/mgbs-private-cnot-phase-boundaries.log" 2>&1
+            > "${RUNNER_TEMP}/mgbs-private-cnot-phase-boundaries.log" 2>&1; then
+            :
+          else
+            status=$?
+            marker="$(grep -E '^CNOT_PHASE_FAILURE case=[A-Za-z0-9._-]+ type=[A-Za-z0-9_]+' \
+              "${RUNNER_TEMP}/mgbs-private-cnot-phase-boundaries.log" | tail -n 1 || true)"
+            if [ -n "$marker" ]; then
+              printf '%s\n' "$marker"
+            else
+              printf '%s\n' "CNOT_PHASE_FAILURE diagnostic=unavailable"
+            fi
+            exit "$status"
+          fi
       - name: Verify run-scoped CNOT backend event receipts
         id: acceptance_events
         run: |
