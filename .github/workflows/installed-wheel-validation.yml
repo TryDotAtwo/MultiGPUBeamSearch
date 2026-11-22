@@ -115,16 +115,6 @@ jobs:
           set -o pipefail
           cargo test --locked -p beam-runtime --test inference_backend_policy \
             > "${RUNNER_TEMP}/mgbs-private-inference-backend-rust.log" 2>&1
-      - name: Upload inference backend policy logs
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: inference-backend-policy-${{ github.run_id }}
-          path: |
-            ${{ runner.temp }}/mgbs-private-inference-backend-policy.log
-            ${{ runner.temp }}/mgbs-private-inference-backend-rust.log
-          if-no-files-found: warn
-          retention-days: 7
       - name: Verify installed scheduler worker and Rust rank supervisor
         id: cluster_worker_installed
         env:
@@ -151,45 +141,14 @@ jobs:
         run: |
           set -euo pipefail
           cd "$RUNNER_TEMP/mgbs-wheel-smoke"
-          env -u PYTHONPATH python - <<'PY'
-          import os
-          import sys
-          import unittest
-
-          start = os.path.join(
-              os.environ["GITHUB_WORKSPACE"],
-              "integrations", "cayleypy_native", "tests",
-          )
-          suite = unittest.defaultTestLoader.discover(
-              start_dir=start,
-              pattern="installed_cnot_handoff_endpoint.py",
-          )
-
-          def flatten(value):
-              for item in value:
-                  if isinstance(item, unittest.TestSuite):
-                      yield from flatten(item)
-                  else:
-                      yield item
-
-          ordered = sorted(flatten(suite), key=lambda test: test.id())
-          numbers = {test.id(): index + 1 for index, test in enumerate(ordered)}
-          log_path = os.path.join(os.environ["RUNNER_TEMP"], "mgbs-private-cnot-handoff-endpoint.log")
-          with open(log_path, "w", encoding="utf-8") as stream:
-              result = unittest.TextTestRunner(stream=stream, verbosity=2).run(suite)
-          failed = [test for test, _ in result.failures + result.errors]
-          for test in failed:
-              print(f"cnot_handoff_endpoint_failed_test={test.id()}")
-          if result.wasSuccessful():
-              status = "passed"
-          else:
-              case = numbers.get(failed[0].id()) if failed else None
-              status = f"failed_case_{case:02d}" if case is not None else "failed_unknown"
-          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
-              output.write(f"status={status}\\n")
-          print(f"cnot_handoff_endpoint={status}")
-          sys.exit(0 if result.wasSuccessful() else 1)
-          PY
+          log="$RUNNER_TEMP/mgbs-private-cnot-handoff-endpoint.log"
+          if env -u PYTHONPATH python "$GITHUB_WORKSPACE/integrations/cayleypy_native/tests/installed_cnot_handoff_endpoint.py" > "$log" 2>&1; then
+            echo "CNOT_HANDOFF_ENDPOINT=passed"
+          else
+            status=$?
+            echo "CNOT_HANDOFF_ENDPOINT=failed"
+            exit "$status"
+          fi
       - name: Verify vendored source headers invalidate the installed native fingerprint
         id: vendor_source_fingerprint
         run: |

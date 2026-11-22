@@ -5,6 +5,7 @@ import copy
 import hashlib
 import importlib.util
 import json
+import os
 from pathlib import Path
 import sys
 import tempfile
@@ -81,6 +82,14 @@ def _run_panel_endpoint_rank(rank, world_size, run_root, output_path, rendezvous
 
 class InstalledHandoffEndpointTests(unittest.TestCase):
     def setUp(self):
+        environment_keys = (
+            "MGBS_CNOT_EXPECTED_CHECKPOINT_SHA256",
+            "MGBS_CNOT_EXPECTED_SEARCH_MANIFEST_SHA256",
+            "MGBS_TQP_MANIFEST",
+        )
+        self._saved_cnot_environment = {
+            key: os.environ.get(key) for key in environment_keys
+        }
         package_path = Path(multigpubeamsearch.__file__).resolve()
         self.assertNotIn(ROOT.resolve(), package_path.parents, "test imported the checkout instead of the installed wheel")
         self.fixture = PanelV2HandoffTests()
@@ -119,6 +128,11 @@ class InstalledHandoffEndpointTests(unittest.TestCase):
     def tearDown(self):
         if self.owns_process_group and dist.is_initialized():
             dist.destroy_process_group()
+        for key, value in self._saved_cnot_environment.items():
+            if value is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = value
         self.fixture.tearDown()
 
     def invoke(self, *, receipt=None, output_name="consumer-panel.private.json", extra=()):

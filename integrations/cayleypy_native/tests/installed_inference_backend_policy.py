@@ -70,6 +70,7 @@ reject(request("auto", "mlp", "fp16", 8, []),
 
 
 from multigpubeamsearch import backend, build, rust_control
+from multigpubeamsearch.options import NativeOptions
 import torch
 
 unsupported = request("auto", "mlp", "bf16", 8, [(79, "NVIDIA test GPU")])
@@ -126,7 +127,7 @@ with tempfile.TemporaryDirectory(prefix="beam-inference-policy-") as temporary:
         backend="mlp",
         manifest={"dtype": "fp16", "output_dim": 8},
     )
-    options = backend.NativeOptions(cache_dir=root / "cache", inference_backend="auto")
+    options = NativeOptions(cache_dir=root / "cache", inference_backend="auto")
     with (
         patch.object(rust_control, "extension", return_value=policy_probe),
         patch.object(torch.cuda, "get_device_capability", return_value=(8, 0)),
