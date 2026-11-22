@@ -127,8 +127,46 @@ class PanelV2HandoffTests(unittest.TestCase):
             "path": "manifests/locked-test-search.json",
             "sha256": digest_bytes(self.search_manifest.read_bytes()),
         }
+        self.comparison = self._comparison_fixture()
+        self.handoff["locked_test_status"] = self.comparison["status"]
+        self.handoff["locked_test_comparison_sha256"] = canonical_digest(self.comparison)
+        self.receipt_source_revision = self.handoff["producer_source_revision"]
+        self.top_level_comparison = copy.deepcopy(self.comparison)
+        self.selected_checkpoint_sha = self.checkpoint_sha
         self.receipt = self.reports / "learning-curve.private.json"
         self.write_receipt()
+
+    def _comparison_fixture(self):
+        baseline_pins = {
+            "search_manifest_sha256": "a" * 64,
+            "dataset_sha256": self.dataset_sha,
+            "source_revision": self.handoff["producer_source_revision"],
+            "runtime_contract": "native_device_search_v13",
+            "training_manifest_sha256": None,
+            "training_result_sha256": None,
+            "checkpoint_sha256": None,
+        }
+        candidate_pins = {
+            "search_manifest_sha256": self.handoff["search_manifest"]["sha256"],
+            "dataset_sha256": self.dataset_sha,
+            "training_manifest_sha256": self.handoff["training_manifest"]["sha256"],
+            "training_result_sha256": self.handoff["training_result"]["sha256"],
+            "checkpoint_sha256": self.checkpoint_sha,
+        }
+        metrics = {
+            "panel_indices": list(self.indices),
+            "panel_digest": self.panel_digest,
+        }
+        return {
+            "status": "length_gain",
+            "reason": "paired physical cost reduced with coverage preserved",
+            "baseline_head": "hamming",
+            "candidate_head": "qhat",
+            "panel": "test",
+            "case_count": len(self.indices),
+            "baseline_metrics": {**metrics, "receipt_pins": baseline_pins},
+            "candidate_metrics": {**metrics, "receipt_pins": candidate_pins},
+        }
 
     def tearDown(self):
         self.temp.cleanup()
@@ -138,6 +176,15 @@ class PanelV2HandoffTests(unittest.TestCase):
             self.receipt,
             {
                 "schema": "cnot103_learning_curve_campaign_v1",
+                "source_revision": self.receipt_source_revision,
+                "dataset_sha256": self.dataset_sha,
+                "search": dict(self.search),
+                "locked_test_panel_digest": self.panel_digest,
+                "selected": {
+                    "accepted_updates": self.accepted_updates,
+                    "checkpoint_sha256": self.selected_checkpoint_sha,
+                },
+                "locked_test_comparison": copy.deepcopy(self.top_level_comparison),
                 "multi_gpu_beam_handoff": copy.deepcopy(self.handoff),
                 "locked_test": {
                     "status": "evaluated",
@@ -202,6 +249,59 @@ class PanelV2HandoffTests(unittest.TestCase):
         self.write_receipt()
         with self.assertRaises(HandoffError):
             resolve_panel_v2_handoff(self.root, self.receipt)
+
+    def test_rejects_source_revision_mismatch_between_receipt_and_handoff(self):
+        self.receipt_source_revision = "f" * 40
+        self.write_receipt()
+        with self.assertRaisesRegex(HandoffError, "source revision"):
+            resolve_panel_v2_handoff(self.root, self.receipt)
+
+    def test_rejects_mismatched_top_level_locked_test_comparison(self):
+        self.top_level_comparison["status"] = "coverage_gain"
+        self.write_receipt()
+        with self.assertRaisesRegex(HandoffError, "comparison"):
+            resolve_panel_v2_handoff(self.root, self.receipt)
+
+    def test_rejects_selected_checkpoint_mismatch(self):
+        self.selected_checkpoint_sha = "f" * 64
+        self.write_receipt()
+        with self.assertRaisesRegex(HandoffError, "selected checkpoint"):
+            resolve_panel_v2_handoff(self.root, self.receipt)
+
+    def test_rejects_locked_comparison_with_wrong_panel_head_or_metric_pins(self):
+        mutations = (
+            lambda value: value.update(panel="dev"),
+            lambda value: value.update(panel_digest="f" * 64),
+            lambda value: value["baseline_metrics"].update(panel_indices=list(reversed(self.indices))),
+            lambda value: value["candidate_metrics"].update(panel_digest="f" * 64),
+            lambda value: value.update(candidate_head="proposal"),
+            lambda value: value["candidate_metrics"]["receipt_pins"].update(checkpoint_sha256="f" * 64),
+            lambda value: value["candidate_metrics"]["receipt_pins"].update(dataset_sha256="f" * 64),
+            lambda value: value["candidate_metrics"]["receipt_pins"].update(training_manifest_sha256="f" * 64),
+            lambda value: value["candidate_metrics"]["receipt_pins"].update(training_result_sha256="f" * 64),
+            lambda value: value["candidate_metrics"]["receipt_pins"].update(search_manifest_sha256="f" * 64),
+            lambda value: value["baseline_metrics"]["receipt_pins"].update(dataset_sha256="f" * 64),
+            lambda value: value["baseline_metrics"]["receipt_pins"].update(source_revision="f" * 40),
+        )
+        for mutate in mutations:
+            with self.subTest(mutation=mutate):
+                self.comparison = self._comparison_fixture()
+                mutate(self.comparison)
+                self.handoff["locked_test_status"] = self.comparison["status"]
+                self.handoff["locked_test_comparison_sha256"] = canonical_digest(self.comparison)
+                self.write_receipt()
+                with self.assertRaises(HandoffError):
+                    resolve_panel_v2_handoff(self.root, self.receipt)
+
+    def test_absolute_search_manifest_pins_require_the_same_run_root_mount(self):
+        import shutil
+        relocated = Path(self.temp.name) / "relocated-run"
+        shutil.copytree(self.root, relocated, ignore=shutil.ignore_patterns("relocated-run"))
+        with self.assertRaisesRegex(HandoffError, "outside the private run root"):
+            resolve_panel_v2_handoff(
+                relocated,
+                relocated / "reports" / "learning-curve.private.json",
+            )
 
 
 if __name__ == "__main__":
