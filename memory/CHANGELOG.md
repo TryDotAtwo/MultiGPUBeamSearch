@@ -3336,3 +3336,5 @@ Main commit `148b2a826a369b7601e904ea409e0cc5301c75c9` also passed the 260-test 
 - Keep rank-local engine inputs separate from common Gloo outcomes, with one phase receipt per rank for mismatch, Rust auto retries, and scorer failures on either rank.
 - The installed-wheel validator reads exactly the three rank-zero replay reports and checks solved status plus bitwise replay. CPU tests reject missing phases, wrong rank identity, missing report cases, and absent replay.
 - This is hosted CPU/Gloo acceptance only; physical CUDA/NCCL remains a separate gate.
+
+- Corrected the installed-wheel workflow to invoke the validator at `tools/cnot_gloo_lifecycle.py`; the previous command referenced a nonexistent file and failed after the Gloo scenarios.

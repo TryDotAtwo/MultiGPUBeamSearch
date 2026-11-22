@@ -190,7 +190,7 @@ jobs:
             env -u PYTHONPATH python -m torch.distributed.run --standalone --nproc_per_node=2 \
             "$GITHUB_WORKSPACE/integrations/cayleypy_native/tests/installed_verify_cnot_gloo_lifecycle.py" \
             > "${RUNNER_TEMP}/mgbs-private-verify-cnot-gloo-lifecycle.log" 2>&1
-          python "$GITHUB_WORKSPACE/tools/verify_cnot_gloo_lifecycle.py" "$RUNNER_TEMP" \
+          python "$GITHUB_WORKSPACE/tools/cnot_gloo_lifecycle.py" "$RUNNER_TEMP" \
             >> "${RUNNER_TEMP}/mgbs-private-verify-cnot-gloo-lifecycle.log" 2>&1
       - name: Summarize synthetic CNOT Gloo lifecycle diagnostic
         if: always()
