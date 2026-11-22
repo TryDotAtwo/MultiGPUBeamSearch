@@ -102,7 +102,40 @@ def _expect_coordinated_failure(label, record):
         raise AssertionError(f"{label} entered transport before admission failed: {record}")
 
 
+def _assert_rust_selector_reads_depth_once():
+    from multigpubeamsearch.rust_control import extension
+
+    selector = getattr(extension(), "_select_cnot_dispatch")
+
+    class ProbeDepth(int):
+        comparisons = 0
+
+        def __gt__(self, other):
+            type(self).comparisons += 1
+            if type(self).comparisons > 1:
+                raise AssertionError("CNOT dispatch compared depth more than once")
+            return super().__gt__(other)
+
+    capabilities = {
+        "native_controller": False,
+        "checked_control": False,
+        "native_stages": False,
+        "stream5_start": False,
+        "world_exchange": False,
+        "fixed_gather": False,
+        "row_gather": False,
+        "broadcast": False,
+        "compatibility_controller": True,
+    }
+    selected = selector("auto", ProbeDepth(2), False, capabilities)
+    if selected != "rust_compatibility":
+        raise AssertionError(f"unexpected typed CNOT dispatch path: {selected}")
+    if ProbeDepth.comparisons != 1:
+        raise AssertionError(f"CNOT selector read depth {ProbeDepth.comparisons} times")
+    print("CNOT_RUST_SELECTOR_SINGLE_PARSE_PASS", flush=True)
+
 def main():
+    _assert_rust_selector_reads_depth_once()
     dist.init_process_group("gloo", timeout=timedelta(seconds=90))
     try:
         for hidden_rank in (0, 1):
