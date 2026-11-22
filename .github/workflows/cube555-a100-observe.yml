@@ -22,7 +22,7 @@ jobs:
           endpoint=https://console.vast.ai/api/v0/instances
           authorization="Authorization: Bearer ${VAST_API_KEY}"
           row="$(curl --fail --silent --show-error --max-time 20 -H "$authorization" "$endpoint/" \
-            | jq -cer --argjson id "$id" '.instances[] | select(.id==$id and .label=="cube555-a100-45001828045-1" and .actual_status=="running")')"
+            | jq -cer --argjson id "$id" '.instances[] | select(.id==$id and .label=="cube555-a100-61937382-proxy" and .actual_status=="running")')"
           key="$RUNNER_TEMP/observe-key"
           ssh-keygen -q -t ed25519 -N "" -C "cube555-observe-$GITHUB_RUN_ID" -f "$key"
           request="$(jq -cn --arg ssh_key "$(cat "$key.pub")" '{ssh_key:$ssh_key}')"
@@ -38,24 +38,25 @@ jobs:
           code='
           set -e
           cd /root/cube555-test 2>/dev/null || { echo "No test directory yet"; exit 0; }
-          du -sh . evidence cube555-standalone/beam_run 2>/dev/null || true
+          stat -c "%s %n" cube555-standalone-linux-x86_64-py311.tar 2>/dev/null || true
           for file in evidence/*.log; do
             [[ -f "$file" ]] || continue
             echo "$file"
             tail -n 7 "$file"
           done
-          ps -eo comm | sort | uniq -c | grep -E "python|cmake|cc1|nvcc|pipeline|ninja|tar|ssh" || true
+          ps -eo comm | sort | uniq -c | grep -E "python|cmake|cc1|nvcc|production|ninja|tar|ssh" || true
           nvidia-smi --query-gpu=name,utilization.gpu,memory.used,temperature.gpu --format=csv,noheader
-          if [[ -d cube555-standalone/beam_run/cache ]]; then
-            find cube555-standalone/beam_run/cache -name maximum-beam.json -o -name verification-budget.json -o -name native-build.json | tail -n 15
+          if [[ -d cube555-standalone/beam_run ]]; then
+            find cube555-standalone/beam_run -name verification-budget.json -exec cat {} \;
+            find cube555-standalone/beam_run -name cmake-build.log -exec tail -n 3 {} \;
           fi'
           for attempt in 1 2 3; do
-            if [[ "$direct_host" =~ ^[0-9.]+$ && "$direct_port" =~ ^[0-9]+$ ]] &&
-                ssh "${options[@]}" -p "$direct_port" "root@$direct_host" "$code"; then
-              exit 0
-            fi
             if [[ "$proxy_host" =~ ^[a-zA-Z0-9.-]+$ && "$proxy_port" =~ ^[0-9]+$ ]] &&
                 ssh "${options[@]}" -p "$proxy_port" "root@$proxy_host" "$code"; then
+              exit 0
+            fi
+            if [[ "$direct_host" =~ ^[0-9.]+$ && "$direct_port" =~ ^[0-9]+$ ]] &&
+                ssh "${options[@]}" -p "$direct_port" "root@$direct_host" "$code"; then
               exit 0
             fi
             sleep 12
