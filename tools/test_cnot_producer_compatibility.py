@@ -43,6 +43,7 @@ class ProducerBuildCacheWorkflowTests(unittest.TestCase):
         # adds no independent verification target.
         self.assertNotIn("cargo check ", workflow)
         self.assertIn("cargo test --locked --features torch --lib", workflow)
+        self.assertEqual(workflow.count('tail -n 80 "$RUNNER_TEMP/producer-adapter-tests.log"'), 2)
 
 
 if __name__ == "__main__":
