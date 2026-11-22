@@ -94,3 +94,13 @@ Tested code SHA: `57bf4f0deb90e1b0009b1a458968e5ca4096fe23`.
 - Installed PEP 517 wheel outside the checkout: PASS, all 27 steps in [run 44983817156](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44983817156). This includes rank-local two-rank Gloo event receipts, separate engine-input validation, rank-zero-only solved/bitwise replay reports, CNOT cutoff and topology fixtures, and the panel-v2 byte-binding regression.
 - Pinned panel-v2 producer CPU compile and synthetic handoff: PASS, [runs 44983817105](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44983817105) and [44983819836](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44983819836).
 - Physical CUDA/NCCL: SKIPPED; no instance was dispatched. Installed-wheel/Gloo and panel CPU results do not establish GPU execution, checkpoint scorer parity on hardware, or 1/2-GPU parity.
+
+## Installed scheduler worker and Rust rank supervisor
+
+Tested source SHA: `3241de1df83c101abe3cca906fa9d1de801f611a`.
+
+- Installed PEP 517 wheel ran outside the checkout with `PYTHONPATH` unset and `REQUIRE_RUST_CLUSTER=1`: PASS, [run 44986148911](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44986148911). This proves the wheel contained the Rust cluster extension and worker route.
+- The gate exercised both Python and Rust supervisors, both `--local-rank` flag spellings, two-rank shared scheduler environment, Slurm step mapping, coordinated peer failure, timeout, and SIGTERM child cleanup. It did not initialize CUDA/NCCL.
+- Hosted acceptance/source harness: PASS, [run 44986148934](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44986148934). Panel-v2 CPU compile and handoff: PASS, [run 44986152290](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44986152290).
+- The first source harness attempt at run 44985950759 caught an added raw log upload that violated the workflow's redacted-status-only contract. The log artifact and `tee` were removed; the subsequent source harness passed.
+- Physical CUDA/NCCL job: SKIPPED. No paid instance was created; physical 1/2-GPU parity and trained checkpoint execution remain pending.
