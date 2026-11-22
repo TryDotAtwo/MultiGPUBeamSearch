@@ -77,6 +77,10 @@ jobs:
             echo "source_adapter=failed" >> "$GITHUB_OUTPUT"
             exit 1
           fi
+          if ! python -m unittest discover -s integrations/cnot_scorer -p 'test_handoff.py' -v > "${RUNNER_TEMP}/producer-handoff-test.log" 2>&1; then
+            echo "source_adapter=failed" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
           echo "source_adapter=passed" >> "$GITHUB_OUTPUT"
       - name: Publish redacted source status
         if: always()
