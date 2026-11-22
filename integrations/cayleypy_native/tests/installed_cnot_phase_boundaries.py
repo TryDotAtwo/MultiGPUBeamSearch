@@ -33,22 +33,26 @@ class FlatScorer:
         return torch.zeros((len(children),), dtype=torch.float64, device=children.device)
 
 
-def public_search(validation="python", force_compatibility_stages=False):
+def public_search(
+    validation="python",
+    force_compatibility_stages=False,
+    force_compatibility_dispatch=False,
+):
     root = pack_rows(replay_cnot(3, (0, 1)))
-    if not force_compatibility_stages:
-        return search_cnot(
-            root,
-            FlatScorer(),
-            width=6,
-            shortlist=6,
-            max_depth=3,
-            validation=validation,
-            engine="rust",
-        )
+    original_stage_runner = cnot_module._native_stages_runner
+    original_native_method = World.native_method
+    if force_compatibility_stages:
+        # Exercise the retained Rust-controller/Python-stage compatibility path.
+        cnot_module._native_stages_runner = lambda: None
+    if force_compatibility_dispatch:
+        # Hide the newer controller ABI on every rank while retaining the
+        # legacy Rust CNOT controller and the stable checked-control path.
+        def compatibility_dispatch(world, name):
+            if name in ("_select_cnot_dispatch", "run_cnot_native_search"):
+                return None
+            return original_native_method(world, name)
 
-    # Exercise the retained Rust-controller/Python-stage compatibility path.
-    original = cnot_module._native_stages_runner
-    cnot_module._native_stages_runner = lambda: None
+        World.native_method = compatibility_dispatch
     try:
         return search_cnot(
             root,
@@ -60,7 +64,21 @@ def public_search(validation="python", force_compatibility_stages=False):
             engine="rust",
         )
     finally:
-        cnot_module._native_stages_runner = original
+        World.native_method = original_native_method
+        cnot_module._native_stages_runner = original_stage_runner
+
+def inject_identity_failure(rank, fail_rank):
+    original_identity = cnot_module.native.cnot_identity
+    state = {"fired": False}
+
+    def injected_identity(*args, **kwargs):
+        if rank == fail_rank and not state["fired"]:
+            state["fired"] = True
+            raise RuntimeError("injected CNOT identity initialization failure")
+        return original_identity(*args, **kwargs)
+
+    cnot_module.native.cnot_identity = injected_identity
+    return original_identity, state
 
 
 def inject_winner_packet_failure(rank, fail_rank):
@@ -132,14 +150,24 @@ def worker(rank, rendezvous, output_dir, phase, fail_rank):
         original, injection = inject_winner_packet_failure(rank, fail_rank)
     elif phase == "history row decode":
         original, injection = inject_history_row_decode_failure(rank, fail_rank)
+    elif phase == "compatibility dispatch identity":
+        original, injection = inject_identity_failure(rank, fail_rank)
     else:
         original, injection = inject_history_edge_failure(rank, fail_rank)
     try:
         with World("cpu"):
-            compatibility = phase.startswith("compatibility ")
+            compatibility_stages = (
+                phase.startswith("compatibility ")
+                and phase != "compatibility dispatch identity"
+            )
+            compatibility_dispatch = phase == "compatibility dispatch identity"
             validation = "auto" if phase.endswith("typed input") else "python"
             try:
-                public_search(validation, force_compatibility_stages=compatibility)
+                public_search(
+                    validation,
+                    force_compatibility_stages=compatibility_stages,
+                    force_compatibility_dispatch=compatibility_dispatch,
+                )
             except RuntimeError as error:
                 collective_error = str(error)
             else:
@@ -149,7 +177,11 @@ def worker(rank, rendezvous, output_dir, phase, fail_rank):
 
             # The failed stage must vote before its next data-plane collective.
             # A second public search proves the process group remains usable.
-            result = public_search(validation, force_compatibility_stages=compatibility)
+            result = public_search(
+                validation,
+                force_compatibility_stages=compatibility_stages,
+                force_compatibility_dispatch=compatibility_dispatch,
+            )
             if (
                 result.status != "solved"
                 or replay_cnot(3, result.gates) != replay_cnot(3, (0, 1))
@@ -173,6 +205,8 @@ def worker(rank, rendezvous, output_dir, phase, fail_rank):
             torch.cat = original
         elif phase == "history row decode":
             World.broadcast = original
+        elif phase == "compatibility dispatch identity":
+            cnot_module.native.cnot_identity = original
         else:
             World.longs = original
         dist.destroy_process_group()
@@ -361,6 +395,8 @@ def main():
             ("compatibility history edge typed input", 1),
             ("compatibility history edge python input", 0),
             ("compatibility history edge python input", 1),
+            ("compatibility dispatch identity", 0),
+            ("compatibility dispatch identity", 1),
         ):
             _diagnostic_case = f"{phase.replace(' ', '-')}-rank-{fail_rank}"
             phase_dir = root / f"{phase.replace(' ', '-')}-rank-{fail_rank}"
@@ -378,7 +414,12 @@ def main():
             ]
             if reports[0]["collective_error"] != reports[1]["collective_error"]:
                 raise AssertionError(f"ranks disagreed on {phase} failure: {reports!r}")
-            if phase == "winner packet":
+            if phase == "compatibility dispatch identity":
+                expected = (
+                    f"initialize CNOT identity failed: rank {fail_rank}: "
+                    "RuntimeError: injected CNOT identity initialization failure"
+                )
+            elif phase == "winner packet":
                 expected = (
                     f"prepare CNOT winner packet failed: rank {fail_rank}: "
                     "RuntimeError: injected winner packet"
