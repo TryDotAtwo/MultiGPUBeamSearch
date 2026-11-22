@@ -378,7 +378,6 @@ pub fn search_environment(request: &SearchEnvironmentRequest) -> BTreeMap<String
     .collect()
 }
 
-
 #[derive(Clone, Debug, PartialEq, Eq, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct MlpHostBindingIdentity {
@@ -442,7 +441,10 @@ pub fn search_model_environment(
     }
 
     if request.inference_backend.as_deref() == Some("libtorch")
-        || matches!(request.model_backend.as_str(), "piece_transformer" | "ensemble")
+        || matches!(
+            request.model_backend.as_str(),
+            "piece_transformer" | "ensemble"
+        )
     {
         environment.insert("BEAM_STREAM1_EXECUTOR".into(), "libtorch_eager".into());
     }
@@ -462,10 +464,7 @@ pub fn search_model_environment(
                 "MLP host binding requires an MLP model and SHA256 identities".into(),
             ));
         }
-        environment.insert(
-            "BEAM_MLP_GRAPH_HASH".into(),
-            binding.graph_hash.clone(),
-        );
+        environment.insert("BEAM_MLP_GRAPH_HASH".into(), binding.graph_hash.clone());
         environment.insert(
             "BEAM_MLP_ARTIFACT_HASH".into(),
             binding.artifact_hash.clone(),

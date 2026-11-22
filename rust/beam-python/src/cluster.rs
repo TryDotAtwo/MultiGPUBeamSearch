@@ -58,7 +58,6 @@ fn resolve_search_environment(
     serde_json::to_string(&environment).map_err(|error| PyRuntimeError::new_err(error.to_string()))
 }
 
-
 #[pyfunction]
 fn resolve_model_search_environment(payload: String) -> PyResult<String> {
     let request: beam_runtime::cluster::SearchModelEnvironmentRequest =

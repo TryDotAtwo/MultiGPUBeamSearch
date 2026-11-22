@@ -249,7 +249,10 @@ fn model_search_environment_preserves_ensemble_and_executor_settings() {
         mlp_host_binding: None,
     })
     .unwrap();
-    assert_eq!(environment.get("BEAM_BLEND_DIR").map(String::as_str), Some("/models/blend"));
+    assert_eq!(
+        environment.get("BEAM_BLEND_DIR").map(String::as_str),
+        Some("/models/blend")
+    );
     assert_eq!(
         environment.get("BEAM_WEIGHT_DIR").map(String::as_str),
         Some("/models/blend/head-a")
@@ -301,7 +304,9 @@ fn model_search_environment_preserves_optional_mlp_host_binding() {
         Some("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
     );
     assert_eq!(
-        environment.get("BEAM_MLP_ARTIFACT_HASH").map(String::as_str),
+        environment
+            .get("BEAM_MLP_ARTIFACT_HASH")
+            .map(String::as_str),
         Some("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb")
     );
     assert_eq!(environment.len(), 2);
