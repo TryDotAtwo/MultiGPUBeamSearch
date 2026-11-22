@@ -361,6 +361,7 @@ def resolve_panel_v2_handoff(
     accepted_updates = handoff.get("accepted_updates")
     checkpoint_sha = handoff.get("checkpoint_sha256")
     dataset_sha = handoff.get("dataset_sha256")
+    search = handoff.get("search")
     model = handoff.get("model")
     if (
         receipt.get("source_revision") != source_revision
