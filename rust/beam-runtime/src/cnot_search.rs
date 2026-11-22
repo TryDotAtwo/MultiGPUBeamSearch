@@ -322,17 +322,7 @@ mod tests {
 
     #[test]
     fn typed_cnot_request_preserves_controls_and_caps_shortlist_to_alphabet() {
-        let request = CnotRequest::new(
-            4,
-            9,
-            99,
-            7,
-            "proposal",
-            true,
-            "auto",
-            "auto",
-        )
-        .unwrap();
+        let request = CnotRequest::new(4, 9, 99, 7, "proposal", true, "auto", "auto").unwrap();
 
         assert_eq!(request.wires, 4);
         assert_eq!(request.width, 9);
