@@ -116,17 +116,27 @@ jobs:
           set -euo pipefail
           build_dir="$RUNNER_TEMP/cnot-panel-v2-build"
           rm -rf "$build_dir" "$CARGO_TARGET_DIR"
-          if ! .venv-cnot-panel/bin/python integrations/cnot_scorer/build.py --contract panel_search_v2 \
+          if .venv-cnot-panel/bin/python integrations/cnot_scorer/build.py --contract panel_search_v2 \
               --source "$GITHUB_WORKSPACE/cnot-producer" \
               --build-dir "$build_dir" --prepare-only > "$RUNNER_TEMP/producer-adapter-prepare.log" 2>&1; then
-            exit 1
+            :
+          else
+            status=$?
+            tail -n 80 "$RUNNER_TEMP/producer-adapter-prepare.log"
+            exit "$status"
           fi
           native="$build_dir/native"
           torch_lib="$(.venv-cnot-panel/bin/python -c 'import pathlib, torch; print(pathlib.Path(torch.__file__).parent / "lib")')"
           export LD_LIBRARY_PATH="$torch_lib:${LD_LIBRARY_PATH:-}"
-          cargo test --locked --features torch --lib mgbs_scorer_panel_v2::tests \
-            --manifest-path "$native/Cargo.toml" \
-            > "$RUNNER_TEMP/producer-adapter-tests.log" 2>&1
+          if cargo test --locked --features torch --lib mgbs_scorer_panel_v2::tests \
+              --manifest-path "$native/Cargo.toml" \
+              > "$RUNNER_TEMP/producer-adapter-tests.log" 2>&1; then
+            :
+          else
+            status=$?
+            tail -n 80 "$RUNNER_TEMP/producer-adapter-tests.log"
+            exit "$status"
+          fi
       - name: Run the cached panel-v2 adapter tests
         id: cached_adapter_tests
         if: steps.cache_validation.outputs.ready == 'true'
@@ -140,9 +150,15 @@ jobs:
           native="$RUNNER_TEMP/cnot-panel-v2-build/native"
           torch_lib="$(.venv-cnot-panel/bin/python -c 'import pathlib, torch; print(pathlib.Path(torch.__file__).parent / "lib")')"
           export LD_LIBRARY_PATH="$torch_lib:${LD_LIBRARY_PATH:-}"
-          cargo test --locked --features torch --lib mgbs_scorer_panel_v2::tests \
-            --manifest-path "$native/Cargo.toml" \
-            > "$RUNNER_TEMP/producer-adapter-tests.log" 2>&1
+          if cargo test --locked --features torch --lib mgbs_scorer_panel_v2::tests \
+              --manifest-path "$native/Cargo.toml" \
+              > "$RUNNER_TEMP/producer-adapter-tests.log" 2>&1; then
+            :
+          else
+            status=$?
+            tail -n 80 "$RUNNER_TEMP/producer-adapter-tests.log"
+            exit "$status"
+          fi
       - name: Save successful native build artifact
         if: success() && steps.cache_validation.outputs.ready != 'true'
         uses: actions/cache/save@v4
