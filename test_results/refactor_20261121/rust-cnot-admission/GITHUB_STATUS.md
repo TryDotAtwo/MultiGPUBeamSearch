@@ -1,19 +1,24 @@
 # Rust + CUDA/C++ migration acceptance status
 
 Source branch: `codex/beam-3060-preflight-20261121`
-Latest tested code SHA: `e4e96c452dba8b531c7de262f8f333b088a579c3`
+Latest tested code SHA: `c9b6e10b2f013d7fc243719d1d7316faba78b88b`
 Base main SHA: `e6c41b6dc6bb3a839f6338f3cfe9eaadf8608d5a`
 
 | Gate | Status | Evidence |
 |---|---|---|
-| Permutation installed-wheel preparation and CPU acceptance | PASS | [run 45058727951](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45058727951) passed on `e4e96c4`, including the public Rust device plan, old-wheel fallback, unavailable-CUDA handling, and saturated permutation CPU acceptance. |
-| Shared Rust CPU/Gloo and formatting checks | PASS | [run 45058728166](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45058728166) passed on the same source SHA. |
-| Hosted source acceptance harness | PASS | [run 45058728397](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45058728397) passed on hosted CPU. The physical producer/GPU jobs were skipped. |
-| Permutation CUDA/NCCL on physical 1/2 GPUs | PENDING | Not run under current resource limits. Physical rank participation, 1/2-GPU parity, and hardware replay remain unverified. |
-| CNOT implementation and compatibility | PRESERVED; final acceptance DEFERRED | CNOT code is unchanged in this slice. Further CNOT changes, checkpoint preparation, and trained/physical acceptance are deferred at the user's request. The shared CPU checks do not establish CNOT GPU acceptance. |
-| Full Rust ownership migration | IN PROGRESS | Rust owns permutation device selection/admission, inference profile/microbatch planning, cluster geometry and scheduler parsing, session identity, CUDA ordinal/visibility mapping, and child environment. Python still prepares some model/world inputs; PR #10 remains draft. |
+| Permutation installed wheel and CPU acceptance | PASS | [run 45062575238](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45062575238) passed on `c9b6e10`; the installed Rust cluster test exercised the public search-policy resolver, first/collect values, invalid-mode rejection and old-wheel fallback. Saturated permutation CPU acceptance also passed. |
+| Shared CPU/Gloo checks | PASS | The installed-wheel run [45062575238](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45062575238) compiled the current Rust extension and completed its installed runtime/Gloo checks. This remains CPU evidence only. |
+| Permutation CUDA/NCCL on physical 1/2 GPUs | PENDING | No physical permutation run was performed. Device participation, 1/2-GPU parity, and hardware replay remain unverified. |
+| CNOT implementation and compatibility | PRESERVED; final acceptance DEFERRED | Existing CNOT code and compatibility remain in place. Further CNOT development, checkpoint preparation, and final acceptance are deferred at the user's request; shared CPU workflow success does not establish CNOT GPU acceptance. |
+| Full Rust ownership migration | IN PROGRESS | Rust now owns permutation device admission, inference/profile and microbatch planning, scheduler/cluster plans, session identity, fixed child/runtime/model/search-policy environments. Python still prepares framework models and performs remaining public orchestration; PR #10 remains draft. |
 
-Installed-wheel and hosted CPU results do not establish physical CUDA/NCCL execution. The permutation physical gate remains required; CNOT final acceptance is deferred.
+Installed-wheel and hosted CPU results do not establish physical CUDA/NCCL execution. The permutation physical gate remains required. CNOT-specific continuation and final acceptance are deferred.
+
+## Rust-owned permutation solution policy environment — 2026-11-22
+
+- The public permutation runner resolves first/collect mode, extra collection depths, maximum collected solutions, and the TSV result name through the versioned Rust runtime API after calibration.
+- The installed-wheel test exercised the Rust extension through the launch-policy helper, checked first/collect values, invalid-mode rejection, and the old-wheel fallback. The installed workflow also passed the existing saturated permutation CPU acceptance.
+- Evidence: installed-wheel validation [45062575238](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45062575238), source SHA `c9b6e10b2f013d7fc243719d1d7316faba78b88b`. Physical permutation CUDA/NCCL was not run.
 
 ## Rust-owned permutation CUDA device admission — 2026-11-22
 

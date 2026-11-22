@@ -1,3 +1,10 @@
+## 2026-11-22 - Resolve permutation solution policy in Rust
+
+- Added a versioned `beam-runtime` request for first/collect mode, extra collection depths, the collected-solution limit, and the result TSV path.
+- Routed the public permutation runner environment through the installed Rust resolver after calibration. Preserved identical string values and the Python fallback for older wheels.
+- Added installed-wheel coverage for collection and first-solution policy, invalid mode rejection, and compatibility fallback. No search, kernel, precision, or transport behavior changed.
+- Installed-wheel validation and saturated permutation CPU acceptance passed on source SHA `c9b6e10b2f013d7fc243719d1d7316faba78b88b`: [run 45062575238](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45062575238). Physical CUDA/NCCL was not run.
+
 ## 2026-11-22 - Build fixed permutation launch environment in Rust
 
 - Moved the public runner's puzzle, input, weight, history, and base BFS environment variables into a versioned `beam-runtime` function.

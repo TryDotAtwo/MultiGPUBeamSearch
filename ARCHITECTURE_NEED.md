@@ -1,3 +1,9 @@
+## Rust-owned permutation solution policy environment — 2026-11-22
+
+The public permutation launch now resolves the fixed solution-collection controls through a versioned `beam-runtime` request: first-solution versus collection mode, extra collection depths, maximum collected solutions, and the result TSV name. `backend._run_native_once` applies that environment after calibration and immediately before the runner launch, so calibration probes retain their existing non-collecting behavior. Older wheels continue to use the same Python compatibility builder. This changes environment ownership only; search ordering, kernel execution, numerical policy, and CUDA/NCCL transport are unchanged.
+
+Installed-wheel validation passed on code SHA `c9b6e10b2f013d7fc243719d1d7316faba78b88b` in [run 45062575238](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45062575238). The installed `test_cluster_rust.py` step exercised the compiled Rust resolver through `backend.search_policy_environment`, checked collection and first-solution values, old-resolver fallback, and rejection of an invalid mode. The same workflow passed the existing saturated permutation CPU acceptance. No physical CUDA/NCCL run occurred.
+
 ## Rust-owned permutation search launch environment — 2026-11-22
 
 The public permutation launcher now obtains its fixed puzzle/input/weight/history paths and base BEAM controls from a versioned Rust runtime function. Python supplies the already prepared paths and validated BFS settings, then merges the returned variables with model-specific inference settings. Older wheels keep the previous Python builder. This does not change search controls, model dispatch, kernel behavior, or numerical policy.
