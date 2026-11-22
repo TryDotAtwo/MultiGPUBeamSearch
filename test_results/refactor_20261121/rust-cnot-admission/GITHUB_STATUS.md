@@ -1,21 +1,28 @@
 # Rust + CUDA/C++ migration acceptance status
 
 Source branch: `codex/beam-3060-preflight-20261121`
-Latest tested code SHA: `5cfff58de62f454fe6b63d8ea61514718e4ed578`
+Latest tested code SHA: `9fa887577d2c1684da8ddb6db29395493ebe45bb`
 Base main SHA: `e6c41b6dc6bb3a839f6338f3cfe9eaadf8608d5a`
 
 | Gate | Status | Evidence |
 |---|---|---|
-| Rust CNOT CPU/Gloo suite | PASS | [run 45048372758](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45048372758) passed on `5cfff58`. |
-| Installed PEP 517 wheel outside checkout | PASS | [run 45048372751](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45048372751) passed, including the Rust-owned microbatch plan through the public helper, old-wheel fallback, inference policy, session reuse, and CNOT Gloo acceptance. |
-| Panel-v2 producer compatibility | PASS | [run 45048377696](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45048377696) passed. The real pinned producer serializer to consumer resolver also passed on the unchanged producer/handoff inputs at [run 45047895962](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45047895962). |
-| Hosted acceptance harness | PASS | [run 45048373196](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45048373196) passed; its physical GPU job was skipped on push. |
+| Rust CNOT CPU/Gloo suite | PASS | [run 45050490783](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45050490783) passed on `9fa8875`, including Rust cluster-plan cases and Python compatibility checks. |
+| Installed PEP 517 wheel outside checkout | PASS | [run 45050490824](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45050490824) passed. The real installed Rust extension handled public `plan_cluster`, the exact multi-node placement, the legacy wheel fallback, microbatch planning, session reuse, and CNOT Gloo acceptance. |
+| Panel-v2 producer compatibility | PASS | [run 45050496913](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45050496913) passed. The real pinned producer serializer to consumer resolver also passed on unchanged producer/handoff inputs at [run 45047895962](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45047895962). |
+| Hosted acceptance harness | PASS | [run 45050491058](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45050491058) passed; its physical GPU job was skipped on push. |
 | Permutation CPU acceptance | PASS on CPU | Installed-wheel CPU replay/reuse and saturated LRX(5), B=3 oracle cases remain covered. No physical permutation parity is claimed. |
 | CUDA/NCCL permutation and trained CNOT on physical 1/2 GPUs | PENDING | No physical CUDA/NCCL execution, trained checkpoint replay, physical rank participation, exact hardware replay, or 1-/2-GPU parity has been run. |
 | Vast campaign staging and total storage cost | BLOCKED | Trusted private GL4 manifest/checkpoint staging and complete storage-cost disposition remain unresolved for the authorized new 2x desktop RTX 3060 campaign. No paid instance was started. |
-| Full Rust ownership migration | IN PROGRESS | Rust now owns the permutation microbatch plan as well as inference route, device selection, and session identity. Python still prepares some model/world inputs; PR #10 is draft. |
+| Full Rust ownership migration | IN PROGRESS | Rust now owns permutation device selection, inference profile and microbatch planning, cluster geometry, and typed session identity. Python still prepares some model/world inputs; PR #10 is draft. |
 
 Hosted CPU and installed-wheel evidence does not establish physical CUDA/NCCL execution or complete the Rust migration.
+
+## Rust-owned public cluster planning — 2026-11-22
+
+- The public `plan_cluster` helper now delegates the existing node/rank placement, exact beam capacity, and shard alignment plan to `beam-runtime`. The Python API and result dataclasses are unchanged.
+- Rust CPU/Gloo suite passed on `9fa887577d2c1684da8ddb6db29395493ebe45bb`: [run 45050490783](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45050490783). The uneven `(2,4,1)` plan checks every global/node/local rank, requested/effective beam, alignment and local capacity; overflow cases reject before use.
+- Installed wheel outside checkout passed: [run 45050490824](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45050490824). It calls `resolve_cluster_plan`, then the public helper with the Python planner forced to fail, and verifies old-extension fallback separately.
+- Hosted acceptance harness passed: [run 45050491058](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45050491058); physical GPU acceptance was skipped. No CUDA/NCCL result is claimed.
 
 ## Rust-owned permutation microbatch plan — 2026-11-22
 

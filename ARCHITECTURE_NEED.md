@@ -2,7 +2,7 @@
 
 The public `plan_cluster` adapter now sends the validated per-node GPU counts, global beam width, shard count and batch alignment to `beam-runtime`. Rust returns the same ordered global/node/local rank mapping, exact global beam, per-rank frontier capacity and alignment. Python preserves the public dataclasses and validation errors, and uses the existing calculation only when an older extension does not export the resolver.
 
-This moves multi-node geometry policy without changing the requested/effective width, rank ordering, shard layout, transport, CUDA execution or hardware-verification status. Hosted CPU and installed-wheel verification is pending; physical CUDA/NCCL acceptance remains separate.
+This moves multi-node geometry policy without changing the requested/effective width, rank ordering, shard layout, transport, CUDA execution or hardware-verification status. Hosted Rust CPU/CNOT validation and the installed PEP 517 wheel passed on code SHA `9fa887577d2c1684da8ddb6db29395493ebe45bb`: [Rust CPU run 45050490783](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45050490783) and [installed-wheel run 45050490824](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45050490824). The installed test exercises the exported resolver, the public helper with the Python formula disabled, and the older-wheel fallback. The hosted acceptance harness also passed ([run 45050491058](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45050491058)); its physical GPU job was skipped. Physical CUDA/NCCL verification remains separate.
 
 ## Rust-owned permutation microbatch plan — 2026-11-22
 
