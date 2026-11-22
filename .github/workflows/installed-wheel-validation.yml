@@ -212,9 +212,9 @@ jobs:
             status=$?
             marker="$(grep -oE 'CNOT_DISPATCH_CONSENSUS_FAILURE phase=[A-Za-z0-9_]+ type=[A-Za-z0-9_]+' "$log" | tail -n 1 || true)"
             if [ -n "$marker" ]; then
-              printf '%s\\n' "$marker"
+              printf '%s\n' "$marker"
             else
-              printf '%s\\n' "CNOT_DISPATCH_CONSENSUS_FAILURE diagnostic=unavailable"
+              printf '%s\n' "CNOT_DISPATCH_CONSENSUS_FAILURE diagnostic=unavailable"
             fi
             exit "$status"
           fi
