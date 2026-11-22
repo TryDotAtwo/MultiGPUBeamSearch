@@ -213,8 +213,7 @@ def ranked_native_entry_worker(rank, rendezvous, output_dir, fail_rank):
                     6,
                     3,
                     None,
-                    admitted_rank,
-                    2,
+                    admitted_topology=(admitted_rank, 2),
                 )
             except RuntimeError as error:
                 collective_error = str(error)

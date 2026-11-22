@@ -549,25 +549,17 @@ impl<'py> NativeStages<'py> {
         mode: String,
         audit: bool,
         admission: Option<Py<PyCnotBackendAdmission>>,
-        admitted_rank: Option<u32>,
-        admitted_world: Option<u32>,
+        admitted_topology: Option<(u32, u32)>,
     ) -> PyResult<Self> {
         let python_rank: u32 = world.getattr("rank")?.extract()?;
         let python_size: u32 = world.getattr("size")?.extract()?;
-        let (rank, size) = match (admitted_rank, admitted_world) {
-            (None, None) => (python_rank, python_size),
-            (Some(rank), Some(size)) if rank == python_rank && size == python_size => {
-                (rank, size)
-            }
-            (Some(rank), Some(size)) => {
+        let (rank, size) = match admitted_topology {
+            None => (python_rank, python_size),
+            Some((rank, size)) if rank == python_rank && size == python_size => (rank, size),
+            Some((rank, size)) => {
                 return Err(PyRuntimeError::new_err(format!(
                     "admitted CNOT rank topology (rank={rank}, world={size}) does not match Python World (rank={python_rank}, world={python_size})"
                 )));
-            }
-            _ => {
-                return Err(PyValueError::new_err(
-                    "admitted CNOT topology requires rank and world together",
-                ));
             }
         };
         if size == 0 || rank >= size {
@@ -1523,7 +1515,7 @@ impl Backend for NativeStages<'_> {
 }
 
 #[pyfunction]
-#[pyo3(signature=(world, root, identity, input, scorer, mode, audit, width, shortlist, alphabet, max_depth, admission=None, admitted_rank=None, admitted_world=None))]
+#[pyo3(signature=(world, root, identity, input, scorer, mode, audit, width, shortlist, alphabet, max_depth, admission=None, admitted_topology=None))]
 #[allow(clippy::too_many_arguments)]
 fn run_cnot_native<'py>(
     py: Python<'py>,
@@ -1539,8 +1531,7 @@ fn run_cnot_native<'py>(
     alphabet: u32,
     max_depth: u64,
     admission: Option<Py<PyCnotBackendAdmission>>,
-    admitted_rank: Option<u32>,
-    admitted_world: Option<u32>,
+    admitted_topology: Option<(u32, u32)>,
 ) -> PyResult<Py<PyAny>> {
     let mut backend = None;
     let prepare_backend = (|| -> PyResult<Bound<'py, PyAny>> {
@@ -1554,8 +1545,7 @@ fn run_cnot_native<'py>(
             mode,
             audit,
             admission,
-            admitted_rank,
-            admitted_world,
+            admitted_topology,
         )?);
         Ok(py.None().into_bound(py))
     })();

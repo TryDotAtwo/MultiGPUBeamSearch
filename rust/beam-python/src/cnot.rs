@@ -950,39 +950,55 @@ fn run_cnot_native_search<'py>(
 
         if supports_native {
             let native_root = input_matrix.getattr("root")?;
+            let topology_kwargs = crate::cnot_native_checked::checked_v2(
+                py,
+                &world,
+                "prepare admitted CNOT rank topology",
+                (|| -> PyResult<Bound<'_, PyAny>> {
+                    let kwargs = PyDict::new(py);
+                    kwargs.set_item(
+                        "admitted_topology",
+                        (request.rank(), request.world()),
+                    )?;
+                    Ok(kwargs.into_any())
+                })(),
+            )?;
+            let topology_kwargs = topology_kwargs.downcast::<PyDict>()?;
             return match admitted_backends {
-                Some(admission) => native_stages.call1((
-                    world,
-                    native_root,
-                    identity,
-                    input_matrix,
-                    scorer,
-                    mode,
-                    audit,
-                    width,
-                    shortlist_value,
-                    alphabet,
-                    depth,
-                    admission,
-                    request.rank(),
-                    request.world(),
-                )),
-                None => native_stages.call1((
-                    world,
-                    native_root,
-                    identity,
-                    input_matrix,
-                    scorer,
-                    mode,
-                    audit,
-                    width,
-                    shortlist_value,
-                    alphabet,
-                    depth,
-                    py.None(),
-                    request.rank(),
-                    request.world(),
-                )),
+                Some(admission) => native_stages.call(
+                    (
+                        world,
+                        native_root,
+                        identity,
+                        input_matrix,
+                        scorer,
+                        mode,
+                        audit,
+                        width,
+                        shortlist_value,
+                        alphabet,
+                        depth,
+                        admission,
+                    ),
+                    Some(&topology_kwargs),
+                ),
+                None => native_stages.call(
+                    (
+                        world,
+                        native_root,
+                        identity,
+                        input_matrix,
+                        scorer,
+                        mode,
+                        audit,
+                        width,
+                        shortlist_value,
+                        alphabet,
+                        depth,
+                        py.None(),
+                    ),
+                    Some(&topology_kwargs),
+                ),
             };
         }
 
