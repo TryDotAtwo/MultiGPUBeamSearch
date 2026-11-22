@@ -9,6 +9,7 @@ import torch.distributed as dist
 import torch.multiprocessing as mp
 
 from multigpubeamsearch.cnot import pack_rows, replay_cnot, search_cnot
+import multigpubeamsearch.cnot as cnot_module
 from multigpubeamsearch.cnot_collectives import World
 from multigpubeamsearch.rust_control import extension
 
@@ -21,17 +22,34 @@ class FlatScorer:
         return torch.zeros((len(children),), dtype=torch.float64, device=children.device)
 
 
-def public_search():
+def public_search(validation="python", force_compatibility_stages=False):
     root = pack_rows(replay_cnot(3, (0, 1)))
-    return search_cnot(
-        root,
-        FlatScorer(),
-        width=6,
-        shortlist=6,
-        max_depth=3,
-        validation="python",
-        engine="rust",
-    )
+    if not force_compatibility_stages:
+        return search_cnot(
+            root,
+            FlatScorer(),
+            width=6,
+            shortlist=6,
+            max_depth=3,
+            validation=validation,
+            engine="rust",
+        )
+
+    # Exercise the retained Rust-controller/Python-stage compatibility path.
+    original = cnot_module._native_stages_runner
+    cnot_module._native_stages_runner = lambda: None
+    try:
+        return search_cnot(
+            root,
+            FlatScorer(),
+            width=6,
+            shortlist=6,
+            max_depth=3,
+            validation=validation,
+            engine="rust",
+        )
+    finally:
+        cnot_module._native_stages_runner = original
 
 
 def inject_winner_packet_failure(rank, fail_rank):
@@ -84,8 +102,10 @@ def worker(rank, rendezvous, output_dir, phase, fail_rank):
     )
     try:
         with World("cpu"):
+            compatibility = phase.startswith("compatibility ")
+            validation = "auto" if phase.endswith("typed input") else "python"
             try:
-                public_search()
+                public_search(validation, force_compatibility_stages=compatibility)
             except RuntimeError as error:
                 collective_error = str(error)
             else:
@@ -95,7 +115,7 @@ def worker(rank, rendezvous, output_dir, phase, fail_rank):
 
             # The failed stage must vote before its next data-plane collective.
             # A second public search proves the process group remains usable.
-            result = public_search()
+            result = public_search(validation, force_compatibility_stages=compatibility)
             if (
                 result.status != "solved"
                 or replay_cnot(3, result.gates) != replay_cnot(3, (0, 1))
@@ -171,6 +191,10 @@ def main():
             ("winner packet", 1),
             ("history edge", 0),
             ("history edge", 1),
+            ("compatibility history edge typed input", 0),
+            ("compatibility history edge typed input", 1),
+            ("compatibility history edge python input", 0),
+            ("compatibility history edge python input", 1),
         ):
             phase_dir = root / f"{phase.replace(' ', '-')}-rank-{fail_rank}"
             phase_dir.mkdir()
