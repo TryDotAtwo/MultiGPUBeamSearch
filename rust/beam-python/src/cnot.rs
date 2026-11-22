@@ -152,41 +152,6 @@ fn run_cnot_native_require_consensus(world: Bound<'_, PyAny>, digest: Vec<u8>) -
     Ok(())
 }
 
-fn select_cnot_engine(
-    py: Python<'_>,
-    engine: &Bound<'_, PyAny>,
-    max_depth: &Bound<'_, PyAny>,
-) -> PyResult<&'static str> {
-    let supported = PyTuple::new(py, ["auto", "python", "rust"])?;
-    if !supported
-        .call_method1("__contains__", (engine,))?
-        .is_truthy()?
-    {
-        return Err(PyValueError::new_err(
-            "CNOT engine must be auto, python, or rust",
-        ));
-    }
-    let equals = py.import("operator")?.getattr("eq")?;
-    let requested = if equals.call1((engine, "python"))?.is_truthy()? {
-        beam_runtime::cnot_search::RequestedEngine::Python
-    } else {
-        let depth_fits_u64 = !max_depth.call_method1("__gt__", (u64::MAX,))?.is_truthy()?;
-        let requested = if equals.call1((engine, "auto"))?.is_truthy()? {
-            beam_runtime::cnot_search::RequestedEngine::Auto
-        } else {
-            beam_runtime::cnot_search::RequestedEngine::Rust
-        };
-        return selected_engine_name(
-            beam_runtime::cnot_search::select_engine(requested, depth_fits_u64)
-                .map_err(|_| PyValueError::new_err("CNOT Rust engine depth exceeds u64"))?,
-        );
-    };
-    selected_engine_name(
-        beam_runtime::cnot_search::select_engine(requested, true)
-            .map_err(|_| PyValueError::new_err("CNOT Rust engine depth exceeds u64"))?,
-    )
-}
-
 fn selected_engine_name(
     selected: beam_runtime::cnot_search::SelectedEngine,
 ) -> PyResult<&'static str> {
@@ -205,14 +170,14 @@ fn cnot_dispatch_capability(capabilities: &Bound<'_, PyDict>, key: &str) -> PyRe
 
 #[pyfunction(name = "_select_cnot_dispatch")]
 fn select_cnot_dispatch(
-    py: Python<'_>,
     engine: Bound<'_, PyAny>,
     max_depth: Bound<'_, PyAny>,
     strict_backend: bool,
     capabilities: Bound<'_, PyDict>,
 ) -> PyResult<&'static str> {
-    let _selected_by_request = select_cnot_engine(py, &engine, &max_depth)?;
-    let engine_text: String = engine.extract()?;
+    let engine_text: String = engine
+        .extract()
+        .map_err(|_| PyValueError::new_err("CNOT engine must be auto, python, or rust"))?;
     let requested = match engine_text.as_str() {
         "auto" => beam_runtime::cnot_search::RequestedEngine::Auto,
         "python" => beam_runtime::cnot_search::RequestedEngine::Python,
