@@ -177,7 +177,7 @@ fn typed_cluster_plan_rejects_world_and_frontier_overflow() {
     })
     .is_err());
     assert!(plan_cluster(&PlanRequest {
-        gpus_per_node: vec![1],
+        gpus_per_node: vec![128],
         beam_width: 1,
         shard_count: u32::MAX,
         batch_alignment: u32::MAX,
