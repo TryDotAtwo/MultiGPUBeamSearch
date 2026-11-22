@@ -1,7 +1,9 @@
 """Solve a Cube555 instance through CayleyPy with a native two-GPU blend."""
 
 import argparse
+import hashlib
 import json
+import subprocess
 import tempfile
 from pathlib import Path
 
@@ -38,30 +40,70 @@ def profile_record(result):
     }
 
 
-def prepare_profile_grid(graph, max_result, search, cache_dir):
-    native = max_result.native_metadata
-    effective_max = native["effective_beam_width"]
-    anchors = [1 << exponent for exponent in range(16, effective_max.bit_length())
-               if 1 << exponent < effective_max]
-    # Native cache admission still runs whenever an anchor is used for search.
-    signature = dict(native["profile"]["inference_calibration"]["signature"])
-    signature.pop("beam_width", None)
-    identity = {"signature": signature, "bfs_radius": search["bfs_radius"], "anchors": anchors}
-    index = cache_dir / "profile-grid.json"
+def profile_grid_path(cache_dir, torch, inputs, cutlass_dir, blend, bfs_radius):
+    manifest = Path(__file__).resolve().with_name("SHA256SUMS")
+    runtime = []
+    bundled_cutlass = cutlass_dir == manifest.parent / "assets" / "cutlass"
+    if manifest.is_file():
+        for line in manifest.read_text(encoding="utf-8").splitlines():
+            path = line.partition("  ")[2]
+            if path.startswith("wheels/") or (
+                bundled_cutlass and path.startswith("assets/cutlass/include/")
+            ):
+                runtime.append(line)
+    if not bundled_cutlass or not manifest.is_file():
+        from multigpubeamsearch.build import source_digest
+        runtime.append(source_digest(cutlass_dir, cutlass=True))
+    try:
+        hardware = subprocess.check_output(
+            ["nvidia-smi", "--query-gpu=uuid,driver_version,power.limit,pci.bus_id",
+             "--format=csv,noheader"],
+            text=True, timeout=5, stderr=subprocess.DEVNULL,
+        ).strip()
+    except (OSError, subprocess.SubprocessError):
+        hardware = None
+    devices = [torch.cuda.get_device_properties(i) for i in range(2)]
+    identity = {
+        "schema": 1,
+        "runtime": sorted(runtime),
+        "files": [hashlib.sha256(path.read_bytes()).hexdigest() for path in inputs],
+        "devices": [[str(getattr(device, "uuid", "")), str(device)] for device in devices],
+        "hardware": hardware,
+        "torch": torch.__version__,
+        "cuda": torch.version.cuda,
+        "blend": blend,
+        "bfs_radius": bfs_radius,
+    }
+    key = hashlib.sha256(json.dumps(identity, sort_keys=True).encode()).hexdigest()
+    return cache_dir / "profile-grids" / f"{key}.json"
+
+
+def load_grid(index):
     try:
         saved = json.loads(index.read_text(encoding="utf-8"))
-    except (FileNotFoundError, ValueError):
-        saved = {}
-    if not isinstance(saved, dict) or saved.get("identity") != identity:
-        saved = {"identity": identity, "profiles": {}}
-    profiles = saved["profiles"]
-    reused = set(profiles) == set(map(str, anchors))
-    saved["max"] = profile_record(max_result)
-    saved["grid_reused"] = reused
+        width = saved["max"]["effective_beam"]
+        if type(width) is int and width > 0 and isinstance(saved["profiles"], dict):
+            return saved
+    except (FileNotFoundError, KeyError, TypeError, ValueError):
+        pass
+    return None
 
+
+def prepare_profile_grid(graph, result, search, index, saved):
+    record = profile_record(result)
+    if saved is None:
+        saved = {"max": record, "profiles": {}}
+        save_grid(index, saved)
+    else:
+        saved["profiles"][str(record["effective_beam"])] = record
+    effective_max = saved["max"]["effective_beam"]
+    widths = [1 << exponent for exponent in range(16, effective_max.bit_length())
+              if 1 << exponent < effective_max] + [effective_max]
+    profiles = saved["profiles"]
+    reused = all(str(width) in profiles for width in widths)
+    saved.update(grid_reused=reused, last_search=record)
     # Write each completed point so an interrupted calibration can resume.
-    cache_dir.mkdir(parents=True, exist_ok=True)
-    for width in anchors:
+    for width in widths:
         if str(width) in profiles:
             continue
         print(f"Calibrating beam {width:,}", flush=True)
@@ -74,10 +116,11 @@ def prepare_profile_grid(graph, max_result, search, cache_dir):
         profiles[str(width)] = profile_record(probe)
         save_grid(index, saved)
     save_grid(index, saved)
-    print(f"{'Reused' if reused else 'Prepared'} profile grid ({len(anchors) + 1} widths): {index}")
+    print(f"{'Reused' if reused else 'Prepared'} profile grid ({len(widths)} widths): {index}")
 
 
 def save_grid(index, data):
+    index.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.NamedTemporaryFile(
         mode="w", encoding="utf-8", dir=index.parent, delete=False,
     ) as output:
@@ -162,17 +205,30 @@ def main(argv=None):
         bfs_radius=min(args.bfs_radius, args.max_steps - 1),
         bfs_max_entries=30_000_000,
     )
+    requested_width = args.beam_width
+    index = saved = None
+    if args.beam_width == "max":
+        inputs = (puzzle_file, transformer_dir / "manifest.json", mlp_dir / "manifest.json")
+        index = profile_grid_path(cache_dir, torch, inputs, cutlass_dir, [w, 1 - w],
+                                  search["bfs_radius"])
+        saved = load_grid(index)
+        if saved is not None:
+            requested_width = saved["max"]["effective_beam"]
+            print(f"Using cached maximum beam {requested_width:,}", flush=True)
+
     result = graph.beam_search(
-        **search, beam_width=args.beam_width, max_steps=args.max_steps,
+        **search, beam_width=requested_width, max_steps=args.max_steps,
         solution_mode="collect" if args.collect else "first",
     )
-    saved = save_result(result, graph, start, work_dir / "results",
-                        metadata={"puzzle_id": args.puzzle_id, "blend": [w, 1 - w]})
+    result_path = save_result(result, graph, start, work_dir / "results",
+                              metadata={"puzzle_id": args.puzzle_id, "blend": [w, 1 - w],
+                                        "beam_width": args.beam_width,
+                                        "maximum_reused": saved is not None})
     print(f"Puzzle {args.puzzle_id}  found={result.path_found}  length={result.path_length}")
-    print(f"Result and profile: {saved}")
-    if args.beam_width == "max" and result.native_metadata.get("effective_beam_width"):
+    print(f"Result and profile: {result_path}")
+    if index is not None and result.native_metadata.get("effective_beam_width"):
         # Calibration depends on graph/model, not on the chosen start.
-        prepare_profile_grid(graph, result, dict(search, start_state=starts["1020"]), cache_dir)
+        prepare_profile_grid(graph, result, dict(search, start_state=starts["1020"]), index, saved)
 
 
 if __name__ == "__main__":
