@@ -1,5 +1,5 @@
 //! Coarse Python adapter for the owned packed CNOT input contract.
-use beam_runtime::cnot_search::{self, Backend, Edge, Goal, Options, Round};
+use beam_runtime::cnot_search::{self, Backend, CnotRequest, Edge, Goal, Options, Round};
 use beam_runtime::cnot_selection;
 use pyo3::{
     exceptions::{PyRuntimeError, PyValueError},
@@ -782,6 +782,7 @@ fn run_cnot_native_search<'py>(
     let reference_search = callbacks.get_item(4)?;
     let result_type = callbacks.get_item(5)?;
 
+    let mut request = None;
     let admission = (|| -> PyResult<Bound<'py, PyAny>> {
         let validation_mode = validation.extract::<String>().ok();
         let input_matrix = if matches!(validation_mode.as_deref(), Some("auto") | Some("rust")) {
@@ -797,7 +798,21 @@ fn run_cnot_native_search<'py>(
                 validation.clone(),
             ))?
         };
-        let selected_engine = select_cnot_engine(py, &engine, &max_depth)?;
+        let mode_text: String = mode.extract()?;
+        let validation_text: String = validation.extract()?;
+        let engine_text: String = engine.extract()?;
+        let request_value = CnotRequest::new(
+            input_matrix.getattr("n")?.extract()?,
+            width.extract()?,
+            shortlist.extract()?,
+            max_depth.extract()?,
+            &mode_text,
+            audit.extract()?,
+            &validation_text,
+            &engine_text,
+        )
+        .map_err(|error| PyValueError::new_err(error.to_string()))?;
+        let selected_engine = selected_engine_name(request_value.selected_engine())?;
         let digest = cnot_admission_digest(
             py,
             &input_matrix,
@@ -810,28 +825,27 @@ fn run_cnot_native_search<'py>(
             &validation,
             selected_engine,
         )?;
+        request = Some(request_value);
         let admitted = PyTuple::new(
             py,
-            [
-                input_matrix,
-                digest.into_bound(py).into_any(),
-                PyString::new(py, selected_engine).into_any(),
-            ],
+            [input_matrix, digest.into_bound(py).into_any()],
         )?;
         Ok(admitted.into_any())
     })();
     let admitted =
         crate::cnot_native_checked::checked_v2(py, &world, "validate CNOT input", admission)?;
     let admitted = admitted.downcast::<PyTuple>()?;
-    if admitted.len() != 3 {
+    if admitted.len() != 2 {
         return Err(PyRuntimeError::new_err(
             "CNOT admission returned an invalid adapter result",
         ));
     }
     let input_matrix = admitted.get_item(0)?;
     let digest: Vec<u8> = admitted.get_item(1)?.extract()?;
-    let selected_engine: String = admitted.get_item(2)?.extract()?;
-    let use_rust = selected_engine == "rust";
+    let request = request.ok_or_else(|| {
+        PyRuntimeError::new_err("CNOT request missing after collective admission")
+    })?;
+    let use_rust = request.selected_engine() == beam_runtime::cnot_search::SelectedEngine::Rust;
 
     let admitted_backends = crate::cnot_native_stages::preflight_strict_backend(
         py,
@@ -862,7 +876,7 @@ fn run_cnot_native_search<'py>(
         )?;
     }
 
-    let wires: u32 = input_matrix.getattr("n")?.extract()?;
+    let wires = request.wires;
     let identity_args = PyDict::new(py);
     identity_args.set_item("device", world.getattr("device")?)?;
     let identity_result = identity_builder.call((wires,), Some(&identity_args));
@@ -893,13 +907,10 @@ fn run_cnot_native_search<'py>(
         }
         let rank: u32 = world.getattr("rank")?.extract()?;
         let world_size: u32 = world.getattr("size")?.extract()?;
-        let width: u64 = width.extract()?;
-        let shortlist_limit = py
-            .import("builtins")?
-            .getattr("min")?
-            .call1((shortlist, alphabet))?;
-        let shortlist_value: u32 = shortlist_limit.extract()?;
-        let depth: u64 = max_depth.extract()?;
+        let width = request.width;
+        let shortlist_value = request.shortlist;
+        let depth = request.max_depth;
+        let mode = PyString::new(py, request.mode.as_str()).into_any();
 
         if supports_native {
             let native_root = input_matrix.getattr("root")?;

@@ -3351,3 +3351,10 @@ Main commit `148b2a826a369b7601e904ea409e0cc5301c75c9` also passed the 260-test 
 
 - The installed two-rank lifecycle test supplies inert `--library` and `--manifest` arguments for trained cases so the public CLI reaches the injected synthetic scorer factory. No model or checkpoint files are opened by this CPU fixture.
 - This preserves validation of the real CLI contract while exercising rank-local scorer failure, common phase reporting, and healthy retry under Gloo.
+
+
+## 2026-11-22 - Rust-owned typed CNOT search request
+
+- Added `beam_runtime::cnot_search::CnotRequest` with typed mode, validation policy, requested engine, width, capped shortlist, depth, and wire count.
+- The Rust controller now creates this request inside the existing collective input-admission phase and uses the validated values for native stage execution. Public input packing, scoring, stage order, kernels, and rank collectives are unchanged.
+- Runtime unit tests cover preserved controls, alphabet shortlist capping, selected-engine semantics, and rejection of invalid public options.

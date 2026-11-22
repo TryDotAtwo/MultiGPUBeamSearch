@@ -116,3 +116,6 @@ Keep an active goal until the migration and required verification are complete.
 
 
 - 2026-11-22 follow-up: In the installed two-rank `verify_cnot` lifecycle fixture, pass inert library/manifest argument values for trained cases to satisfy the public CLI before the injected synthetic scorer factory runs. Do not load checkpoint files in this CPU/Gloo test; retain rank-local scorer failure and healthy retry coverage.
+
+
+- 2026-11-22 follow-up: Move CNOT scalar search settings into a Rust-owned `beam_runtime::cnot_search::CnotRequest`, validate them during the existing rank-wide admission phase, and use the typed request for native stage execution without changing CNOT tensors, kernels, scoring, or collective order.

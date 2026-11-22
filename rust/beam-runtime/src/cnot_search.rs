@@ -12,6 +12,111 @@ pub enum RequestedEngine {
     Rust,
 }
 
+/// Search mode passed to the Rust CNOT controller.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CnotMode {
+    Qhat,
+    Proposal,
+}
+
+impl CnotMode {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Qhat => "qhat",
+            Self::Proposal => "proposal",
+        }
+    }
+}
+
+/// Input validation path requested by the compatible Python API.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CnotValidation {
+    Auto,
+    Python,
+    Rust,
+}
+
+/// Errors while converting public scalar options to one typed CNOT request.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+pub enum CnotRequestError {
+    #[error("CNOT engine must be auto, python, or rust")]
+    Engine,
+    #[error("CNOT validation must be auto, python, or rust")]
+    Validation,
+    #[error(transparent)]
+    Controls(#[from] beam_core::cnot::SearchControlsError),
+}
+
+/// A single admitted CNOT search configuration owned by beam-runtime.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CnotRequest {
+    pub wires: u32,
+    pub width: u64,
+    pub shortlist: u32,
+    pub max_depth: u64,
+    pub mode: CnotMode,
+    pub audit: bool,
+    pub validation: CnotValidation,
+    pub requested_engine: RequestedEngine,
+}
+
+impl CnotRequest {
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        wires: u32,
+        width: u64,
+        shortlist: u64,
+        max_depth: u64,
+        mode: &str,
+        audit: bool,
+        validation: &str,
+        engine: &str,
+    ) -> Result<Self, CnotRequestError> {
+        let mode = match mode {
+            "qhat" => CnotMode::Qhat,
+            "proposal" => CnotMode::Proposal,
+            _ => return Err(CnotRequestError::Controls(beam_core::cnot::SearchControlsError::Mode)),
+        };
+        let validation = match validation {
+            "auto" => CnotValidation::Auto,
+            "python" => CnotValidation::Python,
+            "rust" => CnotValidation::Rust,
+            _ => return Err(CnotRequestError::Validation),
+        };
+        let requested_engine = match engine {
+            "auto" => RequestedEngine::Auto,
+            "python" => RequestedEngine::Python,
+            "rust" => RequestedEngine::Rust,
+            _ => return Err(CnotRequestError::Engine),
+        };
+        beam_core::cnot::validate_search_controls(wires, width, shortlist, mode.as_str())?;
+        let alphabet = u64::from(wires) * u64::from(wires.saturating_sub(1));
+        let shortlist = u32::try_from(shortlist.min(alphabet))
+            .map_err(|_| CnotRequestError::Controls(beam_core::cnot::SearchControlsError::WidthOrShortlist))?;
+        Ok(Self {
+            wires,
+            width,
+            shortlist,
+            max_depth,
+            mode,
+            audit,
+            validation,
+            requested_engine,
+        })
+    }
+
+    pub fn alphabet(self) -> u32 {
+        self.wires * (self.wires - 1)
+    }
+
+    pub fn selected_engine(self) -> SelectedEngine {
+        match self.requested_engine {
+            RequestedEngine::Python => SelectedEngine::Python,
+            RequestedEngine::Auto | RequestedEngine::Rust => SelectedEngine::Rust,
+        }
+    }
+}
+
 /// Controller selected for one admitted CNOT request.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SelectedEngine {

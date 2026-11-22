@@ -3607,3 +3607,10 @@ Rust event producers and the result report use the observed UUID and compare
 it with the expected rank mapping. Host metadata is gathered over the Gloo
 control group. CPU fake-driver checks can validate mapping and rejection
 logic, but only physical runs confirm the selected 3060 devices.
+
+
+## Rust-owned typed CNOT search request, 2026-11-22
+
+The native Rust CNOT controller now creates one `beam_runtime::cnot_search::CnotRequest` during the existing collective admission phase. It owns the wire count, global width, effective shortlist, depth, mode, validation policy and requested engine as typed values. Shortlists are capped to the existing directed-gate alphabet, and the same validated values are used for native stage execution.
+
+Python still supplies the compatible tensor/model adapter and initialized distributed world. The request changes no row-XOR semantics, scoring, precision, kernel, stage order or collective. Hosted Rust/PyO3 and installed-wheel checks are the acceptance boundary for this control transfer; CUDA/NCCL hardware remains separately unverified.
