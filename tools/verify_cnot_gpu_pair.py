@@ -370,8 +370,12 @@ def _panel_json_digest(value):
 
 def _validate_panel_row(row, expected, root_pin, label):
     require(isinstance(row, dict), f"{label}: panel row is malformed")
-    for key in ("panel_index", "case_id", "dimension", "alphabet_id", "orientation"):
+    for key in ("panel_index", "case_id", "dimension", "alphabet_id"):
         require(row.get(key) == expected.get(key), f"{label}: {key} differs from the locked panel")
+    require(
+        row.get("orientation") == root_pin.get("orientation"),
+        f"{label}: orientation differs from the sealed root",
+    )
     require(row.get("terminal_reason") == row.get("status"),
             f"{label}: terminal reason differs from row status")
     require(row.get("status") in {"solved", "depth_limit", "resource_limit", "exhausted"},
