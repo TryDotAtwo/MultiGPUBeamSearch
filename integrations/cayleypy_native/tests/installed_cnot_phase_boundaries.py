@@ -184,7 +184,7 @@ def trace_boundary_worker(rank, rendezvous, output_dir, fail_rank):
 
 
 
-def ranked_native_entry_worker(rank, rendezvous, output_dir):
+def ranked_native_entry_worker(rank, rendezvous, output_dir, fail_rank):
     torch.set_num_threads(1)
     dist.init_process_group(
         "gloo",
@@ -197,7 +197,7 @@ def ranked_native_entry_worker(rank, rendezvous, output_dir):
         root = pack_rows(replay_cnot(3, (0, 1)))
         identity = pack_rows(replay_cnot(3, ()))
         input_matrix = RUNTIME.prepare_cnot_input(root, 6, 6, 3, "qhat")
-        admitted_rank = 1 if rank == 0 else rank
+        admitted_rank = (rank + 1) % 2 if rank == fail_rank else rank
         with World("cpu") as world:
             try:
                 RUNTIME.run_cnot_native(
@@ -318,38 +318,39 @@ def main():
             ):
                 raise AssertionError(f"trace boundary did not recover: {reports!r}")
 
-        binding_dir = root / "ranked-native-entry"
-        binding_dir.mkdir()
-        rendezvous = (binding_dir / "rendezvous").resolve().as_uri()
-        mp.spawn(
-            ranked_native_entry_worker,
-            args=(rendezvous, str(binding_dir)),
-            nprocs=2,
-            join=True,
-        )
-        binding_reports = [
-            json.loads((binding_dir / f"rank-{rank}.json").read_text())
-            for rank in range(2)
-        ]
-        if binding_reports[0]["collective_error"] != binding_reports[1]["collective_error"]:
-            raise AssertionError(
-                f"ranks disagreed on admitted CNOT rank topology: {binding_reports!r}"
+        for fail_rank in (0, 1):
+            binding_dir = root / f"ranked-native-entry-fail-{fail_rank}"
+            binding_dir.mkdir()
+            rendezvous = (binding_dir / "rendezvous").resolve().as_uri()
+            mp.spawn(
+                ranked_native_entry_worker,
+                args=(rendezvous, str(binding_dir), fail_rank),
+                nprocs=2,
+                join=True,
             )
-        expected = (
-            "bind admitted CNOT rank topology failed: rank 0: RuntimeError: "
-            "admitted CNOT rank topology"
-        )
-        if expected not in binding_reports[0]["collective_error"]:
-            raise AssertionError(
-                f"wrong admitted topology failure phase: {binding_reports!r}"
+            binding_reports = [
+                json.loads((binding_dir / f"rank-{rank}.json").read_text())
+                for rank in range(2)
+            ]
+            if binding_reports[0]["collective_error"] != binding_reports[1]["collective_error"]:
+                raise AssertionError(
+                    f"ranks disagreed on admitted CNOT rank topology: {binding_reports!r}"
+                )
+            expected = (
+                f"bind admitted CNOT rank topology failed: rank {fail_rank}: RuntimeError: "
+                "admitted CNOT rank topology"
             )
-        if any(
-            row["recovery"] != "passed"
-            or row["status"] != "solved"
-            or replay_cnot(3, tuple(row["gates"])) != replay_cnot(3, (0, 1))
-            for row in binding_reports
-        ):
-            raise AssertionError(f"rank topology vote did not recover: {binding_reports!r}")
+            if expected not in binding_reports[0]["collective_error"]:
+                raise AssertionError(
+                    f"wrong admitted topology failure phase: {binding_reports!r}"
+                )
+            if any(
+                row["recovery"] != "passed"
+                or row["status"] != "solved"
+                or replay_cnot(3, tuple(row["gates"])) != replay_cnot(3, (0, 1))
+                for row in binding_reports
+            ):
+                raise AssertionError(f"rank topology vote did not recover: {binding_reports!r}")
 
     print("CNOT_GLOO_REAL_PHASE_AND_TRACE_BOUNDARIES_OK")
 

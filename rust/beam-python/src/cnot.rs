@@ -964,6 +964,8 @@ fn run_cnot_native_search<'py>(
                     alphabet,
                     depth,
                     admission,
+                    request.rank(),
+                    request.world(),
                 )),
                 None => native_stages.call1((
                     world,
@@ -977,6 +979,9 @@ fn run_cnot_native_search<'py>(
                     shortlist_value,
                     alphabet,
                     depth,
+                    py.None(),
+                    request.rank(),
+                    request.world(),
                 )),
             };
         }
