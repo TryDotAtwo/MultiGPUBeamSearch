@@ -1,3 +1,9 @@
+## 2026-11-23 - Exercise the public permutation entry through Rust
+
+- Added an installed-wheel CPU fixture for package-level `multigpubeamsearch.beam_search` at one and two Rust-supervised ranks using the compiled PyO3 `SearchSession`.
+- Verified public dispatch selects the Rust resident owner, returns the expected rank metadata and unique worker PIDs, and produces a path accepted by independent graph replay. The fixture does not emulate CUDA kernels or NCCL; search behavior and numeric policy are unchanged.
+- Installed-wheel validation passed on source SHA `d0a6fda1d5d6b685a98bb90b6098980a033cc3c7` in [run 45155692620](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45155692620), step “Verify installed Rust session identity and reuse”; Rust public-owner CPU checks passed in [run 45155692720](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45155692720). Physical permutation CUDA/NCCL remains pending under the existing pause.
+
 ## 2026-11-23 - Route one-GPU permutation launches through Rust
 
 - Routed the public nonresident one-shot search through the same Rust rank supervisor used by multi-GPU runs. Rust appends the existing rank arguments and environment, owns timeout/cancellation and process-group cleanup, and preserves the established worker-log merge. Persistent sessions remain on their existing resident protocol.
