@@ -200,4 +200,4 @@ The targeted installed-wheel session-identity step passed on code SHA `9148293de
 ## 2026-11-23 - Verify installed CayleyPy graph method dispatch through Rust
 
 - Added an installed-wheel CPU case for `enable_native()` followed by the public `CayleyGraph.beam_search()` method. It uses the compiled Rust `SearchSession`, Rust-supervised synthetic workers at world sizes one and two, and independent path replay.
-- The focused installed-wheel job selects this case by name. Hosted verification is pending; CUDA/NCCL is not exercised.
+- The first installed-wheel attempt exposed a fixture-only worker condition mismatch: the older reuse case lost its solved terminal, while the added graph method had a different generated root. Restored the older fixture and made the graph-method worker success explicit in its launch environment. The focused test and full installed-wheel rerun are pending; CUDA/NCCL is not exercised.

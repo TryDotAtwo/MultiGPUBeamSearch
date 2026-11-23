@@ -875,7 +875,7 @@ while not (session / "stop").exists():
     run_dir = Path(request["run_dir"])
     beam = os.environ["FIXTURE_BEAM"]
     text = f"GLOBAL_BEAM_WIDTH_EFFECTIVE={beam}\n"
-    if rank == 0 and os.environ.get("FIXTURE_SOLVED") == "1":
+    if rank == 0 and start[:2] == [1, 0]:
         text += (
             "puzzle_solved=1 puzzle_id=0 seconds=0.1 "
             "solution_length=1 solution=m0\n"
@@ -1014,7 +1014,7 @@ while not (session / "stop").exists():
 
 @pytest.mark.skipif(os.name != "posix", reason="the fixture launches a shebang worker")
 @pytest.mark.parametrize("world", [1, 2])
-def test_installed_public_beam_search_selects_compiled_rust_owner(tmp_path, monkeypatch, world):
+def test_installed_public_beam_search_and_cayleypy_method_select_compiled_rust_owner(tmp_path, monkeypatch, world):
     """Exercise package-level beam_search through the installed Rust session owner."""
     import sys
 
@@ -1112,7 +1112,7 @@ while not (session / "stop").exists():
     run_dir = Path(request["run_dir"])
     beam = os.environ["FIXTURE_BEAM"]
     text = f"GLOBAL_BEAM_WIDTH_EFFECTIVE={beam}\n"
-    if rank == 0 and start[:2] == [1, 0]:
+    if rank == 0 and os.environ.get("FIXTURE_SOLVED") == "1":
         text += (
             "puzzle_solved=1 puzzle_id=0 seconds=0.1 "
             "solution_length=1 solution=m0\n"
