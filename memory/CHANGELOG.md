@@ -149,4 +149,4 @@
 
 - Added a versioned Rust phase plan for the existing permutation inference calibration, capacity discovery, maximum-frontier refinement, downstream calibration and working-capacity selection branches.
 - The public runner consumes the Rust plan while preserving stage order, model/backend predicates, delayed capability errors and the existing Python implementations of each stage. Older wheels use the matching compatibility plan; errors from the installed Rust resolver fail explicitly.
-- Added Rust plan contract cases and an installed-wheel check through the runner's phase-plan helper. Hosted checks are pending for the introducing commit; no physical CUDA/NCCL run was performed.
+- Added Rust plan contract cases and an installed-wheel check through the runner's phase-plan helper. Rust CPU tests passed in [run 45135569729](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45135569729); the installed-wheel policy step passed on source SHA `258cd9f3428edd2fb89212c92290ac59a520527a` in [run 45135335424](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45135335424). No physical CUDA/NCCL run was performed.

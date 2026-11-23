@@ -1,13 +1,14 @@
 # Rust + CUDA/C++ migration acceptance status
 
 Source branch: `codex/beam-3060-preflight-20261121`
-Latest tested code SHA: `fd42ebca8d7486c92a7d3a26c98a7ea591cc6f8f`
+Latest installed-wheel tested code SHA: `258cd9f3428edd2fb89212c92290ac59a520527a`
+Latest Rust phase-plan test commit: `cfaf3a6970b6317467e341c08b0f60375b5aedee` (workflow-only change after the installed-wheel SHA)
 Base main SHA: `e6c41b6dc6bb3a839f6338f3cfe9eaadf8608d5a`
 
 | Gate | Status | Evidence |
 |---|---|---|
-| Permutation installed wheel and CPU acceptance | PASS | Installed wheel passed on `fd42ebc` in [run 45131297173](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45131297173), including the public Rust local-rank launcher: two synthetic ranks, argv/environment/log contract, and sibling cleanup after failure. Saturated permutation CPU acceptance also passed in the installed workflow. |
-| Shared CPU/Gloo checks | PASS | The installed-wheel run [45062575238](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45062575238) compiled the current Rust extension and completed its installed runtime/Gloo checks. This remains CPU evidence only. |
+| Permutation installed wheel and CPU acceptance | PASS | Installed wheel passed on `258cd9f` in [run 45135335424](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45135335424), including the installed Rust phase plan and saturated permutation CPU acceptance. The public Rust local-rank launcher also passed on `fd42ebc` in [run 45131297173](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45131297173). |
+| Shared CPU/Gloo checks | PASS | Rust CPU phase-plan checks passed on `cfaf3a6` in [run 45135569729](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45135569729), including 2/2 ordered-plan contract tests. The installed-wheel run [45135335424](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45135335424) also passed the real-extension consumer check. This remains CPU evidence only. |
 | Permutation CUDA/NCCL on physical 1/2 GPUs | PENDING | No physical permutation run was performed. Device participation, 1/2-GPU parity, and hardware replay remain unverified. |
 | CNOT implementation and compatibility | PRESERVED; final acceptance DEFERRED | Existing CNOT code and compatibility remain in place. Further CNOT development, checkpoint preparation, and final acceptance are deferred at the user's request; shared CPU workflow success does not establish CNOT GPU acceptance. |
 | Full Rust ownership migration | IN PROGRESS | Rust now also supervises single-host local ranks through the public launcher. Python still constructs the graph contract, exports/prepares framework models and runtime, and adapts public results; older wheels retain the Python launcher. PR #10 remains draft. |
@@ -196,4 +197,4 @@ Tested code SHA: `0ca418cbbc2757508dc96ff986af75b888cba5e2`.
 ## Rust-owned permutation calibration and capacity phase plan — 2026-11-23
 
 - The public permutation runner now consumes a versioned `beam-runtime` plan for inference calibration, fixed-width capacity discovery, maximum-frontier refinement, downstream calibration and working-capacity selection. Existing stage code and ordering are retained.
-- Rust CPU and installed-wheel validation are pending for the introducing commit. Physical permutation CUDA/NCCL on one and two GPUs remains pending. CNOT development, checkpoint preparation and final acceptance remain deferred.
+- Rust CPU phase-plan tests passed (2/2) in [run 45135569729](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45135569729), artifact [14799169266](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45135569729/artifacts/14799169266). Installed PEP 517 wheel and the real Rust phase-plan consumer passed on source SHA `258cd9f3428edd2fb89212c92290ac59a520527a` in [run 45135335424](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45135335424); the Rust phase-plan marker is in its hosted job log. Physical permutation CUDA/NCCL on one and two GPUs remains pending. CNOT development, checkpoint preparation and final acceptance remain deferred.
