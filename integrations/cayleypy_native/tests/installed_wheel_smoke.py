@@ -510,6 +510,105 @@ with tempfile.TemporaryDirectory(prefix="beam-shared-profile-") as temporary:
         raise AssertionError("the Python adapter bypassed the Rust digest rejection")
 print("INSTALLED_RUST_SHARED_PROFILE_LOOKUP_PASS", flush=True)
 
+# Exercise one reusable, two-rank planning session through the installed Rust owner.
+from multigpubeamsearch import plan_session as plan_session_module
+from multigpubeamsearch import rust_control as plan_session_rust_control
+from multigpubeamsearch.plan_session import NativePlanSession
+from unittest.mock import patch as _patch
+import time as _time
+
+with tempfile.TemporaryDirectory(prefix="beam-plan-session-") as temporary:
+    plan_root = Path(temporary)
+    fake_planner = plan_root / "fake-planner"
+    fake_planner.write_text(
+        """#!/usr/bin/env python3
+import json
+import sys
+world = int(sys.argv[-2])
+rank = int(sys.argv[-1])
+print(json.dumps({"ready": True, "rank": rank, "component_protocol": "none"}), flush=True)
+for line in sys.stdin:
+    request = json.loads(line)
+    environment = request["environment"]
+    plan = {
+        "GLOBAL_BEAM_WIDTH_EFFECTIVE": request["beam"],
+        "BEAM_WIDTH_ALIGNMENT": 1,
+        "SHARD_COUNT": int(environment["BEAM_SHARD_COUNT"]),
+        "B_MICRO": int(environment["BEAM_B_MICRO"]),
+        "WORLD_SIZE": world,
+        "STREAM4_BATCH_ALIGNMENT": 1024,
+        "LOCAL_RANK": rank,
+        "estimated_required_device_bytes": 1,
+        "gpu_budget_bytes": 2,
+    }
+    print(json.dumps({"admitted": True, "plan": plan}), flush=True)
+""",
+        encoding="utf-8",
+    )
+    fake_planner.chmod(0o755)
+    planner_environment = {
+        "PATH": os.environ["PATH"],
+        "BEAM_B_MICRO": "64",
+        "BEAM_ENSEMBLE_INFERENCE_MICRO": "64",
+    }
+    planner_overrides = {
+        "BEAM_B_MICRO": "64",
+        "BEAM_SHARD_COUNT": "1",
+        "BEAM_STREAM3_RING_SLOTS": "2",
+        "BEAM_STREAM4_BATCH_CANDIDATES": "1024",
+        "BEAM_STREAM4_ACTIVE_SORT_SLOTS": "1",
+    }
+
+    with _patch.object(
+        plan_session_module,
+        "InferenceSession",
+        side_effect=AssertionError("installed planner session used Python-owned rank processes"),
+    ):
+        rust_owner = NativePlanSession(
+            fake_planner,
+            planner_environment,
+            2,
+            plan_root / "rust-owner",
+            deadline=_time.monotonic() + 30.0,
+        )
+        try:
+            rust_pids = tuple(rust_owner.pids)
+            first_plans = rust_owner.admit(128, planner_overrides)
+            second_plans = rust_owner.admit(256, planner_overrides)
+            if len(rust_pids) != 2 or len(set(rust_pids)) != 2:
+                raise AssertionError(f"Rust planner did not own two distinct ranks: {rust_pids}")
+            if tuple(rust_owner.pids) != rust_pids:
+                raise AssertionError("a repeated admission replaced the Rust-owned rank session")
+            if [row["LOCAL_RANK"] for row in first_plans] != [0, 1]:
+                raise AssertionError(f"Rust planner lost rank identity: {first_plans}")
+            if [row["GLOBAL_BEAM_WIDTH_EFFECTIVE"] for row in first_plans] != [128, 128]:
+                raise AssertionError(f"Rust planner changed the first requested width: {first_plans}")
+            if [row["GLOBAL_BEAM_WIDTH_EFFECTIVE"] for row in second_plans] != [256, 256]:
+                raise AssertionError(f"Rust planner changed the repeated requested width: {second_plans}")
+        finally:
+            rust_owner.close()
+
+    class OlderPlanningRuntime:
+        ABI_VERSION = 1
+        InferenceCalibration = object
+
+    with _patch.object(plan_session_rust_control, "extension", return_value=OlderPlanningRuntime()):
+        legacy_owner = NativePlanSession(
+            fake_planner,
+            planner_environment,
+            2,
+            plan_root / "legacy-owner",
+            deadline=_time.monotonic() + 30.0,
+        )
+        try:
+            legacy_plans = legacy_owner.admit(128, planner_overrides)
+            if legacy_plans != first_plans:
+                raise AssertionError("older-wheel planning fallback changed the rank plans")
+        finally:
+            legacy_owner.close()
+
+print("INSTALLED_RUST_PLAN_SESSION_OWNER_PASS", flush=True)
+
 summary = {
     "distribution_version": importlib.metadata.version("multigpubeamsearch"),
     "python": sys.version.split()[0],
