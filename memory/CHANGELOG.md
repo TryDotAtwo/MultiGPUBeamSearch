@@ -1,7 +1,7 @@
 ## 2026-11-23 - Add public permutation session invalidation coverage
 
 - Added an installed-wheel CPU fixture through `NativeSession.beam_search` for identical-request reuse, model-artifact invalidation, a separate geometry-only change, and independent replay at one and two synthetic ranks.
-- The first workflow run after this addition did **not** select the new test name. Installed-wheel run [45158587559](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45158587559) is not pass evidence for this fixture. Added the test name to the focused pytest selector on source SHA `c70ec46877bc8d5fcd088dc7ba0903fd61bfcbce`; the corrected installed-wheel validation is pending. No CUDA/NCCL behavior is claimed.
+- The first workflow run after this addition did **not** select the new test name; that run is not pass evidence. Added its name to the focused pytest selector. The test step and full installed-wheel job passed on source SHA `c70ec46877bc8d5fcd088dc7ba0903fd61bfcbce` in [run 45159435499](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45159435499). No CUDA/NCCL behavior is claimed.
 
 
 ## 2026-11-23 - Verify public permutation NativeSession reuse through Rust
