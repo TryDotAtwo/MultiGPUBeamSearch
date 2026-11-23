@@ -1257,9 +1257,9 @@ while not (session / "stop").exists():
         assert second_session_persistent["request_count"] == 2
         assert second_session_result.path == [0] and session_contract.replay(second_session_result.path)
 
+        changed_model_predictor = SimpleNamespace(artifact_hash=alternate_model.artifact_hash)
         changed_model_result = session_search(
-            session_graph, [1, 0, 2, 3],
-            current_predictor=SimpleNamespace(artifact_hash=alternate_model.artifact_hash),
+            session_graph, [1, 0, 2, 3], current_predictor=changed_model_predictor,
         )
         changed_model_persistent = changed_model_result.native_metadata["persistent_session"]
         changed_model_pids = tuple(changed_model_persistent["worker_pids"])
@@ -1280,7 +1280,9 @@ while not (session / "stop").exists():
         from multigpubeamsearch.contracts import GraphContract
 
         wider_contract = GraphContract.from_graph(wider_graph, [1, 0, 2, 3, 4])
-        changed_geometry_result = session_search(wider_graph, [1, 0, 2, 3, 4])
+        changed_geometry_result = session_search(
+            wider_graph, [1, 0, 2, 3, 4], current_predictor=changed_model_predictor,
+        )
         changed_persistent = changed_geometry_result.native_metadata["persistent_session"]
         changed_pids = tuple(changed_persistent["worker_pids"])
         assert len(changed_pids) == world and changed_pids != first_session_pids
