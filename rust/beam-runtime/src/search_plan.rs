@@ -234,7 +234,6 @@ mod tests {
             vec![CapacityDiscovery, Execute]
         );
     }
-    
     #[test]
     fn execution_plan_preserves_exact_width_and_maximum_calibration_width() {
         let request = |requested_beam_width, autotune| PermutationSearchExecutionPlanRequest {
@@ -244,16 +243,12 @@ mod tests {
             requested_beam_width,
             discover_capacity: false,
         };
-        let exact =
-            resolve_execution_plan(request(RequestedBeamWidth::Exact(37), false)).unwrap();
+        let exact = resolve_execution_plan(request(RequestedBeamWidth::Exact(37), false)).unwrap();
         assert_eq!(exact.calibration_beam_width, 37);
         assert_eq!(exact.phases, vec![PermutationSearchPhase::Execute]);
 
-        let maximum = resolve_execution_plan(request(
-            RequestedBeamWidth::Token("max".into()),
-            true,
-        ))
-        .unwrap();
+        let maximum =
+            resolve_execution_plan(request(RequestedBeamWidth::Token("max".into()), true)).unwrap();
         assert_eq!(
             maximum.calibration_beam_width,
             MAXIMUM_CALIBRATION_BEAM_WIDTH
@@ -265,16 +260,13 @@ mod tests {
                 PermutationSearchPhase::Execute
             ]
         );
-        assert!(resolve_execution_plan(request(
-            RequestedBeamWidth::Token("maximum".into()),
-            true
-        ))
-        .is_err());
-        assert!(resolve_execution_plan(request(
-            RequestedBeamWidth::Token("max".into()),
-            false
-        ))
-        .is_err());
+        assert!(
+            resolve_execution_plan(request(RequestedBeamWidth::Token("maximum".into()), true))
+                .is_err()
+        );
+        assert!(
+            resolve_execution_plan(request(RequestedBeamWidth::Token("max".into()), false))
+                .is_err()
+        );
     }
-
 }
