@@ -1,3 +1,9 @@
+## 2026-11-23 - Verify public permutation NativeSession reuse through Rust
+
+- Extended the installed-wheel CPU fixture through the public `NativeSession.beam_search` method at one and two synthetic ranks. Repeated identical requests retain Rust-supervised worker PIDs and advance the request count; changing graph geometry creates a fresh worker group.
+- Checked both results with independent graph replay and confirmed that the compiled PyO3 `SearchSession` owns the rank group. CUDA kernels and NCCL were not exercised.
+- The targeted session-identity step and full installed-wheel job passed on source SHA `9c1280155252850e4913b548ac21ba7dec1ede84` in [run 45157050381](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45157050381); Rust public-owner CPU checks passed in [run 45157049220](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45157049220). Physical CUDA/NCCL remains pending under the current pause.
+
 ## 2026-11-23 - Exercise the public permutation entry through Rust
 
 - Added an installed-wheel CPU fixture for package-level `multigpubeamsearch.beam_search` at one and two Rust-supervised ranks using the compiled PyO3 `SearchSession`.
