@@ -196,3 +196,8 @@
 - Verified stable rank PIDs and increasing request count for a repeated identity, and fresh workers after inference-plan, model-artifact, and graph-geometry changes. Every returned path is replayed against the fixture graph.
 - The fixture does not emulate CUDA kernels or NCCL; physical one- and two-GPU acceptance remains pending under the active pause.
 The targeted installed-wheel session-identity step passed on code SHA `9148293de77c4e854193221633404dfbf44f0748` in [run 45151845921](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45151845921) (step 13). The separate public-owner CPU job passed on the same SHA in [run 45151845760](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45151845760). The session test uses synthetic CPU workers; no CUDA/NCCL behavior is claimed.
+
+## 2026-11-23 - Verify installed CayleyPy graph method dispatch through Rust
+
+- Added an installed-wheel CPU case for `enable_native()` followed by the public `CayleyGraph.beam_search()` method. It uses the compiled Rust `SearchSession`, Rust-supervised synthetic workers at world sizes one and two, and independent path replay.
+- The focused installed-wheel job selects this case by name. Hosted verification is pending; CUDA/NCCL is not exercised.

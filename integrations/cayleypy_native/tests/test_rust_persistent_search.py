@@ -875,7 +875,7 @@ while not (session / "stop").exists():
     run_dir = Path(request["run_dir"])
     beam = os.environ["FIXTURE_BEAM"]
     text = f"GLOBAL_BEAM_WIDTH_EFFECTIVE={beam}\n"
-    if rank == 0 and start[:2] == [1, 0]:
+    if rank == 0 and os.environ.get("FIXTURE_SOLVED") == "1":
         text += (
             "puzzle_solved=1 puzzle_id=0 seconds=0.1 "
             "solution_length=1 solution=m0\n"
@@ -1183,7 +1183,7 @@ while not (session / "stop").exists():
             [str(runtime.runner), "0", str(max_steps), str(beam_width)],
             contract=contract,
             run_dir=run_dir,
-            env={"FIXTURE_BEAM": str(beam_width)},
+            env={"FIXTURE_BEAM": str(beam_width), "FIXTURE_SOLVED": "1"},
             world=len(devices),
             timeout=current_options.timeout_seconds,
             runtime=runtime,
@@ -1222,6 +1222,44 @@ while not (session / "stop").exists():
     assert len(launched_owners) == 1 and launched_owners[0].closed
     assert len(native_workers) == 1
     assert isinstance(native_workers[0]._owner, extension.SearchSession)
+
+    # Exercise the opt-in CayleyPy method used by notebooks and Kaggle.
+    from cayleypy import CayleyGraph, PermutationGroups
+
+    graph_via_method = CayleyGraph(PermutationGroups.lrx(4), device="cpu", random_seed=42)
+    center = list(range(4))
+    base_contract = GraphContract.from_graph(graph_via_method, center)
+    method_start = [None] * base_contract.state_len
+    for output_index, source_index in enumerate(base_contract.generators[0]):
+        method_start[source_index] = base_contract.center[output_index]
+    method_contract = GraphContract.from_graph(graph_via_method, method_start)
+    assert method_contract.replay([0])
+
+    dispatch_module.disable_native()
+    try:
+        dispatch_module.enable_native(options, default_backend="native")
+        graph_method_result = graph_via_method.beam_search(
+            predictor=default_predictor,
+            start_state=method_start,
+            beam_width=64,
+            max_steps=1,
+            return_path=True,
+        )
+    finally:
+        dispatch_module.disable_native()
+
+    assert graph_method_result.path == [0]
+    assert method_contract.replay(graph_method_result.path)
+    assert graph_method_result.native_metadata["backend"] == "native"
+    assert graph_method_result.native_metadata["devices"] == list(range(world))
+    method_session = graph_method_result.native_metadata["persistent_session"]
+    method_pids = method_session["worker_pids"]
+    assert len(method_pids) == world and len(set(method_pids)) == world
+    assert method_session["reused"] is False and method_session["request_count"] == 1
+    assert len(native_calls) == 2 and native_calls[1] == method_contract.graph_hash
+    assert len(launched_owners) == 2 and launched_owners[1].closed
+    assert len(native_workers) == 2
+    assert isinstance(native_workers[1]._owner, extension.SearchSession)
 
     # The notebook-facing session method also reaches the package dispatch,
     # reuses workers for an identical request, and replaces them on geometry change.
@@ -1293,6 +1331,6 @@ while not (session / "stop").exists():
     finally:
         session.close()
     assert session.closed
-    assert len(launched_owners) == 2
-    assert len(native_workers) == 2
-    assert isinstance(native_workers[1]._owner, extension.SearchSession)
+    assert len(launched_owners) == 3
+    assert len(native_workers) == 3
+    assert isinstance(native_workers[2]._owner, extension.SearchSession)

@@ -3940,3 +3940,7 @@ The targeted test and full installed-wheel job passed on source SHA `9c128015525
 An installed-wheel fixture was added for the user-facing `NativeSession.beam_search` API. It checks reuse for identical requests, model-artifact invalidation, geometry-only invalidation, and independent path replay at world sizes one and two with the compiled Rust `SearchSession` and synthetic workers.
 
 The first run after adding the fixture did **not** execute it: the focused `pytest -k` expression omitted the new test function. The workflow selector now includes the fixture by name. On source SHA `c70ec46877bc8d5fcd088dc7ba0903fd61bfcbce`, the installed-wheel session step selected the test and passed, and the full installed-wheel job passed in [run 45159435499](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45159435499). The fixture does not exercise CUDA kernels or NCCL.
+
+#### Installed CayleyGraph method dispatch through Rust — 2026-11-23
+
+The installed-wheel CPU fixture now covers the opt-in compatibility method used by CayleyPy consumers: `enable_native()` followed by `CayleyGraph.beam_search()`. It exercises the real Rust `SearchSession` with one and two Rust-supervised synthetic workers, validates the returned path through independent graph replay, and records the compiled owner. Hosted verification is pending. This path check does not run CUDA kernels or NCCL.
