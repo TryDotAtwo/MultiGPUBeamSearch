@@ -1,3 +1,9 @@
+## 2026-11-23 - Route one-GPU permutation launches through Rust
+
+- Routed the public nonresident one-shot search through the same Rust rank supervisor used by multi-GPU runs. Rust appends the existing rank arguments and environment, owns timeout/cancellation and process-group cleanup, and preserves the established worker-log merge. Persistent sessions remain on their existing resident protocol.
+- Added an explicit minimum-world-size capability. Matching wheels use Rust at world size 1; version-1 wheels without that capability keep the Python one-GPU compatibility path.
+- Installed PEP 517 wheel, installed Rust supervisor, one-rank argv/environment/log contract, old-wheel fallback, and saturated permutation CPU acceptance passed on source SHA 86afff92cd705afb50cb011c4684151f88c042e2: [run 45145388328](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45145388328). Shared CPU/Gloo passed on the same SHA: [run 45145388385](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45145388385). Physical CUDA/NCCL remains unverified.
+
 ## 2026-11-23 - Supervise local permutation ranks from Rust
 
 - Routed the public `local_launcher.run_local_ranks` through the installed Rust runtime. Rust owns local process startup, the existing rank arguments/environment and log paths, timeout/cancellation polling, and process-group cleanup; older wheels retain the Python compatibility supervisor.

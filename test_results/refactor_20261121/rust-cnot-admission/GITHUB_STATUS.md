@@ -1,17 +1,17 @@
 # Rust + CUDA/C++ migration acceptance status
 
 Source branch: `codex/beam-3060-preflight-20261121`
-Latest installed-wheel tested code SHA: `7304818d0ab7860869053ef01dda5af71ad44ed1` (external smoke step passed; combined workflow still running)
+Latest installed-wheel tested code SHA: `86afff92cd705afb50cb011c4684151f88c042e2` (complete job passed in [run 45145388328](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45145388328))
 Latest Rust execution-plan CPU tested code SHA: `565694c013863238bb9ce38e403e35dfd1231221`
 Base main SHA: `e6c41b6dc6bb3a839f6338f3cfe9eaadf8608d5a`
 
 | Gate | Status | Evidence |
 |---|---|---|
-| Installed permutation rank-planner smoke | PASS (targeted step; combined workflow pending) | External installed-wheel smoke passed on `7304818d` in [run 45142440137](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45142440137), including two synthetic ranks, repeated admission on unchanged Rust-owned PIDs, and equality with the legacy fallback. Earlier saturated permutation CPU acceptance passed on `565694c` in [run 45139332961](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45139332961); it is separate evidence. |
-| Shared CPU/Gloo checks | PASS | Rust CPU checks passed on source SHA `565694c` in [run 45139333020](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45139333020), including 3/3 search-plan contract tests; artifact [14800709775](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45139333020/artifacts/14800709775). The installed-wheel run also passed the real Rust execution-plan consumer. This remains CPU/Gloo evidence only. |
+| Installed permutation launch/session smoke | PASS | Installed PEP 517 wheel on `86afff92` in [run 45145388328](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45145388328): one-rank Rust supervisor, exact argv/environment and worker-log collection, version-1 Python fallback, reusable two-rank Rust planning session, and saturated permutation CPU acceptance. |
+| Shared CPU/Gloo checks | PASS | The Rust/CNOT CPU suite passed on the same one-rank supervisor SHA in [run 45145388385](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45145388385); the installed wheel also passed its hosted two-rank Gloo checks. These are CPU/Gloo results only. |
 | Permutation CUDA/NCCL on physical 1/2 GPUs | PENDING | No physical permutation run was performed. Device participation, 1/2-GPU parity, and hardware replay remain unverified. |
 | CNOT implementation and compatibility | PRESERVED; final acceptance DEFERRED | Existing CNOT code and compatibility remain in place. Further CNOT development, checkpoint preparation, and final acceptance are deferred at the user's request; shared CPU workflow success does not establish CNOT GPU acceptance. |
-| Full Rust ownership migration | IN PROGRESS | Rust now also supervises single-host local ranks through the public launcher. Python still constructs the graph contract, exports/prepares framework models and runtime, and adapts public results; older wheels retain the Python launcher. PR #10 remains draft. |
+| Full Rust ownership migration | IN PROGRESS | Rust supervises the public one-shot permutation launcher at both world size 1 and multi-rank local runs; the persistent session protocol is unchanged. Python still constructs the graph contract, exports/prepares framework models and runtime, and adapts public results; older wheels retain the Python launcher. PR #10 remains draft. |
 
 Installed-wheel and hosted CPU results do not establish physical CUDA/NCCL execution. The permutation physical gate remains required. CNOT-specific continuation and final acceptance are deferred.
 
