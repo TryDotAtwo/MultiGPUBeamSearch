@@ -1209,3 +1209,63 @@ while not (session / "stop").exists():
     assert len(launched_owners) == 1 and launched_owners[0].closed
     assert len(native_workers) == 1
     assert isinstance(native_workers[0]._owner, extension.SearchSession)
+
+    # The notebook-facing session method also reaches the package dispatch,
+    # reuses workers for an identical request, and replaces them on geometry change.
+    session = RecordingNativeSession(engine="rust")
+    session_graph = graph
+    session_contract = contract
+
+    def session_search(current_graph, start_state):
+        return session.beam_search(
+            current_graph,
+            backend="native",
+            native_options=options,
+            predictor=SimpleNamespace(),
+            start_state=start_state,
+            beam_width=64,
+            max_steps=1,
+            return_path=True,
+        )
+
+    try:
+        first_session_result = session_search(session_graph, [1, 0, 2, 3])
+        first_session_persistent = first_session_result.native_metadata["persistent_session"]
+        first_session_pids = tuple(first_session_persistent["worker_pids"])
+        assert len(first_session_pids) == world
+        assert first_session_persistent["reused"] is False
+        assert first_session_persistent["request_count"] == 1
+        assert first_session_result.path == [0] and session_contract.replay(first_session_result.path)
+
+        second_session_result = session_search(session_graph, [1, 0, 2, 3])
+        second_session_persistent = second_session_result.native_metadata["persistent_session"]
+        assert tuple(second_session_persistent["worker_pids"]) == first_session_pids
+        assert second_session_persistent["reused"] is True
+        assert second_session_persistent["request_count"] == 2
+        assert second_session_result.path == [0] and session_contract.replay(second_session_result.path)
+
+        wider_definition = SimpleNamespace(
+            is_permutation_group=lambda: True,
+            state_size=5,
+            central_state=[0, 1, 2, 3, 4],
+            generators_permutations=[[1, 0, 2, 3, 4]],
+            generator_names=["swap"],
+        )
+        wider_graph = SimpleNamespace(definition=wider_definition)
+        from multigpubeamsearch.contracts import GraphContract
+
+        wider_contract = GraphContract.from_graph(wider_graph, [1, 0, 2, 3, 4])
+        changed_geometry_result = session_search(wider_graph, [1, 0, 2, 3, 4])
+        changed_persistent = changed_geometry_result.native_metadata["persistent_session"]
+        changed_pids = tuple(changed_persistent["worker_pids"])
+        assert len(changed_pids) == world and changed_pids != first_session_pids
+        assert changed_persistent["reused"] is False
+        assert changed_persistent["request_count"] == 1
+        assert changed_geometry_result.path == [0]
+        assert wider_contract.replay(changed_geometry_result.path)
+    finally:
+        session.close()
+    assert session.closed
+    assert len(launched_owners) == 2
+    assert len(native_workers) == 2
+    assert isinstance(native_workers[1]._owner, extension.SearchSession)
