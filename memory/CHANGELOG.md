@@ -1,3 +1,9 @@
+## 2026-11-23 - Check public permutation session invalidation through the installed Rust owner
+
+- Extended the installed-wheel CPU test through `NativeSession.beam_search`: identical requests reuse Rust-supervised ranks, changing only model artifact identity invalidates the resident session, and a separate geometry-only change starts a new worker group.
+- Ran at world sizes one and two with the compiled PyO3 `SearchSession`, synthetic workers and independent graph replay. No CUDA kernel or NCCL behavior is claimed.
+- The targeted session-identity step and full installed-wheel job passed on source SHA `a20fc963519140bf754d444e826afae9b1849ce2` in [run 45158587559](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45158587559); Rust public-owner CPU checks passed in [run 45158587644](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45158587644). Physical CUDA/NCCL remains pending under the current pause.
+
 ## 2026-11-23 - Verify public permutation NativeSession reuse through Rust
 
 - Extended the installed-wheel CPU fixture through the public `NativeSession.beam_search` method at one and two synthetic ranks. Repeated identical requests retain Rust-supervised worker PIDs and advance the request count; changing graph geometry creates a fresh worker group.
