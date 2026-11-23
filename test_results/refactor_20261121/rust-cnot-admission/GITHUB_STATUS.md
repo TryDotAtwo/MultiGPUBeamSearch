@@ -1,14 +1,14 @@
 # Rust + CUDA/C++ migration acceptance status
 
 Source branch: `codex/beam-3060-preflight-20261121`
-Latest installed-wheel tested code SHA: `258cd9f3428edd2fb89212c92290ac59a520527a`
-Latest Rust phase-plan test commit: `cfaf3a6970b6317467e341c08b0f60375b5aedee` (workflow-only change after the installed-wheel SHA)
+Latest installed-wheel tested code SHA: `565694c013863238bb9ce38e403e35dfd1231221`
+Latest Rust execution-plan CPU tested code SHA: `565694c013863238bb9ce38e403e35dfd1231221`
 Base main SHA: `e6c41b6dc6bb3a839f6338f3cfe9eaadf8608d5a`
 
 | Gate | Status | Evidence |
 |---|---|---|
-| Permutation installed wheel and CPU acceptance | PASS | Installed wheel passed on `258cd9f` in [run 45135335424](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45135335424), including the installed Rust phase plan and saturated permutation CPU acceptance. The public Rust local-rank launcher also passed on `fd42ebc` in [run 45131297173](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45131297173). |
-| Shared CPU/Gloo checks | PASS | Rust CPU phase-plan checks passed on `cfaf3a6` in [run 45135569729](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45135569729), including 2/2 ordered-plan contract tests. The installed-wheel run [45135335424](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45135335424) also passed the real-extension consumer check. This remains CPU evidence only. |
+| Permutation installed wheel and CPU acceptance | PASS | Installed PEP 517 wheel passed on `565694c` in [run 45139332961](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45139332961), including the real Rust execution-plan consumer, exact and max width cases, legacy fallback, live Rust error handling, and existing saturated permutation CPU acceptance. Redacted status artifact: [14801331950](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45139332961/artifacts/14801331950). The public Rust local-rank launcher also passed on `fd42ebc` in [run 45131297173](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45131297173). |
+| Shared CPU/Gloo checks | PASS | Rust CPU checks passed on source SHA `565694c` in [run 45139333020](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45139333020), including 3/3 search-plan contract tests; artifact [14800709775](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45139333020/artifacts/14800709775). The installed-wheel run also passed the real Rust execution-plan consumer. This remains CPU/Gloo evidence only. |
 | Permutation CUDA/NCCL on physical 1/2 GPUs | PENDING | No physical permutation run was performed. Device participation, 1/2-GPU parity, and hardware replay remain unverified. |
 | CNOT implementation and compatibility | PRESERVED; final acceptance DEFERRED | Existing CNOT code and compatibility remain in place. Further CNOT development, checkpoint preparation, and final acceptance are deferred at the user's request; shared CPU workflow success does not establish CNOT GPU acceptance. |
 | Full Rust ownership migration | IN PROGRESS | Rust now also supervises single-host local ranks through the public launcher. Python still constructs the graph contract, exports/prepares framework models and runtime, and adapts public results; older wheels retain the Python launcher. PR #10 remains draft. |
@@ -198,3 +198,10 @@ Tested code SHA: `0ca418cbbc2757508dc96ff986af75b888cba5e2`.
 
 - The public permutation runner now consumes a versioned `beam-runtime` plan for inference calibration, fixed-width capacity discovery, maximum-frontier refinement, downstream calibration and working-capacity selection. Existing stage code and ordering are retained.
 - Rust CPU phase-plan tests passed (2/2) in [run 45135569729](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45135569729), artifact [14799169266](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45135569729/artifacts/14799169266). Installed PEP 517 wheel and the real Rust phase-plan consumer passed on source SHA `258cd9f3428edd2fb89212c92290ac59a520527a` in [run 45135335424](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45135335424); the Rust phase-plan marker is in its hosted job log. Physical permutation CUDA/NCCL on one and two GPUs remains pending. CNOT development, checkpoint preparation and final acceptance remain deferred.
+
+
+## Rust-owned permutation execution width — 2026-11-23
+
+- Rust CPU execution-plan tests passed 3/3 on source SHA `565694c` in [run 45139333020](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45139333020).
+- Installed PEP 517 wheel passed on the same source SHA in [run 45139332961](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45139332961). The runner passed Rust's exact/max width into microbatch preparation; exact width, max width, old-wheel fallback and live Rust resolver failure behavior were covered.
+- Physical permutation CUDA/NCCL on one and two GPUs remains pending. The automatic CNOT GPU workflow skipped its physical jobs on the push event; CNOT remains deferred.

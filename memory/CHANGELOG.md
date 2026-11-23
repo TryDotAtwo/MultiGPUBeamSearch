@@ -156,4 +156,4 @@
 
 - Added a versioned typed Rust execution plan that returns the existing ordered preparation phases and the initial calibration width for exact and max requests.
 - The public permutation runner now uses that width before microbatch planning; maximum-frontier, capacity selection, models, kernels, multi-GPU behavior and numerical policy are unchanged. Old wheels keep their previous route.
-- Added Rust width contract cases and an installed-wheel consumer check that observes the width passed by the runner. Hosted checks are pending; physical CUDA/NCCL remains unverified.
+- Added Rust width contract cases and an installed-wheel consumer check that observes the width passed by the runner. Rust CPU tests passed 3/3 in [run 45139333020](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45139333020); the installed PEP 517 wheel passed on source SHA 565694c013863238bb9ce38e403e35dfd1231221 in [run 45139332961](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45139332961). Physical CUDA/NCCL remains unverified.
