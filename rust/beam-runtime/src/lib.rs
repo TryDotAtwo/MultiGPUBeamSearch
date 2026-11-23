@@ -30,6 +30,7 @@ pub mod probes;
 pub mod profile_cache;
 mod resident;
 pub mod search_inputs;
+pub mod search_plan;
 pub mod search_session;
 pub mod shared_profiles;
 pub mod telemetry;

@@ -143,3 +143,10 @@
 - Moved reserved-variable filtering, selected CUDA visibility, CUDA device-order preservation and NCCL ID path insertion into a versioned `beam-runtime` operation.
 - Routed the public permutation `backend.child_environment` through the installed PyO3 extension; retained the same output keys and Python fallback when the wheel lacks the operation.
 - Added installed-wheel and Rust contract coverage for environment isolation, selected device order, inherited device identifiers, invalid mapping and older-wheel fallback. Search, kernels, precision and transport are unchanged.
+
+
+## 2026-11-23 - Resolve permutation search phases in beam-runtime
+
+- Added a versioned Rust phase plan for the existing permutation inference calibration, capacity discovery, maximum-frontier refinement, downstream calibration and working-capacity selection branches.
+- The public runner consumes the Rust plan while preserving stage order, model/backend predicates, delayed capability errors and the existing Python implementations of each stage. Older wheels use the matching compatibility plan; errors from the installed Rust resolver fail explicitly.
+- Added Rust plan contract cases and an installed-wheel check through the runner's phase-plan helper. Hosted checks are pending for the introducing commit; no physical CUDA/NCCL run was performed.

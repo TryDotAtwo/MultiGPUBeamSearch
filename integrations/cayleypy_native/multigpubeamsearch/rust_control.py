@@ -873,6 +873,50 @@ def _tag_search_value(value):
     return {"kind": "other", "value": None}
 
 
+def resolve_search_phase_plan(request):
+    """Return the installed Rust phase plan, or None only for an older wheel."""
+    try:
+        native = extension()
+    except (NativeUnavailable, ImportError):
+        return None
+    resolver = getattr(native, 'resolve_search_phase_plan', None)
+    if not callable(resolver):
+        return None
+    if getattr(native, 'SEARCH_PHASE_PLAN_VERSION', None) != 1:
+        raise NativeBackendError('Rust search phase plan ABI is incompatible; rebuild the matching PyO3 module')
+    try:
+        encoded = json.dumps(request, sort_keys=True, allow_nan=False)
+        plan = json.loads(resolver(encoded))
+    except (TypeError, ValueError, OverflowError, RuntimeError) as error:
+        raise NativeBackendError('Rust permutation search phase resolution failed') from error
+    if (
+        type(plan) is not dict
+        or set(plan) != {'schema_version', 'phases'}
+        or type(plan.get('schema_version')) is not int
+        or plan['schema_version'] != 1
+        or type(plan.get('phases')) is not list
+    ):
+        raise NativeBackendError('Rust search phase plan returned an invalid schema')
+    phases = plan['phases']
+    order = {
+        'inference_calibration': 0,
+        'capacity_discovery': 1,
+        'maximum_frontier_search': 2,
+        'pipeline_calibration': 3,
+        'working_capacity_selection': 4,
+        'execute': 5,
+    }
+    if (
+        not phases
+        or any(type(phase) is not str or phase not in order for phase in phases)
+        or len(set(phases)) != len(phases)
+        or phases[-1] != 'execute'
+        or [order[phase] for phase in phases] != sorted(order[phase] for phase in phases)
+    ):
+        raise NativeBackendError('Rust search phase plan returned invalid phase ordering')
+    return tuple(phases)
+
+
 def validate_search_controls(params):
     """Delegate normalized public search-control checks to beam-core when available."""
     beam_mode = params["beam_mode"]

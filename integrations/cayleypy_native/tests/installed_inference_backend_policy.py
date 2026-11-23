@@ -7,7 +7,7 @@ import tempfile
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from multigpubeamsearch.errors import NativeUnavailable
+from multigpubeamsearch.errors import NativeBackendError, NativeUnavailable
 from multigpubeamsearch.rust_control import extension
 
 runtime = extension()
@@ -189,4 +189,131 @@ with tempfile.TemporaryDirectory(prefix="beam-inference-policy-") as temporary:
             f"prepared runtime row limit differs from the installed Rust plan: "
             f"expected={expected_prepared_plan}, profile={prepared.profile}"
         )
+
+phase_plan_native = getattr(runtime, "resolve_search_phase_plan", None)
+if not callable(phase_plan_native) or getattr(runtime, "SEARCH_PHASE_PLAN_VERSION", None) != 1:
+    raise AssertionError("installed Rust runtime does not expose the versioned search phase plan")
+
+phase_cases = [
+    (
+        {"autotune": True, "model_backend": "mlp",
+         "calibration_binary_name": "stream1_native_mlp_benchmark",
+         "maximum_requested": False, "discover_capacity": False},
+        ["inference_calibration", "pipeline_calibration", "execute"],
+    ),
+    (
+        {"autotune": True, "model_backend": "mlp",
+         "calibration_binary_name": "stream1_cutlass_mlp_benchmark",
+         "maximum_requested": False, "discover_capacity": False},
+        ["execute"],
+    ),
+    (
+        {"autotune": True, "model_backend": "ensemble",
+         "calibration_binary_name": None,
+         "maximum_requested": False, "discover_capacity": False},
+        ["inference_calibration", "pipeline_calibration", "execute"],
+    ),
+    (
+        {"autotune": True, "model_backend": "transformer",
+         "calibration_binary_name": None,
+         "maximum_requested": False, "discover_capacity": False},
+        ["execute"],
+    ),
+    (
+        {"autotune": True, "model_backend": "mlp",
+         "calibration_binary_name": "stream1_libtorch_mlp_benchmark",
+         "maximum_requested": False, "discover_capacity": True},
+        ["inference_calibration", "capacity_discovery",
+         "pipeline_calibration", "execute"],
+    ),
+    (
+        {"autotune": True, "model_backend": "mlp",
+         "calibration_binary_name": "stream1_libtorch_mlp_benchmark",
+         "maximum_requested": True, "discover_capacity": True},
+        ["inference_calibration", "maximum_frontier_search",
+         "pipeline_calibration", "working_capacity_selection", "execute"],
+    ),
+    (
+        {"autotune": True, "model_backend": "transformer",
+         "calibration_binary_name": None,
+         "maximum_requested": True, "discover_capacity": False},
+        ["maximum_frontier_search", "execute"],
+    ),
+    (
+        {"autotune": False, "model_backend": "mlp",
+         "calibration_binary_name": "stream1_native_mlp_benchmark",
+         "maximum_requested": False, "discover_capacity": False},
+        ["execute"],
+    ),
+]
+
+for phase_request, expected_phases in phase_cases:
+    direct = json.loads(phase_plan_native(json.dumps(phase_request, sort_keys=True)))
+    if direct != {"schema_version": 1, "phases": expected_phases}:
+        raise AssertionError(
+            f"installed Rust search phase plan mismatch: "
+            f"expected={expected_phases}, actual={direct}, request={phase_request}"
+        )
+    adapted = rust_control.resolve_search_phase_plan(phase_request)
+    if adapted != tuple(expected_phases):
+        raise AssertionError(
+            f"Rust phase-plan Python adapter mismatch: "
+            f"expected={expected_phases}, actual={adapted}"
+        )
+    options = SimpleNamespace(
+        autotune=phase_request["autotune"],
+        calibration_discover_capacity=phase_request["discover_capacity"],
+    )
+    model = SimpleNamespace(backend=phase_request["model_backend"])
+    prepared_runtime = SimpleNamespace(
+        build_metadata={"calibration_binary_name": phase_request["calibration_binary_name"]}
+    )
+    with patch.object(
+        backend, "_python_search_phase_plan",
+        side_effect=AssertionError("installed wheel unexpectedly used Python phase selection"),
+    ):
+        consumed = backend._resolve_search_phase_plan(
+            options, model, prepared_runtime, phase_request["maximum_requested"]
+        )
+    if consumed != tuple(expected_phases):
+        raise AssertionError(
+            f"public permutation preparation consumed a different Rust phase plan: {consumed}"
+        )
+
+with patch.object(rust_control, "extension", return_value=LegacyRuntime()):
+    old_wheel_phases = backend._resolve_search_phase_plan(
+        SimpleNamespace(autotune=True, calibration_discover_capacity=False),
+        SimpleNamespace(backend="mlp"),
+        SimpleNamespace(build_metadata={"calibration_binary_name": "stream1_native_mlp_benchmark"}),
+        False,
+    )
+if old_wheel_phases != ("inference_calibration", "pipeline_calibration", "execute"):
+    raise AssertionError(f"older-wheel Python compatibility plan changed: {old_wheel_phases}")
+
+
+class BrokenPhasePlanRuntime:
+    ABI_VERSION = 1
+    SEARCH_PHASE_PLAN_VERSION = 1
+    InferenceCalibration = object()
+
+    @staticmethod
+    def resolve_search_phase_plan(_payload):
+        raise RuntimeError("injected Rust phase-plan failure")
+
+
+with patch.object(rust_control, "extension", return_value=BrokenPhasePlanRuntime()):
+    try:
+        backend._resolve_search_phase_plan(
+            SimpleNamespace(autotune=True, calibration_discover_capacity=False),
+            SimpleNamespace(backend="mlp"),
+            SimpleNamespace(build_metadata={"calibration_binary_name": "stream1_native_mlp_benchmark"}),
+            False,
+        )
+    except NativeBackendError as error:
+        if "phase resolution failed" not in str(error):
+            raise AssertionError(f"unexpected live Rust phase-plan error: {error}") from error
+    else:
+        raise AssertionError("a live Rust phase-plan failure silently fell back to Python")
+
+print("INSTALLED_RUST_SEARCH_PHASE_PLAN_PASS", flush=True)
 print("INSTALLED_RUST_INFERENCE_BACKEND_POLICY_PASS", flush=True)

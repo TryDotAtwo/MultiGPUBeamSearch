@@ -191,3 +191,9 @@ Tested code SHA: `0ca418cbbc2757508dc96ff986af75b888cba5e2`.
 - Hosted source acceptance: PASS, [run 44999384719](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44999384719), redacted artifact [14744704817](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44999384719/artifacts/14744704817). Physical acceptance: SKIPPED.
 - Pinned panel-v2 CPU compile and synthetic handoff: PASS, [run 44999387783](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44999387783).
 - Remaining in this slice: Python still assembles the profile identity; physical 1/2-GPU and trained-profile execution remain unverified.
+
+
+## Rust-owned permutation calibration and capacity phase plan — 2026-11-23
+
+- The public permutation runner now consumes a versioned `beam-runtime` plan for inference calibration, fixed-width capacity discovery, maximum-frontier refinement, downstream calibration and working-capacity selection. Existing stage code and ordering are retained.
+- Rust CPU and installed-wheel validation are pending for the introducing commit. Physical permutation CUDA/NCCL on one and two GPUs remains pending. CNOT development, checkpoint preparation and final acceptance remain deferred.

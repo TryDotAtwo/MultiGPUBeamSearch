@@ -88,6 +88,7 @@ jobs:
               rust/beam-runtime/src/search_inputs.rs \
               rust/beam-runtime/src/shared_profiles.rs \
               rust/beam-runtime/src/microbatch.rs \
+              rust/beam-runtime/src/search_plan.rs \
               rust/beam-core/src/permutation.rs \
               rust/beam-core/src/search.rs \
               rust/beam-python/src/configuration.rs \
@@ -119,6 +120,7 @@ jobs:
             cargo test --locked -p beam-core --test search
             cargo test --locked -p beam-runtime --test cnot_exchange
             cargo test --locked -p beam-runtime cnot_search
+            cargo test --locked -p beam-runtime --lib search_plan::tests
             cargo test --locked -p beam-runtime --test search_session
             cargo test --locked -p beam-runtime --test session_preparation_identity
             cargo test --locked -p beam-runtime --test search_inputs

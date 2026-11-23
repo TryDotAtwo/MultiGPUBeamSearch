@@ -820,6 +820,48 @@ def _verify_mlp_host_binding(run_dir, artifact_hash, world):
             raise NativeBackendError(f'MLP host binding receipt missing for rank {rank}')
 
 
+def _python_search_phase_plan(request):
+    """Compatibility phase plan for wheels that predate the Rust resolver."""
+    inference = request["autotune"] and (
+        request["model_backend"] == "ensemble"
+        or (
+            request["model_backend"] == "mlp"
+            and request["calibration_binary_name"] in (
+                "stream1_native_mlp_benchmark",
+                "stream1_libtorch_mlp_benchmark",
+            )
+        )
+    )
+    phases = []
+    if inference:
+        phases.append("inference_calibration")
+    if request["discover_capacity"] and not request["maximum_requested"]:
+        phases.append("capacity_discovery")
+    if request["maximum_requested"]:
+        phases.append("maximum_frontier_search")
+    if inference:
+        phases.append("pipeline_calibration")
+        if request["maximum_requested"]:
+            phases.append("working_capacity_selection")
+    phases.append("execute")
+    return tuple(phases)
+
+
+def _resolve_search_phase_plan(options, model, runtime, maximum_requested):
+    request = {
+        "autotune": options.autotune,
+        "model_backend": model.backend,
+        "calibration_binary_name": runtime.build_metadata.get("calibration_binary_name"),
+        "maximum_requested": maximum_requested,
+        "discover_capacity": bool(getattr(options, "calibration_discover_capacity", False)),
+    }
+    from . import rust_control
+    phases = rust_control.resolve_search_phase_plan(request)
+    if phases is None:
+        phases = _python_search_phase_plan(request)
+    return tuple(phases)
+
+
 def _run_native_once(contract, model, options, beam_width, max_steps, run_dir, devices, *, runtime=None) -> NativeOutcome:
     maximum_requested=type(beam_width) is str and beam_width=='max'
     if (not maximum_requested and (type(beam_width) is not int or beam_width <= 0)) or type(max_steps) is not int or max_steps < 0:
@@ -888,9 +930,8 @@ def _run_native_once(contract, model, options, beam_width, max_steps, run_dir, d
     microbatch_env, microbatch_metadata = microbatch_environment(contract, model, beam_width, len(devices),
         row_limit=runtime.profile.get("inference_row_limit", 8192))
     env.update(microbatch_env)
-    calibrate=options.autotune and (model.backend=='ensemble' or
-        (model.backend=='mlp' and runtime.build_metadata.get('calibration_binary_name') in
-            ('stream1_native_mlp_benchmark','stream1_libtorch_mlp_benchmark')))
+    phase_plan = _resolve_search_phase_plan(options, model, runtime, maximum_requested)
+    calibrate = "inference_calibration" in phase_plan
     if calibrate:
         from .autotune import tune_inference
         calibration_started=time.monotonic()
@@ -929,7 +970,7 @@ def _run_native_once(contract, model, options, beam_width, max_steps, run_dir, d
     # A capacity probe is diagnostic for a fixed-width request. Keep its
     # environment and width separate from execution, including when the probe
     # stopped at its time budget and found only a safe lower bound.
-    if getattr(options,'calibration_discover_capacity',False) and not maximum_requested:
+    if "capacity_discovery" in phase_plan:
         if not calibrate:raise NativeUnavailable('capacity discovery requires a supported inference calibrator')
         from .maximum_beam import discover_capacity,capacity_seed
         seed=capacity_seed(calibration)
@@ -943,7 +984,7 @@ def _run_native_once(contract, model, options, beam_width, max_steps, run_dir, d
             capacity_scope='native memory admission with measured inference reserve; full step verified only at requested width')
         runtime.profile['maximum_beam']=capacity
         (run_dir/'maximum-beam.json').write_text(json.dumps(capacity,indent=2))
-    if maximum_requested:
+    if "maximum_frontier_search" in phase_plan:
         if not calibrate:raise NativeUnavailable('maximum beam requires a supported inference calibrator')
         from .maximum_beam import capacity_seed,discover_capacity,refine_maximum
         calibration=capacity_seed(calibration)
@@ -978,9 +1019,9 @@ def _run_native_once(contract, model, options, beam_width, max_steps, run_dir, d
         if options.report_calibration:
             print(f"[MultiGPUBeamSearch] largest admitted frontier {beam_width:,}; "
                 f"capacity search {capacity['wall_seconds']:.2f}s; full-step verification pending",flush=True)
-    if calibrate:
+    if "pipeline_calibration" in phase_plan:
         from .pipeline_autotune import tune_downstream
-        if maximum_requested:
+        if "maximum_frontier_search" in phase_plan:
             downstream=tune_downstream(contract,model,runtime,options,devices,beam_width,
                 run_dir,env,runner,calibration)
         else:
@@ -1005,7 +1046,7 @@ def _run_native_once(contract, model, options, beam_width, max_steps, run_dir, d
             microbatch_metadata['inference_parent_batch']=calibration['parent_batch']
         runtime.profile.update(autotuned=selected,pipeline_autotuned=selected,
             pipeline_calibration=downstream,calibration_total_wall_seconds=time.monotonic()-calibration_started)
-        if maximum_requested:
+        if "working_capacity_selection" in phase_plan:
             if selected:capacity['execution_profile']=dict(downstream['environment'])
             from .working_capacity import choose_working_capacity,measure_reference
             try:
