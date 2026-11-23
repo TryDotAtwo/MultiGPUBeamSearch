@@ -849,7 +849,7 @@ def test_installed_public_session_uses_real_rust_owner_for_reuse_and_invalidatio
 
     worker = tmp_path / "synthetic-resident-worker"
     worker.write_text(
-        f"#!{sys.executable}\\n"
+        f"#!{sys.executable}\n"
         + r'''import json, os, sys, time
 from pathlib import Path
 
@@ -874,11 +874,11 @@ while not (session / "stop").exists():
     start = request["start"]
     run_dir = Path(request["run_dir"])
     beam = os.environ["FIXTURE_BEAM"]
-    text = f"GLOBAL_BEAM_WIDTH_EFFECTIVE={beam}\\n"
+    text = f"GLOBAL_BEAM_WIDTH_EFFECTIVE={beam}\n"
     if rank == 0 and start[:2] == [1, 0]:
         text += (
             "puzzle_solved=1 puzzle_id=0 seconds=0.1 "
-            "solution_length=1 solution=m0\\n"
+            "solution_length=1 solution=m0\n"
         )
     (run_dir / f"resident-rank-{rank}.log").write_text(text, encoding="utf-8")
     receipt = session / f"done-{sequence}-{rank}.json"
@@ -893,7 +893,7 @@ while not (session / "stop").exists():
     )
     worker.chmod(0o755)
     runner = tmp_path / "runner-placeholder"
-    runner.write_text("synthetic runner identity\\n", encoding="utf-8")
+    runner.write_text("synthetic runner identity\n", encoding="utf-8")
     library = tmp_path / "libbeam_native.so"
     library.write_bytes(b"synthetic library handle")
 
