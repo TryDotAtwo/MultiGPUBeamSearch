@@ -800,3 +800,214 @@ def test_old_rust_owner_never_receives_auto_max_preparation_json(tmp_path, monke
         assert outcome.metadata["persistent_session"]["worker_pids"] == [101]
     finally:
         session.close()
+
+
+@pytest.mark.skipif(os.name != "posix", reason="the fixture launches a shebang worker")
+@pytest.mark.parametrize("world", [1, 2])
+def test_installed_public_session_uses_real_rust_owner_for_reuse_and_invalidation(
+    tmp_path, monkeypatch, world
+):
+    """Exercise NativeSession.run with the installed PyO3 owner and CPU rank workers."""
+    import sys
+
+    from multigpubeamsearch import (
+        models,
+        native_library,
+        persistent as persistent_module,
+        rust_control,
+    )
+    from multigpubeamsearch.errors import NativeUnavailable
+
+    try:
+        extension = rust_control.extension()
+    except (NativeUnavailable, ImportError) as error:
+        if os.environ.get("REQUIRE_RUST_PREPARATION_IDENTITY") == "1":
+            raise AssertionError(
+                "installed-wheel gate requires the compiled Rust SearchSession"
+            ) from error
+        pytest.skip("Rust extension is not built in this CPU-only job")
+    assert callable(getattr(extension, "SearchSession", None))
+    assert getattr(extension, "SEARCH_TERMINAL_RESULT_VERSION", None) == 1
+
+    def graph_contract(size):
+        center = list(range(size))
+        start = center.copy()
+        start[0], start[1] = start[1], start[0]
+        swap = list(range(size))
+        swap[0], swap[1] = swap[1], swap[0]
+        graph = rust_control.build_graph_contract(center, start, [swap], ["swap"])
+        assert graph is not None
+        return GraphContract(
+            graph["state_len"],
+            graph["num_classes"],
+            tuple(tuple(row) for row in graph["generators"]),
+            ("swap",),
+            tuple(graph["center"]),
+            tuple(graph["start"]),
+            graph["graph_hash"],
+        )
+
+    worker = tmp_path / "synthetic-resident-worker"
+    worker.write_text(
+        f"#!{sys.executable}\\n"
+        + r'''import json, os, sys, time
+from pathlib import Path
+
+if "--resident-protocol-info" in sys.argv:
+    if len(os.environ.get("BEAM_EXPECTED_GRAPH_HASH", "")) != 64:
+        raise SystemExit("missing Rust graph binding")
+    print(json.dumps({
+        "protocol": "resident-search-v1",
+        "loaded_graph_binding": 1,
+    }), flush=True)
+    raise SystemExit(0)
+
+session = Path(os.environ["BEAM_SESSION_DIR"])
+rank = int(os.environ["RANK"])
+sequence = 0
+while not (session / "stop").exists():
+    request_path = session / f"request-{sequence}.json"
+    if not request_path.is_file():
+        time.sleep(0.002)
+        continue
+    request = json.loads(request_path.read_text(encoding="utf-8"))
+    start = request["start"]
+    run_dir = Path(request["run_dir"])
+    beam = os.environ["FIXTURE_BEAM"]
+    text = f"GLOBAL_BEAM_WIDTH_EFFECTIVE={beam}\\n"
+    if rank == 0 and start[:2] == [1, 0]:
+        text += (
+            "puzzle_solved=1 puzzle_id=0 seconds=0.1 "
+            "solution_length=1 solution=m0\\n"
+        )
+    (run_dir / f"resident-rank-{rank}.log").write_text(text, encoding="utf-8")
+    receipt = session / f"done-{sequence}-{rank}.json"
+    temporary = receipt.with_suffix(".tmp")
+    temporary.write_text(
+        json.dumps({"sequence": sequence, "rank": rank}), encoding="utf-8"
+    )
+    temporary.replace(receipt)
+    sequence += 1
+''',
+        encoding="utf-8",
+    )
+    worker.chmod(0o755)
+    runner = tmp_path / "runner-placeholder"
+    runner.write_text("synthetic runner identity\\n", encoding="utf-8")
+    library = tmp_path / "libbeam_native.so"
+    library.write_bytes(b"synthetic library handle")
+
+    monkeypatch.setattr(models, "verify_prepared_model", lambda *args: None)
+    monkeypatch.setattr(persistent_module, "requires_mlp_host_binding", lambda *args: False)
+    monkeypatch.setattr(rust_control, "worker_executable", lambda: worker)
+    monkeypatch.setattr(
+        native_library,
+        "ensure_native_library",
+        lambda *args: (
+            library,
+            {
+                "library_sha256": "d" * 64,
+                "specification": {"worker_sha256": "e" * 64},
+            },
+        ),
+    )
+    monkeypatch.setenv("CUDA_VISIBLE_DEVICES", ",".join(str(i) for i in range(world)))
+    monkeypatch.setenv("CUDA_DEVICE_ORDER", "PCI_BUS_ID")
+
+    contract = graph_contract(4)
+    model = SimpleNamespace(
+        artifact_hash="b" * 64,
+        artifact_sizes=(17,),
+        backend="mlp",
+    )
+    runtime = SimpleNamespace(
+        runner=runner,
+        architectures=(86,),
+        build_metadata={"binary_sha256": "c" * 64},
+        profile={
+            "inference_backend": "libtorch",
+            "policy": "libtorch-default-v1",
+            "inference_row_limit": 8192,
+        },
+    )
+    options = NativeOptions(cache_dir=tmp_path / "cache", timeout_seconds=8)
+    session = NativeSession(engine="rust")
+    preparation_callbacks = []
+
+    def execute(current_contract, current_model, current_options, beam, depth,
+                run_dir, devices, *, runtime):
+        preparation_callbacks.append((current_model.artifact_hash, current_contract.graph_hash))
+        elapsed = session.launch(
+            [str(runtime.runner), "0", str(depth), str(beam)],
+            contract=current_contract,
+            run_dir=run_dir,
+            env={"FIXTURE_BEAM": str(beam)},
+            world=len(devices),
+            timeout=current_options.timeout_seconds,
+            runtime=runtime,
+        )
+        path, effective_width, terminal = session.terminal_result(
+            run_dir / "native.log", current_contract, max_steps=depth
+        )
+        metadata = dict(terminal)
+        metadata["profile"] = {"calibration_total_wall_seconds": 12.0}
+        return NativeOutcome(path, elapsed, effective_width, run_dir, metadata)
+
+    def run(label, current_contract=contract):
+        run_dir = tmp_path / label
+        run_dir.mkdir()
+        return session.run(
+            execute,
+            current_contract,
+            model,
+            options,
+            64,
+            1,
+            run_dir,
+            tuple(range(world)),
+            runtime=runtime,
+        )
+
+    try:
+        first = run("same-identity-first")
+        assert isinstance(session._workers._owner, extension.SearchSession)
+        first_pids = tuple(first.metadata["persistent_session"]["worker_pids"])
+        assert len(first_pids) == world
+        assert first.metadata["persistent_session"]["reused"] is False
+        assert first.metadata["persistent_session"]["request_count"] == 1
+        assert first.path == (0,) and contract.replay(first.path)
+
+        second = run("same-identity-second")
+        assert tuple(second.metadata["persistent_session"]["worker_pids"]) == first_pids
+        assert second.metadata["persistent_session"]["reused"] is True
+        assert second.metadata["persistent_session"]["request_count"] == 2
+        assert second.metadata["profile"]["calibration_total_wall_seconds"] == 0.0
+        assert second.path == first.path and contract.replay(second.path)
+        assert len(preparation_callbacks) == 1
+
+        runtime.profile["inference_row_limit"] = 4096
+        changed_plan = run("changed-plan")
+        plan_pids = tuple(changed_plan.metadata["persistent_session"]["worker_pids"])
+        assert plan_pids and plan_pids != first_pids
+        assert changed_plan.metadata["persistent_session"]["reused"] is False
+        assert changed_plan.metadata["persistent_session"]["request_count"] == 1
+        assert len(preparation_callbacks) == 2
+
+        model.artifact_hash = "f" * 64
+        changed_model = run("changed-model")
+        model_pids = tuple(changed_model.metadata["persistent_session"]["worker_pids"])
+        assert model_pids and model_pids != plan_pids
+        assert changed_model.metadata["persistent_session"]["reused"] is False
+        assert changed_model.metadata["persistent_session"]["request_count"] == 1
+        assert len(preparation_callbacks) == 3
+
+        changed_geometry = run("changed-geometry", graph_contract(5))
+        geometry_pids = tuple(changed_geometry.metadata["persistent_session"]["worker_pids"])
+        assert geometry_pids and geometry_pids != model_pids
+        assert changed_geometry.metadata["persistent_session"]["reused"] is False
+        assert changed_geometry.metadata["persistent_session"]["request_count"] == 1
+        assert len(preparation_callbacks) == 4
+        assert changed_geometry.path == (0,)
+        assert graph_contract(5).replay(changed_geometry.path)
+    finally:
+        session.close()

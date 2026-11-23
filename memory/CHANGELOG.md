@@ -170,3 +170,10 @@
 - Routed the public permutation \`NativePlanSession\` through the existing Rust \`PlanningSession\`; Python remains the adapter and keeps the older-wheel compatibility path.
 - Added an installed-wheel CPU fixture with two synthetic ranks, repeated admission on stable Rust-owned PIDs, and parity with the Python fallback.
 - The external wheel smoke step passed on source SHA \`7304818d0ab7860869053ef01dda5af71ad44ed1\` in [run 45142440137](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45142440137). Remaining shared CPU/Gloo steps were still in progress at the time of recording. Physical CUDA/NCCL remains unverified.
+
+
+## 2026-11-23 — Exercise public permutation session reuse through the installed Rust owner
+
+- Added an installed-wheel CPU fixture that runs the public `NativeSession.run` adapter with the real compiled PyO3 `SearchSession` and Rust-supervised synthetic rank processes at world sizes 1 and 2.
+- Verified stable rank PIDs and increasing request count for a repeated identity, and fresh workers after inference-plan, model-artifact, and graph-geometry changes. Every returned path is replayed against the fixture graph.
+- The fixture does not emulate CUDA kernels or NCCL; physical one- and two-GPU acceptance remains pending under the active pause.

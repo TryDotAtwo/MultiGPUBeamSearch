@@ -171,7 +171,7 @@ jobs:
           mkdir -p "$(dirname "$log")"
           if env -u PYTHONPATH python -m pytest -q \
             "$GITHUB_WORKSPACE/integrations/cayleypy_native/tests/test_rust_persistent_search.py" \
-            -k "compiled_rust_preparation_identity_uses_structured_options or rust_session_reuses_and_releases_rank_owner" \
+            -k "compiled_rust_preparation_identity_uses_structured_options or rust_session_reuses_and_releases_rank_owner or installed_public_session_uses_real_rust_owner_for_reuse_and_invalidation" \
             > "$log" 2>&1; then
             cat "$log"
           else

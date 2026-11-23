@@ -3913,3 +3913,8 @@ The extension advertises CLUSTER_LOCAL_RANKS_MIN_WORLD_SIZE=1. A version-1 wheel
 
 The installed PEP 517 wheel and saturated permutation CPU acceptance passed on source SHA 86afff92cd705afb50cb011c4684151f88c042e2 in [run 45145388328](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45145388328). Its external smoke exercised the actual Rust one-rank process, argv/environment/log collection, and the version-1 Python fallback. Shared CPU/Gloo checks passed in [run 45145388385](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45145388385). Physical permutation CUDA/NCCL on one and two GPUs remains unverified.
 
+
+
+#### Installed public permutation session through the Rust owner — 2026-11-23
+
+The installed-wheel CPU gate now calls the public `NativeSession.run` path with the compiled PyO3 `SearchSession` and one or two real Rust-supervised child processes running a synthetic terminal protocol. It checks that a second compatible call keeps the rank PIDs and advances the request count, while changes to the resolved inference plan, model artifact identity, and graph geometry start fresh resident workers. Each fixture result must replay to the graph center. This verifies session ownership and invalidation through the installed public adapter; it does not exercise CUDA kernels or NCCL.

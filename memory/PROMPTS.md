@@ -176,3 +176,6 @@ Continue moving public permutation and CNOT search control to Rust + CUDA/C++ wh
 
 
 2026-11-22: Перенести подготовку окружения публичного permutation worker целиком в beam-runtime: фильтрацию inherited rank/BEAM/torchrun/CUDA/NCCL/results ключей, CUDA_VISIBLE_DEVICES, CUDA_DEVICE_ORDER и BEAM_NCCL_ID_FILE. Сохранить child_environment output и fallback старых wheel; проверить установленное расширение и Rust contract. Не менять запуск процесса, поисковую семантику или транспорт.
+
+
+2026-11-23: Продолжить перестановочную миграцию. Через установленный wheel проверить публичный `NativeSession.run` с настоящим PyO3 `SearchSession`: повторное использование rank workers при неизменном плане и инвалидирование при смене inference plan, модели и геометрии. Синтетические rank workers работают на CPU; CUDA/NCCL, алгоритм и численная политика не меняются. CNOT-доработки и отдельная CNOT-приёмка отложены.
