@@ -30,6 +30,7 @@ bindings = "pyo3"
 locked = true
 include = [
   {path = "build_backend.py", format = "sdist"},
+  "multigpubeamsearch/native_source_manifest.json",
   "multigpubeamsearch/_native_source/**/*",
   "multigpubeamsearch/_bin/*",
 ]

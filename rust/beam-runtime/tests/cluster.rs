@@ -1,4 +1,4 @@
-use beam_runtime::cluster::scheduler_rank;
+use beam_runtime::cluster::{cuda_ordinal, scheduler_rank, ClusterError};
 use std::collections::BTreeMap;
 
 fn env(values: &[(&str, &str)]) -> BTreeMap<String, String> {
@@ -82,4 +82,315 @@ fn malformed_assignments_are_rejected() {
         ]));
         assert!(result.is_err());
     }
+}
+
+#[test]
+fn slurm_global_rank_must_match_node_and_local_assignment() {
+    for (rank, local, node) in [("11", "4", "1"), ("13", "4", "1"), ("4", "4", "1")] {
+        let result = scheduler_rank(&env(&[
+            ("SLURM_PROCID", rank),
+            ("SLURM_LOCALID", local),
+            ("SLURM_NODEID", node),
+            ("SLURM_STEP_NUM_TASKS", "14"),
+            ("SLURM_STEP_TASKS_PER_NODE", "8,6"),
+        ]));
+        assert!(
+            result.is_err(),
+            "accepted rank={rank}, node={node}, local={local}"
+        );
+    }
+}
+
+#[test]
+fn typed_cluster_plan_preserves_rank_order_and_capacity() {
+    use beam_runtime::cluster::{plan_cluster, PlanRequest, PlannedRank};
+    let plan = plan_cluster(&PlanRequest {
+        gpus_per_node: vec![2, 4, 1],
+        beam_width: 1_000_003,
+        shard_count: 16,
+        batch_alignment: 1024,
+    })
+    .unwrap();
+    assert_eq!(
+        plan.ranks,
+        vec![
+            PlannedRank {
+                global_rank: 0,
+                node_rank: 0,
+                local_rank: 0,
+            },
+            PlannedRank {
+                global_rank: 1,
+                node_rank: 0,
+                local_rank: 1,
+            },
+            PlannedRank {
+                global_rank: 2,
+                node_rank: 1,
+                local_rank: 0,
+            },
+            PlannedRank {
+                global_rank: 3,
+                node_rank: 1,
+                local_rank: 1,
+            },
+            PlannedRank {
+                global_rank: 4,
+                node_rank: 1,
+                local_rank: 2,
+            },
+            PlannedRank {
+                global_rank: 5,
+                node_rank: 1,
+                local_rank: 3,
+            },
+            PlannedRank {
+                global_rank: 6,
+                node_rank: 2,
+                local_rank: 0,
+            },
+        ]
+    );
+    assert_eq!(plan.requested_beam, 1_000_003);
+    assert_eq!(plan.effective_beam, 1_000_003);
+    assert_eq!(plan.alignment, 114_688);
+    assert_eq!(plan.local_frontier_capacity, 142_858);
+    assert_eq!(plan.shard_count, 16);
+    assert!(!plan.hardware_verified);
+}
+
+#[test]
+fn typed_cluster_plan_rejects_world_and_frontier_overflow() {
+    use beam_runtime::cluster::{plan_cluster, PlanRequest};
+    assert!(plan_cluster(&PlanRequest {
+        gpus_per_node: vec![129],
+        beam_width: 1,
+        shard_count: 16,
+        batch_alignment: 1024,
+    })
+    .is_err());
+    assert!(plan_cluster(&PlanRequest {
+        gpus_per_node: vec![1],
+        beam_width: u64::MAX,
+        shard_count: 16,
+        batch_alignment: 1024,
+    })
+    .is_err());
+    assert!(plan_cluster(&PlanRequest {
+        gpus_per_node: vec![128],
+        beam_width: 1,
+        shard_count: u32::MAX,
+        batch_alignment: u32::MAX,
+    })
+    .is_err());
+}
+
+#[test]
+fn scheduled_cuda_ordinal_preserves_visible_namespace_mapping() {
+    assert_eq!(cuda_ordinal(7, 1).unwrap(), 0);
+    assert_eq!(cuda_ordinal(0, 4).unwrap(), 0);
+    assert_eq!(cuda_ordinal(3, 4).unwrap(), 3);
+    assert_eq!(cuda_ordinal(-1, 4).unwrap(), -1);
+}
+
+#[test]
+fn scheduled_cuda_ordinal_rejects_missing_or_insufficient_visibility() {
+    assert!(matches!(
+        cuda_ordinal(0, 0),
+        Err(ClusterError::Invalid(message)) if message == "no visible CUDA devices"
+    ));
+    assert!(matches!(
+        cuda_ordinal(4, 4),
+        Err(ClusterError::Invalid(message)) if message == "LOCAL_RANK exceeds the visible CUDA devices"
+    ));
+}
+
+#[test]
+fn cuda_visibility_preserves_inherited_token_order_and_whitespace_rules() {
+    use beam_runtime::cluster::cuda_visibility;
+
+    assert_eq!(cuda_visibility(&[2, 0], None).unwrap(), "2,0");
+    assert_eq!(
+        cuda_visibility(&[2, 0], Some(" GPU-a, GPU-b ,GPU-c ")).unwrap(),
+        "GPU-c,GPU-a"
+    );
+    assert_eq!(
+        cuda_visibility(&[1, 1], Some("GPU-a,GPU-b")).unwrap(),
+        "GPU-b,GPU-b"
+    );
+    assert_eq!(cuda_visibility(&[], Some("")).unwrap(), "");
+}
+
+#[test]
+fn cuda_visibility_rejects_missing_indices_empty_tokens_and_disabled_devices() {
+    use beam_runtime::cluster::cuda_visibility;
+
+    for selected in [
+        cuda_visibility(&[2], Some("GPU-a,GPU-b")),
+        cuda_visibility(&[1], Some("GPU-a, ")),
+        cuda_visibility(&[1], Some("GPU-a,-1")),
+    ] {
+        assert_eq!(
+            selected.unwrap_err().to_string(),
+            "cannot map selected devices through inherited CUDA_VISIBLE_DEVICES"
+        );
+    }
+}
+
+#[test]
+fn model_search_environment_preserves_ensemble_and_executor_settings() {
+    use beam_runtime::cluster::{search_model_environment, SearchModelEnvironmentRequest};
+
+    let environment = search_model_environment(&SearchModelEnvironmentRequest {
+        model_backend: "ensemble".into(),
+        ensemble_blend_dir: Some("/models/blend".into()),
+        ensemble_first_weights_dir: Some("/models/blend/head-a".into()),
+        inference_backend: Some("cutlass".into()),
+        mlp_host_binding: None,
+    })
+    .unwrap();
+    assert_eq!(
+        environment.get("BEAM_BLEND_DIR").map(String::as_str),
+        Some("/models/blend")
+    );
+    assert_eq!(
+        environment.get("BEAM_WEIGHT_DIR").map(String::as_str),
+        Some("/models/blend/head-a")
+    );
+    assert_eq!(
+        environment.get("BEAM_ENSEMBLE_BACKEND").map(String::as_str),
+        Some("cutlass")
+    );
+    assert_eq!(
+        environment.get("BEAM_STREAM1_EXECUTOR").map(String::as_str),
+        Some("libtorch_eager")
+    );
+
+    let transformer = search_model_environment(&SearchModelEnvironmentRequest {
+        model_backend: "piece_transformer".into(),
+        ensemble_blend_dir: None,
+        ensemble_first_weights_dir: None,
+        inference_backend: Some("libtorch".into()),
+        mlp_host_binding: None,
+    })
+    .unwrap();
+    assert_eq!(
+        transformer.get("BEAM_STREAM1_EXECUTOR").map(String::as_str),
+        Some("libtorch_eager")
+    );
+    assert!(!transformer.contains_key("BEAM_BLEND_DIR"));
+    assert!(!transformer.contains_key("BEAM_WEIGHT_DIR"));
+}
+
+#[test]
+fn model_search_environment_preserves_optional_mlp_host_binding() {
+    use beam_runtime::cluster::{
+        search_model_environment, MlpHostBindingIdentity, SearchModelEnvironmentRequest,
+    };
+
+    let environment = search_model_environment(&SearchModelEnvironmentRequest {
+        model_backend: "mlp".into(),
+        ensemble_blend_dir: None,
+        ensemble_first_weights_dir: None,
+        inference_backend: Some("cutlass".into()),
+        mlp_host_binding: Some(MlpHostBindingIdentity {
+            graph_hash: "a".repeat(64),
+            artifact_hash: "b".repeat(64),
+        }),
+    })
+    .unwrap();
+    assert_eq!(
+        environment.get("BEAM_MLP_GRAPH_HASH").map(String::as_str),
+        Some("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+    );
+    assert_eq!(
+        environment
+            .get("BEAM_MLP_ARTIFACT_HASH")
+            .map(String::as_str),
+        Some("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb")
+    );
+    assert_eq!(environment.len(), 2);
+}
+
+#[test]
+fn model_search_environment_rejects_invalid_family_routes() {
+    use beam_runtime::cluster::{search_model_environment, SearchModelEnvironmentRequest};
+
+    let invalid_ensemble = SearchModelEnvironmentRequest {
+        model_backend: "ensemble".into(),
+        ensemble_blend_dir: Some("/models/blend".into()),
+        ensemble_first_weights_dir: None,
+        inference_backend: Some("cutlass".into()),
+        mlp_host_binding: None,
+    };
+    assert!(search_model_environment(&invalid_ensemble).is_err());
+
+    let invalid_route = SearchModelEnvironmentRequest {
+        model_backend: "mlp".into(),
+        ensemble_blend_dir: None,
+        ensemble_first_weights_dir: None,
+        inference_backend: Some("unknown".into()),
+        mlp_host_binding: None,
+    };
+    assert!(search_model_environment(&invalid_route).is_err());
+}
+
+#[test]
+fn child_environment_filters_rank_controls_and_maps_cuda_visibility() {
+    use beam_runtime::cluster::child_environment;
+
+    let inherited = env(&[
+        ("PATH", "safe"),
+        ("CUDA_VISIBLE_DEVICES", " GPU-a, GPU-b ,GPU-c "),
+        ("CUDA_DEVICE_ORDER", "PCI_BUS_ID"),
+        ("RANK", "3"),
+        ("ROLE_RANK", "2"),
+        ("MASTER_ADDR", "coordinator"),
+        ("NCCL_DEBUG", "TRACE"),
+        ("BEAM_WEIGHT_DIR", "wrong"),
+        ("STREAM4_BATCH_ALIGNMENT", "999"),
+        ("PUBLISH_RESULTS", "1"),
+        ("RESULTS_INGEST_TOKEN", "filtered"),
+        ("CUSTOM_VALUE", "kept"),
+    ]);
+    let result = child_environment(&inherited, &[2, 0], "/rank/nccl-id.bin").unwrap();
+    assert_eq!(result.get("PATH").map(String::as_str), Some("safe"));
+    assert_eq!(result.get("CUSTOM_VALUE").map(String::as_str), Some("kept"));
+    assert_eq!(
+        result.get("CUDA_VISIBLE_DEVICES").map(String::as_str),
+        Some("GPU-c,GPU-a")
+    );
+    assert_eq!(
+        result.get("CUDA_DEVICE_ORDER").map(String::as_str),
+        Some("PCI_BUS_ID")
+    );
+    assert_eq!(
+        result.get("BEAM_NCCL_ID_FILE").map(String::as_str),
+        Some("/rank/nccl-id.bin")
+    );
+    for removed in [
+        "RANK",
+        "ROLE_RANK",
+        "MASTER_ADDR",
+        "NCCL_DEBUG",
+        "BEAM_WEIGHT_DIR",
+        "STREAM4_BATCH_ALIGNMENT",
+        "PUBLISH_RESULTS",
+        "RESULTS_INGEST_TOKEN",
+    ] {
+        assert!(!result.contains_key(removed), "kept reserved key {removed}");
+    }
+}
+
+#[test]
+fn child_environment_rejects_invalid_cuda_mapping() {
+    use beam_runtime::cluster::child_environment;
+
+    let inherited = env(&[("CUDA_VISIBLE_DEVICES", "GPU-a,-1")]);
+    assert_eq!(
+        child_environment(&inherited, &[1], "/run/nccl-id.bin")
+            .unwrap_err()
+            .to_string(),
+        "cannot map selected devices through inherited CUDA_VISIBLE_DEVICES"
+    );
 }

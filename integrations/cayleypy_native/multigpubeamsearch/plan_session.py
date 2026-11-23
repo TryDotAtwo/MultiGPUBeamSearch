@@ -6,7 +6,7 @@ from .beam_capacity import CapacityRejected
 from .pipeline_profiles import validate_rank_plans
 
 
-class NativePlanSession:
+class _PythonPlanSession:
     def __init__(self, runner, environment, world, directory, *, deadline, puzzle_id=0):
         self.sessions=[]
         self.supports_components=False
@@ -94,3 +94,163 @@ class NativePlanSession:
 
     def __enter__(self):return self
     def __exit__(self,*args):self.close()
+
+
+def _native_planning_type():
+    """Return the installed Rust planner, or None for a pre-planner wheel."""
+    from .errors import NativeUnavailable
+    from . import rust_control
+
+    try:
+        runtime = rust_control.extension()
+    except NativeUnavailable as error:
+        if str(error) in (
+            "the matching Rust/PyO3 runtime is not installed",
+            "the matching Rust/PyO3 runtime could not be loaded",
+        ):
+            return None, None
+        raise
+    planner = getattr(runtime, "PlanningSession", None)
+    if planner is None:
+        return runtime, None
+    if not callable(planner):
+        raise RuntimeError("installed Rust PlanningSession is not constructible")
+    return runtime, planner
+
+
+class NativePlanSession:
+    """Own one all-rank planner through Rust; retain the old-wheel adapter."""
+
+    def __init__(self, runner, environment, world, directory, *, deadline, puzzle_id=0):
+        import json
+        import math
+        import time
+
+        self._native = None
+        self._runtime = None
+        self._legacy = None
+        runtime, planner = _native_planning_type()
+        if planner is None:
+            self._legacy = _PythonPlanSession(
+                runner, environment, world, directory, deadline=deadline, puzzle_id=puzzle_id
+            )
+            self.supports_components = self._legacy.supports_components
+            self.inference_micro = self._legacy.inference_micro
+            return
+
+        directory = Path(directory).resolve()
+        # ProbeCohort creates this fresh directory as part of Rust-owned launch.
+        timeout = deadline - time.monotonic()
+        if not math.isfinite(timeout) or timeout <= 0.0:
+            raise TimeoutError("persistent native planner deadline expired before launch")
+        env = dict(
+            environment,
+            BEAM_CALIBRATION_PLAN_SESSION="1",
+            BEAM_BENCHMARK_PLAN_ONLY="1",
+            BEAM_NCCL_RUN_ID="plan-session-" + uuid.uuid4().hex,
+            BEAM_NCCL_ID_FILE=str(directory / "nccl-id.bin"),
+        )
+        command = [str(runner), str(puzzle_id), "1", "1024"]
+        self._runtime = runtime
+        try:
+            self._native = planner(
+                command, env, int(world), str(Path.cwd()), str(directory), timeout
+            )
+        except Exception as error:
+            translated = self._translate_capacity_error(error)
+            if translated is not None:
+                raise translated from error
+            raise
+        self.supports_components = bool(self._native.supports_components)
+        self.inference_micro = environment.get("BEAM_ENSEMBLE_INFERENCE_MICRO")
+
+    def _translate_capacity_error(self, error):
+        capacity_error = getattr(self._runtime, "CapacityRejected", None)
+        if isinstance(capacity_error, type) and isinstance(error, capacity_error):
+            return CapacityRejected(str(error))
+        return None
+
+    @property
+    def pids(self):
+        if self._native is not None:
+            return list(self._native.pids)
+        if self._legacy is not None:
+            return [session.process.pid for session in self._legacy.sessions]
+        return []
+
+    def exit_codes(self):
+        if self._native is not None:
+            return self._native.exit_codes()
+        if self._legacy is not None:
+            return [session.process.poll() for session in self._legacy.sessions]
+        return []
+
+    def admit(self, beam, environment):
+        import json
+
+        if self._legacy is not None:
+            return self._legacy.admit(beam, environment)
+        if self._native is None:
+            raise RuntimeError("planner session is closed")
+        try:
+            rows = json.loads(self._native.admit(beam, dict(environment)))
+        except Exception as error:
+            translated = self._translate_capacity_error(error)
+            if translated is not None:
+                raise translated from error
+            raise
+        if not isinstance(rows, list):
+            raise RuntimeError("Rust planner returned a non-list admission")
+        return rows
+
+    def set_deadline(self, deadline):
+        import math
+        import time
+
+        if self._legacy is not None:
+            return self._legacy.set_deadline(deadline)
+        if self._native is None:
+            raise RuntimeError("planner session is closed")
+        if not math.isfinite(deadline) or deadline <= time.monotonic():
+            raise ValueError("planning phase deadline must be finite and in the future")
+        self._native.set_deadline(max(0.001, deadline - time.monotonic()))
+
+    def measure_components(self, beam, environment):
+        import json
+
+        if self._legacy is not None:
+            return self._legacy.measure_components(beam, environment)
+        if self._native is None:
+            raise RuntimeError("planner session is closed")
+        if not self.supports_components:
+            raise RuntimeError("native component session unsupported")
+        try:
+            rows = json.loads(self._native.measure_components(beam, dict(environment)))
+        except Exception as error:
+            translated = self._translate_capacity_error(error)
+            if translated is not None:
+                raise translated from error
+            raise
+        if not isinstance(rows, list):
+            raise RuntimeError("Rust planner returned a non-list component result")
+        return rows
+
+    def cancel(self):
+        if self._legacy is not None:
+            return self._legacy.close()
+        if self._native is not None:
+            self._native.cancel()
+
+    def close(self):
+        if self._legacy is not None:
+            legacy, self._legacy = self._legacy, None
+            return legacy.close()
+        if self._native is not None:
+            self._native.close()
+            self._native = None
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        self.close()

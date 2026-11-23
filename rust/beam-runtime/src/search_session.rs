@@ -146,6 +146,14 @@ impl<'de> Deserialize<'de> for RequestedBeam {
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+pub struct ResolvedInferencePlanIdentity {
+    pub backend: String,
+    pub policy: String,
+    pub inference_row_limit: u64,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct PreparationIdentity {
     pub graph_hash: Option<String>,
     pub geometry: [Option<u64>; 3],
@@ -159,7 +167,9 @@ pub struct PreparationIdentity {
     #[serde(rename = "beam_width")]
     pub requested_beam: RequestedBeam,
     pub max_steps: u32,
-    pub options_repr: String,
+    pub options: Value,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub resolved_inference_plan: Option<ResolvedInferencePlanIdentity>,
     pub cuda_visible_devices: Option<String>,
     pub cuda_device_order: Option<String>,
     pub runtime_build: Option<Value>,
@@ -178,10 +188,11 @@ impl PreparationIdentity {
         binding_scope: bool,
         requested_beam: RequestedBeam,
         max_steps: u32,
-        options_repr: String,
+        options: Value,
         cuda_visible_devices: Option<String>,
         cuda_device_order: Option<String>,
         runtime_build: Option<Value>,
+        resolved_inference_plan: Option<ResolvedInferencePlanIdentity>,
     ) -> Self {
         Self {
             graph_hash,
@@ -195,7 +206,8 @@ impl PreparationIdentity {
             binding_scope,
             requested_beam,
             max_steps,
-            options_repr,
+            options,
+            resolved_inference_plan,
             cuda_visible_devices,
             cuda_device_order,
             runtime_build,

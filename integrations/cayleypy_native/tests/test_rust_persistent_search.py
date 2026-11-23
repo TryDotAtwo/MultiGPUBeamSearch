@@ -1,5 +1,6 @@
 """The experimental Rust session owns rank workers behind NativeSession."""
 import json
+import os
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -22,9 +23,14 @@ def test_compiled_rust_preparation_identity_builder_round_trips_fields():
 
     try:
         runtime = rust_control.extension()
-    except NativeUnavailable:
+    except NativeUnavailable as error:
+        if os.environ.get("REQUIRE_RUST_PREPARATION_IDENTITY") == "1":
+            raise AssertionError(
+                "installed-wheel gate requires the compiled Rust preparation API"
+            ) from error
         pytest.skip("Rust extension is not built in this CPU-only job")
 
+    assert getattr(runtime, "PREPARATION_IDENTITY_SCHEMA_VERSION", 0) >= 3
     build = getattr(runtime, "build_preparation_identity", None)
     assert callable(build), "Rust preparation identity builder is missing"
     runtime_build = {"binary_sha256": "c" * 64, "inference_backend": "cutlass"}
@@ -40,7 +46,7 @@ def test_compiled_rust_preparation_identity_builder_round_trips_fields():
         False,
         64,
         4,
-        "NativeOptions()",
+        json.dumps({"inference_backend": "auto"}, sort_keys=True),
         "0,1",
         "PCI_BUS_ID",
         json.dumps(runtime_build),
@@ -57,11 +63,120 @@ def test_compiled_rust_preparation_identity_builder_round_trips_fields():
         "binding_scope": False,
         "beam_width": 64,
         "max_steps": 4,
-        "options_repr": "NativeOptions()",
+        "options": {"inference_backend": "auto"},
         "cuda_visible_devices": "0,1",
         "cuda_device_order": "PCI_BUS_ID",
         "runtime_build": runtime_build,
     }
+
+
+def test_compiled_rust_preparation_identity_uses_structured_options():
+    from multigpubeamsearch import rust_control
+    from multigpubeamsearch.errors import NativeUnavailable
+
+    try:
+        runtime = rust_control.extension()
+    except NativeUnavailable as error:
+        if os.environ.get("REQUIRE_RUST_PREPARATION_IDENTITY") == "1":
+            raise AssertionError(
+                "installed-wheel gate requires the compiled Rust preparation API"
+            ) from error
+        pytest.skip("Rust extension is not built in this CPU-only job")
+
+    assert getattr(runtime, "PREPARATION_IDENTITY_SCHEMA_VERSION", 0) >= 3
+    build = getattr(runtime, "build_preparation_identity", None)
+    assert callable(build), "Rust preparation identity builder is missing"
+    plan = {
+        "backend": "cutlass",
+        "policy": "cutlass-default-v1",
+        "inference_row_limit": 8192,
+    }
+    options = {
+        "inference_backend": "cutlass",
+        "calibration_frontier_max_states": 1234,
+        "source_dir": "/remote/project",
+        "resolved_inference_plan": plan,
+    }
+    identity_json = build(
+        "a" * 64,
+        [4, 4, 2],
+        [0, 1],
+        [[1, 0]],
+        "b" * 64,
+        [17],
+        "mlp",
+        [0],
+        False,
+        64,
+        4,
+        json.dumps(options, sort_keys=True, allow_nan=False),
+        "0",
+        "PCI_BUS_ID",
+        json.dumps({"binary_sha256": "c" * 64}),
+    )
+    identity = json.loads(identity_json)
+    assert identity["options"] == {
+        "inference_backend": "cutlass",
+        "calibration_frontier_max_states": 1234,
+        "source_dir": "/remote/project",
+    }
+    assert identity["resolved_inference_plan"] == plan
+    assert "options_repr" not in identity
+
+    session = runtime.SearchSession()
+    assert session.begin_preparation(identity_json) is False
+    session.remember_preparation(identity_json)
+    assert session.begin_preparation(identity_json) is True
+    changed_plan = dict(plan, inference_row_limit=4096)
+    options["resolved_inference_plan"] = changed_plan
+    changed_identity = build(
+        "a" * 64,
+        [4, 4, 2],
+        [0, 1],
+        [[1, 0]],
+        "b" * 64,
+        [17],
+        "mlp",
+        [0],
+        False,
+        64,
+        4,
+        json.dumps(options, sort_keys=True, allow_nan=False),
+        "0",
+        "PCI_BUS_ID",
+        json.dumps({"binary_sha256": "c" * 64}),
+    )
+    assert session.begin_preparation(changed_identity) is False
+    session.close()
+
+
+def test_legacy_preparation_identity_extension_is_not_used_for_typed_identity(monkeypatch):
+    from multigpubeamsearch import rust_control
+
+    calls = []
+    legacy = SimpleNamespace(build_preparation_identity=lambda *args: calls.append(args))
+    monkeypatch.setattr(rust_control, "extension", lambda: legacy)
+
+    assert rust_control.supports_preparation_identity() is False
+    result = rust_control.build_preparation_identity(
+        graph_hash="a" * 64,
+        geometry=(2, 2, 1),
+        center=(0, 1),
+        generators=((1, 0),),
+        model_artifact_hash="b" * 64,
+        artifact_sizes=(17,),
+        model_backend="mlp",
+        devices=(0,),
+        binding_scope=False,
+        beam_width=64,
+        max_steps=4,
+        options={"inference_backend": "auto"},
+        cuda_visible_devices=None,
+        cuda_device_order=None,
+        runtime_build=None,
+    )
+    assert result is None
+    assert calls == []
 
 
 def test_compiled_rust_session_identity_builder_round_trips_fields():
@@ -216,10 +331,14 @@ def test_rust_session_reuses_and_releases_rank_owner(tmp_path, monkeypatch, worl
         names = (
             "graph_hash", "geometry", "center", "generators", "model_artifact_hash",
             "artifact_sizes", "model_backend", "devices", "binding_scope", "beam_width",
-            "max_steps", "options_repr", "cuda_visible_devices", "cuda_device_order",
+            "max_steps", "options_json", "cuda_visible_devices", "cuda_device_order",
             "runtime_build",
         )
         identity = dict(zip(names, values))
+        identity["options"] = json.loads(identity.pop("options_json"))
+        identity["resolved_inference_plan"] = identity["options"].pop(
+            "resolved_inference_plan", None
+        )
         if identity["runtime_build"] is not None:
             identity["runtime_build"] = json.loads(identity["runtime_build"])
         return json.dumps(identity, sort_keys=True)
@@ -240,13 +359,25 @@ def test_rust_session_reuses_and_releases_rank_owner(tmp_path, monkeypatch, worl
         return json.dumps(identity, sort_keys=True)
     monkeypatch.setattr(rust_control, "extension", lambda: SimpleNamespace(
         SearchSession=Owner, SEARCH_TERMINAL_RESULT_VERSION=1,
+        PREPARATION_IDENTITY_SCHEMA_VERSION=3,
         build_preparation_identity=build_preparation_identity,
         build_session_identity=build_session_identity))
     contract = GraphContract(2, 2, ((1, 0),), ("swap",), (0, 1), (1, 0), "a" * 64)
     model = SimpleNamespace(artifact_hash="b" * 64, backend="mlp")
-    runtime = SimpleNamespace(runner=tmp_path / "runner", architectures=(86,),
-                              build_metadata={"binary_sha256": "c" * 64})
+    runtime = SimpleNamespace(
+        runner=tmp_path / "runner",
+        architectures=(86,),
+        build_metadata={"binary_sha256": "c" * 64},
+        profile={
+            "inference_backend": "cutlass",
+            "policy": "cutlass-default-v1",
+            "inference_row_limit": 8192,
+        },
+    )
     options = NativeOptions(cache_dir=tmp_path)
+    def reject_python_repr(self):
+        raise AssertionError("Rust-owned preparation identity must not use Python repr(options)")
+    monkeypatch.setattr(NativeOptions, "__repr__", reject_python_repr)
     monkeypatch.setenv("CUDA_VISIBLE_DEVICES", "0,1")
     monkeypatch.setenv("CUDA_DEVICE_ORDER", "PCI_BUS_ID")
     session = NativeSession(engine="rust")
@@ -258,10 +389,10 @@ def test_rust_session_reuses_and_releases_rank_owner(tmp_path, monkeypatch, worl
                              {"requested_beam_width": beam, "profile": {}, "terminal_records": 1,
                               "callback_metadata_owner": "python-execute"})
 
-    def run(number):
+    def run(number, current_options=options):
         directory = tmp_path / f"run-{number}"
         directory.mkdir()
-        return session.run(execute, contract, model, options, 64, 4, directory,
+        return session.run(execute, contract, model, current_options, 64, 4, directory,
                            tuple(range(world)), runtime=runtime)
 
     try:
@@ -279,25 +410,45 @@ def test_rust_session_reuses_and_releases_rank_owner(tmp_path, monkeypatch, worl
         assert python_identity["geometry"] == [2, 2, 1]
         assert python_identity["artifact_sizes"] == []
         assert python_identity["binding_scope"] is False
+        assert python_identity["resolved_inference_plan"] == {
+            "backend": "cutlass",
+            "policy": "cutlass-default-v1",
+            "inference_row_limit": 8192,
+        }
         assert launch["command"] == [str(worker), "0", "4", "64"]
         assert launch["protocol_command"] == [str(worker), "--resident-protocol-info"]
         assert launch["environment"]["BEAM_NATIVE_LIBRARY"] == str(library)
         assert launch["environment"]["TEST_ENV"] == "retained"
         assert start == [1, 0] and timeout == 5
+        runtime.profile["inference_row_limit"] = 4096
+        changed_plan = run(3)
+        assert not changed_plan.metadata["persistent_session"]["reused"]
+        assert changed_plan.metadata["persistent_session"]["request_count"] == 1
+        assert owners[0].requests[2][0]["options"]["python_session_identity"]["resolved_inference_plan"]["inference_row_limit"] == 4096
+        assert len(owners) == 1 and not owners[0].closed
+
         model.artifact_hash = "f" * 64
-        changed = run(3)
-        assert not changed.metadata["persistent_session"]["reused"]
-        assert changed.metadata["persistent_session"]["request_count"] == 1
-        assert len(owners) == 1 and len(calls) == 2 and not owners[0].closed
-        assert len(owners[0].requests) == 3
+        changed_model = run(4)
+        assert not changed_model.metadata["persistent_session"]["reused"]
+        assert changed_model.metadata["persistent_session"]["request_count"] == 1
+        assert len(owners) == 1 and not owners[0].closed
+        assert len(owners[0].requests) == 4
         assert owners[0].preparation_checks == []
-        assert len(owners[0].preparation_begins) == 2
-        assert owners[0].preparation_resets == 1
+        assert len(owners[0].preparation_begins) == 3
+        assert owners[0].preparation_resets == 2
         assert owners[0].preparation_records == []
-        assert len(owners[0].preparation_results) == 2
+        assert len(owners[0].preparation_results) == 3
         assert owners[0].preparation_begins[0] == owners[0].preparation_results[0][0]
         assert owners[0].preparation_begins[1] != owners[0].preparation_results[0][0]
         assert owners[0].preparation_begins[1] == owners[0].preparation_results[1][0]
+        assert owners[0].preparation_begins[2] != owners[0].preparation_results[1][0]
+        assert owners[0].preparation_begins[2] == owners[0].preparation_results[2][0]
+        assert json.loads(owners[0].preparation_results[0][0])["resolved_inference_plan"] == {
+            "backend": "cutlass",
+            "policy": "cutlass-default-v1",
+            "inference_row_limit": 8192,
+        }
+        assert json.loads(owners[0].preparation_results[1][0])["resolved_inference_plan"]["inference_row_limit"] == 4096
         assert owners[0].preparation_results[0][1]["callback_metadata_owner"] == "python-execute"
         expected_first_session = {
             "reused": False, "worker_pids": list(range(100, 100 + world)),
@@ -317,23 +468,36 @@ def test_rust_session_reuses_and_releases_rank_owner(tmp_path, monkeypatch, worl
             "binding_scope": False,
             "beam_width": 64,
             "max_steps": 4,
-            "options_repr": repr(options),
+            "options": rust_control.options_descriptor(options),
+            "resolved_inference_plan": {
+                "backend": "cutlass",
+                "policy": "cutlass-default-v1",
+                "inference_row_limit": 8192,
+            },
             "cuda_visible_devices": "0,1",
             "cuda_device_order": "PCI_BUS_ID",
             "runtime_build": {"binary_sha256": "c" * 64},
         }
-        assert owners[0].requests[2][0]["model_artifact_hash"] == "f" * 64
-        assert len(identity_builds) == 3
-        assert len(session_identity_builds) == 2
-        assert session_identity_builds[1][3] == "f" * 64
+        assert owners[0].requests[3][0]["model_artifact_hash"] == "f" * 64
+        assert len(identity_builds) == 4
+        assert len(session_identity_builds) == 3
+        assert session_identity_builds[2][3] == "f" * 64
         assert session_identity_builds[0][0:6] == (
             [0, 1], [[1, 0]], "a" * 64, "b" * 64, "mlp", list(range(world)))
         assert json.loads(session_identity_builds[0][9])["python_session_identity"]["geometry"] == [2, 2, 1]
+        nested_options = json.loads(session_identity_builds[0][9])["python_session_identity"]
+        assert nested_options["options"] == rust_control.options_descriptor(options)
+        assert nested_options["resolved_inference_plan"] == {
+            "backend": "cutlass",
+            "policy": "cutlass-default-v1",
+            "inference_row_limit": 8192,
+        }
+        assert "options_repr" not in nested_options
         assert identity_builds[0][0:4] == ("a" * 64, [2, 2, 1], [0, 1], [[1, 0]])
         assert identity_builds[0][4:8] == ("b" * 64, [], "mlp", list(range(world)))
         owners[0].fail = True
         with pytest.raises(NativeBackendError, match="injected rank failure"):
-            run(4)
+            run(5)
         assert owners[0].closed
     finally:
         session.close()
@@ -408,7 +572,7 @@ def test_rust_session_owner_compares_typed_preparation_identity_when_extension_i
         "binding_scope": False,
         "beam_width": 64,
         "max_steps": 4,
-        "options_repr": "NativeOptions()",
+        "options": {"inference_backend": "auto"},
         "cuda_visible_devices": "0,1",
         "cuda_device_order": "PCI_BUS_ID",
         "runtime_build": {"binary_sha256": "c" * 64, "inference_backend": "cutlass"},
@@ -533,7 +697,7 @@ def test_compiled_rust_preparation_identity_builder_accepts_auto_max():
         binding_scope=False,
         beam_width="max",
         max_steps=4,
-        options_repr="NativeOptions()",
+        options={"inference_backend": "auto"},
         cuda_visible_devices="0,1",
         cuda_device_order="PCI_BUS_ID",
         runtime_build={"binary_sha256": "c" * 64, "inference_backend": "cutlass"},
@@ -572,7 +736,7 @@ def test_auto_max_identity_builder_requires_explicit_extension_capability(monkey
         binding_scope=False,
         beam_width="max",
         max_steps=4,
-        options_repr="NativeOptions()",
+        options={"inference_backend": "auto"},
         cuda_visible_devices=None,
         cuda_device_order=None,
         runtime_build=None,
@@ -636,3 +800,616 @@ def test_old_rust_owner_never_receives_auto_max_preparation_json(tmp_path, monke
         assert outcome.metadata["persistent_session"]["worker_pids"] == [101]
     finally:
         session.close()
+
+
+@pytest.mark.skipif(os.name != "posix", reason="the fixture launches a shebang worker")
+@pytest.mark.parametrize("world", [1, 2])
+def test_installed_public_session_uses_real_rust_owner_for_reuse_invalidation_and_cancellation(
+    tmp_path, monkeypatch, world
+):
+    """Exercise NativeSession.run with the installed PyO3 owner and CPU rank workers."""
+    import sys
+    import threading
+    import time
+
+    from multigpubeamsearch import (
+        models,
+        native_library,
+        persistent as persistent_module,
+        rust_control,
+    )
+    from multigpubeamsearch.errors import NativeUnavailable
+
+    try:
+        extension = rust_control.extension()
+    except (NativeUnavailable, ImportError) as error:
+        if os.environ.get("REQUIRE_RUST_PREPARATION_IDENTITY") == "1":
+            raise AssertionError(
+                "installed-wheel gate requires the compiled Rust SearchSession"
+            ) from error
+        pytest.skip("Rust extension is not built in this CPU-only job")
+    assert callable(getattr(extension, "SearchSession", None))
+    assert getattr(extension, "SEARCH_TERMINAL_RESULT_VERSION", None) == 1
+
+    def _process_exists(pid):
+        try:
+            os.kill(pid, 0)
+        except ProcessLookupError:
+            return False
+        return True
+
+    def graph_contract(size):
+        center = list(range(size))
+        start = center.copy()
+        start[0], start[1] = start[1], start[0]
+        swap = list(range(size))
+        swap[0], swap[1] = swap[1], swap[0]
+        graph = rust_control.build_graph_contract(center, start, [swap], ["swap"])
+        assert graph is not None
+        return GraphContract(
+            graph["state_len"],
+            graph["num_classes"],
+            tuple(tuple(row) for row in graph["generators"]),
+            ("swap",),
+            tuple(graph["center"]),
+            tuple(graph["start"]),
+            graph["graph_hash"],
+        )
+
+    worker = tmp_path / "synthetic-resident-worker"
+    worker.write_text(
+        f"#!{sys.executable}\n"
+        + r'''import json, os, sys, time
+from pathlib import Path
+
+if "--resident-protocol-info" in sys.argv:
+    if len(os.environ.get("BEAM_EXPECTED_GRAPH_HASH", "")) != 64:
+        raise SystemExit("missing Rust graph binding")
+    print(json.dumps({
+        "protocol": "resident-search-v1",
+        "loaded_graph_binding": 1,
+    }), flush=True)
+    raise SystemExit(0)
+
+session = Path(os.environ["BEAM_SESSION_DIR"])
+rank = int(os.environ["RANK"])
+sequence = 0
+while not (session / "stop").exists():
+    request_path = session / f"request-{sequence}.json"
+    if not request_path.is_file():
+        time.sleep(0.002)
+        continue
+    request = json.loads(request_path.read_text(encoding="utf-8"))
+    if (session / "block-next").exists():
+        (session / f"blocked-{rank}").write_text("ready", encoding="utf-8")
+        while not (session / "stop").exists():
+            time.sleep(0.002)
+        (session / f"stopped-{rank}").write_text("stopped", encoding="utf-8")
+        break
+    start = request["start"]
+    run_dir = Path(request["run_dir"])
+    beam = os.environ["FIXTURE_BEAM"]
+    text = f"GLOBAL_BEAM_WIDTH_EFFECTIVE={beam}\n"
+    if rank == 0 and start[:2] == [1, 0]:
+        text += (
+            "puzzle_solved=1 puzzle_id=0 seconds=0.1 "
+            "solution_length=1 solution=m0\n"
+        )
+    (run_dir / f"resident-rank-{rank}.log").write_text(text, encoding="utf-8")
+    receipt = session / f"done-{sequence}-{rank}.json"
+    temporary = receipt.with_suffix(".tmp")
+    temporary.write_text(
+        json.dumps({"sequence": sequence, "rank": rank}), encoding="utf-8"
+    )
+    temporary.replace(receipt)
+    sequence += 1
+''',
+        encoding="utf-8",
+    )
+    worker.chmod(0o755)
+    runner = tmp_path / "runner-placeholder"
+    runner.write_text("synthetic runner identity\n", encoding="utf-8")
+    library = tmp_path / "libbeam_native.so"
+    library.write_bytes(b"synthetic library handle")
+
+    monkeypatch.setattr(models, "verify_prepared_model", lambda *args: None)
+    monkeypatch.setattr(persistent_module, "requires_mlp_host_binding", lambda *args: False)
+    monkeypatch.setattr(rust_control, "worker_executable", lambda: worker)
+    monkeypatch.setattr(
+        native_library,
+        "ensure_native_library",
+        lambda *args: (
+            library,
+            {
+                "library_sha256": "d" * 64,
+                "specification": {"worker_sha256": "e" * 64},
+            },
+        ),
+    )
+    monkeypatch.setenv("CUDA_VISIBLE_DEVICES", ",".join(str(i) for i in range(world)))
+    monkeypatch.setenv("CUDA_DEVICE_ORDER", "PCI_BUS_ID")
+
+    contract = graph_contract(4)
+    model = SimpleNamespace(
+        artifact_hash="b" * 64,
+        artifact_sizes=(17,),
+        backend="mlp",
+    )
+    runtime = SimpleNamespace(
+        runner=runner,
+        architectures=(86,),
+        build_metadata={"binary_sha256": "c" * 64},
+        profile={
+            "inference_backend": "libtorch",
+            "policy": "libtorch-default-v1",
+            "inference_row_limit": 8192,
+        },
+    )
+    options = NativeOptions(cache_dir=tmp_path / "cache", timeout_seconds=8)
+    session = NativeSession(engine="rust")
+    preparation_callbacks = []
+    cancel_thread = None
+
+    def execute(current_contract, current_model, current_options, beam, depth,
+                run_dir, devices, *, runtime):
+        preparation_callbacks.append((current_model.artifact_hash, current_contract.graph_hash))
+        elapsed = session.launch(
+            [str(runtime.runner), "0", str(depth), str(beam)],
+            contract=current_contract,
+            run_dir=run_dir,
+            env={"FIXTURE_BEAM": str(beam)},
+            world=len(devices),
+            timeout=current_options.timeout_seconds,
+            runtime=runtime,
+        )
+        path, effective_width, terminal = session.terminal_result(
+            run_dir / "native.log", current_contract, max_steps=depth
+        )
+        metadata = dict(terminal)
+        metadata["profile"] = {"calibration_total_wall_seconds": 12.0}
+        return NativeOutcome(path, elapsed, effective_width, run_dir, metadata)
+
+    def run(label, current_contract=contract):
+        run_dir = tmp_path / label
+        run_dir.mkdir()
+        return session.run(
+            execute,
+            current_contract,
+            model,
+            options,
+            64,
+            1,
+            run_dir,
+            tuple(range(world)),
+            runtime=runtime,
+        )
+
+    try:
+        first = run("same-identity-first")
+        assert isinstance(session._workers._owner, extension.SearchSession)
+        first_pids = tuple(first.metadata["persistent_session"]["worker_pids"])
+        assert len(first_pids) == world
+        assert first.metadata["persistent_session"]["reused"] is False
+        assert first.metadata["persistent_session"]["request_count"] == 1
+        assert first.path == (0,) and contract.replay(first.path)
+
+        second = run("same-identity-second")
+        assert tuple(second.metadata["persistent_session"]["worker_pids"]) == first_pids
+        assert second.metadata["persistent_session"]["reused"] is True
+        assert second.metadata["persistent_session"]["request_count"] == 2
+        assert second.metadata["profile"]["calibration_total_wall_seconds"] == 0.0
+        assert tuple(second.path) == tuple(first.path) and contract.replay(second.path)
+        assert len(preparation_callbacks) == 1
+
+        runtime.profile["inference_row_limit"] = 4096
+        changed_plan = run("changed-plan")
+        plan_pids = tuple(changed_plan.metadata["persistent_session"]["worker_pids"])
+        assert plan_pids and plan_pids != first_pids
+        assert changed_plan.metadata["persistent_session"]["reused"] is False
+        assert changed_plan.metadata["persistent_session"]["request_count"] == 1
+        assert len(preparation_callbacks) == 2
+
+        model.artifact_hash = "f" * 64
+        changed_model = run("changed-model")
+        model_pids = tuple(changed_model.metadata["persistent_session"]["worker_pids"])
+        assert model_pids and model_pids != plan_pids
+        assert changed_model.metadata["persistent_session"]["reused"] is False
+        assert changed_model.metadata["persistent_session"]["request_count"] == 1
+        assert len(preparation_callbacks) == 3
+
+        changed_geometry = run("changed-geometry", graph_contract(5))
+        geometry_pids = tuple(changed_geometry.metadata["persistent_session"]["worker_pids"])
+        assert geometry_pids and geometry_pids != model_pids
+        assert changed_geometry.metadata["persistent_session"]["reused"] is False
+        assert changed_geometry.metadata["persistent_session"]["request_count"] == 1
+        assert len(preparation_callbacks) == 4
+        assert tuple(changed_geometry.path) == (0,)
+        assert graph_contract(5).replay(changed_geometry.path)
+
+        # Hold the live resident ranks inside one request, cancel through the
+        # public session API, and require Rust to stop and reap the whole group.
+        session_dir = tmp_path / "changed-geometry" / "resident-session"
+        assert session_dir.is_dir()
+        (session_dir / "block-next").touch()
+        cancelled_pids = tuple(session._workers.pids)
+        assert len(cancelled_pids) == world and len(set(cancelled_pids)) == world
+        cancellation_outcome = []
+
+        def cancelled_search():
+            try:
+                run("cancelled-search", graph_contract(5))
+            except BaseException as error:
+                cancellation_outcome.append(error)
+            else:
+                cancellation_outcome.append(None)
+
+        cancel_thread = threading.Thread(target=cancelled_search, daemon=True)
+        cancel_thread.start()
+        blocked_paths = [session_dir / f"blocked-{rank}" for rank in range(world)]
+        deadline = time.monotonic() + 5.0
+        while time.monotonic() < deadline and not all(path.is_file() for path in blocked_paths):
+            if not cancel_thread.is_alive():
+                break
+            time.sleep(0.01)
+        assert all(path.is_file() for path in blocked_paths), "not every rank entered the held request"
+        rust_owner = session._workers._owner
+        assert session.cancel() is True
+        cancel_thread.join(timeout=8.0)
+        assert not cancel_thread.is_alive(), "cancelled resident search did not return"
+        assert len(cancellation_outcome) == 1
+        assert isinstance(cancellation_outcome[0], NativeBackendError)
+        assert "cancel" in str(cancellation_outcome[0]).lower()
+        assert session.closed and session._workers is None
+        assert rust_owner.closed is True
+
+        stopped_paths = [session_dir / f"stopped-{rank}" for rank in range(world)]
+        deadline = time.monotonic() + 5.0
+        while time.monotonic() < deadline:
+            alive = [pid for pid in cancelled_pids if _process_exists(pid)]
+            if not alive and all(path.is_file() for path in stopped_paths):
+                break
+            time.sleep(0.01)
+        assert all(path.is_file() for path in stopped_paths), "Rust did not stop every resident rank"
+        assert not [pid for pid in cancelled_pids if _process_exists(pid)], "cancelled rank process was not reaped"
+
+        # Cancellation closes this session. A fresh Rust session must still
+        # start a complete healthy worker group and independently replay its result.
+        session = NativeSession(engine="rust")
+        recovered = run("healthy-after-cancel", graph_contract(5))
+        recovered_metadata = recovered.metadata["persistent_session"]
+        recovered_pids = tuple(recovered_metadata["worker_pids"])
+        assert len(recovered_pids) == world and len(set(recovered_pids)) == world
+        assert not set(recovered_pids).intersection(cancelled_pids)
+        assert recovered_metadata["reused"] is False
+        assert recovered_metadata["request_count"] == 1
+        assert tuple(recovered.path) == (0,) and graph_contract(5).replay(recovered.path)
+    finally:
+        if cancel_thread is not None and cancel_thread.is_alive():
+            session.cancel()
+            cancel_thread.join(timeout=10.0)
+            assert not cancel_thread.is_alive(), "cancellation cleanup left the search thread active"
+        if not session.closed:
+            session.close()
+
+@pytest.mark.skipif(os.name != "posix", reason="the fixture launches a shebang worker")
+@pytest.mark.parametrize("world", [1, 2])
+def test_installed_public_beam_search_and_cayleypy_method_select_compiled_rust_owner(tmp_path, monkeypatch, world):
+    """Exercise package-level beam_search through the installed Rust session owner."""
+    import sys
+
+    from multigpubeamsearch import (
+        backend as backend_module,
+        beam_search as public_beam_search,
+        bootstrap,
+        dispatch as dispatch_module,
+        models,
+        native_library,
+        persistent as persistent_module,
+        rust_control,
+        rust_resident,
+    )
+    from multigpubeamsearch.errors import NativeUnavailable
+    from multigpubeamsearch.options import NativeOptions, NativeOutcome
+
+    try:
+        extension = rust_control.extension()
+    except (NativeUnavailable, ImportError) as error:
+        if os.environ.get("REQUIRE_RUST_PREPARATION_IDENTITY") == "1":
+            raise AssertionError(
+                "installed-wheel public search requires the compiled Rust SearchSession"
+            ) from error
+        pytest.skip("Rust extension is not built in this CPU-only job")
+    assert callable(getattr(extension, "SearchSession", None))
+    assert getattr(extension, "SEARCH_TERMINAL_RESULT_VERSION", None) == 1
+
+    definition = SimpleNamespace(
+        is_permutation_group=lambda: True,
+        state_size=4,
+        central_state=[0, 1, 2, 3],
+        generators_permutations=[[1, 0, 2, 3]],
+        generator_names=["swap"],
+    )
+    graph = SimpleNamespace(definition=definition)
+    model = SimpleNamespace(
+        artifact_hash="b" * 64,
+        artifact_sizes=(17,),
+        backend="mlp",
+        manifest={"output_dim": 1, "heuristic": "installed-public-rust"},
+    )
+    alternate_model = SimpleNamespace(
+        artifact_hash="f" * 64,
+        artifact_sizes=(17,),
+        backend="mlp",
+        manifest={"output_dim": 1, "heuristic": "installed-public-rust"},
+    )
+    models_by_artifact = {model.artifact_hash: model, alternate_model.artifact_hash: alternate_model}
+    default_predictor = SimpleNamespace(artifact_hash=model.artifact_hash)
+    options = NativeOptions(cache_dir=tmp_path / "cache", timeout_seconds=8)
+    runner = tmp_path / "runner-placeholder"
+    runner.write_text("synthetic runner identity\n", encoding="utf-8")
+    library = tmp_path / "libbeam_native.so"
+    library.write_bytes(b"synthetic library handle")
+    runtime = SimpleNamespace(
+        runner=runner,
+        architectures=(86,),
+        build_metadata={
+            "binary_sha256": "c" * 64,
+            "inference_backend": "libtorch",
+        },
+        profile={
+            "inference_backend": "libtorch",
+            "policy": "libtorch-default-v1",
+            "inference_row_limit": 8192,
+        },
+    )
+
+    worker = tmp_path / "synthetic-public-worker"
+    worker.write_text(
+        f"#!{sys.executable}\n"
+        + r'''import json, os, sys, time
+from pathlib import Path
+
+if "--resident-protocol-info" in sys.argv:
+    if len(os.environ.get("BEAM_EXPECTED_GRAPH_HASH", "")) != 64:
+        raise SystemExit("missing Rust graph binding")
+    print(json.dumps({
+        "protocol": "resident-search-v1",
+        "loaded_graph_binding": 1,
+    }), flush=True)
+    raise SystemExit(0)
+
+session = Path(os.environ["BEAM_SESSION_DIR"])
+rank = int(os.environ["RANK"])
+sequence = 0
+while not (session / "stop").exists():
+    request_path = session / f"request-{sequence}.json"
+    if not request_path.is_file():
+        time.sleep(0.002)
+        continue
+    request = json.loads(request_path.read_text(encoding="utf-8"))
+    start = request["start"]
+    run_dir = Path(request["run_dir"])
+    beam = os.environ["FIXTURE_BEAM"]
+    text = f"GLOBAL_BEAM_WIDTH_EFFECTIVE={beam}\n"
+    if rank == 0 and os.environ.get("FIXTURE_SOLVED") == "1":
+        text += (
+            "puzzle_solved=1 puzzle_id=0 seconds=0.1 "
+            "solution_length=1 solution=m0\n"
+        )
+    (run_dir / f"resident-rank-{rank}.log").write_text(text, encoding="utf-8")
+    receipt = session / f"done-{sequence}-{rank}.json"
+    temporary = receipt.with_suffix(".tmp")
+    temporary.write_text(
+        json.dumps({"sequence": sequence, "rank": rank}), encoding="utf-8"
+    )
+    temporary.replace(receipt)
+    sequence += 1
+''',
+        encoding="utf-8",
+    )
+    worker.chmod(0o755)
+
+    monkeypatch.setattr(bootstrap, "prepare_sources", lambda current: current)
+    monkeypatch.setattr(dispatch_module, "runtime_devices", lambda *args: tuple(range(world)))
+    monkeypatch.setattr(
+        dispatch_module, "prepare_model",
+        lambda predictor, *args, **kwargs: models_by_artifact[
+            getattr(predictor, "artifact_hash", model.artifact_hash)
+        ],
+    )
+    monkeypatch.setattr(dispatch_module, "prepare_runtime", lambda *args, **kwargs: runtime)
+    monkeypatch.setattr(models, "verify_prepared_model", lambda *args: None)
+    monkeypatch.setattr(persistent_module, "requires_mlp_host_binding", lambda *args: False)
+    monkeypatch.setattr(rust_control, "worker_executable", lambda: worker)
+    monkeypatch.setattr(
+        native_library,
+        "ensure_native_library",
+        lambda *args: (
+            library,
+            {
+                "library_sha256": "d" * 64,
+                "specification": {"worker_sha256": "e" * 64},
+            },
+        ),
+    )
+
+    launched_owners = []
+    native_workers = []
+    session_type = persistent_module.NativeSession
+    worker_type = rust_resident.RustResidentWorkers
+
+    class RecordingNativeSession(session_type):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            launched_owners.append(self)
+
+    class RecordingRustResidentWorkers(worker_type):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            native_workers.append(self)
+
+    monkeypatch.setattr(persistent_module, "NativeSession", RecordingNativeSession)
+    monkeypatch.setattr(rust_resident, "RustResidentWorkers", RecordingRustResidentWorkers)
+
+    native_calls = []
+
+    def run_native_once(contract, current_model, current_options, beam_width, max_steps,
+                        run_dir, devices, *, runtime=None):
+        session = persistent_module.current_session()
+        assert session is not None and session._engine == "rust"
+        native_calls.append(contract.graph_hash)
+        elapsed = session.launch(
+            [str(runtime.runner), "0", str(max_steps), str(beam_width)],
+            contract=contract,
+            run_dir=run_dir,
+            env={"FIXTURE_BEAM": str(beam_width), "FIXTURE_SOLVED": "1"},
+            world=len(devices),
+            timeout=current_options.timeout_seconds,
+            runtime=runtime,
+        )
+        path, effective_width, terminal = session.terminal_result(
+            run_dir / "native.log", contract, max_steps=max_steps
+        )
+        metadata = dict(terminal)
+        metadata["profile"] = {"calibration_total_wall_seconds": 12.0}
+        return NativeOutcome(path, elapsed, effective_width, run_dir, metadata)
+
+    monkeypatch.setattr(backend_module, "_run_native_once", run_native_once)
+
+    result = public_beam_search(
+        graph,
+        backend="native",
+        native_options=options,
+        predictor=default_predictor,
+        start_state=[1, 0, 2, 3],
+        beam_width=64,
+        max_steps=1,
+        return_path=True,
+    )
+
+    from multigpubeamsearch.contracts import GraphContract
+
+    contract = GraphContract.from_graph(graph, [1, 0, 2, 3])
+    assert result.path == [0] and contract.replay(result.path)
+    assert result.native_metadata["backend"] == "native"
+    assert result.native_metadata["devices"] == list(range(world))
+    persistent = result.native_metadata["persistent_session"]
+    pids = persistent["worker_pids"]
+    assert len(pids) == world and len(set(pids)) == world
+    assert persistent["reused"] is False and persistent["request_count"] == 1
+    assert len(native_calls) == 1 and native_calls[0] == contract.graph_hash
+    assert len(launched_owners) == 1 and launched_owners[0].closed
+    assert len(native_workers) == 1
+    assert isinstance(native_workers[0]._owner, extension.SearchSession)
+
+    # Exercise the opt-in CayleyPy method used by notebooks and Kaggle.
+    from cayleypy import CayleyGraph, PermutationGroups
+
+    graph_via_method = CayleyGraph(PermutationGroups.lrx(4), device="cpu", random_seed=42)
+    center = list(range(4))
+    base_contract = GraphContract.from_graph(graph_via_method, center)
+    method_start = [None] * base_contract.state_len
+    for output_index, source_index in enumerate(base_contract.generators[0]):
+        method_start[source_index] = base_contract.center[output_index]
+    method_contract = GraphContract.from_graph(graph_via_method, method_start)
+    assert method_contract.replay([0])
+
+    dispatch_module.disable_native()
+    try:
+        dispatch_module.enable_native(options, default_backend="native")
+        graph_method_result = graph_via_method.beam_search(
+            predictor=default_predictor,
+            start_state=method_start,
+            beam_width=64,
+            max_steps=1,
+            return_path=True,
+        )
+    finally:
+        dispatch_module.disable_native()
+
+    assert graph_method_result.path == [0]
+    assert method_contract.replay(graph_method_result.path)
+    assert graph_method_result.native_metadata["backend"] == "native"
+    assert graph_method_result.native_metadata["devices"] == list(range(world))
+    method_session = graph_method_result.native_metadata["persistent_session"]
+    method_pids = method_session["worker_pids"]
+    assert len(method_pids) == world and len(set(method_pids)) == world
+    assert method_session["reused"] is False and method_session["request_count"] == 1
+    assert len(native_calls) == 2 and native_calls[1] == method_contract.graph_hash
+    assert len(launched_owners) == 2 and launched_owners[1].closed
+    assert len(native_workers) == 2
+    assert isinstance(native_workers[1]._owner, extension.SearchSession)
+
+    # The notebook-facing session method also reaches the package dispatch,
+    # reuses workers for an identical request, and replaces them on geometry change.
+    session = RecordingNativeSession(engine="rust")
+    session_graph = graph
+    session_contract = contract
+
+    def session_search(current_graph, start_state, current_predictor=default_predictor):
+        return session.beam_search(
+            current_graph,
+            backend="native",
+            native_options=options,
+            predictor=current_predictor,
+            start_state=start_state,
+            beam_width=64,
+            max_steps=1,
+            return_path=True,
+        )
+
+    try:
+        first_session_result = session_search(session_graph, [1, 0, 2, 3])
+        first_session_persistent = first_session_result.native_metadata["persistent_session"]
+        first_session_pids = tuple(first_session_persistent["worker_pids"])
+        assert len(first_session_pids) == world
+        assert first_session_persistent["reused"] is False
+        assert first_session_persistent["request_count"] == 1
+        assert first_session_result.path == [0] and session_contract.replay(first_session_result.path)
+
+        second_session_result = session_search(session_graph, [1, 0, 2, 3])
+        second_session_persistent = second_session_result.native_metadata["persistent_session"]
+        assert tuple(second_session_persistent["worker_pids"]) == first_session_pids
+        assert second_session_persistent["reused"] is True
+        assert second_session_persistent["request_count"] == 2
+        assert second_session_result.path == [0] and session_contract.replay(second_session_result.path)
+
+        changed_model_predictor = SimpleNamespace(artifact_hash=alternate_model.artifact_hash)
+        changed_model_result = session_search(
+            session_graph, [1, 0, 2, 3], current_predictor=changed_model_predictor,
+        )
+        changed_model_persistent = changed_model_result.native_metadata["persistent_session"]
+        changed_model_pids = tuple(changed_model_persistent["worker_pids"])
+        assert len(changed_model_pids) == world and changed_model_pids != first_session_pids
+        assert changed_model_persistent["reused"] is False
+        assert changed_model_persistent["request_count"] == 1
+        assert changed_model_result.path == [0]
+        assert session_contract.replay(changed_model_result.path)
+
+        wider_definition = SimpleNamespace(
+            is_permutation_group=lambda: True,
+            state_size=5,
+            central_state=[0, 1, 2, 3, 4],
+            generators_permutations=[[1, 0, 2, 3, 4]],
+            generator_names=["swap"],
+        )
+        wider_graph = SimpleNamespace(definition=wider_definition)
+        from multigpubeamsearch.contracts import GraphContract
+
+        wider_contract = GraphContract.from_graph(wider_graph, [1, 0, 2, 3, 4])
+        changed_geometry_result = session_search(
+            wider_graph, [1, 0, 2, 3, 4], current_predictor=changed_model_predictor,
+        )
+        changed_persistent = changed_geometry_result.native_metadata["persistent_session"]
+        changed_pids = tuple(changed_persistent["worker_pids"])
+        assert len(changed_pids) == world and changed_pids != first_session_pids
+        assert changed_persistent["reused"] is False
+        assert changed_persistent["request_count"] == 1
+        assert changed_geometry_result.path == [0]
+        assert wider_contract.replay(changed_geometry_result.path)
+    finally:
+        session.close()
+    assert session.closed
+    assert len(launched_owners) == 3
+    assert len(native_workers) == 3
+    assert isinstance(native_workers[2]._owner, extension.SearchSession)

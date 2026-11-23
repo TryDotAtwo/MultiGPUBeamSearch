@@ -8,6 +8,48 @@ use std::sync::{
 };
 
 #[pyfunction]
+fn resolve_runtime_devices(
+    visible_device_count: u32,
+    explicit_devices: Option<Vec<i64>>,
+    num_gpus: Option<i64>,
+    graph_devices: Vec<(String, Option<i64>)>,
+) -> PyResult<Vec<u32>> {
+    let graph_devices = graph_devices
+        .into_iter()
+        .map(|(kind, index)| beam_runtime::device_selection::DeviceObservation { kind, index })
+        .collect();
+    beam_runtime::device_selection::resolve(
+        visible_device_count,
+        explicit_devices,
+        num_gpus,
+        graph_devices,
+    )
+    .map_err(|error| PyValueError::new_err(error.to_string()))
+}
+
+#[pyfunction]
+fn resolve_runtime_device_plan(
+    cuda_available: bool,
+    visible_device_count: u32,
+    explicit_devices: Option<Vec<i64>>,
+    num_gpus: Option<i64>,
+    graph_devices: Vec<(String, Option<i64>)>,
+) -> PyResult<Vec<u32>> {
+    let graph_devices = graph_devices
+        .into_iter()
+        .map(|(kind, index)| beam_runtime::device_selection::DeviceObservation { kind, index })
+        .collect();
+    beam_runtime::device_selection::resolve_runtime_plan(
+        cuda_available,
+        visible_device_count,
+        explicit_devices,
+        num_gpus,
+        graph_devices,
+    )
+    .map_err(|error| PyValueError::new_err(error.to_string()))
+}
+
+#[pyfunction]
 fn native_depth_budget(max_steps: u64, touch_bfs_radius: u32) -> (u64, u32) {
     beam_core::search::native_depth_budget(max_steps, touch_bfs_radius)
 }
@@ -31,6 +73,23 @@ fn validate_options(options: &str) -> PyResult<String> {
 #[pyfunction]
 fn validate_pipeline_profile_receipt(data: &str, identity: &str) -> Option<bool> {
     beam_runtime::pipeline_cache::validate_pipeline_profile_receipt_json(data, identity)
+}
+
+#[pyfunction]
+fn resolve_search_phase_plan(request: &str) -> PyResult<String> {
+    let request: beam_runtime::search_plan::PermutationSearchPhaseRequest =
+        serde_json::from_str(request).map_err(|error| PyValueError::new_err(error.to_string()))?;
+    let plan = beam_runtime::search_plan::resolve(request);
+    serde_json::to_string(&plan).map_err(|error| PyValueError::new_err(error.to_string()))
+}
+
+#[pyfunction]
+fn resolve_search_execution_plan(request: &str) -> PyResult<String> {
+    let request: beam_runtime::search_plan::PermutationSearchExecutionPlanRequest =
+        serde_json::from_str(request).map_err(|error| PyValueError::new_err(error.to_string()))?;
+    let plan = beam_runtime::search_plan::resolve_execution_plan(request)
+        .map_err(PyValueError::new_err)?;
+    serde_json::to_string(&plan).map_err(|error| PyValueError::new_err(error.to_string()))
 }
 
 #[pyfunction]
@@ -223,10 +282,23 @@ impl InferenceCalibration {
     }
 }
 pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
+    module.add("CLUSTER_RUNTIME_DEVICE_PLAN_VERSION", 1)?;
+    module.add(
+        "SEARCH_PHASE_PLAN_VERSION",
+        beam_runtime::search_plan::SCHEMA_VERSION,
+    )?;
+    module.add(
+        "SEARCH_EXECUTION_PLAN_VERSION",
+        beam_runtime::search_plan::EXECUTION_PLAN_SCHEMA_VERSION,
+    )?;
+    module.add_function(wrap_pyfunction!(resolve_runtime_devices, module)?)?;
+    module.add_function(wrap_pyfunction!(resolve_runtime_device_plan, module)?)?;
     module.add_function(wrap_pyfunction!(native_depth_budget, module)?)?;
     module.add_function(wrap_pyfunction!(touch_bfs_worst_case_entries, module)?)?;
     module.add_function(wrap_pyfunction!(validate_options, module)?)?;
     module.add_function(wrap_pyfunction!(validate_search_controls, module)?)?;
+    module.add_function(wrap_pyfunction!(resolve_search_phase_plan, module)?)?;
+    module.add_function(wrap_pyfunction!(resolve_search_execution_plan, module)?)?;
     module.add_function(wrap_pyfunction!(validate_pipeline_profile_receipt, module)?)?;
     module.add_function(wrap_pyfunction!(build_graph_contract, module)?)?;
     module.add_function(wrap_pyfunction!(write_search_inputs, module)?)?;

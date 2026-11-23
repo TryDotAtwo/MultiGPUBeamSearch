@@ -44,7 +44,8 @@ def test_engine_resolution_is_explicit_and_old_extensions_fail_closed(monkeypatc
         cnot._search_engine("rust", 2**64)
 
 
-def test_rust_top_level_controller_owns_cnot_admission_and_stage_dispatch():
+def test_rust_top_level_controller_owns_cnot_admission_and_stage_dispatch(monkeypatch):
+    monkeypatch.delenv("MGBS_CNOT_STRICT_BACKEND", raising=False)
     require_controller()
     controller = getattr(rust_control.extension(), "run_cnot_native_search", None)
     assert callable(controller), "matching Rust CNOT top-level controller is required"
@@ -96,8 +97,8 @@ def test_rust_top_level_controller_owns_cnot_admission_and_stage_dispatch():
         events.append(("identity", wires, device))
         return identity
 
-    def stage_runner(*args):
-        events.append(("native-stages", *args))
+    def stage_runner(*args, **kwargs):
+        events.append(("native-stages", *args, kwargs))
         return result
 
     def native_stages():
@@ -119,16 +120,23 @@ def test_rust_top_level_controller_owns_cnot_admission_and_stage_dispatch():
     expected_digest = hashlib.sha256(raw)
     expected_digest.update(json.dumps(config).encode())
     digest_values = list(expected_digest.digest())
-    assert events == [
+    assert events[:-1] == [
         ("prepare-input", caller_root, 5, 9, 4, "qhat", "python"),
         ("longs", digest_values),
         ("gather-fixed", digest_values),
         ("identity", 3, "cpu"),
         ("native-runner",),
         ("all-ranks-support", True),
-        ("native-stages", world, admitted_root, identity, input_matrix, scorer,
-         "qhat", True, 5, 6, 6, 4),
     ]
+    stage_event = events[-1]
+    assert stage_event[:12] == (
+        "native-stages", world, admitted_root, identity, input_matrix, scorer,
+        "qhat", True, 5, 6, 6, 4,
+    )
+    assert stage_event[-2].strict is False
+    assert stage_event[-1]["admitted_topology"] == (0, 1)
+    ranked_request = stage_event[-1]["ranked_request"]
+    assert type(ranked_request).__name__ == "_CnotRankedRequest"
 
 
 def test_rust_controller_prepares_typed_input_without_python_builder(monkeypatch):
@@ -291,7 +299,7 @@ def test_rust_compatibility_backend_owns_cnot_initialization_dispatch(monkeypatc
 
 
 
-def test_rust_top_level_controller_preserves_compatibility_stage_fallback():
+def test_rust_top_level_controller_preserves_compatibility_stage_fallback(monkeypatch):
     require_controller()
     controller = getattr(rust_control.extension(), "run_cnot_native_search", None)
     assert callable(controller), "matching Rust CNOT top-level controller is required"
@@ -323,11 +331,15 @@ def test_rust_top_level_controller_preserves_compatibility_stage_fallback():
 
         def all_ranks_support(self, local_support):
             events.append(("all-ranks-support", bool(local_support)))
-            return False
+            remote_support = next(support_votes)
+            return bool(local_support) and remote_support
 
         _stream5_library = None
 
     world = World()
+    # Simulate a peer that supports every optional capability.
+    support_votes = iter((True, True, True, True))
+    monkeypatch.delenv("MGBS_CNOT_STRICT_BACKEND", raising=False)
 
     def prepare_input(*args):
         events.append(("prepare-input", *args))
@@ -339,7 +351,7 @@ def test_rust_top_level_controller_preserves_compatibility_stage_fallback():
 
     def native_stages():
         events.append(("native-runner",))
-        return object()
+        return None
 
     class Stages:
         def root_is_goal(self):
@@ -369,16 +381,22 @@ def test_rust_top_level_controller_preserves_compatibility_stage_fallback():
     expected_digest = hashlib.sha256(b"packed-root")
     expected_digest.update(json.dumps(config).encode())
     digest_values = list(expected_digest.digest())
-    assert events == [
+    assert [event for event in events if event[0] == "all-ranks-support"] == [
+        ("all-ranks-support", False),
+        ("all-ranks-support", True),
+        ("all-ranks-support", False),
+        ("all-ranks-support", False),
+    ]
+    assert [event for event in events if event[0] != "all-ranks-support"] == [
         ("prepare-input", caller_root, 7, 12, 8, "proposal", "python"),
         ("gloo-any-rank-failed", False),
         ("longs", digest_values),
         ("gather-fixed", digest_values),
+        ("gloo-any-rank-failed", False),
         ("identity", 4, "cpu"),
         ("gloo-any-rank-failed", False),
         ("native-runner",),
         ("gloo-any-rank-failed", False),
-        ("all-ranks-support", True),
         ("make-stages", world, admitted_root, identity, input_matrix, scorer,
          "proposal", False),
         ("gloo-any-rank-failed", False),

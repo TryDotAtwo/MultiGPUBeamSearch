@@ -241,44 +241,218 @@ impl<'py> Backend for TensorExchange<'_, 'py> {
 }
 
 #[pyfunction]
+#[pyo3(signature=(world, prefer_rust, admitted_strict=None))]
 pub(crate) fn run_cnot_native_start_transport<'py>(
     py: Python<'py>,
     world: Bound<'py, PyAny>,
     prefer_rust: bool,
-) -> PyResult<()> {
-    let native_library = world.getattr("_stream5_library")?;
-    if native_library.is_none() {
-        return Ok(());
+    admitted_strict: Option<bool>,
+) -> PyResult<Option<String>> {
+    let strict = match admitted_strict {
+        Some(strict) => strict,
+        None => super::cnot_native_stages::strict_backend_mode(&world)?,
+    };
+    if world.getattr("size")?.extract::<usize>()? == 1 {
+        return Ok(None);
     }
-
-    let module = py.import("multigpubeamsearch.cnot_stream5")?;
-    let rust_transport = module.getattr("RustStream5")?;
-    let python_transport = module.getattr("Stream5")?;
-    let library = if prefer_rust {
-        rust_transport.call_method1("compatible_library", (&native_library,))?
+    let local = (|| -> PyResult<(
+        Bound<'py, PyAny>,
+        Bound<'py, PyAny>,
+        Bound<'py, PyAny>,
+        Bound<'py, PyAny>,
+        Option<String>,
+    )> {
+        let native_library = world.getattr("_stream5_library")?;
+        let module = py.import("multigpubeamsearch.cnot_stream5")?;
+        let rust_transport = module.getattr("RustStream5")?;
+        let python_transport = module.getattr("Stream5")?;
+        let library = if prefer_rust && !native_library.is_none() {
+            rust_transport.call_method1("compatible_library", (&native_library,))?
+        } else {
+            py.None().into_bound(py)
+        };
+        let digest = if library.is_none() || !strict {
+            None
+        } else {
+            let path: PathBuf = native_library.getattr("_name")?.extract()?;
+            Some(super::cnot_native_stages::file_sha256(&path)?)
+        };
+        Ok((native_library, rust_transport, python_transport, library, digest))
+    })();
+    // Any rank-local import or ABI error becomes a negative vote; every rank
+    // reaches the same Gloo admission before choosing a data-plane transport.
+    let local_support = local
+        .as_ref()
+        .map(|(_, _, _, library, _)| prefer_rust && !library.is_none())
+        .unwrap_or(false);
+    let use_rust: bool = world
+        .call_method1("all_ranks_support", (local_support,))?
+        .extract()?;
+    if strict && !use_rust {
+        let detail = local
+            .err()
+            .map(|error| error.to_string())
+            .unwrap_or_else(|| "another rank rejected its Stream 5 ABI".to_owned());
+        let failure = PyRuntimeError::new_err(format!(
+            "strict CNOT acceptance requires Rust Stream 5 ABI on every rank: {detail}"
+        ));
+        let result = Err(failure);
+        super::cnot_native_checked::checked_v2(
+            py,
+            &world,
+            "admit strict Rust Stream 5 backend",
+            result,
+        )?;
+        return Err(PyRuntimeError::new_err(
+            "strict Rust Stream 5 admission unexpectedly succeeded",
+        ));
+    }
+    if use_rust {
+        let mut selected = None;
+        let prepare_selected = local.map(|value| {
+            selected = Some(value);
+            py.None().into_bound(py)
+        });
+        super::cnot_native_checked::checked_v2(
+            py,
+            &world,
+            "prepare selected Rust Stream 5 backend",
+            prepare_selected,
+        )?;
+        let (_, rust_transport, _, library, digest) = selected.ok_or_else(|| {
+            PyRuntimeError::new_err("Rust Stream 5 selection returned no local provider")
+        })?;
+        let mut digest_result: Option<String> = None;
+        if strict {
+            let digest = digest.as_deref().ok_or_else(|| {
+                PyRuntimeError::new_err("strict CNOT Stream 5 library hash is unavailable")
+            });
+            let digest = super::cnot_native_checked::checked_v2(
+                py,
+                &world,
+                "prepare strict Rust Stream 5 fingerprint",
+                digest.map(|value| pyo3::types::PyString::new(py, value).into_any()),
+            )?;
+            let digest: String = digest.extract()?;
+            let contract = format!(
+                "stream5_abi=1;owned_abi=1;exchange_abi=1;collectives_abi=1;library_sha256={digest}"
+            );
+            world.call_method1("require_engine_consensus", (contract.as_bytes().to_vec(),))?;
+            let receipt = (|| -> PyResult<Bound<'py, PyAny>> {
+                world.setattr("_cnot_stream5_library_sha256", digest.clone())?;
+                let rank: u32 = world.getattr("rank")?.extract()?;
+                let size: u32 = world.getattr("size")?.extract()?;
+                let pid = std::process::id();
+                let device = world.getattr("device")?.str()?.to_str()?.to_owned();
+                let fields = [
+                    ("abi".to_owned(), "1".to_owned()),
+                    ("owned_abi".to_owned(), "1".to_owned()),
+                    ("exchange_abi".to_owned(), "1".to_owned()),
+                    ("collectives_abi".to_owned(), "1".to_owned()),
+                    ("library_sha256".to_owned(), digest.clone()),
+                ]
+                .into_iter()
+                .collect();
+                let active_device = world.getattr("device")?;
+                let observation =
+                    super::cnot_native_stages::observe_acceptance_gpu(py, &world, &active_device)?;
+                crate::cnot_acceptance::emit(
+                    "stream5_admission",
+                    rank,
+                    size,
+                    pid,
+                    &device,
+                    &fields,
+                    observation.as_ref(),
+                )?;
+                Ok(py.None().into_bound(py))
+            })();
+            super::cnot_native_checked::checked_v2(
+                py,
+                &world,
+                "write Rust Stream 5 admission receipt",
+                receipt,
+            )?;
+            digest_result = Some(digest);
+        }
+        let start_transport = (|| -> PyResult<Bound<'py, PyAny>> {
+            let transport = rust_transport.call1((library, world.clone()))?;
+            world.setattr("transport", transport)?;
+            Ok(py.None().into_bound(py))
+        })();
+        super::cnot_native_checked::checked_v2(
+            py,
+            &world,
+            "start selected Rust Stream 5 transport",
+            start_transport,
+        )?;
+        if strict {
+            let digest = digest_result.as_deref().unwrap_or("unknown");
+            let receipt = (|| -> PyResult<Bound<'py, PyAny>> {
+                let rank: u32 = world.getattr("rank")?.extract()?;
+                let size: u32 = world.getattr("size")?.extract()?;
+                let pid = std::process::id();
+                let device = world.getattr("device")?.str()?.to_str()?.to_owned();
+                let fields = [
+                    ("implementation".to_owned(), "RustStream5/NCCL".to_owned()),
+                    ("abi".to_owned(), "1".to_owned()),
+                    ("library_sha256".to_owned(), digest.to_owned()),
+                ]
+                .into_iter()
+                .collect();
+                let active_device = world.getattr("device")?;
+                let observation =
+                    super::cnot_native_stages::observe_acceptance_gpu(py, &world, &active_device)?;
+                crate::cnot_acceptance::emit(
+                    "stream5_active",
+                    rank,
+                    size,
+                    pid,
+                    &device,
+                    &fields,
+                    observation.as_ref(),
+                )?;
+                Ok(py.None().into_bound(py))
+            })();
+            super::cnot_native_checked::checked_v2(
+                py,
+                &world,
+                "write Rust Stream 5 active receipt",
+                receipt,
+            )?;
+        }
+        Ok(digest_result)
     } else {
-        py.None().into_bound(py)
-    };
-
-    let use_rust = if prefer_rust {
-        let supported = if library.is_none() { 0_i64 } else { 1_i64 };
-        let local = world.call_method1("longs", (vec![supported],))?;
-        let total: usize = world
-            .call_method1("sum", (local,))?
-            .call_method0("item")?
-            .extract()?;
-        total == world.getattr("size")?.extract::<usize>()?
-    } else {
-        false
-    };
-
-    let transport = if use_rust {
-        rust_transport.call1((library, world.clone()))?
-    } else {
-        python_transport.call1((&native_library, world.clone()))?
-    };
-    world.setattr("transport", transport)?;
-    Ok(())
+        let mut selected = None;
+        let prepare_selected = local.map(|value| {
+            selected = Some(value);
+            py.None().into_bound(py)
+        });
+        super::cnot_native_checked::checked_v2(
+            py,
+            &world,
+            "prepare compatibility Stream 5 backend",
+            prepare_selected,
+        )?;
+        let (native_library, _, python_transport, _, _) = selected.ok_or_else(|| {
+            PyRuntimeError::new_err("compatibility Stream 5 selection returned no local provider")
+        })?;
+        if native_library.is_none() {
+            return Ok(None);
+        }
+        let start_transport = (|| -> PyResult<Bound<'py, PyAny>> {
+            let transport = python_transport.call1((&native_library, world.clone()))?;
+            world.setattr("transport", transport)?;
+            Ok(py.None().into_bound(py))
+        })();
+        super::cnot_native_checked::checked_v2(
+            py,
+            &world,
+            "start compatibility Stream 5 transport",
+            start_transport,
+        )?;
+        Ok(None)
+    }
 }
 
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {

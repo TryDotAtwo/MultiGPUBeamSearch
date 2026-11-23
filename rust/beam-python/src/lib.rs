@@ -2,6 +2,7 @@
 #![forbid(unsafe_code)]
 mod cluster;
 mod cnot;
+mod cnot_acceptance;
 mod cnot_native_batch;
 mod cnot_native_checked;
 mod cnot_native_dedup_score;
@@ -16,12 +17,14 @@ mod cnot_tqp_scorer;
 mod cnot_stream5;
 mod configuration;
 mod inference;
+mod inference_backend;
 mod interrupt;
 mod mlp_snapshot;
 mod pipeline;
 mod planning;
 mod probes;
 mod search_session;
+mod shared_profiles;
 use pyo3::{
     exceptions::{PyRuntimeError, PyValueError},
     prelude::*,
@@ -133,6 +136,7 @@ impl ResidentWorkers {
 fn _beam_runtime(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<ResidentWorkers>()?;
     cnot::register(module)?;
+    cnot_native_batch::register(module)?;
     cnot_native_checked::register(module)?;
     cnot_native_exchange::register(module)?;
     cnot_native_goal::register(module)?;
@@ -145,7 +149,9 @@ fn _beam_runtime(module: &Bound<'_, PyModule>) -> PyResult<()> {
     planning::register(module)?;
     pipeline::register(module)?;
     inference::register(module)?;
+    inference_backend::register(module)?;
     search_session::register(module)?;
+    shared_profiles::register(module)?;
     configuration::register(module)?;
     mlp_snapshot::register(module)?;
     module.add("ABI_VERSION", 1)?;

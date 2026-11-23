@@ -1,4 +1,252 @@
+## Rust-owned single-host rank supervision — 2026-11-23
+
+`local_launcher.run_local_ranks` now sends matching installed wheels to one Rust runtime call. Rust starts all local ranks with the established `world_size, rank` argv suffix and rank environment, supervises timeout and cancellation, and reaps each worker process group on completion or failure. Python retains the compatibility supervisor for extensions without this API. Search stages, CUDA kernels, NCCL transport, ordering, and numerical policy are unchanged.
+
+Installed-wheel validation ran outside the checkout and exercised the public launcher with two synthetic ranks, per-rank environment, command metadata, and log layout. A failing rank also verified sibling cleanup. The installed-wheel run passed on source SHA `fd42ebca8d7486c92a7d3a26c98a7ea591cc6f8f`: [run 45131297173](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45131297173). This proves CPU process supervision only; physical permutation CUDA/NCCL remains pending.
+
+## Rust-owned permutation solution policy environment — 2026-11-22
+
+The public permutation launch now resolves the fixed solution-collection controls through a versioned `beam-runtime` request: first-solution versus collection mode, extra collection depths, maximum collected solutions, and the result TSV name. `backend._run_native_once` applies that environment after calibration and immediately before the runner launch, so calibration probes retain their existing non-collecting behavior. Older wheels continue to use the same Python compatibility builder. This changes environment ownership only; search ordering, kernel execution, numerical policy, and CUDA/NCCL transport are unchanged.
+
+Installed-wheel validation passed on code SHA `c9b6e10b2f013d7fc243719d1d7316faba78b88b` in [run 45062575238](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45062575238). The installed `test_cluster_rust.py` step exercised the compiled Rust resolver through `backend.search_policy_environment`, checked collection and first-solution values, old-resolver fallback, and rejection of an invalid mode. The same workflow passed the existing saturated permutation CPU acceptance. No physical CUDA/NCCL run occurred.
+
+## Rust-owned permutation search launch environment — 2026-11-22
+
+The public permutation launcher now obtains its fixed puzzle/input/weight/history paths and base BEAM controls from a versioned Rust runtime function. Python supplies the already prepared paths and validated BFS settings, then merges the returned variables with model-specific inference settings. Older wheels keep the previous Python builder. This does not change search controls, model dispatch, kernel behavior, or numerical policy.
+
+## Rust-owned permutation CUDA device admission — 2026-11-22
+
+The public permutation preparation path now sends the observed CUDA availability and normalized device request to one versioned `beam-runtime` plan. Rust rejects a missing CUDA runtime and resolves the same explicit, `num_gpus`, or graph-derived process-local indices; Python keeps the Linux/torchrun boundary checks, collects Torch facts, and retains the prior device selection for wheels without this API. No device binding, worker launch, search order, kernel, or numerical behavior changes.
+
+Installed-wheel validation passed at source SHA `e4e96c452dba8b531c7de262f8f333b088a579c3` in [run 45058727951](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45058727951). The real `backend.runtime_devices` test exercised the Rust plan, the old-wheel resolver fallback, and the unavailable-CUDA short-circuit. The same installed run passed saturated permutation CPU acceptance. Rust CPU/Gloo formatting and contract checks passed in [run 45058728166](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45058728166); the hosted acceptance harness passed in [run 45058728397](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45058728397). Physical permutation CUDA/NCCL remains unverified.
+
+## Current migration priority — 2026-11-22
+
+The active implementation phase prioritizes the public permutation beam-search path through Rust preparation and launch while preserving the existing CUDA/C++ kernels, multi-GPU execution, numerical policy, Python/Kaggle interfaces, CLI, torchrun and Slurm. CNOT implementation and compatibility remain in the branch; further CNOT changes, private checkpoint preparation and CNOT-specific physical acceptance are deferred at the user's request. Permutation CUDA/NCCL acceptance on one and two physical GPUs remains its own required gate.
+
+## Rust-owned public cluster planning — 2026-11-22
+
+The public `plan_cluster` adapter now sends the validated per-node GPU counts, global beam width, shard count and batch alignment to `beam-runtime`. Rust returns the same ordered global/node/local rank mapping, exact global beam, per-rank frontier capacity and alignment. Python preserves the public dataclasses and validation errors, and uses the existing calculation only when an older extension does not export the resolver.
+
+This moves multi-node geometry policy without changing the requested/effective width, rank ordering, shard layout, transport, CUDA execution or hardware-verification status. Hosted Rust CPU/CNOT validation and the installed PEP 517 wheel passed on code SHA `9fa887577d2c1684da8ddb6db29395493ebe45bb`: [Rust CPU run 45050490783](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45050490783) and [installed-wheel run 45050490824](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45050490824). The installed test exercises the exported resolver, the public helper with the Python formula disabled, and the older-wheel fallback. The hosted acceptance harness also passed ([run 45050491058](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45050491058)); its physical GPU job was skipped. Physical CUDA/NCCL verification remains separate.
+
+## Rust-owned permutation microbatch plan — 2026-11-22
+
+The existing integer plan for Stream 3's initial inference rows is resolved in beam-runtime, including the scalar-head row-to-parent mapping, four initial sort slots, 1024-row alignment, capacity scale and metadata fields. The Python adapter supplies typed request values and turns the plan into the same BEAM_B_MICRO environment value consumed by the existing runner. Older wheels retain the Python implementation. This transfers the current policy without changing candidate, search, model, kernel or precision behavior.
+
+The installed-wheel smoke compares exact scalar-head, ensemble/nondefault-row-limit and unadjusted plans, then exercises the real helper with the Python fallback forced to fail and checks legacy-extension behavior. Hosted installed-wheel validation passed on code SHA `5cfff58de62f454fe6b63d8ea61514718e4ed578` ([run 45048372751](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45048372751)), exercising the public helper against the scalar-head, ensemble/nondefault-row-limit, unadjusted, installed-Rust, and legacy-fallback cases. The Rust CPU/CNOT suite passed on the same SHA ([run 45048372758](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45048372758)). Physical CUDA/NCCL verification remains separate.
+
+## Rust-owned permutation device selection — 2026-11-22
+
+The public native preparation path now sends the visible CUDA count, explicit device request, requested GPU count, and normalized graph-device kind/index observations to `beam-runtime`. Rust applies the existing selection rules and returns the concrete device ordinals used by preparation. Python continues to query Torch and translate CayleyPy device objects; it uses the prior Python resolver only when an older extension does not expose this API. CUDA_VISIBLE_DEVICES mapping remains a separate launch-environment step.
+
+The installed-wheel smoke checks the Rust selection table and calls the public preparation helper with the Python fallback forced to fail. It separately checks the old-wheel compatibility path. CPU/GPU search, model export, inference profile selection, kernels and precision are unchanged.
+
+## Keep CNOT history edges typed across checked stages — 2026-11-22
+
+The Rust checked-stage helper now carries generic Rust results through the existing rank-wide vote and diagnostic path. CNOT history decodes the fixed signed wire row directly into the runtime `Edge` inside that checked phase; it does not convert the values back through a Python tuple. Error stage names, error text, vote ordering, history layout and replay checks remain unchanged.
+
+The typed row decoder rejects invalid length and signed or over-wide fields. Hosted CPU/Gloo and installed-wheel checks must cover normal history reconstruction and a coordinated history-stage failure with a healthy retry. This change does not establish physical CUDA/NCCL acceptance.
+
+## One ranked CNOT request reaches the native stages — 2026-11-22
+
+The Rust CNOT controller now passes the same validated RankedCnotRequest it used for admission into the native-stage adapter. The adapter derives rank, world size, mode, audit and search options from that typed value and checks that its topology matches the live World before stage construction completes. The older scalar run_cnot_native arguments remain valid for direct compatibility callers; the public Rust-controller path no longer reconstructs stage configuration from those scalar copies. Tensor layouts, scorer callbacks, collectives, kernels, search ordering and numerical policy are unchanged.
+
+The existing hosted CPU and installed-wheel public CNOT paths exercise the controller through the native-stage boundary. The change is source-level/runtime ownership progress; it does not establish physical CUDA/NCCL acceptance.
+
+## Rust-owned CNOT dispatch fingerprint — 2026-11-22
+
+The public CNOT path now asks `beam-runtime` for the versioned request fingerprint used by rank consensus. The PyO3 adapter converts the public engine and depth inputs once at this boundary; the Rust runtime hashes engine, u64-depth fit, and strict-mode bits using the established byte contract. The Python adapter uses this API when present and retains the identical legacy digest for older wheels. Gloo phase ordering, capability voting, route selection, search stages, scorer, and CUDA/NCCL behavior are unchanged.
+
+The installed-wheel regression compares the Rust digest against the prior Python formula for every engine, the u64 depth boundary, strict/compatibility mode, and invalid engine; it also asserts that the public search calls the installed Rust API. Physical CUDA/NCCL execution remains a separate gate.
+
+## Accept the current panel-v2 producer receipt — 2026-11-22
+
+The consumer accepts producer source revision `eafc0f82f088603a525f428a8fa3d00e9e702fa8` with the exact existing `build_multigpu_beam_handoff` emitter SHA-256. The receipt source revision is distinct from the emitter ABI: the producer function is unchanged from its parent `42ed72f587ab70fc74a85cf0a25001efb29cb994`, whose receipts remain supported, along with the historical `7310b1eb5ec07c76c131ba8c60b105ff4aad7a9c` pin. The hosted no-Torch compatibility fixture checks out the current producer revision, calls its real serializer, and sends the serialized receipt through the consumer resolver. This is CPU-only handoff validation; trained scorer/GPU acceptance remains separate.
+
+## Rust session identity includes the resolved inference plan — 2026-11-22
+
+Permutation preparation identity schema v3 carries a typed `ResolvedInferencePlanIdentity` with the selected backend, policy and inference row limit returned by the Rust resolver used in `prepare_runtime`. A repeated `NativeSession` call can reuse its resident rank owner only while this plan and the other typed preparation inputs match; a changed policy or row limit invalidates the preparation. Schema-v2 extensions keep the plan inside the existing structured options value, and older extensions retain the Python compatibility identity.
+
+The installed-wheel contract calls the real PyO3 resolver through `prepare_runtime`, checks the runner backend and profile fields, and exercises Rust identity reuse and plan invalidation without CUDA. This changes preparation identity only; scoring, inference kernels, numerical policy and rank execution are unchanged.
+
+## CNOT scorer contract selection — 2026-11-22
+
+The acceptance launcher builds two separate Rust scorer libraries: the historical
+GL4 `dev_v1` adapter and the sealed panel `panel_search_v2` adapter from its
+own pinned upstream commit. The shared launcher helper selects the library and
+its SHA-256 by contract and enables strict Rust admission for both paths.
+
+For the panel, `verify_cnot.py` records metadata returned by the loaded scorer
+for every dimension. The report aggregator checks the panel contract, upstream
+adapter pin, checkpoint and manifest, training pins, dtype, feature registry,
+and the launcher-bound panel library digest. It also requires the strict event
+receipt to match that report. This proves the selected loaded scorer contract
+and binds the invocation to the built artifact digest; it does not constitute
+physical CUDA/NCCL acceptance. The installed-wheel workflow reuses one built wheel and records panel endpoint
+and inference-policy outcomes independently. Hosted checks for the implementation
+revision are pending; physical acceptance remains unverified.
+
+
+## CNOT Gloo lifecycle receipts — 2026-11-22
+
+The installed-wheel lifecycle check records each phase independently on both
+Gloo ranks. For engine mismatch, it validates each rank's requested engine
+(`auto` on rank 0 and `python` on rank 1) separately, while both receipts
+must record the same consensus rejection. Rank-local scorer failures and their
+healthy retries also require matching phase receipts from both ranks.
+
+`verify_cnot.py` owns the global result report on rank 0 only. The aggregate
+therefore requires exactly the three rank-0 retry reports
+`healthy-after-engine-mismatch-0.json`, `healthy-after-0-0.json`, and
+`healthy-after-1-0.json`, each solved with bitwise replay. It does not require
+or infer a report from rank 1. The CPU receipt fixture rejects missing phases,
+wrong rank identity and missing root replay evidence.
+
+At code SHA `c59d6294c11c411c9c1eaad54115b689b00a10a3`, the installed-wheel
+Gloo lifecycle passed in [run 44977925758](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44977925758); the physical GPU job was skipped.
+
+## CNOT public dispatch ownership — 2026-11-22
+
+The public CNOT entry point obtains its runtime route from typed `beam-runtime` policy. The capability snapshot is rank-agreed before selection. The policy selects the Rust controller, the Rust controller with compatibility stages, or the Python reference path; strict acceptance requires the complete Rust controller/stage/transport capability set and fails closed. Older extension builds retain their ordinary compatibility path. This does not yet move PyTorch's Gloo control-group object out of the Python adapter; that lifecycle remains an open migration boundary. Search order, score semantics and kernels are unchanged.
+
+## Typed CNOT request to runtime search options — 2026-11-22
+
+After the existing collective input-admission vote, the Rust controller keeps one validated `CnotRequest`. Its `search_options(rank, world)` conversion supplies the generic `beam-runtime::cnot_search::search` with the normalized global width, directed-gate alphabet, alphabet-capped shortlist and depth. The Rust compatibility-stage branch uses this conversion directly. The existing `run_cnot` PyO3 signature remains as a compatibility adapter. Search order, scoring, tensors, kernels and collective sequence are unchanged.
+
+The hosted RED fixture at `c383aa9` confirmed that the runtime conversion was absent. The exact green source SHA `c63937944b7752227982b388ee075be26e89c055` passed Rust CNOT CPU/Gloo [run 44976811410](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44976811410), installed wheel [run 44976811495](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44976811495), hosted harness [run 44976811467](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44976811467), and panel-v2 CPU compile/handoff [run 44976815210](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44976815210). Physical CUDA/NCCL execution remains unverified.
+
+## Rank-bound CNOT request — 2026-11-22
+
+The public controller binds its validated scalar request to the active
+`rank/world` as `RankedCnotRequest` during the existing collective input
+admission. It rejects `world=0`, `rank >= world`, and `world > 65536`
+before native backend admission or stage allocation. The typed request supplies
+normalized controls to the Rust controller while Python `World` still provides
+the rank topology. That remaining Python ownership is an open migration
+boundary. Search semantics, tensors, collective ordering, scoring, kernels and
+precision are unchanged.
+
+On source SHA `25bc43abc1911d6a96c14d7c7d0c766a043f5f4d`, Rust CNOT CPU/Gloo,
+installed wheel, hosted acceptance and panel-v2 CPU checks passed in runs
+[44980014848](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44980014848),
+[44980014912](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44980014912),
+[44980014854](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44980014854) and
+[44980018575](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44980018575).
+The physical CUDA/NCCL job was skipped.
+
+## Admitted CNOT topology at native-stage binding — 2026-11-22
+
+The public Rust CNOT controller forwards the `rank/world` values from the admitted `RankedCnotRequest` into native-stage construction. The adapter checks that pair against the Python `World` and places construction inside the existing common Gloo phase before search. Existing direct PyO3 callers may omit the optional argument and retain their compatibility behavior.
+
+This narrows the topology handoff for stage setup; Python `World` still owns the control group and tensor collectives. No search, scoring, ordering, kernel, precision, or data-plane behavior changed. The installed wheel passed on implementation SHA `d9814462b05938f3419aa5c71332f9c3ce6619cd`; physical CUDA/NCCL remains unverified.
+
 # Конфиг
+
+## Paired permutation acceptance receipt contract, 2026-11-22
+
+The CNOT campaign verifier now checks the permutation report as a run-bound acceptance artifact. A valid report must bind source SHA, installed wheel SHA and acceptance run ID; include the existing LRX(4) one/two-GPU replay and the saturated LRX(5), B=3 oracle case; prove the exact global cutoff after cross-rank dedup; and carry two ordered calls from one reused Rust session per topology. Each call must match per-rank PIDs, observed CUDA UUIDs, build/binary hashes, expansions, global cutoff counts, retained frontier counts, complete Hash128 survivor order and independent replay status. The canonical report digest is verified before the final paired receipt is written. Hosted fixtures reject world-size-only JSON, foreign identities, missing/duplicate ranks or GPUs, unsaturated counts, changed winner order, missing session reuse and a body modified after digest. This is a CPU-verifier contract; it does not establish physical CUDA/NCCL execution.
+
+
+## Installed-wheel проверка штатного выбора CNOT-контроллера, 2026-11-22
+
+Публичная точка `verify_cnot.main` проверяется с `engine=auto` на двух Gloo-рангах. В healthy retry тест подменяет callback Python reference-loop на ошибку; успешный результат подтверждает, что установленный wheel выбрал Rust controller. До каждого retry тест отдельно инъецирует сбой загрузки scorer только на rank 0, затем только на rank 1, и проверяет последующий запуск в той же живой группе.
+
+На tested source SHA `a517f8afec9de82ad3fe1958fe8b83ba5df2fafa` installed-wheel run [44955518273](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44955518273) прошёл, вместе с прежними PyO3 dtype, strict-admission, event, verifier и permutation CPU gates. Hosted source harness [44955518309](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44955518309) прошёл. Оба артефакта содержат только redacted status. Физический CUDA/NCCL job был пропущен.
+
+Это подтверждает выбор штатного Rust controller на CPU/Gloo и восстановление живой группы после согласованной ошибки. Оно не подтверждает CUDA/NCCL, обученный checkpoint scorer на GPU, физическую работу рангов или завершение полного переноса. Остаточная граница Python `World`/Torch и scheduler/profile preparation остаётся открытой; общий статус — `test_results/refactor_20261121/rust-cnot-admission/GITHUB_STATUS.md`.
+
+## Typed CNOT controller choice in beam-runtime, 2026-11-22
+
+The Rust runtime now owns the controller selection table for public `auto`, `python`, and `rust` requests. The PyO3 boundary keeps the existing public value checks, then calls the typed `beam_runtime::cnot_search::select_engine` function. If depth exceeds the native `u64` range, `auto` and `python` keep the reference path, while explicit `rust` returns the existing error. Search stages, scoring, kernels and precision are unchanged.
+
+The runtime policy has unit coverage for each selection branch. The installed-wheel two-rank Gloo test uses `engine=auto` for both healthy retries and replaces the Python reference-loop callback with a failing sentinel. Injected scorer-load failures on rank 0 and rank 1 remain explicitly Rust; each is followed by a successful search in the same Gloo group. On tested SHA `0606965a210c9cc2417b729433471e3d5ca6988c`, the Rust CNOT CPU/Gloo gate passed in [run 44956473123](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44956473123), the installed wheel passed in [run 44956473162](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44956473162), and the hosted source harness passed in [run 44956473161](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44956473161). The physical GPU job was skipped. Full context ownership and physical CUDA/NCCL acceptance remain open.
+
+## Независимая проверка reference cutoff CNOT, 2026-11-22
+
+CPU acceptance теперь сравнивает порядок выбранных состояний с независимыми оценками scorer. Отчёт сохраняет, был ли cutoff underfilled, точно равным с полным сравнением path word, отделённым от границы погрешности или неоднозначным внутри допуска. Для неоднозначной границы проверка явно не утверждает устойчивый выбор по эталонным оценкам; для точных ties проверяется прежний полный tie-break по path word.
+
+Проверка относится к acceptance verifier `tools/verify_cnot.py`. Она не меняет порядок поиска, scorer, precision или продуктовую численную политику. На SHA `77cc69c421a640dc0ec32ee2ce68564b1ded67d3` все три новые fixtures прошли в установленном wheel: точная ничья, неоднозначная граница и отделённая граница. [Installed-wheel run 44950126048](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44950126048), [artifact 14724934157](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44950126048/artifacts/14724934157), SHA-256 `58f8024b1df53370a5d5292cad9980c34c99e34e88dd8086043612d332e271d9`. Source harness [run 44950126040](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44950126040) также прошёл. Обе проверки hosted CPU; CUDA/NCCL физический job пропущен.
+
+## Typed options in both Rust session identities, 2026-11-21
+
+The v2 preparation identity already carries options as JSON. The nested identity used by the Rust resident worker now does the same: Python places options_descriptor(options) inside python_session_identity.options instead of storing repr(options). Rust therefore compares the same structured option values in both preparation invalidation and worker reuse.
+
+Hosted RED `97441f6` failed the existing reuse test on world sizes 1 and 2 because the nested object had options_repr but no options. After the fix, Python-owner passed on source SHA `9e6863387861c0a643f0a043acfdbe6892126c13` in [run 44947770658](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44947770658), artifact [14724530178](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44947770658/artifacts/14724530178), SHA-256 `74681e4acf1d526dead977f441b6b9d1cc69722819b70cfb185b59c59bf535b3`. The installed wheel passed in [run 44947770665](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44947770665), artifact [14724367144](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44947770665/artifacts/14724367144), SHA-256 `9a2cd384509198463d78cc99df2ea0ee5ac7e834fc2aee404be8c4ebe42c27af`.
+
+No search, scoring, precision, or rank behavior changed. This is hosted CPU evidence only; physical CUDA/NCCL acceptance is pending.
+
+## Rust session preparation identity v2, 2026-11-21
+
+The resident permutation session now receives a typed preparation identity from the Rust extension. Schema v2 stores NativeOptions as a JSON object and compares it structurally; it no longer relies on Python repr output. The Rust builder validates that the options value is an object. The requested beam width retains both the numeric form and the public max form.
+
+The identity includes graph and geometry, model artifact hash and sizes, model backend, device list, binding scope, beam width, depth, options, CUDA device visibility/order, and the native runtime build. Matching identities reuse the resident worker group. A change in model or preparation fields invalidates the match. Python uses the typed schema only when the installed extension declares schema v2; an older extension does not receive the new arguments and keeps the compatibility path.
+
+On source SHA 4cad49f3c98fe1bc37895af98bfffd5827a0829f, the hosted source harness passed in [run 44946584217](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44946584217), artifact [14723403934](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44946584217/artifacts/14723403934), SHA-256 68a7692500d325d01b683a79564f7ad820ee1ca12178475953eface51998c911. The installed wheel and smoke passed in [run 44946584220](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44946584220), artifact [14724077257](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44946584220/artifacts/14724077257), SHA-256 58ec47161cfb381e009412e12b116378b5e277fcb54d7ad29e981d0ecf0c9f93. The CNOT CPU/Gloo suite passed 312 tests with 2 skipped in [run 44946584249](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44946584249), artifact [14723688156](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44946584249/artifacts/14723688156), SHA-256 e1fb89a51013395b43b947a9996f8d68dfbb63311d9b1affe7f52a6beb8868b5. The Python session-owner suite passed in [run 44946584203](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44946584203), artifact [14723997251](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44946584203/artifacts/14723997251), SHA-256 18ab19696753ad16767ba8fef0cb388b28941d48e9b8724cffbc1e50171a1cea.
+
+These hosted results establish the current source and installed CPU behavior. The physical CUDA/NCCL job was skipped; the Rust migration and physical 1/2-GPU gate remain open.
+
+## Saturated permutation acceptance, 2026-11-21
+
+The installed-wheel acceptance keeps the public LRX(4), B=64 smoke and adds a
+separate LRX(5), B=3 saturated case. An independent CPU oracle checks full
+Hash128 deduplication, the existing owner/shard and equal-score cutoff order,
+rank-local frontiers, cross-rank duplicates, exact global width and independent
+replay. The selected LRX(5) witness has the same ordered winners at world sizes
+1 and 2 without changing the production tie policy. Each topology runs twice
+inside one Rust session; per-rank traces bind source, wheel, build and binary
+hashes, PID, observed CUDA UUID, rank work and bounded frontier snapshots.
+
+Hosted source harness `44943664015` and installed-wheel run `44943664035`
+passed on source SHA `bcd92d0a404802604cabf28f7a477ffe41c8d7de`. The wheel gate
+ran 11 permutation acceptance contracts, CNOT dtype/admission/Gloo checks and
+the public CNOT search with a CPU scorer. Its physical job was skipped; this
+evidence does not establish CUDA/NCCL execution. The source and wheel artifacts
+are recorded in
+`test_results/refactor_20261121/rust-cnot-admission/GITHUB_STATUS.md`.
+
+## Новая физическая приёмка Vast: срок и SSH маршрут, 2026-11-21
+
+Разрешённый физический gate использует только один новый, уже работающий
+instance с ровно двумя desktop RTX 3060 и остаётся в остатке лимита $10.
+Старый instance `61080396` исключён. Контракт требует выбрать целиком одну
+пару API полей SSH: `ssh_host`/`ssh_port` либо `public_ipaddr`/`ports[22/tcp]`.
+
+Бюджетный deadline рассчитывается по времени создания instance и фактической
+ставке. Preflight, архивация исходников, передача, сборка/поиск и выгрузка
+результатов повторно считают оставшееся время от этого одного deadline.
+Каждая фаза оставляет резерв остановки; сборка и поиск дополнительно оставляют
+окно для извлечения receipt и частичных результатов. При нехватке времени
+следующая фаза не стартует. Остановка подтверждается свежим API readback.
+
+Hosted CPU harness `44913195522` подтвердил выбор endpoint-пары, точную
+арифметику срока, пересчёт budget для каждой фазы, отказ при нехватке времени
+и сбор частичных результатов после ошибки. Installed-wheel и GPU job в этом
+push-run были `skipped`.
+
+Физический gate пока не готов к запуску. Workflow ещё получает SHA manifest
+GL4 с целевой машины во время preflight вместо сверки с доверенным staging
+receipt. До появления проверяемого pin и нового валидированного предложения
+2× desktop RTX 3060 физический dispatch запрещён. Hosted проверки не являются
+физической CUDA/NCCL проверкой.
+
+Контракт исходников теперь находится в
+`integrations/cayleypy_native/multigpubeamsearch/native_source_manifest.json`.
+Vast packager создаёт source archive из объявленных roots и отклоняет
+отсутствующие обязательные файлы. Wheel source bundle проверяет те же пути,
+даже если generated file manifest пропустил один из них; native fingerprint
+включает объявленные roots и vendor headers. Hosted RED `44914169925`
+подтвердил отсутствие packager, а `44914169994` — отсутствие vendor headers в
+fingerprint. Hosted source harness `44916537646` прошёл упаковку, распаковку и
+negative fixtures для обоих headers. Installed-wheel run `44916537642` прошёл
+проверки двух vendor fingerprint и обязательного bundle header. Их GPU job
+был `skipped`; платный запуск не выполнялся.
+
+Remote preflight также проверяет API CayleyPy до сборок. После установки wheel
+worker проверяет NCCL header/library и готовит pinned CUTLASS через source
+cache с проверкой SHA до нативной GPU-компиляции. Путь CUTLASS передаётся
+permutation smoke явно, поэтому поиск не должен запускать скрытую загрузку
+зависимости. Для этих проверок hosted GREEN ещё не получен.
 
 ## CNOT SIGINT handling across ranks, 2026-11-20
 
@@ -248,6 +496,14 @@ Python fallback. Алгоритм поиска, оценки, precision, GPU-с�
 multi-GPU не менялись. Проверка CPU с PyO3 не является аппаратной проверкой
 CUDA/NCCL. Результат: `test_results/refactor_20261119/rust-inference-selection/GITHUB_STATUS.md`.
 
+## Rust-владелец чтения shared inference profile registry, 2026-11-22
+
+Чтение source-pinned `profiles/index.json` и hash-addressed record перенесено в `beam-runtime::shared_profiles::find_profile`. Rust ограничивает размер index/record двумя MiB и индекс 1024 записями, проверяет совпадение compatibility identity, lowercase SHA-256, нахождение record внутри registry, schema, verified evidence и диапазон `parent_batch`.
+
+PyO3 возвращает только проверенную запись и её digest. Если новый extension вернул отсутствие совпадения, Python не повторяет чтение в обход Rust-проверок. Для старого extension без этого метода сохранён прежний Python reader. Формирование hardware/model compatibility identity пока остаётся Python адаптеру; найденный профиль остаётся предложением и проходит обычную проверку target runtime. Search, scoring, kernels, precision и transport не менялись.
+
+На code SHA `0ca418cbbc2757508dc96ff986af75b888cba5e2` installed wheel прошёл в [run 44999384648](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44999384648); Rust CPU/Gloo прошёл в [run 44999384690](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44999384690), source harness — в [run 44999384719](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44999384719), panel-v2 CPU compile/handoff — в [run 44999387783](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44999387783). Физические CUDA/NCCL проверки пропущены.
+
 ## Самостоятельный CUDA-домен CNOT, 2026-11-17
 
 Отдельная необязательная библиотека предоставляет версионированный C ABI для
@@ -341,6 +597,31 @@ PyTorch владеет CUDA-буферами, а FFI проверяет тенз
 Rust-контроллер не получает GPU-указатели. Порядок обмена NCCL и исходный
 Python-транспорт сохраняются.
 
+## Приёмка CNOT ABI и фазовых ошибок, 2026-11-21
+
+Строгий acceptance-путь согласует до обмена наличие и идентичность Rust
+контроллера, checkpoint scorer, DeviceDomain, CNOT ABI/capabilities и Stream 5
+на всех рангах. Ошибка ABI, отсутствующая обязательная реализация или разный
+набор возможностей завершаются коллективной ошибкой; обычный совместимый
+fallback сохраняется вне строгого режима. Dtype входа проверяется по
+каноническим объектам `torch.dtype`, включая совместимые `int64`/`uint16`
+пути. Подготовка winner packet и history edge получает ранговое голосование
+до следующего data-plane collective.
+
+На source SHA `78087abe5c1b8e794c9e16aa934f6afe084c0f8b` hosted installed-wheel
+проверки прошли: PyO3 dtype с deprecation warnings как errors, strict admission
+на двух Gloo-рангах, инъекции ошибок winner-packet/history-edge на каждом
+ранге с повторным поиском в той же группе, публичный CNOT search и Actionlint.
+Проверки hosted source harness также прошли. Это CPU/Gloo evidence; физические
+CUDA/NCCL и trained-checkpoint вызовы ещё не подтверждены.
+
+Граница миграции остаётся частичной: Rust задаёт последовательность стадий и
+владеет историей поиска, но `NativeStages` всё ещё удерживает Python `World`,
+scorer и Torch-тензоры, а часть стадий вызывает Python/PyTorch. Полный runtime
+контекст CNOT в `beam-runtime` и самостоятельное владение вычислительным
+провайдером остаются следующими вертикальными срезами. Текущие проверки и
+hardware gate: `test_results/refactor_20261121/rust-cnot-admission/GITHUB_STATUS.md`.
+
 ## Rust-контракт CNOT checkpoint scorer, 2026-11-19
 
 `beam-native-sys::TqpScorer` разбирает metadata scorer при открытии,
@@ -366,6 +647,21 @@ Python-supervisor остаётся режимом по умолчанию. Пе�
 публичного поискового цикла в Rust этой работой не завершается.
 Экспериментальный PyO3-адаптер пока требует совместимые с UTF-8 аргументы
 и значения окружения; это не полная замена старого представления Python/OS.
+
+### Slurm rank mapping, 2026-11-22
+
+Перед созданием rank-owned каталогов Python и Rust проверяют, что
+`SLURM_PROCID = sum(SLURM_STEP_TASKS_PER_NODE[..SLURM_NODEID]) + SLURM_LOCALID`.
+Это сохраняет раздачу непрерывных глобальных рангов при неодинаковом числе
+задач на узел и отклоняет противоречивое окружение до запуска дочернего
+процесса. На source SHA `901a7c630d6be25555fe7a8154bd9bb45b537f33`
+hosted CNOT CPU run [44959505649](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44959505649)
+прошёл; Rust contract и Python compatibility-набор зелёные. Installed-wheel
+run [44959505809](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44959505809)
+прошёл. RED run [44959263103](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44959263103)
+подтвердил принятие неправильного rank до исправления. GPU acceptance
+[44959505792](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44959505792)
+прошёл только hosted CPU harness; физический GPU шаг был пропущен.
 
 ## Коллективная ошибка поиска цели CNOT, 2026-11-15
 
@@ -3337,6 +3633,36 @@ collective, frontier payload, or CUDA execution. Evidence:
 `test_results/refactor_20261120/rust-rank-frontier-quotas/GITHUB_STATUS.md`.
 Physical multi-GPU runtime remains unverified.
 
+
+## Строгая приёмка CNOT-бэкендов и границ стадий, 2026-11-21
+
+Обычный публичный режим сохраняет совместимый выбор CNOT engine и транспорта.
+Только профиль `MGBS_CNOT_STRICT_BACKEND=1` запрещает fallback и требует Rust
+controller, Rust TQP checkpoint scorer, CUDA DeviceDomain ABI 1 с возможностями
+owners/expansion/full-matrix distinct и Rust Stream 5 для мног GPU запуска.
+Все ранги сначала согласуют сам флаг strict через существующую CPU/Gloo группу;
+при разном включении они завершаются общей ошибкой до NCCL обмена. Затем каждая
+ранговая конфигурация сравнивает ABI, возможности и SHA-256 библиотек, scorer,
+checkpoint и search manifest до поиска. Strict diagnostics записывают реальные
+вызовы стадий после успешного вызова и не копируют CUDA тензоры для трассировки.
+
+Проверки входных CNOT тензоров сравнивают dtype с каноническими
+`torch.int64`/`torch.uint16`; это сохраняет отдельный маршрут для 16-битных
+направленных ID. Подготовка winner packet и history edge голосуется через Gloo
+до соответствующего exchange/broadcast. Следующая глубина и closed frontier
+фиксируются только после успешного построения буферов. Эти votes покрывают
+ранговые ошибки подготовки, но не восстановление после потери процесса или
+ошибки внутри зависшего NCCL collective.
+
+Приёмочный Vast workflow принимает только явный десятичный ID уже запущенного
+нового 2× desktop RTX 3060, сверяет владельца/состояние/тариф и считает общий
+срок от API `start_date` под лимитом $10 с резервом для подготовки и остановки.
+До передачи кода он требует pinned приватный checkout, manifest и checkpoint.
+После выполнения JSON receipt связывает source/wheel/scorer/checkpoint/manifest
+hashes, события rank/device и readback состояния ресурса. Workflow не создаёт и
+не арендует инстанс. Физический прогон остаётся pending до появления доступного
+предложения и приватного источника данных.
+
 ## Rust validation for calibration rank plans (2026-11-20)
 
 The calibration-side `validate_rank_plans` delegates ordinary typed rank records
@@ -3398,3 +3724,227 @@ splits, and payload contents are unchanged. The control-flow votes and hosted
 evidence are recorded in
 `test_results/refactor_20261120/cnot-exchange-gloo/GITHUB_STATUS.md`.
 Physical CUDA/NCCL multi-GPU exchange remains unverified.
+
+## CNOT acceptance evidence is invocation-scoped (2026-11-21)
+
+Strict CNOT acceptance records use one versioned JSON schema for Rust and
+Python producers. Every event carries the run and case IDs, source and wheel
+hashes, rank/world, process ID, device, physical GPU UUID, event kind and
+structured fields. The hosted verifier reads only the requested report and
+its matching per-rank JSONL receipts, then compares them with the combined
+trace. It requires one admission/controller/terminal record per rank, required
+DeviceDomain operations, Rust TQP scorer dispatch, and the actual Rust
+Stream 5/NCCL phases on every rank of a two-rank run. Backend ABI and artifact
+hashes must match from admission through dispatch. A single-rank receipt
+declares `single_rank_no_exchange` explicitly.
+
+The installed-wheel CPU workflow exercises the public `verify_cnot.main`
+entry under two Gloo ranks. It coordinates scorer setup failure on rank 0 and
+rank 1, destroys the entered `World` before process-group teardown, then runs
+a healthy verifier search after each failure. The result JSON write is also
+checked across ranks. These hosted checks validate control flow and receipt
+contracts only; they do not prove CUDA/NCCL execution. The physical gate stays
+pending until a matched installed-wheel run on one and two physical RTX 3060s
+passes with per-rank backend evidence and independent replay.
+
+For strict acceptance, each worker exposes the selected GPU through its full
+physical UUID in `CUDA_VISIBLE_DEVICES`, initializes that CUDA device, then
+reads the current context's device UUID through the CUDA driver. Python and
+Rust event producers and the result report use the observed UUID and compare
+it with the expected rank mapping. Host metadata is gathered over the Gloo
+control group. CPU fake-driver checks can validate mapping and rejection
+logic, but only physical runs confirm the selected 3060 devices.
+
+
+## Rust-owned typed CNOT search request, 2026-11-22
+
+The native Rust CNOT controller now creates one `beam_runtime::cnot_search::CnotRequest` during the existing collective admission phase. It owns the wire count, global width, effective shortlist, depth, mode, validation policy and requested engine as typed values. Shortlists are capped to the existing directed-gate alphabet, and the same validated values are used for native stage execution.
+
+Python still supplies the compatible tensor/model adapter and initialized distributed world. The request changes no row-XOR semantics, scoring, precision, kernel, stage order or collective. Hosted Rust/PyO3 and installed-wheel checks are the acceptance boundary for this control transfer; CUDA/NCCL hardware remains separately unverified.
+
+
+## Rank-consistent CNOT dispatch selection (2026-11-22)
+
+CNOT route selection consumes one snapshot of callable native bindings per rank.
+The existing control-group vote intersects those snapshots before the executor
+starts a search. A rank-local missing stage therefore cannot cause one rank to
+enter a Gloo vote while another enters a different phase. Strict acceptance
+rejects an incomplete required native set before the data plane. Public
+`auto` selects one shared route, preferring Rust compatibility stages when
+available; explicit `rust` returns a shared error if no Rust route is common.
+The selected route is passed to execution instead of being independently
+resolved again from the user's original engine string.
+
+The installed-wheel test covers missing native callables on either rank,
+strict failure before transport, common-route selection, explicit Rust failure,
+and a healthy auto retry in the same two-rank Gloo group. The same SHA also
+passed wide cutoff parity and separate topology/deduplication/tie fixtures.
+These are CPU/Gloo and installed-wheel checks; physical CUDA/NCCL acceptance
+remains pending.
+
+
+
+## Panel-v2 handoff byte binding — 2026-11-22
+
+The resolver retains each verified JSON artifact's bytes, hashes those bytes, and parses the same byte sequence. It does not reread a manifest or result after digest verification. This applies to the training manifest and result, selected-panel search manifest, and baseline Hamming search manifest. A read-count regression was RED before the change and passed on tested code SHA `57bf4f0deb90e1b0009b1a458968e5ca4096fe23` in the installed-wheel endpoint suite ([run 44983817156](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44983817156)); the pinned producer compile/handoff CPU gates also passed ([44983817105](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44983817105), [44983819836](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44983819836)). This is CPU handoff evidence, not a trained GPU replay.
+
+## Per-search CNOT backend-mode snapshot (2026-11-22)
+
+The controller votes the strict or compatibility mode during backend admission and stores that decision in a Rust-owned per-search admission object. Stream 5 startup, native-stage construction and Rust scorer dispatch consume the stored decision. Production execution does not reread the process environment after admission, so a rank-local environment change cannot change the backend requirements partway through a search. Legacy direct extension calls that omit an admission object retain the environment-based compatibility fallback.
+
+
+## Single CNOT dispatch decision (2026-11-22)
+
+After the existing rank-wide callable-capability vote, the PyO3 adapter converts
+the public engine token and depth-range fact into the typed runtime input. It
+calls `beam_runtime::cnot_search::select_dispatch` once; the discarded
+preliminary engine selection has been removed. The typed route remains the
+value passed to the executor. The Python `World` still owns process-group
+creation and supplies Gloo/Torch adapters, so this change does not transfer
+world or CUDA-handle ownership.
+
+An installed-wheel regression checks the selector boundary and the existing
+two-rank Gloo route/failure/retry cases. The test failed on
+`edcafd46a1585deb81c4f6007db877015a699fae` and passed on
+`9ce5954b6b1d6bd014a2af086dec71ff7686a255` ([run
+44996962384](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/44996962384)).
+CUDA/NCCL behavior remains pending.
+
+## Rust-owned permutation inference backend selection, 2026-11-22
+
+The public permutation runner preparation now sends a typed device/model request to
+`beam_runtime::inference_backend`. Python/Torch still observes the selected CUDA
+devices and supplies their SM version and device name. Rust selects `libtorch` or
+`cutlass` and enforces the existing dtype, ensemble and MLP Q-head compatibility
+rules before native runner construction. The Python rule table remains only for
+older installed extensions that do not expose this API. The selected route is
+stored in the prepared profile and passed to the native build.
+
+This slice moves runner backend selection only. Search stages, model scoring,
+specialized inference kernels, precision policy, CUDA/NCCL ownership and public
+result formats are unchanged. The installed-wheel test covers direct PyO3 policy
+calls, legacy-extension fallback, error translation, and the normal
+`prepare_runtime` caller with a discriminating Rust resolver response.
+
+
+## Panel-v2 consumer binding and pinned producer CI — 2026-11-22
+
+The handoff resolver reads and hashes each referenced artifact's bytes once, parses the same bytes, and now stores the validated frontier expansion bound in the resolved panel object. The public verifier passes that resolved object into search without loading the resolver or revalidating the search contract a second time. Its installed-wheel CPU regression runs two distinguishable synthetic panel receipts and observes the roots sent to search, the selected search width/shortlist/depth, and the scorer's manifest and dimension. Rank consensus and independent replay remain required.
+
+The Vast preflight still validates the private input before build, because it protects the long build stage. At runtime, the public verifier resolves the current receipt once and compares its checkpoint/manifest digests with the preflight pins; the native scorer still checks the pinned manifest itself. The shell no longer hashes that same manifest a third time.
+
+The producer compatibility workflow keeps one stable required PR check on every PR update. It runs the cheap CPU classifier and synthetic handoff tests first. Its input fingerprint includes the pinned producer/adapter files, resolver pins, handoff fixture and workflow. A matching prior success is reused for docs-only changes; a matching failure remains failed; missing or changed inputs run the full pinned build. Manual dispatch always runs full. Status is stored in the Actions cache by fingerprint and uploaded as a small redacted artifact; CPU logs are separate artifacts. Physical GPU behavior is outside this one-off.
+
+
+## Producer source and emitter ABI compatibility — 2026-11-22
+
+The consumer supports producer source revisions `42ed72f587ab70fc74a85cf0a25001efb29cb994` and legacy `7310b1eb5ec07c76c131ba8c60b105ff4aad7a9c`. Each source revision maps separately to emitter ABI SHA-256 `2a6f579be0b1426a451aadf06709fa027b17eb7170f7b694d945acf81e070bf1`. The older synthetic receipt exercises legacy acceptance; negative tests cover unsupported source revisions and a mismatched emitter ABI. Hosted CPU compatibility uses the current emitter commit. The installed-wheel public verifier also consumes a receipt generated by that pinned emitter, then independently replays the result.
+
+
+## CNOT panel preflight snapshot — 2026-11-22
+
+The Vast panel acceptance resolves the private producer receipt and sealed dataset once before the build. That preflight emits only the selected panel roots, validated search settings, artifact digests and a bounded expansion value into a compact run-local snapshot. The acceptance wrapper hashes the snapshot once; the one-rank and two-rank public verifier invocations consume those exact bytes and reject a changed snapshot. Workers no longer reopen, hash and parse the full frozen dataset. The Rust scorer still validates the resolved search manifest against the pinned digest.
+
+The CPU read-count regression models the 1-rank plus 2-rank invocation pattern and requires exactly one full sealed-dataset read across preflight plus all three rank-local snapshot loads. The installed-wheel endpoint test exercises the same snapshot CLI path used by Vast. Physical acceptance remains pending.
+
+The producer compatibility fixture now changes the baseline Hamming manifest's source revision and digest before constructing its comparison when it simulates a different producer source pin. This keeps producer source, baseline manifest, comparison receipt pins and emitter ABI aligned; runtime source/ABI admission remains strict.
+
+
+## Rust-owned inference profile resolution (2026-11-22)
+
+The installed-wheel acceptance check exposed that the Rust extension exported backend selection but not the typed profile plan consumed by the preparation path. Rust now returns the selected backend together with the existing profile name and inference row limit. The Python adapter uses that single plan for runner construction and the prepared profile. Older extensions retain the existing backend-selection fallback and the same fixed profile mapping. No inference kernel, numerical policy, or beam-search behavior changes. CPU/PyO3 verification passed through the installed-wheel policy and preparation path on tested SHA a0f406238515ffab5d0c45b9ae4b0d5dc5011931 (run 45040185404). Physical CUDA/NCCL verification remains pending.
+
+## Rust-owned public scheduler rank resolution
+
+The public `cluster.scheduler_rank` helper delegates torchrun/Slurm environment parsing to `beam-runtime` when the installed PyO3 extension exports the versioned resolver. Rust returns global, node, and local rank plus world/local-world sizes; Python keeps the existing `ScheduledRank` object and uses the original parser only for older wheels. Invalid scheduler input still raises `ValueError` at the Python API. A runtime failure from a present resolver is an error and does not fall back to a different rank assignment. This transfer does not change process launching, CUDA device binding, NCCL, or search behavior.
+
+
+## Rust-owned torchrun and Slurm scheduler rank resolution
+
+The public `cluster.scheduler_rank` path uses the typed `beam-runtime` resolver for torchrun and Slurm environments. Python preserves `ScheduledRank`, its `ValueError` contract, and fallback only when an older wheel lacks the resolver. Installed-wheel validation on source SHA `a96be795a011174d7f244c06f1593a62b16e6c27` passed in [run 45052314835](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45052314835); Rust CPU/Gloo and hosted acceptance passed in [run 45052314834](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45052314834) and [run 45052315268](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45052315268). The physical CUDA/NCCL job was skipped. This transfers scheduler metadata only; it does not change device binding, process launch, transport, or search behavior.
+
+
+## Rust-owned scheduler-to-CUDA ordinal mapping
+
+`ScheduledRank.cuda_ordinal` now delegates its existing single-visible-device and local-rank rules to `beam-runtime` through a versioned PyO3 function. The public method, error text, and old-wheel compatibility fallback remain unchanged. This only maps an already assigned scheduler rank into the process-local CUDA namespace; it does not bind devices, alter `CUDA_VISIBLE_DEVICES`, launch ranks, or initialize NCCL. The extension's ordinary rank resolver and CUDA ordinal API use separate version constants.
+
+
+The scheduler-to-CUDA ordinal transfer was validated on code SHA `935016b513a742067f3be11315b7013a322dbefc`: Rust CPU/Gloo passed in [run 45054019605](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45054019605), the installed PEP 517 wheel passed in [run 45054019597](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45054019597), and hosted acceptance passed in [run 45054020205](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45054020205). The physical GPU job was skipped.
+
+
+## Rust-owned CUDA visibility translation
+
+`backend.child_environment` obtains the child process's `CUDA_VISIBLE_DEVICES` mapping from a versioned `beam-runtime` function. The Rust rule preserves selected-index order, token trimming, duplicate selections, inherited `CUDA_DEVICE_ORDER`, and the previous rejection of out-of-range, empty, or disabled tokens. The Python API and child environment isolation remain unchanged; older extensions without the resolver use the existing Python rule. This translates the scheduler-provided visibility mask and does not select or bind physical devices.
+
+
+The Rust-owned child CUDA visibility translation passed Rust CPU/Gloo in [run 45055128201](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45055128201), installed-wheel validation in [run 45055128252](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45055128252), and the hosted acceptance harness in [run 45055128570](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45055128570) on source SHA `db3e1beb0027b4c4ef42c80b87468fdf3630a07f`. The physical GPU and private producer jobs were skipped.
+
+
+## Rust-owned permutation child environment
+
+The public `backend.child_environment` now delegates reserved-variable filtering, CUDA visibility translation, retention of `CUDA_DEVICE_ORDER`, and the NCCL ID path to a versioned Rust runtime resolver. It returns the same child environment map and keeps the Python builder for older wheels. The resolver removes inherited rank, BEAM, torchrun, CUDA, NCCL, publish/results-ingest, shard and stream controls before adding the selected CUDA mask and run-local NCCL path. This covers the permutation worker's environment preparation; it does not start a child or change CUDA/NCCL algorithms.
+
+Installed-wheel verification passed on code SHA `1e8b88cf6f188171bbe583875a400fca9095c5f8` in [run 45056737762](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45056737762). The tests separate direct `backend.cuda_visibility` mapping from the public `backend.child_environment` path, which exercises the combined Rust resolver, filtering, NCCL ID path, old-wheel fallback and error handling. The same installed run passed the saturated permutation CPU acceptance cases; it does not verify physical CUDA/NCCL.
+
+
+## Rust-owned permutation search phase selection — 2026-11-23
+
+The public permutation runner now asks a versioned `beam-runtime` resolver which existing preparation phases apply: inference calibration, fixed-width capacity discovery, maximum-frontier refinement, downstream calibration, and working-capacity selection. The returned ordered plan is consumed by `backend._run_native_once`; Python retains the existing calibration functions and launches them in the same order. The resolver preserves the current MLP calibration-binary and ensemble predicates, the `beam_width="max"` behavior, and the delayed unsupported-calibrator errors at their existing phase boundaries. Older wheels without the resolver keep the matching Python compatibility plan; errors from a present Rust resolver are not converted into fallback.
+
+This transfers stage selection only. It does not change model inference, precision, GPU kernels, beam semantics, CUDA device binding, NCCL transport, Python/Kaggle APIs or CLI/scheduler interfaces. Rust CPU phase-plan tests passed on [run 45135569729](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45135569729); the installed PEP 517 wheel passed on source SHA `258cd9f3428edd2fb89212c92290ac59a520527a` in [run 45135335424](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45135335424). The installed-wheel step exercised the real Rust extension and public runner phase-plan helper. Physical permutation CUDA/NCCL on one and two GPUs remains unverified. CNOT continuation and final acceptance remain deferred.
+
+
+#### Rust-owned permutation beam-width preparation — 2026-11-23
+
+The public permutation runner now obtains the ordered preparation phases and the width used for resource planning from a typed beam-runtime execution plan. Fixed beam requests pass through unchanged. The existing beam_width="max" request resolves to the same 1,048,576 calibration width before microbatch planning; the maximum-frontier search and working-capacity algorithm are unchanged. The installed Rust resolver is authoritative when present, while older wheels retain their matching phase and width compatibility path. Rust CPU execution-plan tests passed (3/3) in [run 45139333020](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45139333020), artifact [14800709775](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45139333020/artifacts/14800709775). The installed PEP 517 wheel passed on source SHA 565694c013863238bb9ce38e403e35dfd1231221 in [run 45139332961](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45139332961), redacted status artifact [14801331950](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45139332961/artifacts/14801331950). The installed runner used the Rust width plan before microbatch preparation. Physical permutation CUDA/NCCL was not run.
+
+
+#### Rust-owned permutation rank-planner session — 2026-11-23
+
+The public \`NativePlanSession\` adapter now uses the matching installed \`beam-runtime::PlanningSession\` when available. Rust owns the rank processes, rank environment, rendezvous identity, request/response exchange, deadline, cancellation, all-rank admission validation, component two-phase handshake, and process cleanup. Python retains the same adapter behavior and the compatibility path for wheels without this API. Errors from a present Rust planner remain errors; capacity rejection maps to the existing Python capacity-rejection type.
+
+The installed PEP 517 wheel was built and its external smoke step passed on code SHA \`7304818d0ab7860869053ef01dda5af71ad44ed1\` in [run 45142440137](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45142440137). The added CPU fixture made two admissions on the same two Rust-owned rank PIDs and compared its first result with the legacy adapter. The broader combined workflow was still running its remaining CPU/Gloo checks when this note was written. Physical permutation CUDA/NCCL was not run.
+
+#### Rust-owned one-GPU one-shot permutation launch — 2026-11-23
+
+The public nonresident permutation search now sends one-GPU and multi-GPU launches through the same local_launcher.run_local_ranks boundary. The installed beam-runtime supervisor starts the rank process, appends the existing (world_size, rank) arguments, sets the same rank environment and rendezvous ID, applies the existing timeout/cancellation handling, and reaps the process group. Rank stdout/stderr files are merged into the existing native.log contract. Persistent NativeSession launches keep their existing resident protocol.
+
+The extension advertises CLUSTER_LOCAL_RANKS_MIN_WORLD_SIZE=1. A version-1 wheel without that capability keeps the established Python supervisor for a one-GPU launch; its multi-rank behavior remains available. Search kernels, frontier semantics, score ordering, precision, and NCCL behavior are unchanged.
+
+The installed PEP 517 wheel and saturated permutation CPU acceptance passed on source SHA 86afff92cd705afb50cb011c4684151f88c042e2 in [run 45145388328](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45145388328). Its external smoke exercised the actual Rust one-rank process, argv/environment/log collection, and the version-1 Python fallback. Shared CPU/Gloo checks passed in [run 45145388385](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45145388385). Physical permutation CUDA/NCCL on one and two GPUs remains unverified.
+
+
+
+#### Installed public permutation session through the Rust owner — 2026-11-23
+
+The installed-wheel CPU gate now calls the public `NativeSession.run` path with the compiled PyO3 `SearchSession` and one or two real Rust-supervised child processes running a synthetic terminal protocol. It checks that a second compatible call keeps the rank PIDs and advances the request count, while changes to the resolved inference plan, model artifact identity, and graph geometry start fresh resident workers. Each fixture result must replay to the graph center. This verifies session ownership and invalidation through the installed public adapter; it does not exercise CUDA kernels or NCCL.
+The targeted installed-wheel session-identity step passed on code SHA `9148293de77c4e854193221633404dfbf44f0748` in [run 45151845921](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45151845921) (step 13). The separate public-owner CPU job passed on the same SHA in [run 45151845760](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45151845760). The session test uses synthetic CPU workers; no CUDA/NCCL behavior is claimed.
+
+
+#### Public permutation `beam_search` dispatch through the installed Rust owner — 2026-11-23
+
+The installed-wheel CPU gate now calls the package-level `multigpubeamsearch.beam_search` entry with the compiled PyO3 `SearchSession` and one or two Rust-supervised synthetic rank workers. It checks that public dispatch selects the Rust resident session, reports the requested backend/devices, creates distinct rank workers, returns the expected terminal path, and independently replays that path against the graph contract. This closes the public-entry dispatch check alongside the existing explicit-session reuse/invalidation check. The fixture does not run CUDA kernels or NCCL.
+
+The package-level fixture passed in the installed-wheel job on source SHA `d0a6fda1d5d6b685a98bb90b6098980a033cc3c7`, [run 45155692620](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45155692620), step “Verify installed Rust session identity and reuse”. Rust public-owner CPU checks also passed in [run 45155692720](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45155692720). Physical permutation CUDA/NCCL on one and two GPUs remains unverified; CNOT continuation and acceptance are deferred.
+
+
+#### Public permutation NativeSession reuse through Rust — 2026-11-23
+
+Extended the installed-wheel acceptance through the user-facing `NativeSession.beam_search` method. On one and two synthetic CPU ranks, two requests with the same graph/model/runtime keep the same Rust-supervised worker PIDs and advance the persistent request count; changing graph geometry replaces the workers. The fixture verifies both returned paths with independent graph replay and confirms that the compiled PyO3 `SearchSession` owns the resident group. It does not exercise CUDA kernels or NCCL.
+
+The targeted test and full installed-wheel job passed on source SHA `9c1280155252850e4913b548ac21ba7dec1ede84` in [run 45157050381](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45157050381), including step “Verify installed Rust session identity and reuse”. Rust public-owner CPU checks passed in [run 45157049220](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45157049220). Physical permutation CUDA/NCCL on one and two GPUs remains unverified under the current pause; CNOT continuation and acceptance remain deferred.
+
+
+#### Public permutation session model and geometry invalidation — 2026-11-23
+
+An installed-wheel fixture was added for the user-facing `NativeSession.beam_search` API. It checks reuse for identical requests, model-artifact invalidation, geometry-only invalidation, and independent path replay at world sizes one and two with the compiled Rust `SearchSession` and synthetic workers.
+
+The first run after adding the fixture did **not** execute it: the focused `pytest -k` expression omitted the new test function. The workflow selector now includes the fixture by name. On source SHA `c70ec46877bc8d5fcd088dc7ba0903fd61bfcbce`, the installed-wheel session step selected the test and passed, and the full installed-wheel job passed in [run 45159435499](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45159435499). The fixture does not exercise CUDA kernels or NCCL.
+
+#### Installed CayleyGraph method dispatch through Rust — 2026-11-23
+
+The installed-wheel CPU fixture now covers the opt-in compatibility method used by CayleyPy consumers: `enable_native()` followed by `CayleyGraph.beam_search()`. It exercises the real Rust `SearchSession` with one and two Rust-supervised synthetic workers, validates the returned path through independent graph replay, and records the compiled owner. The first hosted attempt found a test-fixture mismatch in the synthetic worker condition; the fixture now preserves the previous session case and explicitly solves the generated graph-method root. On source SHA `bf79da8ed2f5504d09fbe91ca1b7a33142966780`, the installed-wheel step passed all 7 selected tests and the full installed-wheel job passed in [run 45161860862](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45161860862). This CPU path check does not run CUDA kernels or NCCL.
+
+#### Installed permutation session cancellation and recovery
+
+The installed-wheel permutation session fixture now exercises cancellation while the resident Rust owner has an active request. Each rank reports entry into the held request; the test invokes the public cancellation method, checks the common cancellation error, confirms the resident group is closed and each rank process exits, then starts a fresh Rust session and independently replays its result. The fixture runs with one and two synthetic CPU ranks. The installed-wheel test step and full job passed on source SHA `b9dbc5fd67f7163451d423184cd5228ce116bd99` in [run 45165007141](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45165007141). This does not exercise CUDA kernels or NCCL; physical permutation 1/2-GPU validation remains pending.

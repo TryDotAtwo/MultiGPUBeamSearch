@@ -107,10 +107,11 @@ while not (directory/'stop').exists():
         binding_scope: false,
         requested_beam: RequestedBeam::Exact(identity.beam_width),
         max_steps: identity.max_steps,
-        options_repr: "NativeOptions()".into(),
+        options: json!({"inference_backend":"auto"}),
         cuda_visible_devices: None,
         cuda_device_order: None,
         runtime_build: Some(identity.runtime_build.clone()),
+        resolved_inference_plan: None,
     };
     for (index, start) in [vec![1, 0, 2, 3], vec![0, 1, 3, 2], vec![1, 0, 3, 2]]
         .iter()
@@ -207,10 +208,11 @@ while not (directory/'stop').exists():
         binding_scope: false,
         requested_beam: RequestedBeam::Exact(identity.beam_width),
         max_steps: identity.max_steps,
-        options_repr: "NativeOptions()".into(),
+        options: json!({"inference_backend":"auto"}),
         cuda_visible_devices: None,
         cuda_device_order: None,
         runtime_build: Some(identity.runtime_build.clone()),
+        resolved_inference_plan: None,
     };
     session.remember_preparation(&preparation).unwrap();
     assert!(session.begin_preparation(&preparation).unwrap());

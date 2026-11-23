@@ -73,11 +73,13 @@ impl Scorer {
             .map(|spec| spec.id.to_string())
             .collect();
         let metadata = json!({
+            "scorer_contract": "dev_v1",
             "upstream_commit": "c5b3e3f93b45aa7e533fd2c06209c28ce516ffeb",
             "checkpoint_sha256": restored.receipt.sha256,
             "feature_registry_sha256": restored.field.registry.contract_sha256(),
             "training_manifest_sha256": spec.training_manifest.sha256,
             "training_result_sha256": spec.training_result.sha256,
+            "scorer_output_dtype": "float32",
             "dimension": n, "cuda_device": device, "feature_model_inputs": feature_ids.len(),
             "feature_ids": feature_ids, "max_packet_rows": capacity,
         });

@@ -1,5 +1,7 @@
 //! Coarse Python adapter for the owned packed CNOT input contract.
-use beam_runtime::cnot_search::{self, Backend, Edge, Goal, Options, Round};
+use beam_runtime::cnot_search::{
+    self, Backend, CnotRequest, Edge, Goal, Options, RankedCnotRequest, Round,
+};
 use beam_runtime::cnot_selection;
 use pyo3::{
     exceptions::{PyRuntimeError, PyValueError},
@@ -19,6 +21,11 @@ struct PyCnotSearchInput {
     raw: Py<PyBytes>,
     root: Py<PyAny>,
     matrix: beam_core::cnot::CnotMatrix,
+}
+
+#[pyclass(name = "_CnotRankedRequest", frozen)]
+pub(crate) struct PyCnotRankedRequest {
+    pub(crate) inner: RankedCnotRequest,
 }
 
 pub(crate) fn search_input_is_identity(input: &Bound<'_, PyAny>) -> PyResult<Option<bool>> {
@@ -71,10 +78,8 @@ fn prepare_cnot_input<'py>(
     let invalid_shape =
         || PyValueError::new_err("expected one packed int64 matrix [1,n,ceil(n/64)]");
     let torch = py.import("torch")?;
-    let dtype_matches = root
-        .getattr("dtype")?
-        .call_method1("__eq__", (torch.getattr("int64")?,))?
-        .is_truthy()?;
+    let expected_dtype = torch.getattr("int64")?;
+    let dtype_matches = root.getattr("dtype")?.is(&expected_dtype);
     if !dtype_matches {
         return Err(invalid_shape());
     }
@@ -115,7 +120,7 @@ fn prepare_cnot_input<'py>(
 
     // Retain the exact public snapshot semantics: validation, raw hashing and
     // replay all refer to this owned contiguous tensor after the caller returns.
-    let mut clone_kwargs = PyDict::new(py);
+    let clone_kwargs = PyDict::new(py);
     clone_kwargs.set_item("memory_format", torch.getattr("contiguous_format")?)?;
     let snapshot = root
         .call_method0("detach")?
@@ -133,6 +138,31 @@ fn prepare_cnot_input<'py>(
         root: snapshot.unbind(),
         matrix: inner,
     })
+}
+
+#[pyfunction(name = "_cnot_public_dispatch_digest")]
+fn cnot_public_dispatch_digest<'py>(
+    py: Python<'py>,
+    engine: Bound<'py, PyAny>,
+    max_depth: Bound<'py, PyAny>,
+    strict_backend: bool,
+) -> PyResult<Bound<'py, PyBytes>> {
+    let builtins = py.import("builtins")?;
+    let engine_type = builtins.getattr("type")?.call1((&engine,))?;
+    if !engine_type.is(&builtins.getattr("str")?) {
+        return Err(PyValueError::new_err(
+            "CNOT engine must be auto, python, or rust",
+        ));
+    }
+    let engine_text: String = engine.extract()?;
+    let depth_fits_u64 = !max_depth.call_method1("__gt__", (u64::MAX,))?.is_truthy()?;
+    let digest = beam_runtime::cnot_search::public_dispatch_digest(
+        &engine_text,
+        depth_fits_u64,
+        strict_backend,
+    )
+    .map_err(|error| PyValueError::new_err(error.to_string()))?;
+    Ok(PyBytes::new(py, &digest))
 }
 
 #[pyfunction]
@@ -154,31 +184,84 @@ fn run_cnot_native_require_consensus(world: Bound<'_, PyAny>, digest: Vec<u8>) -
     Ok(())
 }
 
-fn select_cnot_engine(
-    py: Python<'_>,
-    engine: &Bound<'_, PyAny>,
-    max_depth: &Bound<'_, PyAny>,
+fn selected_engine_name(
+    selected: beam_runtime::cnot_search::SelectedEngine,
 ) -> PyResult<&'static str> {
-    let supported = PyTuple::new(py, ["auto", "python", "rust"])?;
-    if !supported
-        .call_method1("__contains__", (engine,))?
-        .is_truthy()?
-    {
-        return Err(PyValueError::new_err(
-            "CNOT engine must be auto, python, or rust",
-        ));
-    }
-    let equals = py.import("operator")?.getattr("eq")?;
-    if equals.call1((engine, "python"))?.is_truthy()? {
-        return Ok("python");
-    }
-    if max_depth.call_method1("__gt__", (u64::MAX,))?.is_truthy()? {
-        if equals.call1((engine, "auto"))?.is_truthy()? {
-            return Ok("python");
+    Ok(match selected {
+        beam_runtime::cnot_search::SelectedEngine::Python => "python",
+        beam_runtime::cnot_search::SelectedEngine::Rust => "rust",
+    })
+}
+
+fn cnot_dispatch_capability(capabilities: &Bound<'_, PyDict>, key: &str) -> PyResult<bool> {
+    capabilities
+        .get_item(key)?
+        .ok_or_else(|| PyValueError::new_err(format!("missing CNOT dispatch capability {key}")))?
+        .extract()
+}
+
+#[pyfunction(name = "_select_cnot_dispatch")]
+fn select_cnot_dispatch(
+    engine: Bound<'_, PyAny>,
+    max_depth: Bound<'_, PyAny>,
+    strict_backend: bool,
+    capabilities: Bound<'_, PyDict>,
+) -> PyResult<&'static str> {
+    let engine_text: String = engine
+        .extract()
+        .map_err(|_| PyValueError::new_err("CNOT engine must be auto, python, or rust"))?;
+    let requested = match engine_text.as_str() {
+        "auto" => beam_runtime::cnot_search::RequestedEngine::Auto,
+        "python" => beam_runtime::cnot_search::RequestedEngine::Python,
+        "rust" => beam_runtime::cnot_search::RequestedEngine::Rust,
+        _ => {
+            return Err(PyValueError::new_err(
+                "CNOT engine must be auto, python, or rust",
+            ))
         }
-        return Err(PyValueError::new_err("CNOT Rust engine depth exceeds u64"));
-    }
-    Ok("rust")
+    };
+    let depth_fits_u64 = !max_depth.call_method1("__gt__", (u64::MAX,))?.is_truthy()?;
+    let caps = beam_runtime::cnot_search::DispatchCapabilities {
+        native_controller: cnot_dispatch_capability(&capabilities, "native_controller")?,
+        checked_control: cnot_dispatch_capability(&capabilities, "checked_control")?,
+        native_stages: cnot_dispatch_capability(&capabilities, "native_stages")?,
+        stream5_start: cnot_dispatch_capability(&capabilities, "stream5_start")?,
+        world_exchange: cnot_dispatch_capability(&capabilities, "world_exchange")?,
+        fixed_gather: cnot_dispatch_capability(&capabilities, "fixed_gather")?,
+        row_gather: cnot_dispatch_capability(&capabilities, "row_gather")?,
+        broadcast: cnot_dispatch_capability(&capabilities, "broadcast")?,
+        compatibility_controller: cnot_dispatch_capability(
+            &capabilities,
+            "compatibility_controller",
+        )?,
+    };
+    let path = beam_runtime::cnot_search::select_dispatch(
+        requested,
+        depth_fits_u64,
+        strict_backend,
+        caps,
+    )
+    .map_err(|error| match error {
+        beam_runtime::cnot_search::DispatchError::EngineSelection(
+            beam_runtime::cnot_search::EngineSelectionError::RustDepthExceedsU64,
+        ) => PyValueError::new_err("CNOT Rust engine depth exceeds u64"),
+        beam_runtime::cnot_search::DispatchError::StrictRequiresRustController => {
+            PyRuntimeError::new_err("strict CNOT acceptance requires the Rust CNOT controller")
+        }
+        beam_runtime::cnot_search::DispatchError::StrictBackendUnavailable => {
+            PyRuntimeError::new_err(
+                "strict CNOT acceptance requires matching Rust controller, stage, transport, and Gloo ABIs on every rank",
+            )
+        }
+        beam_runtime::cnot_search::DispatchError::RustControllerUnavailable => {
+            PyRuntimeError::new_err("CNOT Rust engine requested but no compatible Rust controller is available")
+        }
+    })?;
+    Ok(match path {
+        beam_runtime::cnot_search::DispatchPath::RustController => "rust_controller",
+        beam_runtime::cnot_search::DispatchPath::RustCompatibility => "rust_compatibility",
+        beam_runtime::cnot_search::DispatchPath::PythonReference => "python_reference",
+    })
 }
 
 fn cnot_admission_digest<'py>(
@@ -290,6 +373,7 @@ impl PyCnotSearchInput {
 struct PyStages<'py> {
     py: Python<'py>,
     stages: Bound<'py, PyAny>,
+    strict_backend: bool,
 }
 
 impl Backend for PyStages<'_> {
@@ -416,7 +500,13 @@ impl Backend for PyStages<'_> {
                         self.py,
                         &world,
                         "rank parent actions and expand",
-                        crate::cnot_native_expand::expand(self.py, &self.stages, begin, k),
+                        crate::cnot_native_expand::expand(
+                            self.py,
+                            &self.stages,
+                            begin,
+                            k,
+                            self.strict_backend,
+                        ),
                     )?;
                     let expansion = expansion.downcast::<PyTuple>()?;
                     if expansion.len() != 2 {
@@ -477,7 +567,11 @@ impl Backend for PyStages<'_> {
                         self.py,
                         &world,
                         "deduplicate and evaluate distinct children",
-                        crate::cnot_native_dedup_score::deduplicate_score(self.py, &self.stages),
+                        crate::cnot_native_dedup_score::deduplicate_score(
+                            self.py,
+                            &self.stages,
+                            self.strict_backend,
+                        ),
                     )?;
                     let result = result.downcast::<PyTuple>()?;
                     if result.len() != 3 {
@@ -582,22 +676,58 @@ impl Backend for PyStages<'_> {
             if input.is_instance_of::<PyCnotSearchInput>() && self.stages.hasattr("world")? {
                 let world = self.stages.getattr("world")?;
                 let rank: u32 = world.getattr("rank")?.extract()?;
-                let edge = world.call_method1("longs", (vec![0_i64, 0, 0],))?;
-                if target == rank {
-                    edge.call_method1("copy_", (records.bind(self.py).get_item(local_index)?,))?;
-                }
-                world.call_method1("broadcast", (&edge, target))?;
-                let row: Vec<i64> = edge.call_method0("tolist")?.extract()?;
-                if row.len() != 3 {
-                    return Err(PyValueError::new_err("invalid CNOT history edge"));
-                }
+                let prepared = (|| -> PyResult<Bound<'_, PyAny>> {
+                    let edge = world.call_method1("longs", (vec![0_i64, 0, 0],))?;
+                    if target == rank {
+                        let record = records.bind(self.py).get_item(local_index)?;
+                        edge.call_method1("copy_", (record,))?;
+                    }
+                    Ok(edge)
+                })();
+                let edge = crate::cnot_native_checked::checked_compat(
+                    self.py,
+                    &world,
+                    "prepare CNOT history edge",
+                    prepared,
+                )?;
+                let broadcast = world.call_method1("broadcast", (&edge, target));
+                let edge = crate::cnot_native_checked::checked_compat(
+                    self.py,
+                    &world,
+                    "broadcast CNOT history edge",
+                    broadcast,
+                )?;
+                let parsed = crate::cnot_native_checked::checked_compat(
+                    self.py,
+                    &world,
+                    "validate CNOT history edge",
+                    (|| -> PyResult<Bound<'_, PyAny>> {
+                        let row: Vec<i64> = edge.call_method0("tolist")?.extract()?;
+                        if row.len() != 3 {
+                            return Err(PyValueError::new_err("invalid CNOT history edge"));
+                        }
+                        let parent = u64::try_from(row[0])
+                            .map_err(|_| PyValueError::new_err("invalid CNOT history parent"))?;
+                        let route = u32::try_from(row[1])
+                            .map_err(|_| PyValueError::new_err("invalid CNOT history route"))?;
+                        let owner = u32::try_from(row[2])
+                            .map_err(|_| PyValueError::new_err("invalid CNOT history owner"))?;
+                        let int = self.py.import("builtins")?.getattr("int")?;
+                        Ok(PyTuple::new(
+                            self.py,
+                            [
+                                int.call1((parent,))?,
+                                int.call1((route,))?,
+                                int.call1((owner,))?,
+                            ],
+                        )?
+                        .into_any())
+                    })(),
+                )?;
                 return Ok(Edge {
-                    parent: u64::try_from(row[0])
-                        .map_err(|_| PyValueError::new_err("invalid CNOT history parent"))?,
-                    route: u32::try_from(row[1])
-                        .map_err(|_| PyValueError::new_err("invalid CNOT history route"))?,
-                    owner: u32::try_from(row[2])
-                        .map_err(|_| PyValueError::new_err("invalid CNOT history owner"))?,
+                    parent: parsed.get_item(0)?.extract()?,
+                    route: parsed.get_item(1)?.extract()?,
+                    owner: parsed.get_item(2)?.extract()?,
                 });
             }
         }
@@ -696,6 +826,7 @@ fn run_cnot_native_search<'py>(
     let reference_search = callbacks.get_item(4)?;
     let result_type = callbacks.get_item(5)?;
 
+    let mut request = None;
     let admission = (|| -> PyResult<Bound<'py, PyAny>> {
         let validation_mode = validation.extract::<String>().ok();
         let input_matrix = if matches!(validation_mode.as_deref(), Some("auto") | Some("rust")) {
@@ -711,7 +842,26 @@ fn run_cnot_native_search<'py>(
                 validation.clone(),
             ))?
         };
-        let selected_engine = select_cnot_engine(py, &engine, &max_depth)?;
+        let mode_text: String = mode.extract()?;
+        let validation_text: String = validation.extract()?;
+        let engine_text: String = engine.extract()?;
+        let task = CnotRequest::new(
+            input_matrix.getattr("n")?.extract()?,
+            width.extract()?,
+            shortlist.extract()?,
+            max_depth.extract()?,
+            &mode_text,
+            audit.extract()?,
+            &validation_text,
+            &engine_text,
+        )
+        .map_err(|error| PyValueError::new_err(error.to_string()))?;
+        let rank: u32 = world.getattr("rank")?.extract()?;
+        let world_size: u32 = world.getattr("size")?.extract()?;
+        let request_value = task
+            .bind_rank(rank, world_size)
+            .map_err(|error| PyValueError::new_err(error.to_string()))?;
+        let selected_engine = selected_engine_name(request_value.selected_engine())?;
         let digest = cnot_admission_digest(
             py,
             &input_matrix,
@@ -724,33 +874,60 @@ fn run_cnot_native_search<'py>(
             &validation,
             selected_engine,
         )?;
-        let admitted = PyTuple::new(
-            py,
-            [
-                input_matrix,
-                digest.into_bound(py).into_any(),
-                PyString::new(py, selected_engine).into_any(),
-            ],
-        )?;
+        request = Some(request_value);
+        let admitted = PyTuple::new(py, [input_matrix, digest.into_bound(py).into_any()])?;
         Ok(admitted.into_any())
     })();
     let admitted =
         crate::cnot_native_checked::checked_v2(py, &world, "validate CNOT input", admission)?;
     let admitted = admitted.downcast::<PyTuple>()?;
-    if admitted.len() != 3 {
+    if admitted.len() != 2 {
         return Err(PyRuntimeError::new_err(
             "CNOT admission returned an invalid adapter result",
         ));
     }
     let input_matrix = admitted.get_item(0)?;
     let digest: Vec<u8> = admitted.get_item(1)?.extract()?;
-    let selected_engine: String = admitted.get_item(2)?.extract()?;
-    let use_rust = selected_engine == "rust";
+    let request = request.ok_or_else(|| {
+        PyRuntimeError::new_err("CNOT request missing after collective admission")
+    })?;
+    let use_rust = request.selected_engine() == beam_runtime::cnot_search::SelectedEngine::Rust;
+
+    let admitted_backends = crate::cnot_native_stages::preflight_strict_backend(
+        py,
+        &world,
+        &input_matrix.getattr("root")?,
+        &scorer,
+        use_rust,
+    )?;
+    let admitted_strict = admitted_backends.borrow(py).strict;
 
     run_cnot_native_require_consensus(world.clone(), digest)?;
-    crate::cnot_stream5::run_cnot_native_start_transport(py, world.clone(), use_rust)?;
+    let stream5_fingerprint = crate::cnot_stream5::run_cnot_native_start_transport(
+        py,
+        world.clone(),
+        use_rust,
+        Some(admitted_strict),
+    )?;
+    if admitted_strict {
+        let bind_result = (|| -> PyResult<Bound<'_, PyAny>> {
+            crate::cnot_native_stages::bind_stream5_admission(
+                py,
+                &admitted_backends,
+                &world,
+                stream5_fingerprint,
+            )?;
+            Ok(py.None().into_bound(py))
+        })();
+        crate::cnot_native_checked::checked_v2(
+            py,
+            &world,
+            "bind admitted CNOT backend handles",
+            bind_result,
+        )?;
+    }
 
-    let wires: u32 = input_matrix.getattr("n")?.extract()?;
+    let wires = request.wires();
     let identity_args = PyDict::new(py);
     identity_args.set_item("device", world.getattr("device")?)?;
     let identity_result = identity_builder.call((wires,), Some(&identity_args));
@@ -770,30 +947,50 @@ fn run_cnot_native_search<'py>(
             world.clone(),
             !native_stages.is_none(),
         )?;
-        let rank: u32 = world.getattr("rank")?.extract()?;
-        let world_size: u32 = world.getattr("size")?.extract()?;
-        let width: u64 = width.extract()?;
-        let shortlist_limit = py
-            .import("builtins")?
-            .getattr("min")?
-            .call1((shortlist, alphabet))?;
-        let shortlist_value: u32 = shortlist_limit.extract()?;
-        let depth: u64 = max_depth.extract()?;
+        if admitted_strict && !supports_native {
+            return Err(PyRuntimeError::new_err(
+                "strict CNOT acceptance requires the Rust native stage runner on every rank",
+            ));
+        }
+        let width = request.width();
+        let shortlist_value = request.shortlist();
+        let depth = request.max_depth();
+        let mode = PyString::new(py, request.mode().as_str()).into_any();
 
         if supports_native {
-            return native_stages.call1((
-                world,
-                input_matrix.getattr("root")?,
-                identity,
-                input_matrix,
-                scorer,
-                mode,
-                audit,
-                width,
-                shortlist_value,
-                alphabet,
-                depth,
-            ));
+            let native_root = input_matrix.getattr("root")?;
+            let topology_kwargs = crate::cnot_native_checked::checked_v2(
+                py,
+                &world,
+                "prepare admitted CNOT rank topology",
+                (|| -> PyResult<Bound<'_, PyAny>> {
+                    let kwargs = PyDict::new(py);
+                    kwargs.set_item("admitted_topology", (request.rank(), request.world()))?;
+                    kwargs.set_item(
+                        "ranked_request",
+                        Py::new(py, PyCnotRankedRequest { inner: request })?,
+                    )?;
+                    Ok(kwargs.into_any())
+                })(),
+            )?;
+            let topology_kwargs = topology_kwargs.downcast::<PyDict>()?;
+            return native_stages.call(
+                (
+                    world,
+                    native_root,
+                    identity,
+                    input_matrix,
+                    scorer,
+                    mode,
+                    audit,
+                    width,
+                    shortlist_value,
+                    alphabet,
+                    depth,
+                    admitted_backends,
+                ),
+                Some(&topology_kwargs),
+            );
         }
 
         let compatibility_stages = compatibility_stages_builder.call1((
@@ -811,17 +1008,10 @@ fn run_cnot_native_search<'py>(
             "build CNOT compatibility stages",
             compatibility_stages,
         )?;
-        return Ok(run_cnot(
-            py,
-            stages,
-            rank,
-            world_size,
-            width,
-            shortlist_value,
-            alphabet,
-            depth,
-        )?
-        .into_bound(py));
+        return Ok(
+            run_cnot_with_options(py, stages, request.search_options(), admitted_strict)?
+                .into_bound(py),
+        );
     }
 
     let admitted_root = input_matrix.getattr("root")?;
@@ -864,9 +1054,13 @@ fn run_cnot<'py>(
     alphabet: u32,
     max_depth: u64,
 ) -> PyResult<Py<PyAny>> {
-    let mut backend = PyStages { py, stages };
-    let outcome = cnot_search::search(
-        &mut backend,
+    let strict_backend = matches!(
+        std::env::var("MGBS_CNOT_STRICT_BACKEND").as_deref(),
+        Ok("1")
+    );
+    run_cnot_with_options(
+        py,
+        stages,
         Options {
             rank,
             world,
@@ -875,7 +1069,22 @@ fn run_cnot<'py>(
             alphabet,
             max_depth,
         },
-    )?;
+        strict_backend,
+    )
+}
+
+fn run_cnot_with_options<'py>(
+    py: Python<'py>,
+    stages: Bound<'py, PyAny>,
+    options: Options,
+    strict_backend: bool,
+) -> PyResult<Py<PyAny>> {
+    let mut backend = PyStages {
+        py,
+        stages,
+        strict_backend,
+    };
+    let outcome = cnot_search::search(&mut backend, options)?;
     outcome_to_python(py, outcome)
 }
 
@@ -907,9 +1116,12 @@ pub(crate) fn outcome_to_python(
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<PyCnotMatrix>()?;
     module.add_class::<PyCnotSearchInput>()?;
+    module.add_class::<PyCnotRankedRequest>()?;
     module.add_function(wrap_pyfunction!(prepare_cnot_input, module)?)?;
     module.add_function(wrap_pyfunction!(validate_cnot_search_controls, module)?)?;
+    module.add_function(wrap_pyfunction!(cnot_public_dispatch_digest, module)?)?;
     module.add_function(wrap_pyfunction!(run_cnot_native_require_consensus, module)?)?;
+    module.add_function(wrap_pyfunction!(select_cnot_dispatch, module)?)?;
     module.add_function(wrap_pyfunction!(run_cnot_native_search, module)?)?;
     module.add_function(wrap_pyfunction!(run_cnot, module)?)?;
     module.add_function(wrap_pyfunction!(run_cnot_selection, module)?)

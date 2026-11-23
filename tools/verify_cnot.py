@@ -1,16 +1,29 @@
 """Small, exhaustive reference for issue #6 receipts. Run directly or under torchrun."""
 import argparse
-from contextlib import nullcontext
+from contextlib import ExitStack, nullcontext
 import hashlib
+import importlib.util
 import json
+import os
 from pathlib import Path
+import re
 import socket
 import struct
+import time
+import sys
 
 import torch
 import torch.distributed as dist
 
 from multigpubeamsearch.cnot import pack_rows, replay_cnot, search_cnot
+from multigpubeamsearch.cnot_acceptance import (
+    EVENT_SCHEMA,
+    EVENT_VERSION,
+    acceptance_identity,
+    emit_event,
+    gpu_uuid_for_rank,
+    report_sha256,
+)
 from multigpubeamsearch.cnot_cli import initialize_world
 from multigpubeamsearch.cnot_collectives import World
 from multigpubeamsearch.cnot_scorer import TQPScorer
@@ -42,6 +55,30 @@ def require(condition, message):
         raise AssertionError(message)
 
 
+def reference_cutoff(eligible, reported_scores, reference_scores, width):
+    """Order the CPU child oracle and classify uncertainty at the global cutoff."""
+    ordered = sorted(eligible, key=lambda rows: (reference_scores[rows], eligible[rows][1]))
+    selected = ordered[:width]
+    if len(ordered) <= width:
+        return selected, "underfilled", None
+
+    kept, excluded = ordered[width - 1], ordered[width]
+    kept_score, excluded_score = reference_scores[kept], reference_scores[excluded]
+    gap = excluded_score - kept_score
+    if gap == 0:
+        tied = [rows for rows in ordered if reference_scores[rows] == kept_score]
+        exact = all(reported_scores[rows] == reference_scores[rows] for rows in tied)
+        status = "exact_tie_full_word" if exact else "ambiguous_within_score_tolerance"
+        return selected, status, gap
+
+    # Match assert_close(rtol=1e-6, atol=1e-7) conservatively for each side.
+    kept_tolerance = 1e-7 + 1e-6 * max(abs(kept_score), abs(reported_scores[kept]))
+    excluded_tolerance = 1e-7 + 1e-6 * max(abs(excluded_score), abs(reported_scores[excluded]))
+    status = ("reference_separated" if gap > kept_tolerance + excluded_tolerance
+              else "ambiguous_within_score_tolerance")
+    return selected, status, gap
+
+
 def small_exact_distance(target, pairs, bound):
     start = tuple(1 << i for i in range(len(target)))
     frontier, seen = {start}, {start}
@@ -66,6 +103,8 @@ def verify_layers(root, scorer, mode, width, k, layers, device):
             batch = torch.cat([pack_rows(rows, device=device) for rows, word in parents])
             head = scorer.parent_scores(batch, mode).tolist()
         eligible = {}
+        raw_legal_candidates = 0
+        duplicate_children = 0
         for i, (rows, word) in enumerate(parents):
             actions = range(len(pairs))
             if k < len(pairs):
@@ -73,7 +112,11 @@ def verify_layers(root, scorer, mode, width, k, layers, device):
             for action in actions:
                 child = apply(rows, pairs[action])
                 if child not in closed:
-                    eligible.setdefault(child, (i, word + (action,)))
+                    raw_legal_candidates += 1
+                    if child in eligible:
+                        duplicate_children += 1
+                    else:
+                        eligible[child] = (i, word + (action,))
         measured = {}
         for bits, parent, _lex, _generation, route, *lanes in layer["candidates"]:
             child = rows_of(lanes, n)
@@ -82,17 +125,35 @@ def verify_layers(root, scorer, mode, width, k, layers, device):
             require(parent == i and (route & 65535) == word[-1], "wrong stable representative")
             measured[child] = float_value(bits)
         require(set(measured) == set(eligible), "candidate missing from the global union")
+        reference_scores = {}
         if measured:
             children = torch.cat([pack_rows(rows, device=device) for rows in measured])
             actual = scorer.child_values(children).double().cpu()
             torch.testing.assert_close(actual, torch.tensor(list(measured.values()), dtype=torch.float64),
                                        rtol=1e-6, atol=1e-7)
+            reference_scores = dict(zip(measured, (float(value) for value in actual.tolist())))
         expected = sorted(eligible, key=lambda rows: (measured[rows], eligible[rows][1]))[:width]
+        expected_reference, reference_status, boundary_gap = reference_cutoff(
+            eligible, measured, reference_scores, width
+        )
+        if reference_status in ("reference_separated", "exact_tie_full_word"):
+            require(expected == expected_reference,
+                    "reported-score order differs from the independent reference cutoff")
         winners = [rows_of(item[5:], n) for item in layer["winners"]]
         require(winners == expected, "global top B differs")
         digest = hashlib.sha256(json.dumps(winners, separators=(",", ":")).encode()).hexdigest()
-        reports.append(dict(depth=layer["depth"], distinct=len(eligible), retained=len(winners),
-                            winners_sha256=digest, by_rank=layer["by_rank"]))
+        reference_digest = hashlib.sha256(
+            json.dumps(expected_reference, separators=(",", ":")).encode()
+        ).hexdigest()
+        reports.append(dict(
+            depth=layer["depth"], distinct=len(eligible), retained=len(winners),
+            raw_legal_candidates=raw_legal_candidates, duplicate_children=duplicate_children,
+            winners_sha256=digest, by_rank=layer["by_rank"],
+            selection_oracle="reported_scores",
+            reference_order_status=reference_status,
+            reference_boundary_gap=boundary_gap,
+            reference_ordered_winners_sha256=reference_digest,
+        ))
         parents = [(rows, eligible[rows][1]) for rows in expected]
         closed.update(winners)
     return reports
@@ -147,8 +208,15 @@ def validate_case(rows, scorer, mode, width, k, depth, device, require_cross_ran
             report = dict(n=len(rows), width=width, shortlist=k, mode=mode, world=world.size,
                           scorer=type(scorer).__name__,
                           scorer_runtime=f"{type(scorer).__module__}.{type(scorer).__qualname__}",
-                          engine=engine, model=getattr(scorer, "metadata", None),
-                          layers=layers, physical_ids=list(result.gates), directed_gates=[pairs[i] for i in result.gates],
+                          root_sha256=hashlib.sha256(
+                              json.dumps(rows, separators=(",", ":")).encode("utf-8")
+                          ).hexdigest(),
+                          precision_contract={"scorer_output_dtype": getattr(
+                              getattr(scorer, "metadata", {}), "get", lambda _key, _default=None: None
+                          )("scorer_output_dtype", "unspecified"), "selection_dtype": "float64"},
+            engine=engine, model=getattr(scorer, "metadata", None),
+            layers=layers, status=result.status,
+            physical_ids=list(result.gates), directed_gates=[pairs[i] for i in result.gates],
                           length=result.length, bitwise_replay=True, routes=result.path_routes)
             if len(rows) == 4 and result.length <= 3:
                 report["exact_distance_bfs"] = small_exact_distance(rows, pairs, result.length)
@@ -182,72 +250,527 @@ def validate_distribution(device, engine="auto"):
         return world.checked("all-rank validation", inspect)
 
 
-def main():
+def _load_handoff_snapshot_loader():
+    path = Path(__file__).with_name("cnot_panel_snapshot.py")
+    spec = importlib.util.spec_from_file_location("mgbs_cnot_panel_snapshot", path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError("resolved CNOT panel snapshot loader is unavailable")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def _load_handoff_resolver():
+    root = Path(__file__).resolve().parents[1]
+    path = root / "integrations" / "cnot_scorer" / "handoff.py"
+    spec = importlib.util.spec_from_file_location("mgbs_cnot_handoff_resolver", path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError("CNOT handoff resolver is unavailable")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def _adapter_provenance():
+    root = Path(__file__).resolve().parents[1]
+    build_path = root / "integrations" / "cnot_scorer" / "build.py"
+    bridge_path = root / "integrations" / "cnot_scorer" / "bridge_panel_v2.rs"
+    match = re.search(
+        r'^PANEL_SEARCH_V2_SOURCE_COMMIT = "([0-9a-f]{40})"$',
+        build_path.read_text(encoding="utf-8"),
+        flags=re.MULTILINE,
+    )
+    if match is None:
+        raise RuntimeError("CNOT panel adapter source pin is malformed")
+    return {
+        "native_adapter_source_commit": match.group(1),
+        "adapter_source_sha256": hashlib.sha256(bridge_path.read_bytes()).hexdigest(),
+        "endpoint_source_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+    }
+
+
+def main(argv=None, *, scorer_factory=None, manage_process_group=True):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--case", choices=("trained", "trained-deep", "wide", "topology"), required=True)
+    parser.add_argument("--case", choices=("trained", "trained-deep", "wide", "topology", "panel"), required=True)
     parser.add_argument("--backend", choices=("nccl", "gloo"), default="nccl")
     parser.add_argument("--mode", choices=("qhat", "proposal"), default="qhat")
+    parser.add_argument("--audit", action="store_true")
+    parser.add_argument("--inference-batch", type=int, default=4)
     parser.add_argument("--width", type=int)
     parser.add_argument("--library")
-    parser.add_argument("--manifest")
+    parser.add_argument("--manifest", help="direct checkpoint manifest for isolated smoke cases only")
+    parser.add_argument("--handoff-receipt", help="private producer learning-curve receipt for direct panel acceptance")
+    parser.add_argument("--handoff-preflight", help="immutable resolved panel summary from the single preflight pass")
+    parser.add_argument("--handoff-preflight-sha256", help="SHA-256 of the exact resolved panel summary bytes")
+    parser.add_argument("--run-root", help="private run root containing the pinned manifest and related artifacts")
     parser.add_argument("--engine", choices=("auto", "python", "rust"), default="auto",
                         help="select the search controller; rust fails closed when unavailable")
     parser.add_argument("--require-rust-scorer", action="store_true",
                         help="require the Rust-owned checkpoint scorer and Rust controller")
     parser.add_argument("--output", required=True, type=Path)
-    args = parser.parse_args()
+    parser.add_argument("--validate-cli-only", action="store_true", help=argparse.SUPPRESS)
+    args = parser.parse_args(argv)
+    if args.validate_cli_only:
+        if args.case != "panel":
+            parser.error("--validate-cli-only is reserved for the panel launch contract")
+        direct_receipt = args.handoff_receipt is not None
+        resolved_snapshot = args.handoff_preflight is not None
+        if args.run_root is None or direct_receipt == resolved_snapshot:
+            parser.error("--case panel requires --run-root and exactly one of --handoff-receipt or --handoff-preflight")
+        if resolved_snapshot and args.handoff_preflight_sha256 is None:
+            parser.error("--handoff-preflight requires --handoff-preflight-sha256")
+        if not resolved_snapshot and args.handoff_preflight_sha256 is not None:
+            parser.error("--handoff-preflight-sha256 requires --handoff-preflight")
+        if args.manifest is not None or args.library is None:
+            parser.error("--case panel requires a scorer library and does not accept --manifest")
+        if args.mode != "qhat" or args.backend != "nccl" or args.audit or args.inference_batch != 4 or args.width is not None:
+            parser.error("paired panel acceptance uses the pinned Qhat/NCCL search and inference batch")
+        if args.engine != "rust" or not args.require_rust_scorer:
+            parser.error("paired panel acceptance requires the Rust search engine and scorer")
+        print("CNOT_PANEL_CLI_VALIDATION=passed")
+        return 0
+    resolved_handoff = None
+    if args.case == "panel":
+        direct_receipt = args.handoff_receipt is not None
+        resolved_snapshot = args.handoff_preflight is not None
+        if args.run_root is None or direct_receipt == resolved_snapshot:
+            parser.error("--case panel requires --run-root and exactly one of --handoff-receipt or --handoff-preflight")
+        if resolved_snapshot and args.handoff_preflight_sha256 is None:
+            parser.error("--handoff-preflight requires --handoff-preflight-sha256")
+        if not resolved_snapshot and args.handoff_preflight_sha256 is not None:
+            parser.error("--handoff-preflight-sha256 requires --handoff-preflight")
+        if args.manifest is not None:
+            parser.error("--case panel accepts a resolved handoff, not a direct manifest")
+        if args.library is None:
+            parser.error("--case panel requires the compiled CNOT scorer library")
+        if args.mode != "qhat" or args.audit or args.inference_batch != 4 or args.width is not None:
+            parser.error("paired panel acceptance uses the pinned Qhat search and inference batch")
+        if args.engine == "python":
+            parser.error("paired panel acceptance requires the compiled Rust search engine")
+        args.engine = "rust"
+        args.require_rust_scorer = True
+        try:
+            if args.handoff_preflight is not None:
+                snapshot_loader = _load_handoff_snapshot_loader()
+                resolved_handoff = snapshot_loader.load_panel_v2_snapshot(
+                    args.handoff_preflight,
+                    args.run_root,
+                    args.handoff_preflight_sha256,
+                    expected_checkpoint_sha256=os.environ.get(
+                        "MGBS_CNOT_EXPECTED_CHECKPOINT_SHA256"
+                    ),
+                    expected_search_manifest_sha256=os.environ.get(
+                        "MGBS_CNOT_EXPECTED_SEARCH_MANIFEST_SHA256"
+                    ),
+                )
+            else:
+                resolver = _load_handoff_resolver()
+                resolved_handoff = resolver.resolve_panel_v2_handoff(
+                    args.run_root, args.handoff_receipt
+                )
+            for variable, expected in (
+                ("MGBS_CNOT_EXPECTED_CHECKPOINT_SHA256", resolved_handoff.checkpoint_sha256),
+                ("MGBS_CNOT_EXPECTED_SEARCH_MANIFEST_SHA256", resolved_handoff.search_manifest_sha256),
+            ):
+                current = os.environ.get(variable)
+                if current is not None and current != expected:
+                    raise ValueError(f"{variable} differs from the resolved producer handoff")
+                os.environ[variable] = expected
+            os.environ["MGBS_TQP_MANIFEST"] = str(resolved_handoff.search_manifest)
+            output_root = Path(args.run_root).resolve(strict=True)
+            args.output = args.output.resolve()
+            args.output.relative_to(output_root)
+            if args.output.exists():
+                raise ValueError("private panel result path already exists")
+        except (OSError, ValueError, RuntimeError) as error:
+            parser.error(str(error))
+    elif (
+        args.handoff_receipt is not None
+        or args.handoff_preflight is not None
+        or args.handoff_preflight_sha256 is not None
+        or args.run_root is not None
+    ):
+        parser.error("handoff inputs and --run-root are valid only for --case panel")
+    elif args.case in ("trained", "trained-deep") and (args.manifest is None or args.library is None):
+        parser.error("direct smoke cases require --manifest and --library")
     if args.require_rust_scorer:
-        if args.case not in ("trained", "trained-deep"):
+        if args.case not in ("trained", "trained-deep", "panel"):
             parser.error("--require-rust-scorer requires a trained checkpoint case")
         if args.engine == "python":
             parser.error("--require-rust-scorer cannot be combined with --engine python")
         args.engine = "rust"
-    device = initialize_world(args.backend)
-    world = World(device)
-    try:
-        if args.case in ("trained", "trained-deep"):
-            rows, k, default_width = ((1, 7, 4, 10), 3, 2) if args.case == "trained-deep" else ((1, 2, 7, 8), 11, 8)
-            width = default_width if args.width is None else args.width
-            context = world.checked("load trained scorer", lambda:
-                TQPScorer(args.library, args.manifest, n=len(rows), device=device, inference_batch=4))
-        elif args.case == "wide":
-            rows, scorer = wide_case()
-            context, k, width = nullcontext(scorer), 3, 1 if args.width is None else args.width
-        else:
-            context = nullcontext()
-        with context as scorer:
-            if args.require_rust_scorer:
-                def require_native_scorer():
-                    from multigpubeamsearch.cnot_scorer import _rust_tqp_scorer
-                    native_type = _rust_tqp_scorer()
-                    require(native_type is not None and type(scorer) is native_type,
-                            "Rust-owned checkpoint scorer is required")
-                world.checked("verify Rust-owned checkpoint scorer", require_native_scorer)
-            output = (validate_distribution(device, args.engine) if args.case == "topology" else
-                      validate_case(rows, scorer, args.mode, width, k, 3, device,
-                                    args.case == "wide", engine=args.engine))
-            if args.case == "trained-deep" and world.size == 2:
-                def check_participation():
-                    if world.rank == 0:
-                        require(any(all(rank[0] and rank[3] and rank[4] for rank in layer["by_rank"])
-                                    and layer["distinct"] > layer["retained"] == width for layer in output["layers"]),
-                                "both GPUs must expand, score and retain in the same saturated layer")
-                world.checked("trained layer participation", check_participation)
-            hardware = dict(rank=world.rank, host=socket.gethostname(), device=str(device),
-                            gpu=torch.cuda.get_device_name(device) if device.type == "cuda" else None)
-            devices = [None] * world.size
-            if world.size > 1:
-                dist.all_gather_object(devices, hardware)
-            else:
-                devices[0] = hardware
-            if world.rank == 0:
-                output.update(devices=devices, torch=str(torch.__version__), backend=args.backend)
-                args.output.write_text(json.dumps(output, indent=2) + "\n", encoding="utf-8")
-                print(json.dumps(output), flush=True)
-    finally:
+    if manage_process_group:
         if dist.is_initialized():
+            parser.error("verify_cnot.main owns process-group initialization when manage_process_group is true")
+        device = initialize_world(args.backend)
+    else:
+        if not dist.is_initialized():
+            parser.error("verify_cnot.main requires an initialized process group when manage_process_group is false")
+        initialized_backend = str(dist.get_backend()).lower()
+        if args.backend not in initialized_backend:
+            parser.error(
+                f"requested backend {args.backend!r} differs from initialized process group {initialized_backend!r}"
+            )
+        device = torch.device("cuda", torch.cuda.current_device()) if "nccl" in initialized_backend else torch.device("cpu")
+    try:
+        with World(device) as world:
+            identity = world.checked("prepare CNOT acceptance identity", acceptance_identity)
+            identity_contract = None if identity is None else {
+                "run_id": identity["run_id"],
+                "case_id": identity["case_id"],
+                "source_sha": identity["source_sha"],
+                "wheel_sha256": identity["wheel_sha256"],
+                "gpu_uuids": identity["gpu_uuids"],
+                "evidence_dir": str(identity["evidence_dir"]),
+            }
+            identity_digest = hashlib.sha256(json.dumps(
+                identity_contract, sort_keys=True, separators=(",", ":")
+            ).encode("utf-8")).digest()
+            world.require_engine_consensus(list(identity_digest))
+            if identity is not None:
+                world.checked(
+                    "observe CNOT physical GPU UUID",
+                    lambda: gpu_uuid_for_rank(
+                        world.rank, world.size, device=device, torch_module=torch
+                    ),
+                )
+            if args.case == "panel":
+                context = nullcontext(None)
+            elif args.case in ("trained", "trained-deep"):
+                rows, k, default_width = ((1, 7, 4, 10), 3, 2) if args.case == "trained-deep" else ((1, 2, 7, 8), 11, 8)
+                width = default_width if args.width is None else args.width
+                construct_scorer = TQPScorer if scorer_factory is None else scorer_factory
+                context = world.checked("load trained scorer", lambda:
+                    construct_scorer(args.library, args.manifest, n=len(rows), device=device, inference_batch=4))
+            elif args.case == "wide":
+                rows, scorer = wide_case()
+                context, k, width = nullcontext(scorer), 3, 1 if args.width is None else args.width
+            else:
+                context = nullcontext()
+            with context as scorer:
+                if args.require_rust_scorer and args.case != "panel":
+                    def require_native_scorer():
+                        from multigpubeamsearch.cnot_scorer import _rust_tqp_scorer
+                        native_type = _rust_tqp_scorer()
+                        require(native_type is not None and type(scorer) is native_type,
+                                "Rust-owned checkpoint scorer is required")
+                    world.checked("verify Rust-owned checkpoint scorer", require_native_scorer)
+                if args.case == "panel":
+                    output = _search_handoff_panel(
+                        args, resolved_handoff, device, world, scorer_factory=scorer_factory
+                    )
+                else:
+                    output = (validate_distribution(device, args.engine) if args.case == "topology" else
+                              validate_case(rows, scorer, args.mode, width, k, 3, device,
+                                            args.case == "wide", engine=args.engine))
+                if args.case == "trained-deep" and world.size == 2:
+                    def check_participation():
+                        if world.rank == 0:
+                            require(any(all(rank[0] and rank[3] and rank[4] for rank in layer["by_rank"])
+                                        and layer["distinct"] > layer["retained"] == width for layer in output["layers"]),
+                                    "both GPUs must expand, score and retain in the same saturated layer")
+                    world.checked("trained layer participation", check_participation)
+                if identity is not None:
+
+                    def prepare_hardware_identity():
+                        return dict(
+                            rank=world.rank,
+                            pid=os.getpid(),
+                            host=socket.gethostname(),
+                            device=str(device),
+                            gpu=torch.cuda.get_device_name(device) if device.type == "cuda" else None,
+                            gpu_uuid=gpu_uuid_for_rank(world.rank, world.size, device=device),
+                        )
+
+                    hardware = world.checked("prepare CNOT rank/device receipt", prepare_hardware_identity)
+                else:
+                    hardware = dict(
+                        rank=world.rank,
+                        pid=os.getpid(),
+                        host=socket.gethostname(),
+                        device=str(device),
+                        gpu=torch.cuda.get_device_name(device) if device.type == "cuda" else None,
+                        gpu_uuid=None,
+                    )
+                devices = [None] * world.size
+                if world.size > 1:
+                    dist.all_gather_object(devices, hardware, group=world._control_group)
+                else:
+                    devices[0] = hardware
+
+                if identity is not None:
+                    def hash_result():
+                        if world.rank == 0:
+                            if not isinstance(output, dict):
+                                raise RuntimeError("rank zero has no CNOT result report to bind")
+                            summary = dict(output, devices=devices, torch=str(torch.__version__), backend=args.backend)
+                            return report_sha256(summary), str(output.get("status", "completed"))
+                        return None
+
+                    summary = world.checked("hash CNOT acceptance result", hash_result)
+                    summaries = [summary if world.rank == 0 else None]
+                    if world.size > 1:
+                        dist.broadcast_object_list(summaries, src=0, group=world._control_group)
+                    report_digest, terminal_status = summaries[0]
+                    if not isinstance(report_digest, str) or len(report_digest) != 64:
+                        raise RuntimeError("CNOT acceptance result hash was not broadcast to every rank")
+                    if world.rank == 0:
+                        output.update(devices=devices, torch=str(torch.__version__), backend=args.backend)
+                        output["acceptance"] = {
+                            "schema": EVENT_SCHEMA,
+                            "version": EVENT_VERSION,
+                            "run_id": identity["run_id"],
+                            "case_id": identity["case_id"],
+                            "source_sha": identity["source_sha"],
+                            "wheel_sha256": identity["wheel_sha256"],
+                            "world": world.size,
+                            "transport": "single_rank_no_exchange" if world.size == 1 else "rust_stream5_nccl",
+                            "report_sha256": report_digest,
+                        }
+                    world.checked("write CNOT terminal acceptance receipts", lambda: emit_event(
+                        "search_terminal", world,
+                        {"status": terminal_status,
+                         "report_sha256": report_digest},
+                    ))
+                def write_result():
+                    if world.rank == 0:
+                        output.update(devices=devices, torch=str(torch.__version__), backend=args.backend)
+                        if args.case == "panel":
+                            with args.output.open("x", encoding="utf-8") as receipt_file:
+                                receipt_file.write(json.dumps(output, indent=2) + "\n")
+                            print("cnot_handoff=completed", flush=True)
+                        else:
+                            args.output.write_text(json.dumps(output, indent=2) + "\n", encoding="utf-8")
+                            print(json.dumps(output), flush=True)
+
+                world.checked("write CNOT result JSON", write_result)
+    finally:
+        if manage_process_group and dist.is_initialized():
             dist.destroy_process_group()
 
+def _rows_from_panel_root(panel_root):
+    n = panel_root["dimension"]
+    words = (n + 63) // 64
+    lanes = panel_root["start_packed_rows"]
+    if len(lanes) != n * words:
+        raise ValueError("sealed root lane count differs from its dimension")
+    return tuple(
+        sum(lanes[row * words + word] << (64 * word) for word in range(words))
+        for row in range(n)
+    )
+
+
+def _control_target(move, n):
+    if type(move) is not int or not 0 <= move < n * (n - 1):
+        raise ValueError("CNOT move ID is outside the sealed alphabet")
+    control, slot = divmod(move, n - 1)
+    return control, slot + (slot >= control)
+
+
+def _panel_result_row(panel_root, result, wall_seconds):
+    n = panel_root["dimension"]
+    start = _rows_from_panel_root(panel_root)
+    status = result.status
+    if status not in {"solved", "depth_limit", "resource_limit", "exhausted"}:
+        raise AssertionError("CNOT runtime returned an unknown terminal status")
+    if status != "solved":
+        if result.gates is not None:
+            raise AssertionError("unsolved panel search returned a construction word")
+        word, end = None, None
+    else:
+        if result.gates is None:
+            raise AssertionError("solved panel search omitted its construction word")
+        construction_moves = tuple(result.gates)
+        if replay_cnot(n, construction_moves) != start:
+            raise AssertionError("independent construction replay differs from the sealed root")
+        reduced = list(start)
+        reduction_moves = tuple(reversed(construction_moves))
+        for move in reduction_moves:
+            control, target = _control_target(move, n)
+            reduced[target] ^= reduced[control]
+        identity = tuple(1 << row for row in range(n))
+        if tuple(reduced) != identity:
+            raise AssertionError("independent reduction replay did not reach identity")
+        word = {
+            "control_target": [list(_control_target(move, n)) for move in reduction_moves],
+            "physical_cost": len(reduction_moves),
+            "direction": "original_matrix_to_identity",
+            "replayed": True,
+        }
+        words = (n + 63) // 64
+        end = [0] * (n * words)
+        for row in range(n):
+            end[row * words + row // 64] |= 1 << (row % 64)
+    return {
+        "panel_index": panel_root["panel_index"],
+        "case_id": panel_root["case_id"],
+        "dimension": n,
+        "alphabet_id": panel_root["alphabet_id"],
+        "orientation": panel_root["orientation"],
+        "start_packed_rows": panel_root["start_packed_rows"],
+        "status": status,
+        "word": word,
+        "end_packed_rows": end,
+        "terminal_reason": status,
+        "expanded_layers": len(result.layers),
+        "wall_seconds": wall_seconds,
+    }
+
+
+def _search_handoff_panel(args, resolved, device, world, *, scorer_factory):
+    expansion_bound = resolved.expansion_upper_bound
+    provenance = _adapter_provenance()
+    def bind_scorer_library_identity():
+        expected_sha256 = os.environ.get("MGBS_CNOT_EXPECTED_TQP_LIBRARY_SHA256")
+        if expected_sha256 is not None:
+            if re.fullmatch(r"[0-9a-f]{64}", expected_sha256) is None:
+                raise ValueError("expected scorer library SHA-256 is malformed")
+            return expected_sha256
+        if os.environ.get("MGBS_CNOT_ACCEPTANCE_RUN_ID"):
+            raise ValueError("strict acceptance requires the launcher's pinned scorer library SHA-256")
+        return hashlib.sha256(Path(args.library).read_bytes()).hexdigest()
+
+    scorer_library_sha256 = world.checked(
+        "bind CNOT scorer library identity", bind_scorer_library_identity
+    )
+    identity = {
+        "producer_source_revision": resolved.producer_source_revision,
+        "producer_emitter_sha256": resolved.producer_emitter_sha256,
+        "accepted_updates": resolved.accepted_updates,
+        "checkpoint_sha256": resolved.checkpoint_sha256,
+        "scorer_library_sha256": scorer_library_sha256,
+        "locked_test_status": resolved.locked_test_status,
+        "locked_test_comparison_sha256": resolved.locked_test_comparison_sha256,
+        "dataset_sha256": resolved.dataset_sha256,
+        "search_manifest_sha256": resolved.search_manifest_sha256,
+        "baseline_search_manifest_sha256": resolved.baseline_search_manifest_sha256,
+        "panel_digest": resolved.panel_digest,
+        "panel_indices": list(resolved.panel_indices),
+        "panel_ids": list(resolved.panel_ids),
+        "search": resolved.search,
+        "head": "qhat",
+        "adapter": provenance,
+    }
+    consensus = hashlib.sha256(
+        json.dumps(identity, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).digest()
+    world.require_engine_consensus(list(consensus))
+
+    construct_scorer = TQPScorer if scorer_factory is None else scorer_factory
+    result_rows, scorers, scorer_metadata = [], {}, {}
+    with ExitStack() as stack:
+        for panel_root in resolved.panel_roots:
+            n = panel_root["dimension"]
+            if n not in scorers:
+                context = world.checked(
+                    "load handoff-pinned CNOT scorer",
+                    lambda dimension=n: construct_scorer(
+                        str(args.library), str(resolved.search_manifest),
+                        n=dimension, device=device, inference_batch=4,
+                    ),
+                )
+                scorer = stack.enter_context(context)
+
+                def load_native_metadata():
+                    raw = getattr(scorer, "metadata", None)
+                    if raw is None:
+                        if args.require_rust_scorer and scorer_factory is None:
+                            raise RuntimeError("Rust panel scorer did not expose loaded library metadata")
+                        return None
+                    if not isinstance(raw, dict):
+                        raise TypeError("Rust panel scorer metadata must be a mapping")
+                    metadata = dict(raw)
+                    if args.require_rust_scorer and scorer_factory is None:
+                        expected = {
+                            "scorer_contract": "panel_search_v2",
+                            "upstream_commit": provenance["native_adapter_source_commit"],
+                            "panel": "test",
+                            "panel_digest": resolved.panel_digest,
+                            "checkpoint_sha256": resolved.checkpoint_sha256,
+                            "search_manifest_sha256": resolved.search_manifest_sha256,
+                            "training_manifest_sha256": resolved.training_manifest_sha256,
+                            "training_result_sha256": resolved.training_result_sha256,
+                            "scorer_output_dtype": "float32",
+                            "dimension": n,
+                        }
+                        for key, value in expected.items():
+                            require(metadata.get(key) == value,
+                                    f"loaded panel scorer metadata differs at {key}")
+                        require(re.fullmatch(
+                            r"[0-9a-f]{64}", str(metadata.get("feature_registry_sha256", ""))
+                        ) is not None, "loaded panel scorer feature registry SHA-256 is malformed")
+                    return metadata
+
+                scorer_metadata[n] = world.checked(
+                    "validate loaded CNOT panel scorer contract", load_native_metadata
+                )
+                if args.require_rust_scorer and scorer_factory is None:
+                    def verify_native_type():
+                        from multigpubeamsearch.cnot_scorer import _rust_tqp_scorer
+                        native_type = _rust_tqp_scorer()
+                        require(native_type is not None and type(scorer) is native_type,
+                                "Rust-owned checkpoint scorer is required")
+                    world.checked("verify Rust-owned handoff scorer", verify_native_type)
+                scorers[n] = scorer
+            root = pack_rows(_rows_from_panel_root(panel_root), device=device)
+            if device.type == "cuda":
+                torch.cuda.synchronize(device)
+            search_started = time.perf_counter()
+            result = search_cnot(
+                root, scorers[n],
+                width=resolved.search["global_width"],
+                shortlist=resolved.search["shortlist"],
+                max_depth=resolved.search["max_depth"],
+                mode="qhat", audit=False, validation="rust", engine="rust",
+            )
+            if device.type == "cuda":
+                torch.cuda.synchronize(device)
+            wall_seconds = time.perf_counter() - search_started
+            row = world.checked(
+                "independently replay handoff panel result",
+                lambda: _panel_result_row(panel_root, result, wall_seconds) if world.rank == 0 else None,
+            )
+            if world.rank == 0:
+                result_rows.append(row)
+
+    return {
+        "schema": "cnot103_mgbs_panel_search_result_v1",
+        "producer_source_revision": resolved.producer_source_revision,
+        "producer_emitter_sha256": resolved.producer_emitter_sha256,
+        "accepted_updates": resolved.accepted_updates,
+        "checkpoint_sha256": resolved.checkpoint_sha256,
+        "dataset_sha256": resolved.dataset_sha256,
+        "search_manifest_sha256": resolved.search_manifest_sha256,
+        "baseline_search_manifest_sha256": resolved.baseline_search_manifest_sha256,
+        "training_manifest_sha256": resolved.training_manifest_sha256,
+        "training_result_sha256": resolved.training_result_sha256,
+        "panel": "test",
+        "panel_indices": list(resolved.panel_indices),
+        "panel_ids": list(resolved.panel_ids),
+        "panel_digest": resolved.panel_digest,
+        "panel_roots": [dict(root) for root in resolved.panel_roots],
+        "search": dict(resolved.search),
+        "head": "qhat",
+        "runtime_contract": "native_device_search_v13",
+        "expansion_upper_bound": expansion_bound,
+        "orientation": resolved.orientation,
+        "adapter": provenance,
+        "execution_backend": "cpu_gloo" if device.type == "cpu" else "cuda_distributed",
+        "world_size": world.size,
+        "world": world.size,
+        "status": "completed",
+        "engine": "rust",
+        "scorer_library_sha256": scorer_library_sha256,
+        "scorer_metadata": [
+            {"dimension": dimension, "metadata": scorer_metadata[dimension]}
+            for dimension in sorted(scorer_metadata) if scorer_metadata[dimension] is not None
+        ],
+        "locked_test_status": resolved.locked_test_status,
+        "locked_test_comparison_sha256": resolved.locked_test_comparison_sha256,
+        "rows": result_rows if world.rank == 0 else None,
+    }
 
 if __name__ == "__main__":
     main()

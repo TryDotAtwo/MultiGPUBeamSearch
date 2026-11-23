@@ -1,5 +1,7 @@
 use beam_core::search::PermutationGraph;
-use beam_runtime::search_session::{PreparationIdentity, RequestedBeam, SessionIdentity};
+use beam_runtime::search_session::{
+    PreparationIdentity, RequestedBeam, ResolvedInferencePlanIdentity, SessionIdentity,
+};
 use pyo3::{
     exceptions::{PyRuntimeError, PyValueError},
     prelude::*,
@@ -49,7 +51,7 @@ fn build_session_identity(
     serde_json::to_string(&identity).map_err(error)
 }
 #[pyfunction]
-#[pyo3(signature=(graph_hash, geometry, center, generators, model_artifact_hash, artifact_sizes, model_backend, devices, binding_scope, beam_width, max_steps, options_repr, cuda_visible_devices, cuda_device_order, runtime_build))]
+#[pyo3(signature=(graph_hash, geometry, center, generators, model_artifact_hash, artifact_sizes, model_backend, devices, binding_scope, beam_width, max_steps, options_json, cuda_visible_devices, cuda_device_order, runtime_build))]
 fn build_preparation_identity(
     graph_hash: Option<String>,
     geometry: Vec<Option<u64>>,
@@ -62,7 +64,7 @@ fn build_preparation_identity(
     binding_scope: bool,
     beam_width: &Bound<'_, PyAny>,
     max_steps: u32,
-    options_repr: String,
+    options_json: String,
     cuda_visible_devices: Option<String>,
     cuda_device_order: Option<String>,
     runtime_build: Option<String>,
@@ -85,6 +87,17 @@ fn build_preparation_identity(
         .map(|raw| serde_json::from_str(&raw))
         .transpose()
         .map_err(error)?;
+    let mut options: serde_json::Value = serde_json::from_str(&options_json).map_err(error)?;
+    let Some(option_map) = options.as_object_mut() else {
+        return Err(PyValueError::new_err(
+            "preparation options must be a JSON object",
+        ));
+    };
+    let resolved_inference_plan = option_map
+        .remove("resolved_inference_plan")
+        .map(serde_json::from_value::<ResolvedInferencePlanIdentity>)
+        .transpose()
+        .map_err(error)?;
     let identity = PreparationIdentity::new(
         graph_hash,
         geometry,
@@ -97,10 +110,11 @@ fn build_preparation_identity(
         binding_scope,
         requested_beam,
         max_steps,
-        options_repr,
+        options,
         cuda_visible_devices,
         cuda_device_order,
         runtime_build,
+        resolved_inference_plan,
     );
     serde_json::to_string(&identity).map_err(error)
 }
@@ -220,6 +234,7 @@ fn parse_terminal(
 pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add("SEARCH_TERMINAL_RESULT_VERSION", 1)?;
     module.add("PREPARATION_IDENTITY_AUTO_MAX_VERSION", 1)?;
+    module.add("PREPARATION_IDENTITY_SCHEMA_VERSION", 3)?;
     module.add_function(wrap_pyfunction!(build_preparation_identity, module)?)?;
     module.add_function(wrap_pyfunction!(build_session_identity, module)?)?;
     module.add_class::<SearchSession>()?;

@@ -9,10 +9,125 @@ use std::{
 };
 
 #[pyfunction]
+fn resolve_cluster_plan(payload: String) -> PyResult<String> {
+    let request: beam_runtime::cluster::PlanRequest =
+        serde_json::from_str(&payload).map_err(|error| PyValueError::new_err(error.to_string()))?;
+    let plan = beam_runtime::cluster::plan_cluster(&request).map_err(|error| match error {
+        beam_runtime::cluster::ClusterError::Invalid(message) => PyValueError::new_err(message),
+        beam_runtime::cluster::ClusterError::Runtime(message) => PyRuntimeError::new_err(message),
+        beam_runtime::cluster::ClusterError::Io(error) => PyErr::from(error),
+        beam_runtime::cluster::ClusterError::Json(error) => {
+            PyValueError::new_err(error.to_string())
+        }
+    })?;
+    serde_json::to_string(&plan).map_err(|error| PyRuntimeError::new_err(error.to_string()))
+}
+
+#[pyfunction]
 fn validate_cluster_rank(environment: BTreeMap<String, String>) -> PyResult<()> {
     beam_runtime::cluster::scheduler_rank(&environment)
         .map(|_| ())
         .map_err(|error| PyValueError::new_err(error.to_string()))
+}
+
+#[pyfunction]
+fn resolve_scheduler_rank(environment: BTreeMap<String, String>) -> PyResult<String> {
+    let rank = beam_runtime::cluster::scheduler_rank(&environment)
+        .map_err(|error| PyValueError::new_err(error.to_string()))?;
+    serde_json::to_string(&rank).map_err(|error| PyRuntimeError::new_err(error.to_string()))
+}
+
+#[pyfunction]
+fn resolve_search_environment(
+    puzzle_info: String,
+    test_csv: String,
+    weight_dir: String,
+    run_dir: String,
+    effective_touch_bfs_radius: u32,
+    touch_bfs_max_entries: u64,
+) -> PyResult<String> {
+    let request = beam_runtime::cluster::SearchEnvironmentRequest {
+        puzzle_info,
+        test_csv,
+        weight_dir,
+        run_dir,
+        effective_touch_bfs_radius,
+        touch_bfs_max_entries,
+    };
+    let environment = beam_runtime::cluster::search_environment(&request);
+    serde_json::to_string(&environment).map_err(|error| PyRuntimeError::new_err(error.to_string()))
+}
+
+#[pyfunction]
+fn resolve_model_search_environment(payload: String) -> PyResult<String> {
+    let request: beam_runtime::cluster::SearchModelEnvironmentRequest =
+        serde_json::from_str(&payload).map_err(|error| PyValueError::new_err(error.to_string()))?;
+    let environment = beam_runtime::cluster::search_model_environment(&request)
+        .map_err(|error| PyValueError::new_err(error.to_string()))?;
+    serde_json::to_string(&environment).map_err(|error| PyRuntimeError::new_err(error.to_string()))
+}
+
+#[pyfunction]
+fn resolve_search_policy_environment(payload: String) -> PyResult<String> {
+    let request: beam_runtime::cluster::SearchPolicyEnvironmentRequest =
+        serde_json::from_str(&payload).map_err(|error| PyValueError::new_err(error.to_string()))?;
+    let environment = beam_runtime::cluster::search_policy_environment(&request)
+        .map_err(|error| PyValueError::new_err(error.to_string()))?;
+    serde_json::to_string(&environment).map_err(|error| PyRuntimeError::new_err(error.to_string()))
+}
+
+#[pyfunction]
+fn resolve_child_environment(
+    environment: BTreeMap<String, String>,
+    devices: Vec<u32>,
+    nccl_id_file: String,
+) -> PyResult<String> {
+    let resolved = beam_runtime::cluster::child_environment(&environment, &devices, &nccl_id_file)
+        .map_err(|error| PyValueError::new_err(error.to_string()))?;
+    serde_json::to_string(&resolved).map_err(|error| PyRuntimeError::new_err(error.to_string()))
+}
+
+#[pyfunction]
+fn resolve_cuda_visibility(devices: Vec<u32>, inherited: Option<String>) -> PyResult<String> {
+    beam_runtime::cluster::cuda_visibility(&devices, inherited.as_deref())
+        .map_err(|error| PyValueError::new_err(error.to_string()))
+}
+
+#[pyfunction]
+fn resolve_cuda_ordinal(local_rank: i64, visible_devices: u64) -> PyResult<i64> {
+    beam_runtime::cluster::cuda_ordinal(local_rank, visible_devices)
+        .map_err(|error| PyValueError::new_err(error.to_string()))
+}
+
+#[pyfunction]
+fn run_local_search_ranks(
+    py: Python<'_>,
+    command: Vec<String>,
+    world_size: u32,
+    cwd: PathBuf,
+    log_path: PathBuf,
+    worker_logs: PathBuf,
+    timeout: f64,
+    environment: BTreeMap<String, String>,
+) -> PyResult<f64> {
+    let cancel = Arc::new(AtomicBool::new(false));
+    let request = beam_runtime::cluster::LocalRanksRequest {
+        command,
+        world_size,
+        cwd,
+        log_path,
+        worker_logs,
+        timeout,
+        environment,
+    };
+    crate::interrupt::run(py, &cancel, || {
+        beam_runtime::cluster::run_local_search_ranks(request, &cancel).map_err(|error| match error
+        {
+            beam_runtime::cluster::ClusterError::Invalid(message) => PyValueError::new_err(message),
+            beam_runtime::cluster::ClusterError::Io(error) => PyErr::from(error),
+            other => PyRuntimeError::new_err(other.to_string()),
+        })
+    })
 }
 
 #[pyfunction]
@@ -44,8 +159,24 @@ fn run_cluster_rank(
 }
 
 pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
+    module.add("CLUSTER_SEARCH_ENVIRONMENT_VERSION", 1)?;
+    module.add("CLUSTER_MODEL_SEARCH_ENVIRONMENT_VERSION", 1)?;
+    module.add("CLUSTER_SEARCH_POLICY_ENVIRONMENT_VERSION", 1)?;
+    module.add("CLUSTER_LOCAL_RANKS_VERSION", 1)?;
+    module.add("CLUSTER_LOCAL_RANKS_MIN_WORLD_SIZE", 1)?;
     module.add("CLUSTER_RANK_VERSION", 1)?;
+    module.add("CLUSTER_DEVICE_BINDING_VERSION", 1)?;
+    module.add("CLUSTER_CHILD_ENVIRONMENT_VERSION", 1)?;
     module.add_function(wrap_pyfunction!(run_cluster_rank, module)?)?;
+    module.add_function(wrap_pyfunction!(run_local_search_ranks, module)?)?;
     module.add_function(wrap_pyfunction!(validate_cluster_rank, module)?)?;
+    module.add_function(wrap_pyfunction!(resolve_scheduler_rank, module)?)?;
+    module.add_function(wrap_pyfunction!(resolve_cuda_ordinal, module)?)?;
+    module.add_function(wrap_pyfunction!(resolve_cuda_visibility, module)?)?;
+    module.add_function(wrap_pyfunction!(resolve_child_environment, module)?)?;
+    module.add_function(wrap_pyfunction!(resolve_search_environment, module)?)?;
+    module.add_function(wrap_pyfunction!(resolve_model_search_environment, module)?)?;
+    module.add_function(wrap_pyfunction!(resolve_search_policy_environment, module)?)?;
+    module.add_function(wrap_pyfunction!(resolve_cluster_plan, module)?)?;
     Ok(())
 }

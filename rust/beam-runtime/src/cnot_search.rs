@@ -4,6 +4,336 @@
 //! never receives a device pointer; each call represents a complete batch or
 //! collective, and the caller keeps the backend on its original rank thread.
 
+use sha2::{Digest, Sha256};
+
+/// Public preference for the CNOT search controller.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RequestedEngine {
+    Auto,
+    Python,
+    Rust,
+}
+
+/// Search mode passed to the Rust CNOT controller.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CnotMode {
+    Qhat,
+    Proposal,
+}
+
+impl CnotMode {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Qhat => "qhat",
+            Self::Proposal => "proposal",
+        }
+    }
+}
+
+/// Input validation path requested by the compatible Python API.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CnotValidation {
+    Auto,
+    Python,
+    Rust,
+}
+
+/// Errors while converting public scalar options to one typed CNOT request.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+pub enum CnotRequestError {
+    #[error("CNOT engine must be auto, python, or rust")]
+    Engine,
+    #[error("CNOT validation must be auto, python, or rust")]
+    Validation,
+    #[error("invalid CNOT search geometry")]
+    Geometry,
+    #[error(transparent)]
+    Controls(#[from] beam_core::cnot::SearchControlsError),
+}
+
+/// A single admitted CNOT search configuration owned by beam-runtime.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CnotRequest {
+    wires: u32,
+    width: u64,
+    shortlist: u32,
+    max_depth: u64,
+    mode: CnotMode,
+    audit: bool,
+    validation: CnotValidation,
+    requested_engine: RequestedEngine,
+}
+
+impl CnotRequest {
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        wires: u32,
+        width: u64,
+        shortlist: u64,
+        max_depth: u64,
+        mode: &str,
+        audit: bool,
+        validation: &str,
+        engine: &str,
+    ) -> Result<Self, CnotRequestError> {
+        let mode = match mode {
+            "qhat" => CnotMode::Qhat,
+            "proposal" => CnotMode::Proposal,
+            _ => {
+                return Err(CnotRequestError::Controls(
+                    beam_core::cnot::SearchControlsError::Mode,
+                ))
+            }
+        };
+        let validation = match validation {
+            "auto" => CnotValidation::Auto,
+            "python" => CnotValidation::Python,
+            "rust" => CnotValidation::Rust,
+            _ => return Err(CnotRequestError::Validation),
+        };
+        let requested_engine = match engine {
+            "auto" => RequestedEngine::Auto,
+            "python" => RequestedEngine::Python,
+            "rust" => RequestedEngine::Rust,
+            _ => return Err(CnotRequestError::Engine),
+        };
+        beam_core::cnot::validate_search_controls(wires, width, shortlist, mode.as_str())?;
+        let alphabet = u64::from(wires) * u64::from(wires.saturating_sub(1));
+        let shortlist = u32::try_from(shortlist.min(alphabet)).map_err(|_| {
+            CnotRequestError::Controls(beam_core::cnot::SearchControlsError::WidthOrShortlist)
+        })?;
+        Ok(Self {
+            wires,
+            width,
+            shortlist,
+            max_depth,
+            mode,
+            audit,
+            validation,
+            requested_engine,
+        })
+    }
+
+    pub fn alphabet(self) -> u32 {
+        self.wires * (self.wires - 1)
+    }
+
+    /// Convert the admitted request into the generic runtime search options.
+    /// The shortlist is already capped to the request's directed-gate alphabet.
+    fn search_options(self, rank: u32, world: u32) -> Options {
+        Options {
+            rank,
+            world,
+            width: self.width,
+            shortlist: self.shortlist,
+            alphabet: self.alphabet(),
+            max_depth: self.max_depth,
+        }
+    }
+
+    /// Bind the validated task controls to the rank topology before any
+    /// backend admission or stage allocation starts.
+    pub fn bind_rank(self, rank: u32, world: u32) -> Result<RankedCnotRequest, CnotRequestError> {
+        if world == 0 || rank >= world || world > 65536 {
+            return Err(CnotRequestError::Geometry);
+        }
+        Ok(RankedCnotRequest {
+            task: self,
+            rank,
+            world,
+        })
+    }
+
+    pub fn selected_engine(self) -> SelectedEngine {
+        match self.requested_engine {
+            RequestedEngine::Python => SelectedEngine::Python,
+            RequestedEngine::Auto | RequestedEngine::Rust => SelectedEngine::Rust,
+        }
+    }
+}
+
+/// One validated task bound to its rank in the active distributed world.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RankedCnotRequest {
+    task: CnotRequest,
+    rank: u32,
+    world: u32,
+}
+
+impl RankedCnotRequest {
+    pub fn rank(self) -> u32 {
+        self.rank
+    }
+
+    pub fn world(self) -> u32 {
+        self.world
+    }
+
+    pub fn wires(self) -> u32 {
+        self.task.wires
+    }
+
+    pub fn width(self) -> u64 {
+        self.task.width
+    }
+
+    pub fn shortlist(self) -> u32 {
+        self.task.shortlist
+    }
+
+    pub fn max_depth(self) -> u64 {
+        self.task.max_depth
+    }
+
+    pub fn mode(self) -> CnotMode {
+        self.task.mode
+    }
+
+    pub fn audit(self) -> bool {
+        self.task.audit
+    }
+
+    pub fn search_options(self) -> Options {
+        self.task.search_options(self.rank, self.world)
+    }
+
+    pub fn selected_engine(self) -> SelectedEngine {
+        self.task.selected_engine()
+    }
+}
+
+/// Controller selected for one admitted CNOT request.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SelectedEngine {
+    Python,
+    Rust,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EngineSelectionError {
+    RustDepthExceedsU64,
+}
+
+/// Resolve controller selection in the runtime so adapters share one policy.
+/// A depth that cannot fit the native controller remains valid for the Python
+/// reference path when the request is automatic or explicitly Python.
+pub fn select_engine(
+    requested: RequestedEngine,
+    depth_fits_u64: bool,
+) -> Result<SelectedEngine, EngineSelectionError> {
+    match requested {
+        RequestedEngine::Python => Ok(SelectedEngine::Python),
+        RequestedEngine::Auto if depth_fits_u64 => Ok(SelectedEngine::Rust),
+        RequestedEngine::Auto => Ok(SelectedEngine::Python),
+        RequestedEngine::Rust if depth_fits_u64 => Ok(SelectedEngine::Rust),
+        RequestedEngine::Rust => Err(EngineSelectionError::RustDepthExceedsU64),
+    }
+}
+
+/// Compute the stable fingerprint used to agree public route inputs across ranks.
+///
+/// Keep this byte contract aligned with the legacy Python adapter so mixed-age
+/// wheels fail or agree at the existing consensus phase, never at a later
+/// transport collective.
+pub fn public_dispatch_digest(
+    engine: &str,
+    depth_fits_u64: bool,
+    strict_backend: bool,
+) -> Result<[u8; 32], CnotRequestError> {
+    if !matches!(engine, "auto" | "python" | "rust") {
+        return Err(CnotRequestError::Engine);
+    }
+    let mut engine_hash = Sha256::new();
+    engine_hash.update(b"cnot-requested-engine-v1:");
+    engine_hash.update(engine.as_bytes());
+
+    let mut request_hash = Sha256::new();
+    request_hash.update(b"cnot-public-dispatch-v1:");
+    request_hash.update([u8::from(strict_backend), u8::from(depth_fits_u64)]);
+    request_hash.update(engine_hash.finalize());
+    Ok(request_hash.finalize().into())
+}
+
+/// Capabilities agreed by all ranks before choosing the public controller path.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct DispatchCapabilities {
+    pub native_controller: bool,
+    pub checked_control: bool,
+    pub native_stages: bool,
+    pub stream5_start: bool,
+    pub world_exchange: bool,
+    pub fixed_gather: bool,
+    pub row_gather: bool,
+    pub broadcast: bool,
+    pub compatibility_controller: bool,
+}
+
+/// Public CNOT dispatch route selected from the request and rank capabilities.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DispatchPath {
+    RustController,
+    RustCompatibility,
+    PythonReference,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DispatchError {
+    EngineSelection(EngineSelectionError),
+    StrictRequiresRustController,
+    StrictBackendUnavailable,
+    RustControllerUnavailable,
+}
+
+/// Resolve the CNOT control path once from typed options and the rank-wide
+/// capability vote. The Rust controller requires a common native stage runner;
+/// otherwise a common compatibility controller is preferred. Strict acceptance
+/// requires the complete Rust data path; ordinary auto mode can use Python.
+pub fn select_dispatch(
+    requested: RequestedEngine,
+    depth_fits_u64: bool,
+    strict_backend: bool,
+    capabilities: DispatchCapabilities,
+) -> Result<DispatchPath, DispatchError> {
+    let selected =
+        select_engine(requested, depth_fits_u64).map_err(DispatchError::EngineSelection)?;
+    if strict_backend {
+        if selected != SelectedEngine::Rust {
+            return Err(DispatchError::StrictRequiresRustController);
+        }
+        return if capabilities.native_controller
+            && capabilities.checked_control
+            && capabilities.native_stages
+            && capabilities.stream5_start
+            && capabilities.world_exchange
+            && capabilities.fixed_gather
+            && capabilities.row_gather
+            && capabilities.broadcast
+        {
+            Ok(DispatchPath::RustController)
+        } else {
+            Err(DispatchError::StrictBackendUnavailable)
+        };
+    }
+
+    match selected {
+        SelectedEngine::Python => Ok(DispatchPath::PythonReference),
+        SelectedEngine::Rust
+            if capabilities.native_controller
+                && capabilities.checked_control
+                && capabilities.native_stages =>
+        {
+            Ok(DispatchPath::RustController)
+        }
+        SelectedEngine::Rust if capabilities.compatibility_controller => {
+            Ok(DispatchPath::RustCompatibility)
+        }
+        SelectedEngine::Rust if requested == RequestedEngine::Auto => {
+            Ok(DispatchPath::PythonReference)
+        }
+        SelectedEngine::Rust => Err(DispatchError::RustControllerUnavailable),
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct Options {
     pub rank: u32,
@@ -25,6 +355,23 @@ pub struct Edge {
     pub parent: u64,
     pub route: u32,
     pub owner: u32,
+}
+
+impl Edge {
+    /// Decode the fixed [parent, route, owner] row exchanged by CNOT history.
+    pub fn from_i64_row(row: &[i64]) -> Result<Self, &'static str> {
+        if row.len() != 3 {
+            return Err("invalid CNOT history edge");
+        }
+        let parent = u64::try_from(row[0]).map_err(|_| "invalid CNOT history parent")?;
+        let route = u32::try_from(row[1]).map_err(|_| "invalid CNOT history route")?;
+        let owner = u32::try_from(row[2]).map_err(|_| "invalid CNOT history owner")?;
+        Ok(Self {
+            parent,
+            route,
+            owner,
+        })
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -208,6 +555,225 @@ pub fn search<B: Backend>(
 mod tests {
     use super::*;
     use std::collections::VecDeque;
+
+    #[test]
+    fn history_edge_decodes_checked_signed_wire_rows() {
+        let edge = Edge::from_i64_row(&[11, (2 << 16) | 7, 3]).unwrap();
+        assert_eq!(
+            edge,
+            Edge {
+                parent: 11,
+                route: (2 << 16) | 7,
+                owner: 3,
+            }
+        );
+        assert_eq!(
+            Edge::from_i64_row(&[1, 2]),
+            Err("invalid CNOT history edge")
+        );
+        assert_eq!(
+            Edge::from_i64_row(&[-1, 2, 3]),
+            Err("invalid CNOT history parent")
+        );
+        assert_eq!(
+            Edge::from_i64_row(&[1, -1, 3]),
+            Err("invalid CNOT history route")
+        );
+        assert_eq!(
+            Edge::from_i64_row(&[1, i64::from(u32::MAX) + 1, 3]),
+            Err("invalid CNOT history route")
+        );
+        assert_eq!(
+            Edge::from_i64_row(&[1, 2, -1]),
+            Err("invalid CNOT history owner")
+        );
+        assert_eq!(
+            Edge::from_i64_row(&[1, 2, i64::from(u32::MAX) + 1]),
+            Err("invalid CNOT history owner")
+        );
+    }
+
+    #[test]
+    fn public_dispatch_digest_validates_engine_and_tracks_route_inputs() {
+        let base = public_dispatch_digest("auto", true, false).unwrap();
+        assert_ne!(base, public_dispatch_digest("rust", true, false).unwrap());
+        assert_ne!(base, public_dispatch_digest("auto", false, false).unwrap());
+        assert_ne!(base, public_dispatch_digest("auto", true, true).unwrap());
+        assert_eq!(
+            public_dispatch_digest("invalid", true, false),
+            Err(CnotRequestError::Engine)
+        );
+    }
+
+    #[test]
+    fn typed_cnot_request_preserves_controls_and_caps_shortlist_to_alphabet() {
+        let request = CnotRequest::new(4, 9, 99, 7, "proposal", true, "auto", "auto").unwrap();
+
+        assert_eq!(request.wires, 4);
+        assert_eq!(request.width, 9);
+        assert_eq!(request.shortlist, 12);
+        assert_eq!(request.max_depth, 7);
+        assert_eq!(request.mode, CnotMode::Proposal);
+        assert!(request.audit);
+        assert_eq!(request.validation, CnotValidation::Auto);
+        assert_eq!(request.requested_engine, RequestedEngine::Auto);
+        assert_eq!(request.selected_engine(), SelectedEngine::Rust);
+
+        let ranked = request.bind_rank(1, 2).unwrap();
+        assert_eq!(ranked.rank(), 1);
+        assert_eq!(ranked.world(), 2);
+        let options = ranked.search_options();
+        assert_eq!(options.rank, 1);
+        assert_eq!(options.world, 2);
+        assert_eq!(options.width, 9);
+        assert_eq!(options.shortlist, 12);
+        assert_eq!(options.alphabet, 12);
+        assert_eq!(options.max_depth, 7);
+    }
+
+    #[test]
+    fn typed_cnot_request_rejects_invalid_rank_topology_before_stage_setup() {
+        let request = CnotRequest::new(4, 9, 4, 7, "qhat", false, "auto", "auto").unwrap();
+        assert!(request.bind_rank(0, 0).is_err());
+        assert!(request.bind_rank(2, 2).is_err());
+        assert!(request.bind_rank(0, 65_537).is_err());
+        assert!(request.bind_rank(0, 1).is_ok());
+        assert!(request.bind_rank(1, 2).is_ok());
+    }
+
+    #[test]
+    fn typed_cnot_request_rejects_invalid_public_controls() {
+        assert!(CnotRequest::new(4, 0, 1, 7, "qhat", false, "auto", "auto").is_err());
+        assert!(CnotRequest::new(4, 9, 1, 7, "unknown", false, "auto", "auto").is_err());
+        assert!(CnotRequest::new(4, 9, 1, 7, "qhat", false, "auto", "unknown").is_err());
+        assert!(CnotRequest::new(4, 9, 1, 7, "qhat", false, "unknown", "auto").is_err());
+    }
+
+    #[test]
+    fn engine_selection_preserves_auto_reference_and_explicit_rust_depth_rules() {
+        assert_eq!(
+            select_engine(RequestedEngine::Auto, true),
+            Ok(SelectedEngine::Rust)
+        );
+        assert_eq!(
+            select_engine(RequestedEngine::Auto, false),
+            Ok(SelectedEngine::Python)
+        );
+        assert_eq!(
+            select_engine(RequestedEngine::Python, false),
+            Ok(SelectedEngine::Python)
+        );
+        assert_eq!(
+            select_engine(RequestedEngine::Rust, true),
+            Ok(SelectedEngine::Rust)
+        );
+        assert_eq!(
+            select_engine(RequestedEngine::Rust, false),
+            Err(EngineSelectionError::RustDepthExceedsU64)
+        );
+    }
+
+    fn complete_dispatch_capabilities() -> DispatchCapabilities {
+        DispatchCapabilities {
+            native_controller: true,
+            checked_control: true,
+            native_stages: true,
+            stream5_start: true,
+            world_exchange: true,
+            fixed_gather: true,
+            row_gather: true,
+            broadcast: true,
+            compatibility_controller: true,
+        }
+    }
+
+    #[test]
+    fn runtime_selects_public_cnot_path_from_typed_capabilities() {
+        let complete = complete_dispatch_capabilities();
+        assert_eq!(
+            select_dispatch(RequestedEngine::Auto, true, false, complete),
+            Ok(DispatchPath::RustController)
+        );
+
+        let mut compatibility = complete;
+        compatibility.native_controller = false;
+        compatibility.checked_control = false;
+        assert_eq!(
+            select_dispatch(RequestedEngine::Auto, true, false, compatibility),
+            Ok(DispatchPath::RustCompatibility)
+        );
+
+        assert_eq!(
+            select_dispatch(
+                RequestedEngine::Auto,
+                true,
+                false,
+                DispatchCapabilities::default()
+            ),
+            Ok(DispatchPath::PythonReference)
+        );
+        assert_eq!(
+            select_dispatch(RequestedEngine::Python, true, false, complete),
+            Ok(DispatchPath::PythonReference)
+        );
+        assert_eq!(
+            select_dispatch(
+                RequestedEngine::Rust,
+                true,
+                false,
+                DispatchCapabilities::default()
+            ),
+            Err(DispatchError::RustControllerUnavailable)
+        );
+    }
+
+    #[test]
+    fn runtime_requires_common_native_stage_runner_before_selecting_rust_controller() {
+        let mut missing_native_stage = complete_dispatch_capabilities();
+        missing_native_stage.native_stages = false;
+        assert_eq!(
+            select_dispatch(RequestedEngine::Auto, true, false, missing_native_stage),
+            Ok(DispatchPath::RustCompatibility)
+        );
+        assert_eq!(
+            select_dispatch(RequestedEngine::Rust, true, false, missing_native_stage),
+            Ok(DispatchPath::RustCompatibility)
+        );
+
+        missing_native_stage.compatibility_controller = false;
+        assert_eq!(
+            select_dispatch(RequestedEngine::Auto, true, false, missing_native_stage),
+            Ok(DispatchPath::PythonReference)
+        );
+        assert_eq!(
+            select_dispatch(RequestedEngine::Rust, true, false, missing_native_stage),
+            Err(DispatchError::RustControllerUnavailable)
+        );
+    }
+
+    #[test]
+    fn strict_public_cnot_path_requires_all_native_rank_capabilities() {
+        let complete = complete_dispatch_capabilities();
+        assert_eq!(
+            select_dispatch(RequestedEngine::Auto, true, true, complete),
+            Ok(DispatchPath::RustController)
+        );
+        assert_eq!(
+            select_dispatch(RequestedEngine::Python, true, true, complete),
+            Err(DispatchError::StrictRequiresRustController)
+        );
+
+        let mut missing = complete;
+        missing.native_stages = false;
+        assert_eq!(
+            select_dispatch(RequestedEngine::Auto, true, true, missing),
+            Err(DispatchError::StrictBackendUnavailable)
+        );
+        assert_eq!(
+            select_dispatch(RequestedEngine::Auto, false, true, complete),
+            Err(DispatchError::StrictRequiresRustController)
+        );
+    }
 
     #[derive(Default)]
     struct Mock {

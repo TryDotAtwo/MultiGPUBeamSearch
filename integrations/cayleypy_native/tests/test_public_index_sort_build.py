@@ -39,6 +39,13 @@ def test_managed_builds_separate_index_mode_and_reject_tampered_receipt(tmp_path
     (source / 'tools').mkdir(parents=True)
     (source / 'CMakeLists.txt').write_text('production_runner')
     (source / 'tools/production_runner.cu').write_text('production runner')
+    manifest = json.loads((Path(build.__file__).with_name('native_source_manifest.json')).read_text())
+    for relative in manifest['required_files']:
+        path = source / relative
+        if path.exists():
+            continue
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(f'synthetic source input: {relative}')
     (cutlass / 'include/cutlass').mkdir(parents=True)
     (cutlass / 'include/cutlass/cutlass.h').write_text('cutlass')
     graph = SimpleNamespace(state_len=96, move_count=24)

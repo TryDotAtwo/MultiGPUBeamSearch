@@ -13,6 +13,7 @@ pub(crate) fn expand<'py>(
     stages: &Bound<'py, PyAny>,
     begin: u64,
     k: u32,
+    strict_backend: bool,
 ) -> PyResult<Bound<'py, PyAny>> {
     let world = stages.getattr("world")?;
     let parents = stages.getattr("parents")?;
@@ -37,7 +38,18 @@ pub(crate) fn expand<'py>(
         let n: i64 = stages.getattr("n")?.extract()?;
         let words: i64 = stages.getattr("words")?.extract()?;
         return crate::cnot_native_batch::expand(
-            py, &world, &parents, &lex, begin, &scorer, &mode_text, k, n, words, None,
+            py,
+            &world,
+            &parents,
+            &lex,
+            begin,
+            &scorer,
+            &mode_text,
+            strict_backend,
+            k,
+            n,
+            words,
+            None,
         );
     }
 
@@ -49,7 +61,14 @@ pub(crate) fn expand<'py>(
         .checked_mul(n.saturating_sub(1))
         .ok_or_else(|| PyOverflowError::new_err("CNOT move alphabet exceeds uint64"))?;
     let scores = if count != 0 && u64::from(k) < alphabet {
-        let values = scorer.call_method1("parent_scores", (&parents, &mode))?;
+        let values = crate::cnot_scorer_dispatch::parent_scores(
+            py,
+            &world,
+            &scorer,
+            &parents,
+            &mode_text,
+            strict_backend,
+        )?;
         let expected = [
             i64::try_from(count)
                 .map_err(|_| PyOverflowError::new_err("CNOT parent count exceeds int64"))?,

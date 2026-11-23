@@ -10,7 +10,9 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 from pathlib import Path
+from pathlib import PurePosixPath
 import shutil
 import subprocess
 import sys
@@ -19,6 +21,41 @@ from typing import Any
 
 from .errors import NativeBackendError, NativeUnavailable
 
+
+
+def acceptance_rank_trace_identity(environment=None):
+    """Return the strict, opt-in identity for a physical acceptance build/run."""
+    environment = os.environ if environment is None else environment
+    enabled = environment.get("MGBS_ACCEPTANCE_RANK_TRACE", "0")
+    if enabled == "0":
+        if any(name in environment for name in (
+            "MGBS_ACCEPTANCE_RUN_ID", "MGBS_ACCEPTANCE_CASE_ID",
+            "MGBS_ACCEPTANCE_SOURCE_SHA", "MGBS_ACCEPTANCE_WHEEL_SHA256",
+        )):
+            raise NativeBackendError("acceptance rank-trace identity was supplied while tracing is disabled")
+        return None
+    if enabled != "1":
+        raise NativeBackendError("MGBS_ACCEPTANCE_RANK_TRACE must be exactly 0 or 1")
+    identity = {
+        "run_id": environment.get("MGBS_ACCEPTANCE_RUN_ID", ""),
+        "case_id": environment.get("MGBS_ACCEPTANCE_CASE_ID", ""),
+        "source_sha": environment.get("MGBS_ACCEPTANCE_SOURCE_SHA", ""),
+        "wheel_sha256": environment.get("MGBS_ACCEPTANCE_WHEEL_SHA256", ""),
+    }
+    for name in ("run_id", "case_id"):
+        if re.fullmatch(r"[A-Za-z0-9_.-]+", identity[name]) is None:
+            raise NativeBackendError(f"MGBS_ACCEPTANCE_{name.upper()} must be a portable nonempty label")
+    for name, digits in (("source_sha", 40), ("wheel_sha256", 64)):
+        value = identity[name]
+        if re.fullmatch(rf"[0-9a-f]{{{digits}}}", value) is None:
+            raise NativeBackendError(f"MGBS_ACCEPTANCE_{name.upper()} must be a lowercase SHA256/Git digest")
+    return identity
+
+
+def _validate_acceptance_rank_trace(metadata: dict, requested: bool) -> None:
+    observed = metadata.get("acceptance_rank_trace", False)
+    if type(observed) is not bool or observed != requested:
+        raise NativeBackendError("runner acceptance rank-trace build mode does not match the request")
 
 def file_sha256(path: Path) -> str:
     digest = hashlib.sha256()
@@ -30,18 +67,46 @@ def file_sha256(path: Path) -> str:
 
 def source_digest(source: Path, *, cutlass: bool = False) -> str:
     """Hash source content, including dirty files; ignore build/output trees."""
-    roots = [source / "include"] if cutlass else [source / p for p in ("src", "cuda", "tools", "cmake", "native", "rust")]
+    source = source.resolve()
+    roots = [source / "include"] if cutlass else []
     if cutlass:
         roots.append(source / "tools" / "util" / "include")
     files = [source / "CMakeLists.txt"] if not cutlass else []
     if not cutlass:
         files.extend(source / name for name in ("Cargo.toml", "Cargo.lock") if (source / name).is_file())
+        contract_path = Path(__file__).with_name("native_source_manifest.json")
+        try:
+            contract = json.loads(contract_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise NativeUnavailable(f"native source manifest is missing or invalid: {contract_path}") from exc
+        if not isinstance(contract, dict) or contract.get("schema_version") != 1:
+            raise NativeUnavailable("native source manifest has an unsupported schema")
+        roots_value = contract.get("native_fingerprint_roots")
+        required_value = contract.get("required_files")
+        if (not isinstance(roots_value, list) or not roots_value
+                or not all(isinstance(value, str) for value in roots_value)
+                or not isinstance(required_value, list)
+                or not all(isinstance(value, str) for value in required_value)):
+            raise NativeUnavailable("native source manifest has invalid fingerprint roots or required files")
+        for value in [*roots_value, *required_value]:
+            relative = PurePosixPath(value)
+            if relative.is_absolute() or ".." in relative.parts or "\\" in value:
+                raise NativeUnavailable(f"native source manifest has an unsafe path: {value}")
+        missing_required = [value for value in required_value if not (source / value).is_file()]
+        if missing_required:
+            raise NativeUnavailable("native source tree is missing required files: "
+                                     + ", ".join(missing_required))
+        roots.extend(source / value for value in roots_value)
+        files.extend(source / value for value in required_value)
     extensions = {".h", ".hpp", ".cuh", ".c", ".cpp", ".cu", ".cmake", ".py", ".in", ".rs", ".toml"}
     for root in roots:
         if root.is_dir():
             files.extend(p for p in root.rglob("*") if p.is_file() and p.suffix in extensions
                          and not any(part in ("target", "__pycache__", ".pytest_cache") for part in p.relative_to(root).parts))
     digest = hashlib.sha256()
+    if not cutlass:
+        digest.update(b"native_source_manifest.json\0")
+        digest.update(bytes.fromhex(file_sha256(contract_path)))
     for path in sorted(set(files)):
         if not path.is_file():
             raise NativeUnavailable(f"native source file is missing: {path}")
@@ -190,7 +255,7 @@ def _validate_index_sort(metadata: dict, requested: bool) -> None:
 def configure_command(source: Path, build_dir: Path, cutlass: Path, contract,
                       backend: str, architectures: tuple[int, ...], programs: dict[str, str],
                       *, nccl: dict[str, str] | None = None, inference_backend="cutlass", calibration=False,
-                      experimental_index_sort=False) -> list[str]:
+                      experimental_index_sort=False, acceptance_rank_trace=False) -> list[str]:
     shape = shape_contract(contract)
     command = [programs["cmake"], "-S", str(source), "-B", str(build_dir),
                "-DCMAKE_BUILD_TYPE=Release", f"-DCMAKE_CXX_COMPILER={programs['cxx']}",
@@ -205,7 +270,9 @@ def configure_command(source: Path, build_dir: Path, cutlass: Path, contract,
                "-DBEAM_EXPERIMENTAL_OWNER_RADIX=OFF",
                "-DBEAM_EXPERIMENTAL_SCORE_BITS=OFF",
                "-DBEAM_ENABLE_DEBUG=ON", "-DBEAM_ENABLE_DEBUG_LOGS=ON",
-               "-DBEAM_ENABLE_DEPTH_LOGS=OFF", "-DBEAM_DEBUG_STREAM_TIMING=OFF",
+               "-DBEAM_ENABLE_DEPTH_LOGS=OFF",
+               "-DBEAM_DEBUG_DEPTH_FLOW_TRACE=" + ("ON" if acceptance_rank_trace else "OFF"),
+               "-DBEAM_DEBUG_STREAM_TIMING=OFF",
                "-DBEAM_DEBUG_INFERENCE_TRACE=OFF", "-DBEAM_DEBUG_PATH_TRACE=OFF"]
     if nccl is not None:
         command += [f"-DNCCL_INCLUDE_DIR={nccl['include_dir']}", f"-DNCCL_LIBRARY={nccl['library']}",
@@ -219,9 +286,11 @@ def configure_command(source: Path, build_dir: Path, cutlass: Path, contract,
 
 
 def ensure_runner(contract, model, options, architectures: tuple[int, ...], run_dir: Path, *, nccl_digest_cache=None) -> tuple[Path, dict[str, Any]]:
+    acceptance_trace = acceptance_rank_trace_identity() is not None
     if options.runner_path is not None:
         metadata = validate_runner(options.runner_path, contract, model.backend, architectures)
         _validate_index_sort(metadata, options.experimental_index_sort)
+        _validate_acceptance_rank_trace(metadata, acceptance_trace)
         observed = metadata.get("inference_backend", "cutlass")
         if observed != options.inference_backend:
             raise NativeUnavailable("existing runner inference backend does not match GPU selection")
@@ -254,6 +323,9 @@ def ensure_runner(contract, model, options, architectures: tuple[int, ...], run_
                      "toolchain": toolchain_identity(programs), "target": target, "nccl": nccl,
                      "build_mode": "release-debug-logs-v1", "inference_backend": options.inference_backend,
                      'calibration_binary_name': calibration_target}
+    if acceptance_trace:
+        # Acceptance instrumentation gets a separate binary cache identity.
+        specification['acceptance_rank_trace'] = True
     if options.experimental_index_sort:
         # Omission for the default preserves the identity of legacy OFF builds.
         specification['experimental_index_sort'] = True
@@ -277,6 +349,7 @@ def ensure_runner(contract, model, options, architectures: tuple[int, ...], run_
     if (build_dir / "native-build.json").is_file():
         metadata = validate_runner(runner, contract, model.backend, architectures)
         _validate_index_sort(metadata, options.experimental_index_sort)
+        _validate_acceptance_rank_trace(metadata, acceptance_trace)
         if metadata.get('build_key') != key or any(metadata.get(k) != v for k, v in specification.items()):
             raise NativeBackendError("cached native runner build key or provenance does not match the request")
         return runner, metadata
@@ -296,7 +369,8 @@ def ensure_runner(contract, model, options, architectures: tuple[int, ...], run_
         env["TORCH_CUDA_ARCH_LIST"] = ";".join(f"{sm // 10}.{sm % 10}" for sm in architectures)
         run_process(configure_command(source, build_dir, cutlass, contract, model.backend, architectures, programs, nccl=nccl,
                                      inference_backend=options.inference_backend, calibration=bool(calibration_target),
-                                     experimental_index_sort=options.experimental_index_sort),
+                                     experimental_index_sort=options.experimental_index_sort,
+                                      acceptance_rank_trace=acceptance_trace),
                     cwd=run_dir, env=env, timeout=options.build_timeout_seconds, log_path=run_dir / "cmake-configure.log")
         targets=[target]+([calibration_target] if calibration_target else [])
         run_process([programs["cmake"], "--build", str(build_dir), "--target", *targets,

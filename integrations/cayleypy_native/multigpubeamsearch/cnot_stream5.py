@@ -11,6 +11,8 @@ import sys
 import torch
 import torch.distributed as dist
 
+from .cnot_acceptance import emit_event
+
 
 def _build_stream5():
     from torch.utils.cpp_extension import load
@@ -79,6 +81,12 @@ class RustStream5:
 
     def __init__(self, library, world):
         self.world = world
+        self.library = library
+        source = getattr(world._stream5_library, "_name", None)
+        admitted_digest = getattr(world, "_cnot_stream5_library_sha256", None)
+        self.library_sha256 = admitted_digest or (
+            hashlib.sha256(Path(source).read_bytes()).hexdigest() if source else "unknown"
+        )
         identity = [bytes(library.id_size)]
 
         def create_id():
@@ -86,21 +94,58 @@ class RustStream5:
                 identity[0] = library.unique_id()
 
         world.checked("create NCCL unique ID", create_id)
-        payload = torch.tensor(list(identity[0]), dtype=torch.uint8, device=world.device)
-        dist.broadcast(payload, 0)
-        self.comm = library.init(bytes(payload.tolist()), world.rank, world.size)
+        payload = world.checked(
+            "prepare NCCL unique ID broadcast payload",
+            lambda: torch.tensor(list(identity[0]), dtype=torch.uint8, device=world.device),
+        )
+        world.checked(
+            "broadcast NCCL unique ID",
+            lambda: dist.broadcast(payload, 0),
+        )
+        identity_bytes = world.checked(
+            "materialize NCCL unique ID",
+            lambda: bytes(payload.tolist()),
+        )
+        self.comm = world.checked(
+            "initialize Rust Stream 5 communicator",
+            lambda: library.init(identity_bytes, world.rank, world.size),
+        )
+
+    def _trace_dispatch(self, operation, rows=None):
+        if os.environ.get("MGBS_CNOT_STRICT_BACKEND") != "1":
+            return
+        fields = {
+            "implementation": "RustStream5/NCCL",
+            "operation": operation,
+            "abi": "1",
+            "owned_abi": "1",
+            "exchange_abi": "1",
+            "library_sha256": self.library_sha256,
+        }
+        if rows is not None:
+            fields["rows"] = str(rows)
+        try:
+            emit_event("stream5_dispatch", self.world, fields)
+        except Exception as error:
+            # The collective has already completed. Leave the missing receipt
+            # for the final verifier to reject without splitting the ranks.
+            print(f"CNOT_ACCEPTANCE_RECEIPT_WRITE_ERROR {type(error).__name__}: {error}",
+                  file=sys.stderr, flush=True)
 
     def close(self, *, abort):
         self.comm.close(abort)
 
     def sum(self, tensor):
         self.comm.all_reduce_i64(tensor)
+        self._trace_dispatch("all_reduce_i64", rows=tensor.numel())
         return tensor
 
     def gather_fixed(self, tensor):
         if not all(hasattr(self.comm, name) for name in
                    ("validate_all_gather_i64_into", "all_gather_i64_into")):
-            return self.comm.all_gather_i64(tensor)
+            result = self.comm.all_gather_i64(tensor)
+            self._trace_dispatch("all_gather_i64", rows=tensor.numel())
+            return result
 
         def prepare():
             work = tensor.contiguous()
@@ -115,19 +160,24 @@ class RustStream5:
             "validate Rust Stream 5 fixed gather",
             lambda: self.comm.validate_all_gather_i64_into(tensor, work, output),
         )
-        return self.world.checked(
+        result = self.world.checked(
             "gather Rust Stream 5 fixed values",
             lambda: self.comm.all_gather_i64_into(tensor, work, output),
         )
+        self._trace_dispatch("all_gather_i64_into", rows=tensor.numel())
+        return result
 
     def broadcast(self, tensor, source):
         self.comm.broadcast_i64(tensor, source)
+        self._trace_dispatch(f"broadcast_i64:source={source}", rows=tensor.numel())
         return tensor
 
     def exchange(self, send, counts):
         self.world.checked("validate Rust Stream 5 exchange",
                            lambda: self.comm.validate(send, counts, self.world))
-        return self.comm.exchange(send, counts, self.world)
+        result = self.comm.exchange(send, counts, self.world)
+        self._trace_dispatch("exchange", rows=len(send))
+        return result
 
 
 class Stream5:

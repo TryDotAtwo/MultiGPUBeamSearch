@@ -134,11 +134,21 @@ class CnotStages:
         return count, layer, history_records
 
     def history_edge(self, records, target, local_index):
-        edge = self.world.longs([0, 0, 0])
-        if target == self.world.rank:
-            edge.copy_(records[local_index])
-        self.world.broadcast(edge, target)
-        return tuple(edge.tolist())
+        def prepare_edge():
+            edge = self.world.longs([0, 0, 0])
+            if target == self.world.rank:
+                edge.copy_(records[local_index])
+            return edge
+
+        edge = self.world.checked("prepare CNOT history edge", prepare_edge)
+        edge = self.world.checked(
+            "broadcast CNOT history edge",
+            lambda: self.world.broadcast(edge, target),
+        )
+        return self.world.checked(
+            "validate CNOT history edge",
+            lambda: tuple(edge.tolist()),
+        )
 
     def verifies_construction(self, gates):
         return self.input_matrix.verifies_construction(gates)

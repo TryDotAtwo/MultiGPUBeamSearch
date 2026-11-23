@@ -22,6 +22,7 @@ class World:
         self._owns_control_group = False
         self._native_extension = _UNSET
         self._native_support_cache = {}
+        self._native_binding_snapshot = None
         self._checked_error_gather_control = None
         if self.size > 65536:
             raise ValueError("CNOT physical routes support at most 65536 world ranks")
@@ -101,6 +102,32 @@ class World:
         vote = self.control_longs([int(bool(local_support))])
         gathered = self._control_gather(vote)
         return gathered.sum().item() == self.size
+
+    def all_ranks_support_vector(self, local_supports):
+        """Intersect a fixed-order capability vector over the stable Gloo group."""
+        entries = tuple(local_supports.items())
+        if not entries:
+            raise ValueError("CNOT capability snapshot cannot be empty")
+        names = tuple(name for name, _ in entries)
+        values = tuple(bool(value) for _, value in entries)
+        if self.size == 1:
+            return dict(zip(names, values))
+        gathered = self._control_gather(
+            self.control_longs([int(value) for value in values])
+        )
+        agreed = gathered.to(dtype=torch.bool).all(dim=0).tolist()
+        return {name: bool(value) for name, value in zip(names, agreed)}
+
+    def agree_native_bindings(self, bindings):
+        """Pin local native functions and return their rank-wide capability intersection."""
+        if self._native_binding_snapshot is not None:
+            raise RuntimeError("CNOT native bindings were already admitted for this World")
+        common = self.all_ranks_support_vector(
+            {name: callable(binding) for name, binding in bindings.items()}
+        )
+        self._native_binding_snapshot = dict(bindings)
+        self._native_support_cache.update(common)
+        return common
 
     def any_rank_failed(self, local_failed):
         """OR rank-local failure flags over the CPU Gloo control group."""
@@ -245,6 +272,11 @@ class World:
         return self._native_extension
 
     def native_method(self, name):
+        if (
+            self._native_binding_snapshot is not None
+            and name in self._native_binding_snapshot
+        ):
+            return self._native_binding_snapshot[name]
         native = self._extension()
         return getattr(native, name, None) if native is not None else None
 

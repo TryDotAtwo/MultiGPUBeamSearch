@@ -42,6 +42,9 @@ def test_metadata_exceptions_stay_inside_the_admission_failure_boundary(monkeypa
         def gather_fixed(self, _):
             raise AssertionError("a failing rank must not enter the digest exchange")
 
+        def require_engine_consensus(self, _):
+            return None
+
     monkeypatch.setattr(cnot, "World", CollectiveProbe)
     with pytest.raises(RuntimeError, match="validate CNOT input failed: rank 0:"):
         search_cnot(pack_rows((1, 2)), Scorer(), width=1, shortlist=1, max_depth=1)

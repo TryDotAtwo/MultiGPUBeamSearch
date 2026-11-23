@@ -9,6 +9,8 @@ import shutil
 import subprocess
 import time
 
+from .errors import NativeUnavailable
+
 
 MAX_WORLD_SIZE = 128  # Fixed host control arrays in the native final exchange.
 
@@ -31,6 +33,16 @@ class ClusterPlan:
     hardware_verified: bool = False
 
 
+def _resolve_cluster_plan_python(counts, beam_width, shard_count, batch_alignment,
+                                alignment, capacity):
+    """Compatibility policy for installed extensions without the Rust planner."""
+    ranks = []
+    for node, count in enumerate(counts):
+        for local in range(count):
+            ranks.append(RankPlacement(len(ranks), node, local))
+    return ClusterPlan(tuple(ranks), beam_width, beam_width, alignment, capacity, shard_count)
+
+
 def plan_cluster(gpus_per_node, beam_width, *, shard_count=16, batch_alignment=1024):
     """Plan a block layout and the native exact top-k before memory admission."""
     counts = tuple(gpus_per_node)
@@ -47,11 +59,41 @@ def plan_cluster(gpus_per_node, beam_width, *, shard_count=16, batch_alignment=1
     capacity = (beam_width + world - 1) // world
     if alignment >= 2**64 or capacity >= 2**32:
         raise ValueError("native alignment or rank-local frontier index overflows")
-    ranks = []
-    for node, count in enumerate(counts):
-        for local in range(count):
-            ranks.append(RankPlacement(len(ranks), node, local))
-    return ClusterPlan(tuple(ranks), beam_width, beam_width, alignment, capacity, shard_count)
+
+    from .rust_control import resolve_cluster_plan
+
+    request = {
+        "gpus_per_node": list(counts),
+        "beam_width": beam_width,
+        "shard_count": shard_count,
+        "batch_alignment": batch_alignment,
+    }
+    plan = resolve_cluster_plan(request)
+    if plan is None:
+        return _resolve_cluster_plan_python(
+            counts, beam_width, shard_count, batch_alignment, alignment, capacity
+        )
+    ranks = tuple(RankPlacement(**rank) for rank in plan["ranks"])
+    return ClusterPlan(
+        ranks,
+        plan["requested_beam"],
+        plan["effective_beam"],
+        plan["alignment"],
+        plan["local_frontier_capacity"],
+        plan["shard_count"],
+        plan["hardware_verified"],
+    )
+
+
+def _cuda_ordinal_python(local_rank, visible_devices):
+    """Compatibility rule for older extensions and nonstandard Python inputs."""
+    if type(visible_devices) is not int or visible_devices <= 0:
+        raise ValueError("no visible CUDA devices")
+    if visible_devices == 1:
+        return 0
+    if local_rank >= visible_devices:
+        raise ValueError("LOCAL_RANK exceeds the visible CUDA devices")
+    return local_rank
 
 
 @dataclass(frozen=True)
@@ -61,13 +103,15 @@ class ScheduledRank(RankPlacement):
 
     def cuda_ordinal(self, visible_devices: int) -> int:
         """Resolve the scheduler rank inside this process's CUDA namespace."""
-        if type(visible_devices) is not int or visible_devices <= 0:
-            raise ValueError("no visible CUDA devices")
-        if visible_devices == 1:
-            return 0
-        if self.local_rank >= visible_devices:
-            raise ValueError("LOCAL_RANK exceeds the visible CUDA devices")
-        return self.local_rank
+        from .rust_control import resolve_cuda_ordinal
+
+        try:
+            ordinal = resolve_cuda_ordinal(self.local_rank, visible_devices)
+        except NativeUnavailable as error:
+            raise ValueError(str(error)) from error
+        if ordinal is None:
+            return _cuda_ordinal_python(self.local_rank, visible_devices)
+        return ordinal
 
 
 def _number(env, name):
@@ -91,9 +135,10 @@ def _slurm_counts(text):
     return counts
 
 
-def scheduler_rank(environ=None):
+def _scheduler_rank_python(environ=None):
     """Read the actual torchrun or Slurm step assignment, including task masks."""
     env = os.environ if environ is None else environ
+    rank_offset = None
     # A torchrun agent can itself occupy a single Slurm task. Conversely, a
     # direct srun child inherits normalized RANK variables from this launcher.
     if "TORCHELASTIC_RUN_ID" in env or "SLURM_PROCID" not in env:
@@ -108,9 +153,31 @@ def scheduler_rank(environ=None):
         if sum(counts) != world or node >= len(counts):
             raise ValueError("Slurm node counts disagree with the current step")
         local_size = counts[node]
+        rank_offset = sum(counts[:node])
     if not 1 <= world <= MAX_WORLD_SIZE or rank >= world or local >= local_size:
         raise ValueError(f"invalid rank or world size (maximum {MAX_WORLD_SIZE})")
+    if rank_offset is not None and rank != rank_offset + local:
+        raise ValueError("Slurm rank does not match node/local assignment")
     return ScheduledRank(rank, node, local, world, local_size)
+
+
+def scheduler_rank(environ=None):
+    """Resolve the public scheduler placement through Rust, with old-wheel fallback."""
+    env = os.environ if environ is None else environ
+    from .rust_control import resolve_scheduler_rank
+
+    try:
+        rank = resolve_scheduler_rank(dict(env))
+    except NativeUnavailable as error:
+        # Preserve the public helper's ValueError contract for malformed
+        # torchrun/Slurm environments; a Rust error never chooses Python.
+        raise ValueError(str(error)) from error
+    if rank is None:
+        return _scheduler_rank_python(environ)
+    return ScheduledRank(
+        rank["global_rank"], rank["node_rank"], rank["local_rank"],
+        rank["world_size"], rank["local_world_size"],
+    )
 
 
 def run_cluster_rank(command, *, shared_dir, run_id=None, timeout=3600, environ=None, engine="python"):

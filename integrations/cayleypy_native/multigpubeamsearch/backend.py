@@ -164,6 +164,61 @@ def validate_touch_bfs_contract(contract, radius: int, max_entries: int) -> int:
     return touch_bfs_worst_case_entries(contract.move_count, radius, max_entries)
 
 
+def _resolve_inference_backend_python(request):
+    """Compatibility policy for extensions built before Rust owns this choice."""
+    requested = request["requested"]
+    model_backend = request["model_backend"]
+    output_dim = request["output_dim"]
+    devices = request["devices"]
+    if requested not in ("auto", "libtorch", "cutlass"):
+        raise NativeUnavailable("inference_backend must be auto, libtorch, or cutlass")
+    if requested == "cutlass" and model_backend == "mlp" and output_dim != 1 and output_dim % 8:
+        raise NativeUnavailable("native MLP Q-head output_dim must be a multiple of 8 for CUTLASS row alignment; scalar output_dim=1 is supported")
+    if not devices:
+        raise NativeUnavailable("inference backend selection requires at least one GPU")
+    if request.get("dtype") == "bf16" and any(device["sm"] < 80 for device in devices):
+        raise NativeUnavailable("native BF16 Stream1 requires SM80+ on every selected GPU; use FP16 on SM75")
+    if request.get("dtype") == "fp16" and any(device["sm"] < 75 for device in devices):
+        raise NativeUnavailable("this native FP16 MLP backend uses SM75+ TensorOp kernels; older GPU executors need a separate adapter")
+    executor = requested
+    if executor == "auto":
+        older_ensemble = model_backend == "ensemble" and any(device["sm"] < 80 for device in devices)
+        has_t4 = any("T4" in device["name"].split() for device in devices)
+        executor = "libtorch" if older_ensemble or has_t4 else "cutlass"
+    if model_backend == "ensemble" and executor == "cutlass" and any(device["sm"] < 80 for device in devices):
+        raise NativeUnavailable("ensemble CUTLASS requires SM80+ on every selected GPU")
+    if executor == "cutlass" and model_backend == "mlp" and output_dim != 1 and output_dim % 8:
+        raise NativeUnavailable("native MLP Q-head output_dim must be a multiple of 8 for CUTLASS row alignment; scalar output_dim=1 is supported")
+    return executor
+
+
+def _resolve_inference_backend(request):
+    """Use the Rust runtime policy; retain a Python policy only for old wheels."""
+    from .rust_control import resolve_inference_backend
+
+    selected = resolve_inference_backend(request)
+    if selected is not None:
+        return selected
+    return _resolve_inference_backend_python(request)
+
+
+def _resolve_inference_plan(request):
+    """Return the selected route and unchanged profile, with old-wheel fallback."""
+    from .rust_control import resolve_inference_plan
+
+    plan = resolve_inference_plan(request)
+    if plan is not None:
+        return plan
+    executor = _resolve_inference_backend(request)
+    if executor == "libtorch":
+        policy, row_limit = "libtorch-conservative-v1", 2048
+    elif executor == "cutlass":
+        policy, row_limit = "cutlass-default-v1", 8192
+    else:
+        raise NativeUnavailable("inference backend resolver returned an invalid selection")
+    return {"backend": executor, "policy": policy, "inference_row_limit": row_limit}
+
+
 def prepare_runtime(contract, model, options, run_dir, devices, *,
                     touch_bfs_radius: int | None = None, nccl_digest_cache=None) -> PreparedRuntime:
     """Resolve/build before dispatch closes its capability fallback window."""
@@ -179,25 +234,32 @@ def prepare_runtime(contract, model, options, run_dir, devices, *,
         raise NativeUnavailable("native MLP Q-head output_dim must be a multiple of 8 for CUTLASS row alignment; scalar output_dim=1 is supported")
     import torch
     try:
-        architectures = tuple(sorted({major * 10 + minor for major, minor in
-                                      (torch.cuda.get_device_capability(d) for d in devices)}))
+        device_sms = tuple(
+            major * 10 + minor
+            for major, minor in (torch.cuda.get_device_capability(d) for d in devices)
+        )
     except (RuntimeError, AssertionError) as exc:
         raise NativeUnavailable(f"cannot inspect requested native CUDA architecture: {exc}") from exc
-    if model.manifest.get("dtype") == "bf16" and any(sm < 80 for sm in architectures):
-        raise NativeUnavailable("native BF16 Stream1 requires SM80+ on every selected GPU; use FP16 on SM75")
-    if model.manifest.get("dtype") == "fp16" and any(sm < 75 for sm in architectures):
-        raise NativeUnavailable("this native FP16 MLP backend uses SM75+ TensorOp kernels; older GPU executors need a separate adapter")
-    executor = options.inference_backend
-    if executor == "auto":
-        # One runner implementation per job. A mixed T4/newer set uses
-        # LibTorch on all ranks; never send a T4 to the newer-only route.
-        older_ensemble = model.backend == "ensemble" and any(sm < 80 for sm in architectures)
-        executor = "libtorch" if older_ensemble or any("T4" in torch.cuda.get_device_name(d).split() for d in devices) else "cutlass"
-    if model.backend == "ensemble" and executor == "cutlass" and any(sm < 80 for sm in architectures):
-        raise NativeUnavailable("ensemble CUTLASS requires SM80+ on every selected GPU")
+    architectures = tuple(sorted(set(device_sms)))
+    device_names = None
+    if options.inference_backend == "auto":
+        device_names = tuple(torch.cuda.get_device_name(d) for d in devices)
+    request = {
+        "requested": options.inference_backend,
+        "model_backend": model.backend,
+        "dtype": model.manifest.get("dtype"),
+        "output_dim": model.manifest["output_dim"],
+        "devices": [
+            {
+                "sm": sm,
+                "name": "" if device_names is None else device_names[index],
+            }
+            for index, sm in enumerate(device_sms)
+        ],
+    }
+    inference_plan = _resolve_inference_plan(request)
+    executor = inference_plan["backend"]
     options = replace(options, inference_backend=executor)
-    if executor == "cutlass" and model.backend == "mlp" and model.manifest["output_dim"] != 1 and model.manifest["output_dim"] % 8:
-        raise NativeUnavailable("native MLP Q-head output_dim must be a multiple of 8 for CUTLASS row alignment; scalar output_dim=1 is supported")
     from .build import ensure_runner
     run_dir = Path(run_dir).resolve()
     run_dir.mkdir(parents=True, exist_ok=True)
@@ -206,11 +268,52 @@ def prepare_runtime(contract, model, options, run_dir, devices, *,
     else:
         runner, metadata = ensure_runner(contract, model, options, architectures, run_dir,
                                          nccl_digest_cache=nccl_digest_cache)
-    profile = {"policy": "libtorch-conservative-v1" if executor == "libtorch" else "cutlass-default-v1",
-               "inference_backend": executor, "inference_row_limit": 2048 if executor == "libtorch" else 8192,
-               "cuda_architectures": list(architectures), "gpu_names": [torch.cuda.get_device_name(d) for d in devices],
+    if device_names is None:
+        device_names = tuple(torch.cuda.get_device_name(d) for d in devices)
+    profile = {"policy": inference_plan["policy"],
+               "inference_backend": executor,
+               "inference_row_limit": inference_plan["inference_row_limit"],
+               "cuda_architectures": list(architectures), "gpu_names": list(device_names),
                "memory_planning": "native_auto", "autotuned": False}
     return PreparedRuntime(runner, metadata, architectures, profile)
+
+
+def _graph_device_observations(graph, torch):
+    config = getattr(graph, "device_config", None)
+    if config is None:
+        # CayleyPy 0.1 exposes graph.device instead of device_config.
+        device = getattr(graph, "device", None)
+        configured = () if device is None else (device,)
+    else:
+        configured = tuple(getattr(config, "devices", ()))
+    return tuple(
+        (device.type, device.index)
+        for device in (torch.device(value) for value in configured)
+    )
+
+
+def _resolve_runtime_devices_python(visible_device_count, explicit_devices,
+                                    num_gpus, graph_devices):
+    """Compatibility policy for wheels without the Rust device resolver."""
+    if explicit_devices is not None:
+        devices = explicit_devices
+    elif num_gpus is not None:
+        if num_gpus > visible_device_count:
+            raise NativeUnavailable("num_gpus exceeds the number of visible CUDA devices")
+        devices = tuple(range(num_gpus))
+    elif not graph_devices or all(kind == "cpu" for kind, _ in graph_devices):
+        # A CPU graph describes the puzzle; native search uses visible GPUs.
+        devices = tuple(range(visible_device_count))
+    elif any(kind != "cuda" for kind, _ in graph_devices):
+        raise NativeUnavailable("graph mixes CPU and CUDA devices; set explicit native devices")
+    else:
+        devices = tuple(0 if index is None else index for _, index in graph_devices)
+    if not devices or len(set(devices)) != len(devices) or len(devices) > 128 or any(
+        type(device) is not int or device < 0 or device >= visible_device_count
+        for device in devices
+    ):
+        raise NativeUnavailable("native devices must be distinct available CUDA indices (at most 128)")
+    return tuple(devices)
 
 
 def runtime_devices(graph, options) -> tuple[int, ...]:
@@ -219,37 +322,41 @@ def runtime_devices(graph, options) -> tuple[int, ...]:
     if any(key in os.environ for key in ("RANK", "LOCAL_RANK", "WORLD_SIZE", "TORCHELASTIC_RUN_ID")):
         raise NativeUnavailable("native adapter cannot be invoked inside an existing torchrun rank")
     import torch
-    if not torch.cuda.is_available():
+    cuda_available = torch.cuda.is_available()
+    visible_device_count = torch.cuda.device_count() if cuda_available else 0
+    graph_devices = (
+        _graph_device_observations(graph, torch)
+        if cuda_available and options.devices is None and options.num_gpus is None
+        else ()
+    )
+    from .rust_control import resolve_runtime_device_plan, resolve_runtime_devices
+    selected = resolve_runtime_device_plan(
+        cuda_available,
+        visible_device_count,
+        options.devices,
+        options.num_gpus,
+        graph_devices,
+    )
+    if selected is not None:
+        return selected
+    if not cuda_available:
         raise NativeUnavailable("native beam requires available CUDA devices")
-    if options.devices is not None:
-        devices = options.devices
-    elif options.num_gpus is not None:
-        if options.num_gpus > torch.cuda.device_count():
-            raise NativeUnavailable("num_gpus exceeds the number of visible CUDA devices")
-        devices = tuple(range(options.num_gpus))
-    else:
-        config = getattr(graph, "device_config", None)
-        if config is None:
-            # CayleyPy 0.1 exposes graph.device instead of device_config.
-            device = getattr(graph, "device", None)
-            configured = () if device is None else (device,)
-        else:
-            configured = getattr(config, "devices", ())
-        if not configured or all(torch.device(d).type == "cpu" for d in configured):
-            # A CPU graph describes the puzzle; native search uses visible GPUs.
-            devices = tuple(range(torch.cuda.device_count()))
-        elif any(torch.device(d).type != "cuda" for d in configured):
-            raise NativeUnavailable("graph mixes CPU and CUDA devices; set explicit native devices")
-        else:
-            devices = tuple(0 if torch.device(d).index is None else torch.device(d).index for d in configured)
-    if not devices or len(set(devices)) != len(devices) or len(devices) > 128 or any(
-        type(d) is not int or d < 0 or d >= torch.cuda.device_count() for d in devices
-    ):
-        raise NativeUnavailable("native devices must be distinct available CUDA indices (at most 128)")
-    return tuple(devices)
-
-
-def cuda_visibility(devices: tuple[int, ...], environ: dict[str, str]) -> str:
+    selected = resolve_runtime_devices(
+        visible_device_count,
+        options.devices,
+        options.num_gpus,
+        graph_devices,
+    )
+    if selected is not None:
+        return selected
+    return _resolve_runtime_devices_python(
+        visible_device_count,
+        options.devices,
+        options.num_gpus,
+        graph_devices,
+    )
+def _cuda_visibility_python(devices, environ):
+    """Compatibility rule for older runtime extensions."""
     inherited = environ.get("CUDA_VISIBLE_DEVICES")
     if inherited is None:
         return ",".join(map(str, devices))
@@ -259,8 +366,18 @@ def cuda_visibility(devices: tuple[int, ...], environ: dict[str, str]) -> str:
     return ",".join(tokens[d] for d in devices)
 
 
-def child_environment(devices: tuple[int, ...], run_dir: Path, environ=None) -> dict[str, str]:
-    inherited = dict(os.environ if environ is None else environ)
+def cuda_visibility(devices: tuple[int, ...], environ: dict[str, str]) -> str:
+    from .rust_control import resolve_cuda_visibility
+
+    inherited = environ.get("CUDA_VISIBLE_DEVICES")
+    resolved = resolve_cuda_visibility(devices, inherited)
+    if resolved is not None:
+        return resolved
+    return _cuda_visibility_python(devices, environ)
+
+
+def _child_environment_python(inherited, devices, nccl_id_file):
+    """Compatibility implementation for extensions without Rust env planning."""
     env = {k: v for k, v in inherited.items() if not (
         k.startswith(("BEAM_", "TORCHELASTIC_", "TORCHRUN_", "CUDA_", "NCCL_", "PUBLISH_", "RESULTS_INGEST_")) or k in _RANK_KEYS
         or k.startswith(("SHARD_", "STREAM1_", "STREAM3_", "STREAM4_", "GLOBAL_"))
@@ -268,33 +385,150 @@ def child_environment(devices: tuple[int, ...], run_dir: Path, environ=None) -> 
     env["CUDA_VISIBLE_DEVICES"] = cuda_visibility(devices, inherited)
     if "CUDA_DEVICE_ORDER" in inherited:
         env["CUDA_DEVICE_ORDER"] = inherited["CUDA_DEVICE_ORDER"]
-    env["BEAM_NCCL_ID_FILE"] = str(run_dir / "nccl-id.bin")
+    env["BEAM_NCCL_ID_FILE"] = nccl_id_file
     return env
 
 
-def microbatch_environment(contract, model, beam_width: int, world_size: int, *, row_limit=8192) -> tuple[dict[str, str], dict]:
-    """Fit one inference slot into a native auto candidate without changing beam.
+def child_environment(devices: tuple[int, ...], run_dir: Path, environ=None) -> dict[str, str]:
+    inherited = dict(os.environ if environ is None else environ)
+    nccl_id_file = str(run_dir / "nccl-id.bin")
+    from .rust_control import resolve_child_environment
 
-    Native runtime_config.cpp uses 8192 inference rows, four initial sort slots,
-    alignment 1024 and capacity scale 1.25. At tiny beams it otherwise rejects
-    every candidate when Stream3's one-slot batch exceeds physical shard storage.
-    Only lower the row budget; leave shards, ring count and VRAM planning to native.
-    """
+    resolved = resolve_child_environment(inherited, devices, nccl_id_file)
+    if resolved is not None:
+        return resolved
+    return _child_environment_python(inherited, devices, nccl_id_file)
+
+
+
+def _runtime_search_environment_python(puzzle_info, test_csv, weight_dir, run_dir,
+                                       effective_touch_bfs_radius, touch_bfs_max_entries):
+    history_dir = str(Path(run_dir) / "history")
+    return {
+        "BEAM_GENERATOR_PATH": str(puzzle_info),
+        "BEAM_PUZZLE_INFO_JSON": str(puzzle_info),
+        "BEAM_TEST_CSV": str(test_csv),
+        "BEAM_WEIGHT_DIR": str(weight_dir),
+        "BEAM_RUNTIME_CONFIG_MODE": "auto",
+        "BEAM_SOLVED_NEIGHBORHOOD_RADIUS": str(effective_touch_bfs_radius),
+        "BEAM_SOLVED_NEIGHBORHOOD_MAX_ENTRIES": str(touch_bfs_max_entries),
+        "BEAM_STREAM2_SUFFIX_RADIUS": "0",
+        "BEAM_SOLVE_BUCKET_MODE": "0",
+        "BEAM_HISTORY_MODE": "disk",
+        "BEAM_HISTORY_DIR": history_dir,
+        "BEAM_HISTORY_DISK_PATH": history_dir,
+    }
+
+
+def runtime_search_environment(puzzle_info, test_csv, weight_dir, run_dir,
+                              effective_touch_bfs_radius, touch_bfs_max_entries):
+    """Build fixed native search variables through the versioned Rust runtime API."""
+    from .rust_control import resolve_search_environment
+
+    paths = tuple(str(path) for path in (puzzle_info, test_csv, weight_dir, run_dir))
+    native = resolve_search_environment(
+        *paths, effective_touch_bfs_radius, touch_bfs_max_entries
+    )
+    if native is not None:
+        return native
+    return _runtime_search_environment_python(
+        *paths, effective_touch_bfs_radius, touch_bfs_max_entries
+    )
+
+
+
+def _search_model_environment_python(request):
+    """Compatibility environment builder for older runtime wheels."""
+    environment = {}
+    if request["model_backend"] == "ensemble":
+        environment["BEAM_BLEND_DIR"] = request["ensemble_blend_dir"]
+        environment["BEAM_WEIGHT_DIR"] = request["ensemble_first_weights_dir"]
+        if request["inference_backend"]:
+            environment["BEAM_ENSEMBLE_BACKEND"] = request["inference_backend"]
+    if (request["inference_backend"] == "libtorch"
+            or request["model_backend"] in ("piece_transformer", "ensemble")):
+        environment["BEAM_STREAM1_EXECUTOR"] = "libtorch_eager"
+    binding = request["mlp_host_binding"]
+    if binding is not None:
+        environment["BEAM_MLP_GRAPH_HASH"] = binding["graph_hash"]
+        environment["BEAM_MLP_ARTIFACT_HASH"] = binding["artifact_hash"]
+    return environment
+
+
+def search_model_environment(model, runtime, *, graph_hash, mlp_host_binding):
+    """Build the prepared model-family environment through the versioned Rust API."""
+    backend_name = model.backend
+    ensemble_blend_dir = None
+    ensemble_first_weights_dir = None
+    if backend_name == "ensemble":
+        ensemble_blend_dir = str(model.weights_dir)
+        first = model.manifest["ensemble"]["models"][0]
+        ensemble_first_weights_dir = str(model.weights_dir / first["weights_dir"])
+    binding = None
+    if mlp_host_binding:
+        binding = {
+            "graph_hash": graph_hash,
+            "artifact_hash": model.artifact_hash,
+        }
+    request = {
+        "model_backend": backend_name,
+        "ensemble_blend_dir": ensemble_blend_dir,
+        "ensemble_first_weights_dir": ensemble_first_weights_dir,
+        "inference_backend": runtime.build_metadata.get("inference_backend"),
+        "mlp_host_binding": binding,
+    }
+    from .rust_control import resolve_search_model_environment
+
+    native = resolve_search_model_environment(request)
+    if native is not None:
+        return native
+    return _search_model_environment_python(request)
+
+
+
+def _resolve_microbatch_plan_python(contract, model, beam_width: int, world_size: int, *, row_limit=8192) -> dict:
+    """Compatibility implementation for extensions without the Rust planner."""
     default_rows, alignment, initial_sort_slots = row_limit, 1024, 4
     divisor = world_size * initial_sort_slots * alignment
     logical_shard = ((beam_width + divisor - 1) // divisor) * alignment
     scaled_capacity = (logical_shard * 5 + 3) // 4
     shard_storage = ((scaled_capacity + alignment - 1) // alignment) * alignment
-    rows_per_parent = contract.move_count if model.manifest["output_dim"] == 1 and getattr(model,"backend","mlp") != "ensemble" else 1
+    rows_per_parent = contract.move_count if model.manifest["output_dim"] == 1 and getattr(model, "backend", "mlp") != "ensemble" else 1
     default_parents = default_rows // rows_per_parent
     parents = min(default_parents, shard_storage // contract.move_count)
     row_budget = default_rows if parents == default_parents else parents * rows_per_parent
-    env = {} if row_budget == 8192 else {"BEAM_B_MICRO": str(row_budget)}
-    return env, {"native_default_row_budget": default_rows, "configured_row_budget": row_budget,
-                 "derived_parent_batch": parents, "derived_candidates_per_slot": parents * contract.move_count,
-                 "reference_logical_shard": logical_shard, "reference_shard_storage": shard_storage,
-                 "adjusted_for_small_beam": bool(env)}
+    return {
+        "native_default_row_budget": default_rows,
+        "configured_row_budget": row_budget,
+        "derived_parent_batch": parents,
+        "derived_candidates_per_slot": parents * contract.move_count,
+        "reference_logical_shard": logical_shard,
+        "reference_shard_storage": shard_storage,
+        "adjusted_for_small_beam": row_budget != 8192,
+    }
 
+
+def microbatch_environment(contract, model, beam_width: int, world_size: int, *, row_limit=8192) -> tuple[dict[str, str], dict]:
+    """Build the legacy runner environment from one Rust-owned resource plan."""
+    request = {
+        "beam_width": beam_width,
+        "world_size": world_size,
+        "move_count": contract.move_count,
+        "output_dim": model.manifest["output_dim"],
+        "model_backend": getattr(model, "backend", "mlp"),
+        "row_limit": row_limit,
+    }
+    from .rust_control import resolve_microbatch_plan
+
+    plan = resolve_microbatch_plan(request)
+    if plan is None:
+        plan = _resolve_microbatch_plan_python(
+            contract, model, beam_width, world_size, row_limit=row_limit
+        )
+    env = {} if plan["configured_row_budget"] == 8192 else {
+        "BEAM_B_MICRO": str(plan["configured_row_budget"])
+    }
+    return env, plan
 
 def _stop_process_tree(process: subprocess.Popen) -> None:
     if os.name == "posix":
@@ -542,6 +776,31 @@ def run_native(contract, model, options, beam_width, max_steps, run_dir, devices
     return _run_native_once(contract,model,options,beam_width,max_steps,run_dir,devices,runtime=runtime)
 
 
+def _search_policy_environment_python(options):
+    """Compatibility policy for extensions built before Rust owned these values."""
+    return {
+        "BEAM_SOLVE_BUCKET_MODE": str(int(options.solution_mode == "collect")),
+        "BEAM_SOLVE_BUCKET_EXTRA_DEPTHS": str(options.collect_extra_depths),
+        "BEAM_SOLVE_BUCKET_MAX_SOLUTIONS": str(options.max_collected_solutions),
+        "BEAM_SOLVE_BUCKET_RESULT_TSV": "collected-solutions.tsv",
+    }
+
+
+def search_policy_environment(options):
+    """Resolve fixed solution collection controls through the installed Rust runtime."""
+    request = {
+        "solution_mode": options.solution_mode,
+        "collect_extra_depths": options.collect_extra_depths,
+        "max_collected_solutions": options.max_collected_solutions,
+    }
+    from .rust_control import resolve_search_policy_environment
+
+    native = resolve_search_policy_environment(request)
+    if native is not None:
+        return native
+    return _search_policy_environment_python(options)
+
+
 def _verify_mlp_host_binding(run_dir, artifact_hash, world):
     """Require one receipt from each worker's own startup log."""
     expected = f"BEAM_MLP_ARTIFACT_VERIFIED={artifact_hash}"
@@ -561,6 +820,70 @@ def _verify_mlp_host_binding(run_dir, artifact_hash, world):
             raise NativeBackendError(f'MLP host binding receipt missing for rank {rank}')
 
 
+def _python_search_phase_plan(request):
+    """Compatibility phase plan for wheels that predate the Rust resolver."""
+    inference = request["autotune"] and (
+        request["model_backend"] == "ensemble"
+        or (
+            request["model_backend"] == "mlp"
+            and request["calibration_binary_name"] in (
+                "stream1_native_mlp_benchmark",
+                "stream1_libtorch_mlp_benchmark",
+            )
+        )
+    )
+    phases = []
+    if inference:
+        phases.append("inference_calibration")
+    if request["discover_capacity"] and not request["maximum_requested"]:
+        phases.append("capacity_discovery")
+    if request["maximum_requested"]:
+        phases.append("maximum_frontier_search")
+    if inference:
+        phases.append("pipeline_calibration")
+        if request["maximum_requested"]:
+            phases.append("working_capacity_selection")
+    phases.append("execute")
+    return tuple(phases)
+
+
+def _resolve_search_phase_plan(options, model, runtime, maximum_requested):
+    request = {
+        "autotune": options.autotune,
+        "model_backend": model.backend,
+        "calibration_binary_name": runtime.build_metadata.get("calibration_binary_name"),
+        "maximum_requested": maximum_requested,
+        "discover_capacity": bool(getattr(options, "calibration_discover_capacity", False)),
+    }
+    from . import rust_control
+    phases = rust_control.resolve_search_phase_plan(request)
+    if phases is None:
+        phases = _python_search_phase_plan(request)
+    return tuple(phases)
+
+
+def _resolve_search_execution_plan(options, model, runtime, requested_beam_width):
+    maximum_requested = type(requested_beam_width) is str and requested_beam_width == "max"
+    request = {
+        "autotune": options.autotune,
+        "model_backend": model.backend,
+        "calibration_binary_name": runtime.build_metadata.get("calibration_binary_name"),
+        "requested_beam_width": requested_beam_width,
+        "discover_capacity": bool(getattr(options, "calibration_discover_capacity", False)),
+    }
+    from . import rust_control
+    plan = rust_control.resolve_search_execution_plan(request)
+    if plan is not None:
+        return plan
+    # Older wheels retain their previous phase resolver and Python width policy.
+    phases = _resolve_search_phase_plan(options, model, runtime, maximum_requested)
+    calibration_beam_width = 1_048_576 if maximum_requested else requested_beam_width
+    return {
+        "phases": phases,
+        "calibration_beam_width": calibration_beam_width,
+    }
+
+
 def _run_native_once(contract, model, options, beam_width, max_steps, run_dir, devices, *, runtime=None) -> NativeOutcome:
     maximum_requested=type(beam_width) is str and beam_width=='max'
     if (not maximum_requested and (type(beam_width) is not int or beam_width <= 0)) or type(max_steps) is not int or max_steps < 0:
@@ -569,7 +892,6 @@ def _run_native_once(contract, model, options, beam_width, max_steps, run_dir, d
         if not options.autotune:raise NativeUnavailable('maximum beam requires autotuning')
         from .working_capacity import maximum_options
         options=maximum_options(options)
-        beam_width=1_048_576  # Bounded inference curve; capacity uses actual native plans below.
     if contract.replay(()):
         return NativeOutcome((), 0.0, None, None, {"already_solved": True, "replay_valid": True})
     if max_steps == 0:
@@ -589,6 +911,17 @@ def _run_native_once(contract, model, options, beam_width, max_steps, run_dir, d
                 or runtime.build_metadata.get("backend") != model.backend):
             raise NativeBackendError("prepared native runner does not match graph/model")
     build_metadata = runtime.build_metadata
+    from .build import acceptance_rank_trace_identity
+    acceptance_trace = acceptance_rank_trace_identity()
+    if acceptance_trace is not None:
+        if build_metadata.get("acceptance_rank_trace") is not True:
+            raise NativeBackendError("strict acceptance requested but the selected runner lacks rank-trace instrumentation")
+        build_key = build_metadata.get("build_key")
+        binary_sha256 = build_metadata.get("binary_sha256")
+        if not isinstance(build_key, str) or re.fullmatch(r"[0-9a-f]{64}", build_key) is None:
+            raise NativeBackendError("acceptance runner metadata has no valid native build key")
+        if not isinstance(binary_sha256, str) or re.fullmatch(r"[0-9a-f]{64}", binary_sha256) is None:
+            raise NativeBackendError("acceptance runner metadata has no valid binary SHA256")
     puzzle = run_dir / "puzzle_info.json"
     inputs = run_dir / "test.csv"
     from . import rust_control
@@ -597,32 +930,31 @@ def _run_native_once(contract, model, options, beam_width, max_steps, run_dir, d
         # The native CSV reader requires a bare numeric ID and a quoted state cell.
         inputs.write_text('initial_state_id,initial_state\n0,"' + ",".join(map(str, contract.start)) + '"\n', encoding="utf-8")
     env = child_environment(tuple(devices), run_dir)
-    env.update({"BEAM_GENERATOR_PATH": str(puzzle), "BEAM_PUZZLE_INFO_JSON": str(puzzle),
-                "BEAM_TEST_CSV": str(inputs), "BEAM_WEIGHT_DIR": str(model.weights_dir),
-                "BEAM_RUNTIME_CONFIG_MODE": "auto", "BEAM_SOLVED_NEIGHBORHOOD_RADIUS": str(effective_touch_bfs_radius),
-                "BEAM_SOLVED_NEIGHBORHOOD_MAX_ENTRIES": str(options.touch_bfs_max_entries),
-                "BEAM_STREAM2_SUFFIX_RADIUS": "0", "BEAM_SOLVE_BUCKET_MODE": "0", "BEAM_HISTORY_MODE": "disk",
-                "BEAM_HISTORY_DIR": str(run_dir / "history"), "BEAM_HISTORY_DISK_PATH": str(run_dir / "history")})
+    # Native calibration runs may reuse the trace-enabled binary, but only the
+    # actual search gets an acceptance identity or emits rank snapshots.
+    for acceptance_name in tuple(env):
+        if acceptance_name.startswith("MGBS_ACCEPTANCE_"):
+            env.pop(acceptance_name, None)
+    env.update(runtime_search_environment(
+        puzzle, inputs, model.weights_dir, run_dir,
+        effective_touch_bfs_radius, options.touch_bfs_max_entries
+    ))
     from .persistent import current_session
     from .model_snapshot import requires_mlp_host_binding
     resident_session = current_session()
     snapshot_cache = getattr(resident_session, 'model_snapshot_cache', None)
     mlp_host_binding = requires_mlp_host_binding(snapshot_cache, model, contract, build_metadata)
-    if mlp_host_binding:
-        env.update(BEAM_MLP_GRAPH_HASH=contract.graph_hash,
-                   BEAM_MLP_ARTIFACT_HASH=model.artifact_hash)
-    if model.backend == "ensemble":
-        env["BEAM_BLEND_DIR"] = str(model.weights_dir)
-        if runtime.build_metadata.get('inference_backend'):
-            env["BEAM_ENSEMBLE_BACKEND"] = runtime.build_metadata['inference_backend']
-        first = model.manifest["ensemble"]["models"][0]
-        env["BEAM_WEIGHT_DIR"] = str(model.weights_dir / first["weights_dir"])
+    env.update(search_model_environment(
+        model, runtime, graph_hash=contract.graph_hash,
+        mlp_host_binding=mlp_host_binding,
+    ))
+    execution_plan = _resolve_search_execution_plan(options, model, runtime, beam_width)
+    beam_width = execution_plan["calibration_beam_width"]
+    phase_plan = execution_plan["phases"]
     microbatch_env, microbatch_metadata = microbatch_environment(contract, model, beam_width, len(devices),
         row_limit=runtime.profile.get("inference_row_limit", 8192))
     env.update(microbatch_env)
-    calibrate=options.autotune and (model.backend=='ensemble' or
-        (model.backend=='mlp' and runtime.build_metadata.get('calibration_binary_name') in
-            ('stream1_native_mlp_benchmark','stream1_libtorch_mlp_benchmark')))
+    calibrate = "inference_calibration" in phase_plan
     if calibrate:
         from .autotune import tune_inference
         calibration_started=time.monotonic()
@@ -652,8 +984,6 @@ def _run_native_once(contract, model, options, beam_width, max_steps, run_dir, d
     inherited_ld = env.get("LD_LIBRARY_PATH", "")
     nccl_dir = str(nccl_library.parent)
     env["LD_LIBRARY_PATH"] = nccl_dir + (os.pathsep + inherited_ld if inherited_ld else "")
-    if runtime.build_metadata.get("inference_backend") == "libtorch" or model.backend in ("piece_transformer", "ensemble"):
-        env["BEAM_STREAM1_EXECUTOR"] = "libtorch_eager"
     # Legacy production_runner writes its solution/no-solution logs here.
     legacy_results = run_dir / "test_results"
     legacy_results.mkdir(exist_ok=True)
@@ -663,7 +993,7 @@ def _run_native_once(contract, model, options, beam_width, max_steps, run_dir, d
     # A capacity probe is diagnostic for a fixed-width request. Keep its
     # environment and width separate from execution, including when the probe
     # stopped at its time budget and found only a safe lower bound.
-    if getattr(options,'calibration_discover_capacity',False) and not maximum_requested:
+    if "capacity_discovery" in phase_plan:
         if not calibrate:raise NativeUnavailable('capacity discovery requires a supported inference calibrator')
         from .maximum_beam import discover_capacity,capacity_seed
         seed=capacity_seed(calibration)
@@ -677,7 +1007,7 @@ def _run_native_once(contract, model, options, beam_width, max_steps, run_dir, d
             capacity_scope='native memory admission with measured inference reserve; full step verified only at requested width')
         runtime.profile['maximum_beam']=capacity
         (run_dir/'maximum-beam.json').write_text(json.dumps(capacity,indent=2))
-    if maximum_requested:
+    if "maximum_frontier_search" in phase_plan:
         if not calibrate:raise NativeUnavailable('maximum beam requires a supported inference calibrator')
         from .maximum_beam import capacity_seed,discover_capacity,refine_maximum
         calibration=capacity_seed(calibration)
@@ -712,9 +1042,9 @@ def _run_native_once(contract, model, options, beam_width, max_steps, run_dir, d
         if options.report_calibration:
             print(f"[MultiGPUBeamSearch] largest admitted frontier {beam_width:,}; "
                 f"capacity search {capacity['wall_seconds']:.2f}s; full-step verification pending",flush=True)
-    if calibrate:
+    if "pipeline_calibration" in phase_plan:
         from .pipeline_autotune import tune_downstream
-        if maximum_requested:
+        if "maximum_frontier_search" in phase_plan:
             downstream=tune_downstream(contract,model,runtime,options,devices,beam_width,
                 run_dir,env,runner,calibration)
         else:
@@ -739,7 +1069,7 @@ def _run_native_once(contract, model, options, beam_width, max_steps, run_dir, d
             microbatch_metadata['inference_parent_batch']=calibration['parent_batch']
         runtime.profile.update(autotuned=selected,pipeline_autotuned=selected,
             pipeline_calibration=downstream,calibration_total_wall_seconds=time.monotonic()-calibration_started)
-        if maximum_requested:
+        if "working_capacity_selection" in phase_plan:
             if selected:capacity['execution_profile']=dict(downstream['environment'])
             from .working_capacity import choose_working_capacity,measure_reference
             try:
@@ -783,17 +1113,25 @@ def _run_native_once(contract, model, options, beam_width, max_steps, run_dir, d
         (run_dir/'runtime-config.json').write_text(json.dumps(
             {'mode':'auto','profile':runtime.profile,'microbatch':microbatch_metadata,
              'search_budget':search_budget},indent=2)+'\n',encoding='utf-8')
+    if acceptance_trace is not None:
+        env.update({
+            "MGBS_ACCEPTANCE_RANK_TRACE": "1",
+            "MGBS_ACCEPTANCE_RUN_ID": acceptance_trace["run_id"],
+            "MGBS_ACCEPTANCE_CASE_ID": acceptance_trace["case_id"],
+            "MGBS_ACCEPTANCE_SOURCE_SHA": acceptance_trace["source_sha"],
+            "MGBS_ACCEPTANCE_WHEEL_SHA256": acceptance_trace["wheel_sha256"],
+            "MGBS_ACCEPTANCE_BUILD_KEY": build_key,
+            "MGBS_ACCEPTANCE_BINARY_SHA256": binary_sha256,
+            "BEAM_SHARD_COUNT": "64",
+        })
     args = [str(runner), "0", str(forward_depth_limit), str(beam_width)]
     # Apply search policy only after calibration: probes must not collect solutions.
-    env.update(BEAM_SOLVE_BUCKET_MODE=str(int(options.solution_mode == 'collect')),
-               BEAM_SOLVE_BUCKET_EXTRA_DEPTHS=str(options.collect_extra_depths),
-               BEAM_SOLVE_BUCKET_MAX_SOLUTIONS=str(options.max_collected_solutions),
-               BEAM_SOLVE_BUCKET_RESULT_TSV='collected-solutions.tsv')
+    env.update(search_policy_environment(options))
     if calibrate:env['BEAM_RUNTIME_DEPTH_TIMING']='1'
     log = run_dir / "native.log"
     process_log = log
     log_metadata = {}
-    if len(devices) > 1 and resident_session is None:
+    if resident_session is None:
         worker_logs = run_dir / "worker-logs"
         try:
             worker_logs.mkdir()
@@ -810,17 +1148,15 @@ def _run_native_once(contract, model, options, beam_width, max_steps, run_dir, d
         if resident_session is not None:
             elapsed=resident_session.launch(args[:4],contract=contract,run_dir=run_dir,env=env,
                 world=len(devices),timeout=options.timeout_seconds,runtime=runtime)
-        elif len(devices) > 1:
+        else:
             from .local_launcher import run_local_ranks
             elapsed = run_local_ranks(args, world_size=len(devices), cwd=run_dir, env=env,
                 timeout=options.timeout_seconds, log_path=process_log, worker_logs=worker_logs)
-        else:
-            elapsed = run_process(args, cwd=run_dir, env=env, timeout=options.timeout_seconds, log_path=process_log)
     except BaseException as error:
         failure = error
         raise
     finally:
-        if len(devices) > 1 and resident_session is None:
+        if resident_session is None:
             try:
                 log_metadata = collect_worker_logs(worker_logs, process_log, log, len(devices), strict=failure is None)
             except Exception as log_error:

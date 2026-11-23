@@ -1,6 +1,7 @@
 """Bounded single-host native ranks; no Python distributed worker startup."""
 from contextlib import ExitStack
 import json
+import math
 import os
 from pathlib import Path
 import subprocess
@@ -11,8 +12,19 @@ from .errors import NativeBackendError
 
 
 def run_local_ranks(command, *, world_size, cwd, env, timeout, log_path, worker_logs):
+    from .rust_control import run_local_search_ranks as run_rust
+    elapsed = run_rust(command, world_size=world_size, cwd=cwd, timeout=timeout,
+                       log_path=log_path, worker_logs=worker_logs, environment=env)
+    if elapsed is not None:
+        return elapsed
     from .backend import _stop_process_tree
-    if type(world_size) is not int or world_size < 2 or timeout <= 0:
+    if (
+        type(world_size) is not int
+        or world_size < 1
+        or type(timeout) not in (int, float)
+        or not math.isfinite(timeout)
+        or timeout <= 0
+    ):
         raise ValueError("invalid local rank launch geometry or timeout")
     started = time.monotonic()
     processes = []
