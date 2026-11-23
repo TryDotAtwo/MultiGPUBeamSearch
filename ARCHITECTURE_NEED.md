@@ -1,3 +1,9 @@
+## Rust-owned single-host rank supervision — 2026-11-23
+
+`local_launcher.run_local_ranks` now sends matching installed wheels to one Rust runtime call. Rust starts all local ranks with the established `world_size, rank` argv suffix and rank environment, supervises timeout and cancellation, and reaps each worker process group on completion or failure. Python retains the compatibility supervisor for extensions without this API. Search stages, CUDA kernels, NCCL transport, ordering, and numerical policy are unchanged.
+
+Installed-wheel validation ran outside the checkout and exercised the public launcher with two synthetic ranks, per-rank environment, command metadata, and log layout. A failing rank also verified sibling cleanup. The installed-wheel run passed on source SHA `fd42ebca8d7486c92a7d3a26c98a7ea591cc6f8f`: [run 45131297173](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45131297173). This proves CPU process supervision only; physical permutation CUDA/NCCL remains pending.
+
 ## Rust-owned permutation solution policy environment — 2026-11-22
 
 The public permutation launch now resolves the fixed solution-collection controls through a versioned `beam-runtime` request: first-solution versus collection mode, extra collection depths, maximum collected solutions, and the result TSV name. `backend._run_native_once` applies that environment after calibration and immediately before the runner launch, so calibration probes retain their existing non-collecting behavior. Older wheels continue to use the same Python compatibility builder. This changes environment ownership only; search ordering, kernel execution, numerical policy, and CUDA/NCCL transport are unchanged.

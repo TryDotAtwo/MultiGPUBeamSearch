@@ -1,3 +1,9 @@
+## 2026-11-23 - Supervise local permutation ranks from Rust
+
+- Routed the public `local_launcher.run_local_ranks` through the installed Rust runtime. Rust owns local process startup, the existing rank arguments/environment and log paths, timeout/cancellation polling, and process-group cleanup; older wheels retain the Python compatibility supervisor.
+- Added installed-wheel coverage from outside the checkout for two synthetic ranks and sibling cleanup after a rank failure. Search stages, kernels, NCCL, ordering and numerical policy are unchanged.
+- Installed-wheel validation passed on source SHA `fd42ebca8d7486c92a7d3a26c98a7ea591cc6f8f`: [run 45131297173](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45131297173). Physical permutation CUDA/NCCL was not run.
+
 ## 2026-11-22 - Resolve permutation solution policy in Rust
 
 - Added a versioned `beam-runtime` request for first/collect mode, extra collection depths, the collected-solution limit, and the result TSV path.
