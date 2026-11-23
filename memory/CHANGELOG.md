@@ -157,3 +157,10 @@
 - Added a versioned typed Rust execution plan that returns the existing ordered preparation phases and the initial calibration width for exact and max requests.
 - The public permutation runner now uses that width before microbatch planning; maximum-frontier, capacity selection, models, kernels, multi-GPU behavior and numerical policy are unchanged. Old wheels keep their previous route.
 - Added Rust width contract cases and an installed-wheel consumer check that observes the width passed by the runner. Rust CPU tests passed 3/3 in [run 45139333020](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45139333020); the installed PEP 517 wheel passed on source SHA 565694c013863238bb9ce38e403e35dfd1231221 in [run 45139332961](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45139332961). Physical CUDA/NCCL remains unverified.
+
+
+## 2026-11-23 — Rust-owned permutation planning session
+
+- Routed the public permutation \`NativePlanSession\` through the existing Rust \`PlanningSession\`; Python remains the adapter and keeps the older-wheel compatibility path.
+- Added an installed-wheel CPU fixture with two synthetic ranks, repeated admission on stable Rust-owned PIDs, and parity with the Python fallback.
+- The external wheel smoke step passed on source SHA \`7304818d0ab7860869053ef01dda5af71ad44ed1\` in [run 45142440137](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45142440137). Remaining shared CPU/Gloo steps were still in progress at the time of recording. Physical CUDA/NCCL remains unverified.

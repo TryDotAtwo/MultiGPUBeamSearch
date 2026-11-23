@@ -1,13 +1,13 @@
 # Rust + CUDA/C++ migration acceptance status
 
 Source branch: `codex/beam-3060-preflight-20261121`
-Latest installed-wheel tested code SHA: `565694c013863238bb9ce38e403e35dfd1231221`
+Latest installed-wheel tested code SHA: `7304818d0ab7860869053ef01dda5af71ad44ed1` (external smoke step passed; combined workflow still running)
 Latest Rust execution-plan CPU tested code SHA: `565694c013863238bb9ce38e403e35dfd1231221`
 Base main SHA: `e6c41b6dc6bb3a839f6338f3cfe9eaadf8608d5a`
 
 | Gate | Status | Evidence |
 |---|---|---|
-| Permutation installed wheel and CPU acceptance | PASS | Installed PEP 517 wheel passed on `565694c` in [run 45139332961](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45139332961), including the real Rust execution-plan consumer, exact and max width cases, legacy fallback, live Rust error handling, and existing saturated permutation CPU acceptance. Redacted status artifact: [14801331950](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45139332961/artifacts/14801331950). The public Rust local-rank launcher also passed on `fd42ebc` in [run 45131297173](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45131297173). |
+| Installed permutation rank-planner smoke | PASS (targeted step; combined workflow pending) | External installed-wheel smoke passed on `7304818d` in [run 45142440137](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45142440137), including two synthetic ranks, repeated admission on unchanged Rust-owned PIDs, and equality with the legacy fallback. Earlier saturated permutation CPU acceptance passed on `565694c` in [run 45139332961](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45139332961); it is separate evidence. |
 | Shared CPU/Gloo checks | PASS | Rust CPU checks passed on source SHA `565694c` in [run 45139333020](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45139333020), including 3/3 search-plan contract tests; artifact [14800709775](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45139333020/artifacts/14800709775). The installed-wheel run also passed the real Rust execution-plan consumer. This remains CPU/Gloo evidence only. |
 | Permutation CUDA/NCCL on physical 1/2 GPUs | PENDING | No physical permutation run was performed. Device participation, 1/2-GPU parity, and hardware replay remain unverified. |
 | CNOT implementation and compatibility | PRESERVED; final acceptance DEFERRED | Existing CNOT code and compatibility remain in place. Further CNOT development, checkpoint preparation, and final acceptance are deferred at the user's request; shared CPU workflow success does not establish CNOT GPU acceptance. |
@@ -205,3 +205,10 @@ Tested code SHA: `0ca418cbbc2757508dc96ff986af75b888cba5e2`.
 - Rust CPU execution-plan tests passed 3/3 on source SHA `565694c` in [run 45139333020](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45139333020).
 - Installed PEP 517 wheel passed on the same source SHA in [run 45139332961](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45139332961). The runner passed Rust's exact/max width into microbatch preparation; exact width, max width, old-wheel fallback and live Rust resolver failure behavior were covered.
 - Physical permutation CUDA/NCCL on one and two GPUs remains pending. The automatic CNOT GPU workflow skipped its physical jobs on the push event; CNOT remains deferred.
+
+
+## Rust-owned permutation rank-planner session — 2026-11-23
+
+- Installed PEP 517 wheel build and outside-checkout smoke step: PASS on code SHA \`7304818d0ab7860869053ef01dda5af71ad44ed1\`, [run 45142440137](https://github.com/TryDotAtwo/MultiGPUBeamSearch/actions/runs/45142440137). The new fixture exercises the actual installed Rust \`PlanningSession\` with two CPU workers, performs two admission requests without replacing either rank process, and compares the first response with the Python compatibility path.
+- The enclosing workflow's remaining CPU/Gloo checks were still running when recorded; this entry does not mark the whole workflow passed.
+- Physical permutation CUDA/NCCL on one and two GPUs remains pending. CNOT work and final acceptance remain deferred.
