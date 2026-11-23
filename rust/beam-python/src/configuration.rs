@@ -274,7 +274,10 @@ impl InferenceCalibration {
 }
 pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add("CLUSTER_RUNTIME_DEVICE_PLAN_VERSION", 1)?;
-    module.add("SEARCH_PHASE_PLAN_VERSION", beam_runtime::search_plan::SCHEMA_VERSION)?;
+    module.add(
+        "SEARCH_PHASE_PLAN_VERSION",
+        beam_runtime::search_plan::SCHEMA_VERSION,
+    )?;
     module.add_function(wrap_pyfunction!(resolve_runtime_devices, module)?)?;
     module.add_function(wrap_pyfunction!(resolve_runtime_device_plan, module)?)?;
     module.add_function(wrap_pyfunction!(native_depth_budget, module)?)?;

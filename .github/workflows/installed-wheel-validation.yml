@@ -158,6 +158,7 @@ jobs:
           cd "$RUNNER_TEMP/mgbs-wheel-smoke"
           env -u PYTHONPATH python "$GITHUB_WORKSPACE/integrations/cayleypy_native/tests/installed_inference_backend_policy.py" \
             > "${RUNNER_TEMP}/mgbs-private-inference-backend-policy.log" 2>&1
+          grep -F INSTALLED_RUST_SEARCH_PHASE_PLAN_PASS "${RUNNER_TEMP}/mgbs-private-inference-backend-policy.log"
       - name: Verify installed Rust session identity and reuse
         if: always() && steps.wheel_smoke.outcome == 'success'
         id: installed_rust_session_identity

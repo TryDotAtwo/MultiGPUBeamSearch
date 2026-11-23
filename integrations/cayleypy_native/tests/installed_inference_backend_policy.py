@@ -315,5 +315,23 @@ with patch.object(rust_control, "extension", return_value=BrokenPhasePlanRuntime
     else:
         raise AssertionError("a live Rust phase-plan failure silently fell back to Python")
 
+with patch.object(
+    rust_control,
+    "extension",
+    side_effect=NativeUnavailable("Rust runtime is incompatible; rebuild the matching PyO3 module"),
+):
+    try:
+        backend._resolve_search_phase_plan(
+            SimpleNamespace(autotune=True, calibration_discover_capacity=False),
+            SimpleNamespace(backend="mlp"),
+            SimpleNamespace(build_metadata={"calibration_binary_name": "stream1_native_mlp_benchmark"}),
+            False,
+        )
+    except NativeBackendError as error:
+        if "incompatible" not in str(error):
+            raise AssertionError(f"unexpected incompatible runtime error: {error}") from error
+    else:
+        raise AssertionError("an incompatible Rust runtime silently fell back to Python")
+
 print("INSTALLED_RUST_SEARCH_PHASE_PLAN_PASS", flush=True)
 print("INSTALLED_RUST_INFERENCE_BACKEND_POLICY_PASS", flush=True)

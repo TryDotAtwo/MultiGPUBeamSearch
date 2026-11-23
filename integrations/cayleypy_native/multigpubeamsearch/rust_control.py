@@ -877,12 +877,17 @@ def resolve_search_phase_plan(request):
     """Return the installed Rust phase plan, or None only for an older wheel."""
     try:
         native = extension()
-    except (NativeUnavailable, ImportError):
+    except NativeUnavailable as error:
+        if 'incompatible' in str(error) or 'could not be loaded' in str(error):
+            raise NativeBackendError('Rust search phase plan runtime is incompatible or could not be loaded') from error
+        return None
+    except ImportError:
         return None
     resolver = getattr(native, 'resolve_search_phase_plan', None)
     if not callable(resolver):
         return None
-    if getattr(native, 'SEARCH_PHASE_PLAN_VERSION', None) != 1:
+    version = getattr(native, 'SEARCH_PHASE_PLAN_VERSION', None)
+    if type(version) is not int or version != 1:
         raise NativeBackendError('Rust search phase plan ABI is incompatible; rebuild the matching PyO3 module')
     try:
         encoded = json.dumps(request, sort_keys=True, allow_nan=False)
