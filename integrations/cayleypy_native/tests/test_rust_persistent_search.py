@@ -982,7 +982,7 @@ while not (session / "stop").exists():
         assert second.metadata["persistent_session"]["reused"] is True
         assert second.metadata["persistent_session"]["request_count"] == 2
         assert second.metadata["profile"]["calibration_total_wall_seconds"] == 0.0
-        assert second.path == first.path and contract.replay(second.path)
+        assert tuple(second.path) == tuple(first.path) and contract.replay(second.path)
         assert len(preparation_callbacks) == 1
 
         runtime.profile["inference_row_limit"] = 4096
@@ -1007,7 +1007,7 @@ while not (session / "stop").exists():
         assert changed_geometry.metadata["persistent_session"]["reused"] is False
         assert changed_geometry.metadata["persistent_session"]["request_count"] == 1
         assert len(preparation_callbacks) == 4
-        assert changed_geometry.path == (0,)
+        assert tuple(changed_geometry.path) == (0,)
         assert graph_contract(5).replay(changed_geometry.path)
     finally:
         session.close()
