@@ -614,7 +614,7 @@ pub fn run_local_search_ranks(request: LocalRanksRequest, cancel: &AtomicBool) -
 
         let mut child_command = Command::new(&request.command[0]);
         child_command
-            .args(&request.command[1..])
+            .args(&command[1..])
             .current_dir(&request.cwd)
             .env_clear()
             .envs(&environment)
