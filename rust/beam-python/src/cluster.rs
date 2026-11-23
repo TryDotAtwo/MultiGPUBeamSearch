@@ -163,6 +163,7 @@ pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add("CLUSTER_MODEL_SEARCH_ENVIRONMENT_VERSION", 1)?;
     module.add("CLUSTER_SEARCH_POLICY_ENVIRONMENT_VERSION", 1)?;
     module.add("CLUSTER_LOCAL_RANKS_VERSION", 1)?;
+    module.add("CLUSTER_LOCAL_RANKS_MIN_WORLD_SIZE", 1)?;
     module.add("CLUSTER_RANK_VERSION", 1)?;
     module.add("CLUSTER_DEVICE_BINDING_VERSION", 1)?;
     module.add("CLUSTER_CHILD_ENVIRONMENT_VERSION", 1)?;

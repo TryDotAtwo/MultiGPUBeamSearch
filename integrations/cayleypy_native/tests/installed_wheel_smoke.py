@@ -292,6 +292,102 @@ worker = assert_installed(worker_executable(), "beam-runner")
 if not os.access(worker, os.X_OK):
     raise AssertionError(f"installed worker is not executable: {worker}")
 
+# The public one-shot permutation path now uses the installed Rust rank
+# supervisor even when there is only one local GPU.
+from multigpubeamsearch.local_launcher import run_local_ranks
+from multigpubeamsearch.backend import collect_worker_logs
+from multigpubeamsearch import rust_control as _rank_control
+from unittest.mock import patch as _rank_patch
+
+if getattr(module, "CLUSTER_LOCAL_RANKS_MIN_WORLD_SIZE", None) != 1:
+    raise AssertionError("the installed Rust runtime lacks single-rank supervision")
+
+worker_code = """
+import json, os, pathlib, sys
+world, rank = sys.argv[-2:]
+row = {"argv_world": world, "argv_rank": rank,
+       "env_world": os.environ.get("WORLD_SIZE"),
+       "env_rank": os.environ.get("RANK"),
+       "env_local_rank": os.environ.get("LOCAL_RANK"),
+       "run_id": os.environ.get("BEAM_NCCL_RUN_ID")}
+pathlib.Path(sys.argv[1]).write_text(json.dumps(row, sort_keys=True))
+print("GLOBAL_BEAM_WIDTH_EFFECTIVE=16", flush=True)
+print("puzzle_solved=1 puzzle_id=0 seconds=0.1 solution_length=1 solution=m1", flush=True)
+"""
+
+with tempfile.TemporaryDirectory(prefix="beam-installed-single-rank-") as temporary:
+    single_root = Path(temporary)
+    single_worker_logs = single_root / "worker-logs"
+    single_worker_logs.mkdir()
+    observed_path = single_root / "observed.json"
+    with _rank_patch(
+        "multigpubeamsearch.local_launcher.subprocess.Popen",
+        side_effect=AssertionError("single-rank launch fell back to Python Popen"),
+    ):
+        single_elapsed = run_local_ranks(
+            [sys.executable, "-c", worker_code, str(observed_path)],
+            world_size=1,
+            cwd=single_root,
+            env=dict(os.environ),
+            timeout=10.0,
+            log_path=single_root / "launcher.log",
+            worker_logs=single_worker_logs,
+        )
+    if not isinstance(single_elapsed, float) or single_elapsed <= 0:
+        raise AssertionError(f"invalid Rust single-rank runtime: {single_elapsed}")
+    observed_rank = json.loads(observed_path.read_text())
+    if (
+        observed_rank["argv_world"] != "1"
+        or observed_rank["argv_rank"] != "0"
+        or observed_rank["env_world"] != "1"
+        or observed_rank["env_rank"] != "0"
+        or observed_rank["env_local_rank"] != "0"
+        or not observed_rank["run_id"]
+    ):
+        raise AssertionError(f"Rust single-rank launch contract mismatch: {observed_rank}")
+    single_log_metadata = collect_worker_logs(
+        single_worker_logs, single_root / "launcher.log",
+        single_root / "native.log", 1, strict=True,
+    )
+    if not single_log_metadata["worker_logs_complete"]:
+        raise AssertionError("Rust single-rank launch did not collect its exact worker logs")
+    merged_single_log = (single_root / "native.log").read_text()
+    if "GLOBAL_BEAM_WIDTH_EFFECTIVE=16" not in merged_single_log or "puzzle_solved=1" not in merged_single_log:
+        raise AssertionError("Rust single-rank worker output was not merged")
+print("INSTALLED_RUST_SINGLE_RANK_SUPERVISOR_PASS", flush=True)
+
+# Version-1 wheels predate the single-rank capability and retain the Python fallback.
+legacy_rank_root = Path(tempfile.mkdtemp(prefix="beam-installed-single-rank-legacy-"))
+try:
+    legacy_logs = legacy_rank_root / "worker-logs"
+    legacy_logs.mkdir()
+    legacy_observed = legacy_rank_root / "observed.json"
+    class LegacyLocalRanksRuntime:
+        CLUSTER_LOCAL_RANKS_VERSION = 1
+    with _rank_patch.object(_rank_control, "extension", return_value=LegacyLocalRanksRuntime()):
+        run_local_ranks(
+            [sys.executable, "-c", worker_code, str(legacy_observed)],
+            world_size=1,
+            cwd=legacy_rank_root,
+            env=dict(os.environ),
+            timeout=10.0,
+            log_path=legacy_rank_root / "launcher.log",
+            worker_logs=legacy_logs,
+        )
+    legacy_rank = json.loads(legacy_observed.read_text())
+    if legacy_rank["argv_world"] != "1" or legacy_rank["env_rank"] != "0":
+        raise AssertionError(f"version-1 compatibility launch mismatch: {legacy_rank}")
+    legacy_meta = collect_worker_logs(
+        legacy_logs, legacy_rank_root / "launcher.log",
+        legacy_rank_root / "native.log", 1, strict=True,
+    )
+    if not legacy_meta["worker_logs_complete"]:
+        raise AssertionError("version-1 Python compatibility logs were incomplete")
+finally:
+    import shutil as _rank_shutil
+    _rank_shutil.rmtree(legacy_rank_root)
+print("INSTALLED_OLD_WHEEL_SINGLE_RANK_FALLBACK_PASS", flush=True)
+
 response = subprocess.run(
     [str(worker), "--resident-protocol-info"],
     check=True,

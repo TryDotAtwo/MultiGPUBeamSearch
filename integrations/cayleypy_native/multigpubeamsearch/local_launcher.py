@@ -20,7 +20,7 @@ def run_local_ranks(command, *, world_size, cwd, env, timeout, log_path, worker_
     from .backend import _stop_process_tree
     if (
         type(world_size) is not int
-        or world_size < 2
+        or world_size < 1
         or type(timeout) not in (int, float)
         or not math.isfinite(timeout)
         or timeout <= 0

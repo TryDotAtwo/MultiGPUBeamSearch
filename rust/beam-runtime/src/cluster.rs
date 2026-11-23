@@ -563,7 +563,7 @@ impl Drop for LocalOwnedChild {
 /// the public Python launcher contract.
 pub fn run_local_search_ranks(request: LocalRanksRequest, cancel: &AtomicBool) -> Result<f64> {
     if request.command.is_empty()
-        || request.world_size < 2
+        || request.world_size == 0
         || !request.timeout.is_finite()
         || request.timeout <= 0.0
     {

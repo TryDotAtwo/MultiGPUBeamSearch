@@ -731,8 +731,12 @@ def test_worker_uses_private_model_and_runner_snapshots_before_launch(monkeypatc
     original_runner = runner.read_bytes()
     (weights / "output_bias.fp16").write_bytes(b"\x01\x00")  # Same-size caller mutation.
 
-    def fake_process(command, **kwargs):
+    import multigpubeamsearch.local_launcher as local_launcher
+
+    def fake_supervisor(command, **kwargs):
         launched_runner = Path(command[0])
+        assert kwargs["world_size"] == 1
+        assert len(command) == 4
         assert launched_runner == kwargs["cwd"] / "production_runner"
         assert launched_runner != runner.resolve()
         assert launched_runner.read_bytes() == original_runner
@@ -742,21 +746,27 @@ def test_worker_uses_private_model_and_runner_snapshots_before_launch(monkeypatc
         assert launched_weights == model.weights_dir
         assert launched_weights != weights.resolve()
         assert (launched_weights / "output_bias.fp16").read_bytes() == b"\x00\x00"
-        kwargs["log_path"].write_text(
+        kwargs["log_path"].write_text("single-rank launcher diagnostic\n")
+        rank_dir = kwargs["worker_logs"] / "native" / "attempt_0" / "0"
+        rank_dir.mkdir(parents=True)
+        (rank_dir / "stdout.log").write_text(
             "GLOBAL_BEAM_WIDTH_EFFECTIVE=16\n"
             "puzzle_solved=1 puzzle_id=0 seconds=0.1 solution_length=1 solution=m1\n"
         )
+        (rank_dir / "stderr.log").write_text("single-rank diagnostic\n")
         return 0.1
 
-    monkeypatch.setattr(backend, "run_process", fake_process)
+    monkeypatch.setattr(local_launcher, "run_local_ranks", fake_supervisor)
     monkeypatch.delenv("CUDA_VISIBLE_DEVICES", raising=False)
     outcome = backend.run_native(contract, model, NativeOptions(cache_dir=tmp_path), 16, 2,
                                  tmp_path / "run", (0,), runtime=runtime)
     assert outcome.path == (1,)
+    assert outcome.metadata["worker_logs_complete"] is True
+    assert "single-rank diagnostic" in (tmp_path / "run/native.log").read_text()
 
     runner.write_bytes(original_runner)
     (model.weights_dir / "output_bias.fp16").write_bytes(b"\x02\x00")
-    monkeypatch.setattr(backend, "run_process",
+    monkeypatch.setattr(local_launcher, "run_local_ranks",
                         lambda *a, **k: pytest.fail("changed private snapshot reached worker launch"))
     with pytest.raises(NativeBackendError, match="model artifact changed before launch"):
         backend.run_native(contract, model, NativeOptions(cache_dir=tmp_path), 16, 2,

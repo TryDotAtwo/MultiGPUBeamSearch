@@ -1131,7 +1131,7 @@ def _run_native_once(contract, model, options, beam_width, max_steps, run_dir, d
     log = run_dir / "native.log"
     process_log = log
     log_metadata = {}
-    if len(devices) > 1 and resident_session is None:
+    if resident_session is None:
         worker_logs = run_dir / "worker-logs"
         try:
             worker_logs.mkdir()
@@ -1148,17 +1148,15 @@ def _run_native_once(contract, model, options, beam_width, max_steps, run_dir, d
         if resident_session is not None:
             elapsed=resident_session.launch(args[:4],contract=contract,run_dir=run_dir,env=env,
                 world=len(devices),timeout=options.timeout_seconds,runtime=runtime)
-        elif len(devices) > 1:
+        else:
             from .local_launcher import run_local_ranks
             elapsed = run_local_ranks(args, world_size=len(devices), cwd=run_dir, env=env,
                 timeout=options.timeout_seconds, log_path=process_log, worker_logs=worker_logs)
-        else:
-            elapsed = run_process(args, cwd=run_dir, env=env, timeout=options.timeout_seconds, log_path=process_log)
     except BaseException as error:
         failure = error
         raise
     finally:
-        if len(devices) > 1 and resident_session is None:
+        if resident_session is None:
             try:
                 log_metadata = collect_worker_logs(worker_logs, process_log, log, len(devices), strict=failure is None)
             except Exception as log_error:

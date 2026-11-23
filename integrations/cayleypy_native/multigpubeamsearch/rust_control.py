@@ -590,7 +590,7 @@ def run_local_search_ranks(command, *, world_size, cwd, timeout, log_path, worke
         return None
     if (
         type(world_size) is not int
-        or world_size < 2
+        or world_size < 1
         or type(timeout) not in (int, float)
         or not math.isfinite(timeout)
         or timeout <= 0
@@ -607,6 +607,12 @@ def run_local_search_ranks(command, *, world_size, cwd, timeout, log_path, worke
         return None
     if getattr(native, "CLUSTER_LOCAL_RANKS_VERSION", None) != 1:
         raise NativeBackendError("Rust local rank launcher API version is incompatible")
+    minimum_world_size = getattr(native, "CLUSTER_LOCAL_RANKS_MIN_WORLD_SIZE", 2)
+    if type(minimum_world_size) is not int or not 1 <= minimum_world_size <= 128:
+        raise NativeBackendError("Rust local rank launcher minimum world size is invalid")
+    # Version-1 wheels predating this capability keep the Python path for one GPU.
+    if world_size < minimum_world_size:
+        return None
     try:
         elapsed = runner(
             list(command),
