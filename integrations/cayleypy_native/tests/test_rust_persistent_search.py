@@ -1011,3 +1011,201 @@ while not (session / "stop").exists():
         assert graph_contract(5).replay(changed_geometry.path)
     finally:
         session.close()
+
+@pytest.mark.skipif(os.name != "posix", reason="the fixture launches a shebang worker")
+@pytest.mark.parametrize("world", [1, 2])
+def test_installed_public_beam_search_selects_compiled_rust_owner(tmp_path, monkeypatch, world):
+    """Exercise package-level beam_search through the installed Rust session owner."""
+    import sys
+
+    from multigpubeamsearch import (
+        backend as backend_module,
+        beam_search as public_beam_search,
+        bootstrap,
+        dispatch as dispatch_module,
+        models,
+        native_library,
+        persistent as persistent_module,
+        rust_control,
+        rust_resident,
+    )
+    from multigpubeamsearch.errors import NativeUnavailable
+    from multigpubeamsearch.options import NativeOptions, NativeOutcome
+
+    try:
+        extension = rust_control.extension()
+    except (NativeUnavailable, ImportError) as error:
+        if os.environ.get("REQUIRE_RUST_PREPARATION_IDENTITY") == "1":
+            raise AssertionError(
+                "installed-wheel public search requires the compiled Rust SearchSession"
+            ) from error
+        pytest.skip("Rust extension is not built in this CPU-only job")
+    assert callable(getattr(extension, "SearchSession", None))
+    assert getattr(extension, "SEARCH_TERMINAL_RESULT_VERSION", None) == 1
+
+    definition = SimpleNamespace(
+        is_permutation_group=lambda: True,
+        state_size=4,
+        central_state=[0, 1, 2, 3],
+        generators_permutations=[[1, 0, 2, 3]],
+        generator_names=["swap"],
+    )
+    graph = SimpleNamespace(definition=definition)
+    model = SimpleNamespace(
+        artifact_hash="b" * 64,
+        artifact_sizes=(17,),
+        backend="mlp",
+        manifest={"output_dim": 1, "heuristic": "installed-public-rust"},
+    )
+    options = NativeOptions(cache_dir=tmp_path / "cache", timeout_seconds=8)
+    runner = tmp_path / "runner-placeholder"
+    runner.write_text("synthetic runner identity\n", encoding="utf-8")
+    library = tmp_path / "libbeam_native.so"
+    library.write_bytes(b"synthetic library handle")
+    runtime = SimpleNamespace(
+        runner=runner,
+        architectures=(86,),
+        build_metadata={
+            "binary_sha256": "c" * 64,
+            "inference_backend": "libtorch",
+        },
+        profile={
+            "inference_backend": "libtorch",
+            "policy": "libtorch-default-v1",
+            "inference_row_limit": 8192,
+        },
+    )
+
+    worker = tmp_path / "synthetic-public-worker"
+    worker.write_text(
+        f"#!{sys.executable}\n"
+        + r'''import json, os, sys, time
+from pathlib import Path
+
+if "--resident-protocol-info" in sys.argv:
+    if len(os.environ.get("BEAM_EXPECTED_GRAPH_HASH", "")) != 64:
+        raise SystemExit("missing Rust graph binding")
+    print(json.dumps({
+        "protocol": "resident-search-v1",
+        "loaded_graph_binding": 1,
+    }), flush=True)
+    raise SystemExit(0)
+
+session = Path(os.environ["BEAM_SESSION_DIR"])
+rank = int(os.environ["RANK"])
+sequence = 0
+while not (session / "stop").exists():
+    request_path = session / f"request-{sequence}.json"
+    if not request_path.is_file():
+        time.sleep(0.002)
+        continue
+    request = json.loads(request_path.read_text(encoding="utf-8"))
+    start = request["start"]
+    run_dir = Path(request["run_dir"])
+    beam = os.environ["FIXTURE_BEAM"]
+    text = f"GLOBAL_BEAM_WIDTH_EFFECTIVE={beam}\n"
+    if rank == 0 and start[:2] == [1, 0]:
+        text += (
+            "puzzle_solved=1 puzzle_id=0 seconds=0.1 "
+            "solution_length=1 solution=m0\n"
+        )
+    (run_dir / f"resident-rank-{rank}.log").write_text(text, encoding="utf-8")
+    receipt = session / f"done-{sequence}-{rank}.json"
+    temporary = receipt.with_suffix(".tmp")
+    temporary.write_text(
+        json.dumps({"sequence": sequence, "rank": rank}), encoding="utf-8"
+    )
+    temporary.replace(receipt)
+    sequence += 1
+''',
+        encoding="utf-8",
+    )
+    worker.chmod(0o755)
+
+    monkeypatch.setattr(bootstrap, "prepare_sources", lambda current: current)
+    monkeypatch.setattr(dispatch_module, "runtime_devices", lambda *args: tuple(range(world)))
+    monkeypatch.setattr(dispatch_module, "prepare_model", lambda *args, **kwargs: model)
+    monkeypatch.setattr(dispatch_module, "prepare_runtime", lambda *args, **kwargs: runtime)
+    monkeypatch.setattr(models, "verify_prepared_model", lambda *args: None)
+    monkeypatch.setattr(persistent_module, "requires_mlp_host_binding", lambda *args: False)
+    monkeypatch.setattr(rust_control, "worker_executable", lambda: worker)
+    monkeypatch.setattr(
+        native_library,
+        "ensure_native_library",
+        lambda *args: (
+            library,
+            {
+                "library_sha256": "d" * 64,
+                "specification": {"worker_sha256": "e" * 64},
+            },
+        ),
+    )
+
+    launched_owners = []
+    native_workers = []
+    session_type = persistent_module.NativeSession
+    worker_type = rust_resident.RustResidentWorkers
+
+    class RecordingNativeSession(session_type):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            launched_owners.append(self)
+
+    class RecordingRustResidentWorkers(worker_type):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            native_workers.append(self)
+
+    monkeypatch.setattr(persistent_module, "NativeSession", RecordingNativeSession)
+    monkeypatch.setattr(rust_resident, "RustResidentWorkers", RecordingRustResidentWorkers)
+
+    native_calls = []
+
+    def run_native_once(contract, current_model, current_options, beam_width, max_steps,
+                        run_dir, devices, *, runtime=None):
+        session = persistent_module.current_session()
+        assert session is not None and session._engine == "rust"
+        native_calls.append(contract.graph_hash)
+        elapsed = session.launch(
+            [str(runtime.runner), "0", str(max_steps), str(beam_width)],
+            contract=contract,
+            run_dir=run_dir,
+            env={"FIXTURE_BEAM": str(beam_width)},
+            world=len(devices),
+            timeout=current_options.timeout_seconds,
+            runtime=runtime,
+        )
+        path, effective_width, terminal = session.terminal_result(
+            run_dir / "native.log", contract, max_steps=max_steps
+        )
+        metadata = dict(terminal)
+        metadata["profile"] = {"calibration_total_wall_seconds": 12.0}
+        return NativeOutcome(path, elapsed, effective_width, run_dir, metadata)
+
+    monkeypatch.setattr(backend_module, "_run_native_once", run_native_once)
+
+    result = public_beam_search(
+        graph,
+        backend="native",
+        native_options=options,
+        predictor=SimpleNamespace(),
+        start_state=[1, 0, 2, 3],
+        beam_width=64,
+        max_steps=1,
+        return_path=True,
+    )
+
+    from multigpubeamsearch.contracts import GraphContract
+
+    contract = GraphContract.from_graph(graph, [1, 0, 2, 3])
+    assert result.path == [0] and contract.replay(result.path)
+    assert result.native_metadata["backend"] == "native"
+    assert result.native_metadata["devices"] == list(range(world))
+    persistent = result.native_metadata["persistent_session"]
+    pids = persistent["worker_pids"]
+    assert len(pids) == world and len(set(pids)) == world
+    assert persistent["reused"] is False and persistent["request_count"] == 1
+    assert len(native_calls) == 1 and native_calls[0] == contract.graph_hash
+    assert len(launched_owners) == 1 and launched_owners[0].closed
+    assert len(native_workers) == 1
+    assert isinstance(native_workers[0]._owner, extension.SearchSession)

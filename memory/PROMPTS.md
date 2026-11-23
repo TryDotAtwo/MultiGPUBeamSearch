@@ -179,3 +179,5 @@ Continue moving public permutation and CNOT search control to Rust + CUDA/C++ wh
 
 
 2026-11-23: Продолжить перестановочную миграцию. Через установленный wheel проверить публичный `NativeSession.run` с настоящим PyO3 `SearchSession`: повторное использование rank workers при неизменном плане и инвалидирование при смене inference plan, модели и геометрии. Синтетические rank workers работают на CPU; CUDA/NCCL, алгоритм и численная политика не меняются. CNOT-доработки и отдельная CNOT-приёмка отложены.
+
+- 2026-11-23: Prioritize the permutation beam-search Rust + CUDA/C++ migration, including public dispatch and session launch. Preserve multi-GPU, Python/Kaggle, CLI, torchrun and Slurm compatibility; keep algorithms, kernels and numeric policy unchanged. Defer further CNOT implementation and acceptance. Physical permutation CUDA/NCCL checks on one and two GPUs remain required when the existing pause is lifted.
