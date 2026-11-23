@@ -1057,6 +1057,14 @@ def test_installed_public_beam_search_selects_compiled_rust_owner(tmp_path, monk
         backend="mlp",
         manifest={"output_dim": 1, "heuristic": "installed-public-rust"},
     )
+    alternate_model = SimpleNamespace(
+        artifact_hash="f" * 64,
+        artifact_sizes=(17,),
+        backend="mlp",
+        manifest={"output_dim": 1, "heuristic": "installed-public-rust"},
+    )
+    models_by_artifact = {model.artifact_hash: model, alternate_model.artifact_hash: alternate_model}
+    default_predictor = SimpleNamespace(artifact_hash=model.artifact_hash)
     options = NativeOptions(cache_dir=tmp_path / "cache", timeout_seconds=8)
     runner = tmp_path / "runner-placeholder"
     runner.write_text("synthetic runner identity\n", encoding="utf-8")
@@ -1124,7 +1132,12 @@ while not (session / "stop").exists():
 
     monkeypatch.setattr(bootstrap, "prepare_sources", lambda current: current)
     monkeypatch.setattr(dispatch_module, "runtime_devices", lambda *args: tuple(range(world)))
-    monkeypatch.setattr(dispatch_module, "prepare_model", lambda *args, **kwargs: model)
+    monkeypatch.setattr(
+        dispatch_module, "prepare_model",
+        lambda predictor, *args, **kwargs: models_by_artifact[
+            getattr(predictor, "artifact_hash", model.artifact_hash)
+        ],
+    )
     monkeypatch.setattr(dispatch_module, "prepare_runtime", lambda *args, **kwargs: runtime)
     monkeypatch.setattr(models, "verify_prepared_model", lambda *args: None)
     monkeypatch.setattr(persistent_module, "requires_mlp_host_binding", lambda *args: False)
@@ -1188,7 +1201,7 @@ while not (session / "stop").exists():
         graph,
         backend="native",
         native_options=options,
-        predictor=SimpleNamespace(),
+        predictor=default_predictor,
         start_state=[1, 0, 2, 3],
         beam_width=64,
         max_steps=1,
@@ -1216,12 +1229,12 @@ while not (session / "stop").exists():
     session_graph = graph
     session_contract = contract
 
-    def session_search(current_graph, start_state):
+    def session_search(current_graph, start_state, current_predictor=default_predictor):
         return session.beam_search(
             current_graph,
             backend="native",
             native_options=options,
-            predictor=SimpleNamespace(),
+            predictor=current_predictor,
             start_state=start_state,
             beam_width=64,
             max_steps=1,
@@ -1243,6 +1256,18 @@ while not (session / "stop").exists():
         assert second_session_persistent["reused"] is True
         assert second_session_persistent["request_count"] == 2
         assert second_session_result.path == [0] and session_contract.replay(second_session_result.path)
+
+        changed_model_result = session_search(
+            session_graph, [1, 0, 2, 3],
+            current_predictor=SimpleNamespace(artifact_hash=alternate_model.artifact_hash),
+        )
+        changed_model_persistent = changed_model_result.native_metadata["persistent_session"]
+        changed_model_pids = tuple(changed_model_persistent["worker_pids"])
+        assert len(changed_model_pids) == world and changed_model_pids != first_session_pids
+        assert changed_model_persistent["reused"] is False
+        assert changed_model_persistent["request_count"] == 1
+        assert changed_model_result.path == [0]
+        assert session_contract.replay(changed_model_result.path)
 
         wider_definition = SimpleNamespace(
             is_permutation_group=lambda: True,
