@@ -586,19 +586,30 @@ def test_run_native_writes_unquoted_id_quoted_state_and_preserves_move_order(mon
     monkeypatch.setenv("LD_LIBRARY_PATH", "/unrelated/library/path")
     observed = {}
 
-    def fake_process(command, **kwargs):
+    import multigpubeamsearch.local_launcher as local_launcher
+
+    def fake_supervisor(command, **kwargs):
         assert (kwargs["cwd"] / "test_results").is_dir(), "native solution logging requires private test_results"
+        assert kwargs["world_size"] == 1
+        assert len(command) == 4
         assert Path(command[0]) == kwargs["cwd"] / "production_runner"
         assert Path(command[0]).read_bytes() == b"test-only runner bytes"
         nccl_library.write_bytes(b"replacement after verified NCCL snapshot")
         loader_dirs = kwargs["env"]["LD_LIBRARY_PATH"].split(os.pathsep)
         assert Path(loader_dirs[0]) == kwargs["cwd"] / "runtime-libs"
         assert (Path(loader_dirs[0]) / "libnccl.so.2").read_bytes() == original_nccl
-        observed.update(command=command, **kwargs)
-        kwargs["log_path"].write_text("GLOBAL_BEAM_WIDTH_EFFECTIVE=1000\npuzzle_solved=1 puzzle_id=0 seconds=0.1 solution_length=1 solution=m1\n")
+        observed.update(command=[*command, "1", "0"], **kwargs)
+        kwargs["log_path"].write_text("single-rank launcher diagnostic\n")
+        rank_dir = kwargs["worker_logs"] / "native" / "attempt_0" / "0"
+        rank_dir.mkdir(parents=True)
+        (rank_dir / "stdout.log").write_text(
+            "GLOBAL_BEAM_WIDTH_EFFECTIVE=1000\n"
+            "puzzle_solved=1 puzzle_id=0 seconds=0.1 solution_length=1 solution=m1\n"
+        )
+        (rank_dir / "stderr.log").write_text("rank 0 diagnostic\n")
         return 0.1
 
-    monkeypatch.setattr(backend, "run_process", fake_process)
+    monkeypatch.setattr(local_launcher, "run_local_ranks", fake_supervisor)
     # This protocol fixture uses a labelled fake model; real byte rehashing has
     # its own artifact-backed regression test below.
     monkeypatch.setattr(backend, "verify_prepared_model", lambda *args: None)
@@ -666,7 +677,7 @@ def test_run_native_writes_unquoted_id_quoted_state_and_preserves_move_order(mon
     assert int(observed["env"]["BEAM_B_MICRO"]) <= 2048
     assert observed["env"]["BEAM_HISTORY_MODE"] == "disk"
     assert observed["env"]["LD_LIBRARY_PATH"] == str(tmp_path / "run/runtime-libs") + os.pathsep + "/unrelated/library/path"
-    monkeypatch.setattr(backend, "run_process", lambda *args, **kwargs: pytest.fail("changed NCCL must prevent launch"))
+    monkeypatch.setattr(local_launcher, "run_local_ranks", lambda *args, **kwargs: pytest.fail("changed NCCL must prevent launch"))
     with pytest.raises(NativeBackendError, match="NCCL library changed"):
         backend.run_native(contract, model, options, 1000, 4, tmp_path / "run-replaced", (0,))
 

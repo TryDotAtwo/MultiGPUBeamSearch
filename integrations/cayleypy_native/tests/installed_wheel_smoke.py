@@ -364,6 +364,11 @@ try:
     legacy_observed = legacy_rank_root / "observed.json"
     class LegacyLocalRanksRuntime:
         CLUSTER_LOCAL_RANKS_VERSION = 1
+
+        @staticmethod
+        def run_local_search_ranks(*_args):
+            raise AssertionError("version-1 single-rank call must stay on the Python compatibility path")
+
     with _rank_patch.object(_rank_control, "extension", return_value=LegacyLocalRanksRuntime()):
         run_local_ranks(
             [sys.executable, "-c", worker_code, str(legacy_observed)],
