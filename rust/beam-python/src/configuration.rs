@@ -84,6 +84,15 @@ fn resolve_search_phase_plan(request: &str) -> PyResult<String> {
 }
 
 #[pyfunction]
+fn resolve_search_execution_plan(request: &str) -> PyResult<String> {
+    let request: beam_runtime::search_plan::PermutationSearchExecutionPlanRequest =
+        serde_json::from_str(request).map_err(|error| PyValueError::new_err(error.to_string()))?;
+    let plan = beam_runtime::search_plan::resolve_execution_plan(request)
+        .map_err(PyValueError::new_err)?;
+    serde_json::to_string(&plan).map_err(|error| PyValueError::new_err(error.to_string()))
+}
+
+#[pyfunction]
 fn validate_search_controls(request: &str) -> PyResult<(String, String)> {
     let controls: beam_core::search::PublicSearchControls =
         serde_json::from_str(request).map_err(|e| PyValueError::new_err(e.to_string()))?;
@@ -278,6 +287,10 @@ pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
         "SEARCH_PHASE_PLAN_VERSION",
         beam_runtime::search_plan::SCHEMA_VERSION,
     )?;
+    module.add(
+        "SEARCH_EXECUTION_PLAN_VERSION",
+        beam_runtime::search_plan::EXECUTION_PLAN_SCHEMA_VERSION,
+    )?;
     module.add_function(wrap_pyfunction!(resolve_runtime_devices, module)?)?;
     module.add_function(wrap_pyfunction!(resolve_runtime_device_plan, module)?)?;
     module.add_function(wrap_pyfunction!(native_depth_budget, module)?)?;
@@ -285,6 +298,7 @@ pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(validate_options, module)?)?;
     module.add_function(wrap_pyfunction!(validate_search_controls, module)?)?;
     module.add_function(wrap_pyfunction!(resolve_search_phase_plan, module)?)?;
+    module.add_function(wrap_pyfunction!(resolve_search_execution_plan, module)?)?;
     module.add_function(wrap_pyfunction!(validate_pipeline_profile_receipt, module)?)?;
     module.add_function(wrap_pyfunction!(build_graph_contract, module)?)?;
     module.add_function(wrap_pyfunction!(write_search_inputs, module)?)?;

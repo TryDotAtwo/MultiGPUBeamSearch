@@ -862,6 +862,28 @@ def _resolve_search_phase_plan(options, model, runtime, maximum_requested):
     return tuple(phases)
 
 
+def _resolve_search_execution_plan(options, model, runtime, requested_beam_width):
+    maximum_requested = type(requested_beam_width) is str and requested_beam_width == "max"
+    request = {
+        "autotune": options.autotune,
+        "model_backend": model.backend,
+        "calibration_binary_name": runtime.build_metadata.get("calibration_binary_name"),
+        "requested_beam_width": requested_beam_width,
+        "discover_capacity": bool(getattr(options, "calibration_discover_capacity", False)),
+    }
+    from . import rust_control
+    plan = rust_control.resolve_search_execution_plan(request)
+    if plan is not None:
+        return plan
+    # Older wheels retain their previous phase resolver and Python width policy.
+    phases = _resolve_search_phase_plan(options, model, runtime, maximum_requested)
+    calibration_beam_width = 1_048_576 if maximum_requested else requested_beam_width
+    return {
+        "phases": phases,
+        "calibration_beam_width": calibration_beam_width,
+    }
+
+
 def _run_native_once(contract, model, options, beam_width, max_steps, run_dir, devices, *, runtime=None) -> NativeOutcome:
     maximum_requested=type(beam_width) is str and beam_width=='max'
     if (not maximum_requested and (type(beam_width) is not int or beam_width <= 0)) or type(max_steps) is not int or max_steps < 0:
@@ -870,7 +892,6 @@ def _run_native_once(contract, model, options, beam_width, max_steps, run_dir, d
         if not options.autotune:raise NativeUnavailable('maximum beam requires autotuning')
         from .working_capacity import maximum_options
         options=maximum_options(options)
-        beam_width=1_048_576  # Bounded inference curve; capacity uses actual native plans below.
     if contract.replay(()):
         return NativeOutcome((), 0.0, None, None, {"already_solved": True, "replay_valid": True})
     if max_steps == 0:
@@ -927,10 +948,12 @@ def _run_native_once(contract, model, options, beam_width, max_steps, run_dir, d
         model, runtime, graph_hash=contract.graph_hash,
         mlp_host_binding=mlp_host_binding,
     ))
+    execution_plan = _resolve_search_execution_plan(options, model, runtime, beam_width)
+    beam_width = execution_plan["calibration_beam_width"]
+    phase_plan = execution_plan["phases"]
     microbatch_env, microbatch_metadata = microbatch_environment(contract, model, beam_width, len(devices),
         row_limit=runtime.profile.get("inference_row_limit", 8192))
     env.update(microbatch_env)
-    phase_plan = _resolve_search_phase_plan(options, model, runtime, maximum_requested)
     calibrate = "inference_calibration" in phase_plan
     if calibrate:
         from .autotune import tune_inference

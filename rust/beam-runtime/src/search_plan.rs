@@ -2,6 +2,8 @@
 use serde::{Deserialize, Serialize};
 
 pub const SCHEMA_VERSION: u32 = 1;
+pub const EXECUTION_PLAN_SCHEMA_VERSION: u32 = 1;
+pub const MAXIMUM_CALIBRATION_BEAM_WIDTH: u64 = 1_048_576;
 
 #[derive(Clone, Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -10,6 +12,23 @@ pub struct PermutationSearchPhaseRequest {
     pub model_backend: String,
     pub calibration_binary_name: Option<String>,
     pub maximum_requested: bool,
+    pub discover_capacity: bool,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(untagged)]
+pub enum RequestedBeamWidth {
+    Exact(u64),
+    Token(String),
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PermutationSearchExecutionPlanRequest {
+    pub autotune: bool,
+    pub model_backend: String,
+    pub calibration_binary_name: Option<String>,
+    pub requested_beam_width: RequestedBeamWidth,
     pub discover_capacity: bool,
 }
 
@@ -29,6 +48,14 @@ pub enum PermutationSearchPhase {
 pub struct PermutationSearchPhasePlan {
     pub schema_version: u32,
     pub phases: Vec<PermutationSearchPhase>,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct PermutationSearchExecutionPlan {
+    pub schema_version: u32,
+    pub phases: Vec<PermutationSearchPhase>,
+    pub calibration_beam_width: u64,
 }
 
 /// Resolve the existing calibration and capacity branches without changing their implementations.
@@ -63,6 +90,38 @@ pub fn resolve(request: PermutationSearchPhaseRequest) -> PermutationSearchPhase
         schema_version: SCHEMA_VERSION,
         phases,
     }
+}
+
+/// Resolve the public requested width into the unchanged width used by preparation.
+pub fn resolve_execution_plan(
+    request: PermutationSearchExecutionPlanRequest,
+) -> std::result::Result<PermutationSearchExecutionPlan, String> {
+    let (maximum_requested, calibration_beam_width) = match request.requested_beam_width {
+        RequestedBeamWidth::Exact(width) if width > 0 => (false, width),
+        RequestedBeamWidth::Exact(_) => return Err("beam_width must be positive".into()),
+        RequestedBeamWidth::Token(token) if token == "max" => {
+            if !request.autotune {
+                return Err("maximum beam requires autotuning".into());
+            }
+            (true, MAXIMUM_CALIBRATION_BEAM_WIDTH)
+        }
+        RequestedBeamWidth::Token(_) => {
+            return Err("beam_width must be a positive integer or 'max'".into());
+        }
+    };
+    let phases = resolve(PermutationSearchPhaseRequest {
+        autotune: request.autotune,
+        model_backend: request.model_backend,
+        calibration_binary_name: request.calibration_binary_name,
+        maximum_requested,
+        discover_capacity: request.discover_capacity,
+    })
+    .phases;
+    Ok(PermutationSearchExecutionPlan {
+        schema_version: EXECUTION_PLAN_SCHEMA_VERSION,
+        phases,
+        calibration_beam_width,
+    })
 }
 
 #[cfg(test)]
@@ -175,4 +234,47 @@ mod tests {
             vec![CapacityDiscovery, Execute]
         );
     }
+    
+    #[test]
+    fn execution_plan_preserves_exact_width_and_maximum_calibration_width() {
+        let request = |requested_beam_width, autotune| PermutationSearchExecutionPlanRequest {
+            autotune,
+            model_backend: "transformer".into(),
+            calibration_binary_name: None,
+            requested_beam_width,
+            discover_capacity: false,
+        };
+        let exact =
+            resolve_execution_plan(request(RequestedBeamWidth::Exact(37), false)).unwrap();
+        assert_eq!(exact.calibration_beam_width, 37);
+        assert_eq!(exact.phases, vec![PermutationSearchPhase::Execute]);
+
+        let maximum = resolve_execution_plan(request(
+            RequestedBeamWidth::Token("max".into()),
+            true,
+        ))
+        .unwrap();
+        assert_eq!(
+            maximum.calibration_beam_width,
+            MAXIMUM_CALIBRATION_BEAM_WIDTH
+        );
+        assert_eq!(
+            maximum.phases,
+            vec![
+                PermutationSearchPhase::MaximumFrontierSearch,
+                PermutationSearchPhase::Execute
+            ]
+        );
+        assert!(resolve_execution_plan(request(
+            RequestedBeamWidth::Token("maximum".into()),
+            true
+        ))
+        .is_err());
+        assert!(resolve_execution_plan(request(
+            RequestedBeamWidth::Token("max".into()),
+            false
+        ))
+        .is_err());
+    }
+
 }

@@ -922,6 +922,59 @@ def resolve_search_phase_plan(request):
     return tuple(phases)
 
 
+def resolve_search_execution_plan(request):
+    """Return Rust's typed public beam-width and preparation plan when supported."""
+    try:
+        native = extension()
+    except NativeUnavailable as error:
+        if 'incompatible' in str(error) or 'could not be loaded' in str(error):
+            raise NativeBackendError('Rust search execution plan runtime is incompatible or could not be loaded') from error
+        return None
+    except ImportError:
+        return None
+    resolver = getattr(native, 'resolve_search_execution_plan', None)
+    if not callable(resolver):
+        return None
+    if getattr(native, 'SEARCH_EXECUTION_PLAN_VERSION', None) != 1:
+        raise NativeBackendError('Rust search execution plan ABI is incompatible; rebuild the matching PyO3 module')
+    try:
+        encoded = json.dumps(request, sort_keys=True, allow_nan=False)
+        plan = json.loads(resolver(encoded))
+    except (TypeError, ValueError, OverflowError, RuntimeError) as error:
+        raise NativeBackendError('Rust permutation search execution planning failed') from error
+    if (
+        type(plan) is not dict
+        or set(plan) != {'schema_version', 'phases', 'calibration_beam_width'}
+        or type(plan.get('schema_version')) is not int
+        or plan['schema_version'] != 1
+        or type(plan.get('calibration_beam_width')) is not int
+        or plan['calibration_beam_width'] <= 0
+        or type(plan.get('phases')) is not list
+    ):
+        raise NativeBackendError('Rust search execution plan returned an invalid schema')
+    phases = plan['phases']
+    order = {
+        'inference_calibration': 0,
+        'capacity_discovery': 1,
+        'maximum_frontier_search': 2,
+        'pipeline_calibration': 3,
+        'working_capacity_selection': 4,
+        'execute': 5,
+    }
+    if (
+        not phases
+        or any(type(phase) is not str or phase not in order for phase in phases)
+        or len(set(phases)) != len(phases)
+        or phases[-1] != 'execute'
+        or [order[phase] for phase in phases] != sorted(order[phase] for phase in phases)
+    ):
+        raise NativeBackendError('Rust search execution plan returned invalid phase ordering')
+    return {
+        'phases': tuple(phases),
+        'calibration_beam_width': plan['calibration_beam_width'],
+    }
+
+
 def validate_search_controls(params):
     """Delegate normalized public search-control checks to beam-core when available."""
     beam_mode = params["beam_mode"]

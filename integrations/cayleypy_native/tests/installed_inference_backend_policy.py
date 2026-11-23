@@ -333,5 +333,159 @@ with patch.object(
     else:
         raise AssertionError("an incompatible Rust runtime silently fell back to Python")
 
+
+execution_resolver = getattr(runtime, "resolve_search_execution_plan", None)
+if not callable(execution_resolver) or getattr(runtime, "SEARCH_EXECUTION_PLAN_VERSION", None) != 1:
+    raise AssertionError("installed Rust runtime does not expose the typed search execution plan")
+
+maximum_request = {
+    "autotune": True,
+    "model_backend": "transformer",
+    "calibration_binary_name": None,
+    "requested_beam_width": "max",
+    "discover_capacity": False,
+}
+direct_execution = json.loads(execution_resolver(json.dumps(maximum_request, sort_keys=True)))
+if direct_execution != {
+    "schema_version": 1,
+    "phases": ["maximum_frontier_search", "execute"],
+    "calibration_beam_width": 1_048_576,
+}:
+    raise AssertionError(f"Rust maximum-width execution plan changed: {direct_execution}")
+exact_request = dict(maximum_request, requested_beam_width=37, autotune=False)
+direct_exact = json.loads(execution_resolver(json.dumps(exact_request, sort_keys=True)))
+if direct_exact["calibration_beam_width"] != 37 or direct_exact["phases"] != ["execute"]:
+    raise AssertionError(f"Rust fixed-width execution plan changed: {direct_exact}")
+
+from multigpubeamsearch import model_snapshot
+
+prepared_runtime = SimpleNamespace(
+    build_metadata={
+        "shape": "fixture-shape",
+        "backend": "transformer",
+        "calibration_binary_name": None,
+        "binary_sha256": "c" * 64,
+    },
+    profile={},
+)
+execution_options = NativeOptions(
+    cache_dir=Path(tempfile.gettempdir()) / "beam-execution-plan-cache",
+    autotune=True,
+)
+with patch.object(
+    backend, "_python_search_phase_plan",
+    side_effect=AssertionError("installed wheel unexpectedly used Python execution planning"),
+):
+    consumed_execution = backend._resolve_search_execution_plan(
+        execution_options, SimpleNamespace(backend="transformer"),
+        prepared_runtime, "max"
+    )
+if consumed_execution != {
+    "phases": ("maximum_frontier_search", "execute"),
+    "calibration_beam_width": 1_048_576,
+}:
+    raise AssertionError(f"public preparation did not consume the Rust execution plan: {consumed_execution}")
+
+observed_microbatch_widths = []
+def record_microbatch(_contract, _model, beam_width, _world_size, *, row_limit=8192):
+    observed_microbatch_widths.append(beam_width)
+    return {}, {}
+
+with tempfile.TemporaryDirectory(prefix="beam-rust-execution-plan-") as temporary:
+    root = Path(temporary)
+    run_dir = root / "run"
+    contract = SimpleNamespace(
+        move_count=2,
+        graph_hash="a" * 64,
+        replay=lambda _path: False,
+    )
+    model = SimpleNamespace(
+        backend="transformer",
+        manifest={"output_dim": 1, "heuristic": "fixture"},
+        weights_dir=root / "weights",
+    )
+    prepared_runtime = SimpleNamespace(
+        build_metadata={
+            "shape": "fixture-shape",
+            "backend": "transformer",
+            "calibration_binary_name": None,
+            "binary_sha256": "c" * 64,
+        },
+        profile={},
+    )
+    execution_options = NativeOptions(
+        cache_dir=root / "cache",
+        autotune=True,
+    )
+    try:
+        with (
+            patch.object(backend, "native_depth_budget", return_value=(1, 0)),
+            patch.object(backend, "validate_touch_bfs_contract", return_value=0),
+            patch.object(build, "shape_contract", return_value="fixture-shape"),
+            patch.object(build, "acceptance_rank_trace_identity", return_value=None),
+            patch.object(rust_control, "write_search_inputs", return_value=True),
+            patch.object(backend, "child_environment", return_value={}),
+            patch.object(backend, "runtime_search_environment", return_value={}),
+            patch.object(model_snapshot, "requires_mlp_host_binding", return_value=False),
+            patch.object(backend, "search_model_environment", return_value={}),
+            patch.object(backend, "microbatch_environment", side_effect=record_microbatch),
+            patch.object(backend, "snapshot_runtime_nccl", return_value=root / "libnccl.so"),
+            patch.object(backend, "snapshot_runtime_runner", return_value=root / "runner"),
+            patch.object(
+                backend, "_python_search_phase_plan",
+                side_effect=AssertionError("installed runner unexpectedly used Python execution planning"),
+            ),
+        ):
+            backend._run_native_once(
+                contract, model, execution_options, "max", 1, run_dir, (0,),
+                runtime=prepared_runtime,
+            )
+    except NativeUnavailable as error:
+        if "maximum beam requires a supported inference calibrator" not in str(error):
+            raise
+    else:
+        raise AssertionError("maximum-width transformer unexpectedly passed the unsupported-calibrator boundary")
+if observed_microbatch_widths != [1_048_576]:
+    raise AssertionError(
+        f"the public runner did not use Rust's calibration width: {observed_microbatch_widths}"
+    )
+
+with patch.object(rust_control, "extension", return_value=LegacyRuntime()):
+    legacy_execution_plan = backend._resolve_search_execution_plan(
+        SimpleNamespace(autotune=True, calibration_discover_capacity=False),
+        SimpleNamespace(backend="transformer"),
+        SimpleNamespace(build_metadata={"calibration_binary_name": None}),
+        "max",
+    )
+if legacy_execution_plan != {
+    "phases": ("maximum_frontier_search", "execute"),
+    "calibration_beam_width": 1_048_576,
+}:
+    raise AssertionError(f"the old-wheel execution fallback changed: {legacy_execution_plan}")
+
+class BrokenExecutionPlanRuntime:
+    ABI_VERSION = 1
+    SEARCH_EXECUTION_PLAN_VERSION = 1
+    InferenceCalibration = object()
+
+    @staticmethod
+    def resolve_search_execution_plan(_payload):
+        raise RuntimeError("injected Rust execution-plan failure")
+
+with patch.object(rust_control, "extension", return_value=BrokenExecutionPlanRuntime()):
+    try:
+        backend._resolve_search_execution_plan(
+            SimpleNamespace(autotune=True, calibration_discover_capacity=False),
+            SimpleNamespace(backend="transformer"),
+            SimpleNamespace(build_metadata={"calibration_binary_name": None}),
+            "max",
+        )
+    except NativeBackendError as error:
+        if "execution planning failed" not in str(error):
+            raise
+    else:
+        raise AssertionError("a live Rust execution-plan error silently fell back to Python")
+
+print("INSTALLED_RUST_SEARCH_EXECUTION_PLAN_PASS", flush=True)
 print("INSTALLED_RUST_SEARCH_PHASE_PLAN_PASS", flush=True)
 print("INSTALLED_RUST_INFERENCE_BACKEND_POLICY_PASS", flush=True)
