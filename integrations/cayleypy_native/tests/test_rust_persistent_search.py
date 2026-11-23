@@ -804,11 +804,13 @@ def test_old_rust_owner_never_receives_auto_max_preparation_json(tmp_path, monke
 
 @pytest.mark.skipif(os.name != "posix", reason="the fixture launches a shebang worker")
 @pytest.mark.parametrize("world", [1, 2])
-def test_installed_public_session_uses_real_rust_owner_for_reuse_and_invalidation(
+def test_installed_public_session_uses_real_rust_owner_for_reuse_invalidation_and_cancellation(
     tmp_path, monkeypatch, world
 ):
     """Exercise NativeSession.run with the installed PyO3 owner and CPU rank workers."""
     import sys
+    import threading
+    import time
 
     from multigpubeamsearch import (
         models,
@@ -828,6 +830,13 @@ def test_installed_public_session_uses_real_rust_owner_for_reuse_and_invalidatio
         pytest.skip("Rust extension is not built in this CPU-only job")
     assert callable(getattr(extension, "SearchSession", None))
     assert getattr(extension, "SEARCH_TERMINAL_RESULT_VERSION", None) == 1
+
+    def _process_exists(pid):
+        try:
+            os.kill(pid, 0)
+        except ProcessLookupError:
+            return False
+        return True
 
     def graph_contract(size):
         center = list(range(size))
@@ -871,6 +880,12 @@ while not (session / "stop").exists():
         time.sleep(0.002)
         continue
     request = json.loads(request_path.read_text(encoding="utf-8"))
+    if (session / "block-next").exists():
+        (session / f"blocked-{rank}").write_text("ready", encoding="utf-8")
+        while not (session / "stop").exists():
+            time.sleep(0.002)
+        (session / f"stopped-{rank}").write_text("stopped", encoding="utf-8")
+        break
     start = request["start"]
     run_dir = Path(request["run_dir"])
     beam = os.environ["FIXTURE_BEAM"]
@@ -933,6 +948,7 @@ while not (session / "stop").exists():
     options = NativeOptions(cache_dir=tmp_path / "cache", timeout_seconds=8)
     session = NativeSession(engine="rust")
     preparation_callbacks = []
+    cancel_thread = None
 
     def execute(current_contract, current_model, current_options, beam, depth,
                 run_dir, devices, *, runtime):
@@ -1009,8 +1025,71 @@ while not (session / "stop").exists():
         assert len(preparation_callbacks) == 4
         assert tuple(changed_geometry.path) == (0,)
         assert graph_contract(5).replay(changed_geometry.path)
+
+        # Hold the live resident ranks inside one request, cancel through the
+        # public session API, and require Rust to stop and reap the whole group.
+        session_dir = tmp_path / "changed-geometry" / "resident-session"
+        assert session_dir.is_dir()
+        (session_dir / "block-next").touch()
+        cancelled_pids = tuple(session._workers.pids)
+        assert len(cancelled_pids) == world and len(set(cancelled_pids)) == world
+        cancellation_outcome = []
+
+        def cancelled_search():
+            try:
+                run("cancelled-search", graph_contract(5))
+            except BaseException as error:
+                cancellation_outcome.append(error)
+            else:
+                cancellation_outcome.append(None)
+
+        cancel_thread = threading.Thread(target=cancelled_search, daemon=True)
+        cancel_thread.start()
+        blocked_paths = [session_dir / f"blocked-{rank}" for rank in range(world)]
+        deadline = time.monotonic() + 5.0
+        while time.monotonic() < deadline and not all(path.is_file() for path in blocked_paths):
+            if not cancel_thread.is_alive():
+                break
+            time.sleep(0.01)
+        assert all(path.is_file() for path in blocked_paths), "not every rank entered the held request"
+        rust_owner = session._workers._owner
+        assert session.cancel() is True
+        cancel_thread.join(timeout=8.0)
+        assert not cancel_thread.is_alive(), "cancelled resident search did not return"
+        assert len(cancellation_outcome) == 1
+        assert isinstance(cancellation_outcome[0], NativeBackendError)
+        assert "cancel" in str(cancellation_outcome[0]).lower()
+        assert session.closed and session._workers is None
+        assert rust_owner.closed is True
+
+        stopped_paths = [session_dir / f"stopped-{rank}" for rank in range(world)]
+        deadline = time.monotonic() + 5.0
+        while time.monotonic() < deadline:
+            alive = [pid for pid in cancelled_pids if _process_exists(pid)]
+            if not alive and all(path.is_file() for path in stopped_paths):
+                break
+            time.sleep(0.01)
+        assert all(path.is_file() for path in stopped_paths), "Rust did not stop every resident rank"
+        assert not [pid for pid in cancelled_pids if _process_exists(pid)], "cancelled rank process was not reaped"
+
+        # Cancellation closes this session. A fresh Rust session must still
+        # start a complete healthy worker group and independently replay its result.
+        session = NativeSession(engine="rust")
+        recovered = run("healthy-after-cancel", graph_contract(5))
+        recovered_metadata = recovered.metadata["persistent_session"]
+        recovered_pids = tuple(recovered_metadata["worker_pids"])
+        assert len(recovered_pids) == world and len(set(recovered_pids)) == world
+        assert not set(recovered_pids).intersection(cancelled_pids)
+        assert recovered_metadata["reused"] is False
+        assert recovered_metadata["request_count"] == 1
+        assert tuple(recovered.path) == (0,) and graph_contract(5).replay(recovered.path)
     finally:
-        session.close()
+        if cancel_thread is not None and cancel_thread.is_alive():
+            session.cancel()
+            cancel_thread.join(timeout=10.0)
+            assert not cancel_thread.is_alive(), "cancellation cleanup left the search thread active"
+        if not session.closed:
+            session.close()
 
 @pytest.mark.skipif(os.name != "posix", reason="the fixture launches a shebang worker")
 @pytest.mark.parametrize("world", [1, 2])

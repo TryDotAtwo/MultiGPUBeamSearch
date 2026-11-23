@@ -1,3 +1,8 @@
+## 2026-11-23 - Verify cancellation of an installed permutation Rust session
+
+- Extended the installed-wheel NativeSession fixture to hold the active resident request, cancel it through the public API, and check coordinated worker shutdown and process reaping at one and two synthetic CPU ranks.
+- The same fixture starts a fresh Rust-owned session after cancellation and independently replays its healthy result. Hosted installed-wheel validation is pending for the commit that adds this check; this does not claim CUDA or NCCL execution.
+
 ## 2026-11-23 - Add public permutation session invalidation coverage
 
 - Added an installed-wheel CPU fixture through `NativeSession.beam_search` for identical-request reuse, model-artifact invalidation, a separate geometry-only change, and independent replay at one and two synthetic ranks.
